@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aufgaben</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2f6fed">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #cfe6fb; --panel: #f2f8fe; --ink: #1d3557; --ink-dim: #4a6c94;
+    --accent: #2f6fed; --accent-2: #ff8a65; --border: #a9cdf0;
+    --overdue-bg: #fde2e1; --overdue-text: #b3261e; --overdue-border: #f5b7b4;
+    --today-bg: #fdead1; --today-text: #935e00; --today-border: #f3cf8e;
+    --reminder-bg: #e4ecfd;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Work Sans", system-ui, sans-serif; min-height: 100vh; }
+  .topbar { display: flex; align-items: baseline; gap: 0.6rem; padding: 1.4rem 1.6rem; border-bottom: 1px solid var(--border); }
+  .brand { font-family: "Fraunces", serif; font-weight: 600; font-size: 1.15rem; }
+  .brand-sub { color: var(--ink-dim); font-size: 0.85rem; }
+  main { max-width: 700px; margin: 0 auto; padding: 2.4rem 1.4rem 4rem; }
+  h1 { font-family: "Fraunces", serif; font-weight: 700; font-size: 2rem; margin: 0 0 0.4rem; }
+  .hero-text { color: var(--ink-dim); margin: 0 0 1.6rem; max-width: 46ch; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+  input, select, button { font-family: "Work Sans", sans-serif; font-size: 0.9rem; }
+  input, select {
+    padding: 0.75rem 0.8rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); color: var(--ink);
+  }
+  input[type="text"] { flex: 1 1 200px; }
+  input[type="number"] { width: 8rem; }
+  .btn-primary {
+    padding: 0.75rem 1.1rem; border: none; border-radius: 8px;
+    background: var(--accent); color: #fff; font-weight: 500; cursor: pointer;
+  }
+  .btn-secondary {
+    padding: 0.6rem 1rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); color: var(--ink); cursor: pointer; font-size: 0.85rem;
+  }
+  .link-btn { background: none; border: none; color: var(--ink-dim); cursor: pointer; padding: 0; font-size: 0.85rem; }
+  .project-heading {
+    font-size: 0.78rem; font-weight: 600; color: var(--ink-dim);
+    text-transform: uppercase; letter-spacing: 0.04em; margin: 1.6rem 0 0.6rem;
+  }
+  .task-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .task {
+    display: flex; align-items: center; gap: 0.7rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem;
+  }
+  .task.ueberfaellig { border-left: 3px solid var(--overdue-text); }
+  .task.heute { border-left: 3px solid var(--accent-2); }
+  .task-check {
+    width: 1.4rem; height: 1.4rem; border-radius: 50%; border: 1.5px solid var(--ink-dim);
+    background: transparent; cursor: pointer; flex-shrink: 0; color: #fff; font-size: 0.75rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .task-check.done { background: var(--accent); border-color: var(--accent); }
+  .task-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+  .task-titel { font-size: 0.95rem; }
+  .task-titel.done { color: var(--ink-dim); text-decoration: line-through; }
+  .task-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .badge {
+    font-size: 0.72rem; padding: 0.12rem 0.5rem; border-radius: 999px;
+    background: var(--bg); color: var(--ink-dim); border: 1px solid var(--border); display: inline-block;
+  }
+  .badge.overdue { background: var(--overdue-bg); color: var(--overdue-text); border-color: var(--overdue-border); }
+  .badge.today { background: var(--today-bg); color: var(--today-text); border-color: var(--today-border); }
+  .badge.reminder { background: var(--reminder-bg); color: var(--accent); }
+  .task-snooze { border: 1px solid var(--border); border-radius: 6px; background: none; color: var(--ink-dim); padding: 0.35rem 0.55rem; cursor: pointer; flex-shrink: 0; }
+  .task-delete { background: none; border: none; color: var(--ink-dim); font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.5rem; flex-shrink: 0; }
+  .empty-text { color: var(--ink-dim); }
+  #login-screen { max-width: 320px; margin: 4rem auto; padding: 0 1.4rem; text-align: center; }
+  #login-screen input { width: 100%; margin-bottom: 0.8rem; }
+  #login-screen button { width: 100%; }
+  #login-error { color: var(--overdue-text); font-size: 0.85rem; margin-top: 0.6rem; min-height: 1.2rem; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+  <div id="login-screen">
+    <h1 style="font-size:1.5rem;">Aufgaben</h1>
+    <p class="hero-text">Passwort eingeben, um deine Aufgaben zu sehen.</p>
+    <input type="password" id="login-pass" placeholder="Passwort">
+    <button class="btn-primary" id="login-btn">Anmelden</button>
+    <div id="login-error"></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="topbar">
+      <span class="brand">Dashboard</span>
+      <span class="brand-sub">Aufgaben</span>
+    </div>
+
+    <main>
+      <h1>Aufgaben</h1>
+      <p class="hero-text">Nach Projekten sortiert, mit Fälligkeit und wiederkehrender Erinnerung.</p>
+
+      <div class="row">
+        <input type="text" id="neue-aufgabe" placeholder="Neue Aufgabe eintragen …">
+        <select id="aufgabe-projekt"><option value="">Ohne Projekt</option></select>
+        <input type="date" id="aufgabe-faellig" title="Fälligkeitsdatum (optional)">
+        <input type="number" id="aufgabe-intervall" min="1" placeholder="alle X Tage" title="Wiederkehrende Erinnerung">
+        <button class="btn-primary" id="btn-hinzufuegen">Hinzufügen</button>
+      </div>
+
+      <div style="margin-bottom:1.8rem;">
+        <button class="link-btn" id="toggle-projekt-form">▸ Neues Projekt anlegen</button>
+        <div class="row hidden" id="projekt-form" style="margin-top:0.5rem;">
+          <input type="text" id="neues-projekt" placeholder="Projektname">
+          <button class="btn-secondary" id="btn-projekt-anlegen">Anlegen</button>
+        </div>
+      </div>
+
+      <div id="listen-bereich"></div>
+
+      <div id="erledigt-bereich" style="margin-top:1.8rem;"></div>
+    </main>
+  </div>
+
+<script>
+  // ==========================================================
+  // WICHTIG: Diese URL nach dem Deployment der Edge Function
+  // aus dem Supabase-Dashboard eintragen (siehe SETUP.md).
+  // Beispiel: https://xxxxxxxx.supabase.co/functions/v1/aufgaben-api
+  // ==========================================================
+  const API_URL = "https://juxoxltaeugsmtvirfcm.supabase.co/functions/v1/quick-endpoint";
+
+  let pass = localStorage.getItem("aufgaben-pass") || "";
+  let projekte = [];
+  let aufgaben = [];
+
+  async function api(action, extra = {}) {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, pass, ...extra }),
+    });
+    if (res.status === 401) {
+      localStorage.removeItem("aufgaben-pass");
+      zeigeLogin("Passwort falsch oder abgelaufen.");
+      throw new Error("unauthorized");
+    }
+    if (!res.ok) throw new Error("Serverfehler");
+    return res.json();
+  }
+
+  function zeigeLogin(fehler) {
+    document.getElementById("app").classList.add("hidden");
+    document.getElementById("login-screen").classList.remove("hidden");
+    document.getElementById("login-error").textContent = fehler || "";
+  }
+
+  function zeigeApp() {
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+  }
+
+  document.getElementById("login-btn").addEventListener("click", anmelden);
+  document.getElementById("login-pass").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") anmelden();
+  });
+
+  async function anmelden() {
+    pass = document.getElementById("login-pass").value;
+    try {
+      await ladeDaten();
+      localStorage.setItem("aufgaben-pass", pass);
+      zeigeApp();
+    } catch (e) {
+      // Fehlermeldung wurde schon in api() gesetzt
+    }
+  }
+
+  function heuteISO() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function addTage(datumISO, tage) {
+    const d = new Date(datumISO + "T00:00:00");
+    d.setDate(d.getDate() + tage);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function enrich(a) {
+    const heute = heuteISO();
+    let status = "normal";
+    if (a.faellig_am) {
+      if (a.faellig_am < heute) status = "ueberfaellig";
+      else if (a.faellig_am === heute) status = "heute";
+    }
+    const erinnerungFaellig = !!(a.naechste_erinnerung && a.naechste_erinnerung <= heute);
+    return { ...a, status, erinnerungFaellig };
+  }
+
+  async function ladeDaten() {
+    const data = await api("liste");
+    projekte = data.projekte || [];
+    aufgaben = data.aufgaben || [];
+    render();
+  }
+
+  function badgeHtml(cls, text) {
+    return `<span class="badge ${cls}">${text}</span>`;
+  }
+
+  function taskHtml(a, done) {
+    const projekt = projekte.find((p) => p.id === a.projekt_id);
+    let meta = "";
+    if (done && projekt) meta += badgeHtml("", projekt.name);
+    if (!done && a.faellig_am) {
+      if (a.status === "ueberfaellig") meta += badgeHtml("overdue", "überfällig · " + a.faellig_am);
+      else if (a.status === "heute") meta += badgeHtml("today", "heute fällig");
+      else meta += badgeHtml("", "fällig " + a.faellig_am);
+    }
+    if (!done && a.erinnere_alle_tage) meta += badgeHtml("reminder", "alle " + a.erinnere_alle_tage + " Tage");
+
+    const snoozeBtn = !done && a.erinnerungFaellig
+      ? `<button class="task-snooze" onclick="erinnerungVerschieben('${a.id}')" title="Später erneut erinnern">↻</button>`
+      : "";
+
+    return `
+      <div class="task ${!done ? a.status : ""}">
+        <button class="task-check ${done ? "done" : ""}" onclick="umschalten('${a.id}')">${done ? "✓" : ""}</button>
+        <div class="task-info">
+          <span class="task-titel ${done ? "done" : ""}">${escapeHtml(a.titel)}</span>
+          <div class="task-meta">${meta}</div>
+        </div>
+        ${snoozeBtn}
+        <button class="task-delete" onclick="loeschen('${a.id}')">×</button>
+      </div>`;
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function render() {
+    const select = document.getElementById("aufgabe-projekt");
+    select.innerHTML = '<option value="">Ohne Projekt</option>' +
+      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+
+    const offen = aufgaben.filter((a) => !a.erledigt).map(enrich);
+    const erledigt = aufgaben.filter((a) => a.erledigt);
+
+    const sortiere = (liste) => [...liste].sort((a, b) => {
+      const ad = a.faellig_am || "9999-99-99";
+      const bd = b.faellig_am || "9999-99-99";
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      return b.erstellt_am < a.erstellt_am ? -1 : 1;
+    });
+
+    const ohneProjekt = sortiere(offen.filter((a) => !a.projekt_id));
+    const gruppen = projekte
+      .map((p) => ({ projekt: p, liste: sortiere(offen.filter((a) => a.projekt_id === p.id)) }))
+      .filter((g) => g.liste.length > 0);
+
+    let html = "";
+    if (ohneProjekt.length > 0) {
+      html += `<div class="project-heading">Ohne Projekt</div><div class="task-list">${ohneProjekt.map((a) => taskHtml(a, false)).join("")}</div>`;
+    }
+    for (const g of gruppen) {
+      html += `<div class="project-heading">${escapeHtml(g.projekt.name)}</div><div class="task-list">${g.liste.map((a) => taskHtml(a, false)).join("")}</div>`;
+    }
+    if (ohneProjekt.length === 0 && gruppen.length === 0) {
+      html = '<p class="empty-text">Keine offenen Aufgaben — gut gemacht.</p>';
+    }
+    document.getElementById("listen-bereich").innerHTML = html;
+
+    const erledigtBereich = document.getElementById("erledigt-bereich");
+    if (erledigt.length > 0) {
+      erledigtBereich.innerHTML = `
+        <button class="link-btn" id="toggle-erledigt">▸ Erledigt (${erledigt.length})</button>
+        <div class="task-list hidden" id="erledigt-liste" style="margin-top:0.6rem;">
+          ${erledigt.map((a) => taskHtml(a, true)).join("")}
+        </div>`;
+      document.getElementById("toggle-erledigt").addEventListener("click", (e) => {
+        const liste = document.getElementById("erledigt-liste");
+        liste.classList.toggle("hidden");
+        e.target.textContent = (liste.classList.contains("hidden") ? "▸" : "▾") + ` Erledigt (${erledigt.length})`;
+      });
+    } else {
+      erledigtBereich.innerHTML = "";
+    }
+  }
+
+  document.getElementById("btn-hinzufuegen").addEventListener("click", aufgabeHinzufuegen);
+  document.getElementById("neue-aufgabe").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") aufgabeHinzufuegen();
+  });
+
+  async function aufgabeHinzufuegen() {
+    const titel = document.getElementById("neue-aufgabe").value.trim();
+    if (!titel) return;
+    const projekt_id = document.getElementById("aufgabe-projekt").value || null;
+    const faellig_am = document.getElementById("aufgabe-faellig").value || null;
+    const erinnere_alle_tage = document.getElementById("aufgabe-intervall").value || null;
+
+    await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am, erinnere_alle_tage });
+    document.getElementById("neue-aufgabe").value = "";
+    document.getElementById("aufgabe-faellig").value = "";
+    document.getElementById("aufgabe-intervall").value = "";
+    await ladeDaten();
+  }
+
+  document.getElementById("toggle-projekt-form").addEventListener("click", (e) => {
+    const form = document.getElementById("projekt-form");
+    form.classList.toggle("hidden");
+    e.target.textContent = (form.classList.contains("hidden") ? "▸" : "▾") + " Neues Projekt anlegen";
+  });
+
+  document.getElementById("btn-projekt-anlegen").addEventListener("click", projektAnlegen);
+  document.getElementById("neues-projekt").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") projektAnlegen();
+  });
+
+  async function projektAnlegen() {
+    const name = document.getElementById("neues-projekt").value.trim();
+    if (!name) return;
+    await api("projekt_hinzufuegen", { name });
+    document.getElementById("neues-projekt").value = "";
+    await ladeDaten();
+  }
+
+  async function umschalten(id) {
+    await api("aufgabe_umschalten", { id });
+    await ladeDaten();
+  }
+
+  async function loeschen(id) {
+    await api("aufgabe_loeschen", { id });
+    await ladeDaten();
+  }
+
+  async function erinnerungVerschieben(id) {
+    await api("erinnerung_verschieben", { id });
+    await ladeDaten();
+  }
+
+  // Beim Start: automatisch anmelden, falls Passwort schon gespeichert
+  (async function init() {
+    if (pass) {
+      try {
+        await ladeDaten();
+        zeigeApp();
+        return;
+      } catch (e) {
+        // Passwort ungültig geworden -> Login zeigen
+      }
+    }
+    zeigeLogin();
+  })();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+</script>
+</body>
+</html>
