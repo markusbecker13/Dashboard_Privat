@@ -78,6 +78,44 @@
   #login-screen button { width: 100%; }
   #login-error { color: var(--overdue-text); font-size: 0.85rem; margin-top: 0.6rem; min-height: 1.2rem; }
   .hidden { display: none !important; }
+
+  .tabs { display: flex; gap: 0.4rem; margin-bottom: 1.6rem; border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    background: none; border: none; padding: 0.7rem 0.2rem; margin-right: 1.2rem;
+    font-size: 0.95rem; color: var(--ink-dim); cursor: pointer; border-bottom: 2px solid transparent;
+  }
+  .tab-btn.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 500; }
+
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .cal-header h2 { font-family: "Fraunces", serif; font-size: 1.2rem; margin: 0; }
+  .cal-nav button {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    width: 2rem; height: 2rem; cursor: pointer; color: var(--ink); font-size: 1rem;
+  }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.3rem; margin-bottom: 1.6rem; }
+  .cal-daylabel { text-align: center; font-size: 0.72rem; color: var(--ink-dim); padding-bottom: 0.3rem; }
+  .cal-day {
+    aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--border); background: var(--panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 0.85rem; color: var(--ink); position: relative; gap: 0.15rem;
+  }
+  .cal-day.empty { border: none; background: none; cursor: default; }
+  .cal-day.today { border-color: var(--accent); border-width: 2px; }
+  .cal-day.selected { background: var(--accent); color: #fff; }
+  .cal-day .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-2); }
+  .cal-day.selected .dot { background: #fff; }
+  .cal-day-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .cal-day-panel h3 { font-family: "Fraunces", serif; font-size: 1rem; margin: 0 0 0.8rem; }
+  .termin-item { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+  .termin-item:last-of-type { border-bottom: none; }
+  .termin-zeit { color: var(--ink-dim); font-size: 0.82rem; min-width: 3.2rem; }
+  .termin-titel { flex: 1; font-size: 0.92rem; }
+  .termin-notiz { color: var(--ink-dim); font-size: 0.8rem; display: block; }
+  .termin-form { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
+  .termin-form input[type="text"] { flex: 1 1 160px; }
+  .upcoming-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.6rem; }
+  .upcoming-item { display: flex; gap: 0.6rem; align-items: baseline; font-size: 0.9rem; }
+  .upcoming-datum { color: var(--accent); font-weight: 500; min-width: 4.2rem; font-size: 0.82rem; }
 </style>
 </head>
 <body>
@@ -97,6 +135,12 @@
     </div>
 
     <main>
+      <div class="tabs">
+        <button class="tab-btn active" id="tab-aufgaben">Aufgaben</button>
+        <button class="tab-btn" id="tab-kalender">Kalender</button>
+      </div>
+
+      <div id="view-aufgaben">
       <h1>Aufgaben</h1>
       <p class="hero-text">Nach Projekten sortiert, mit Fälligkeit und wiederkehrender Erinnerung.</p>
 
@@ -119,6 +163,23 @@
       <div id="listen-bereich"></div>
 
       <div id="erledigt-bereich" style="margin-top:1.8rem;"></div>
+      </div>
+
+      <div id="view-kalender" class="hidden">
+        <h1>Kalender</h1>
+        <p class="hero-text">Termine eintragen und im Monatsüberblick behalten.</p>
+
+        <div id="upcoming-bereich"></div>
+
+        <div class="cal-header">
+          <div class="cal-nav"><button id="cal-prev">‹</button></div>
+          <h2 id="cal-monat-label"></h2>
+          <div class="cal-nav"><button id="cal-next">›</button></div>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+
+        <div id="cal-day-panel"></div>
+      </div>
     </main>
   </div>
 
@@ -133,6 +194,9 @@
   let pass = localStorage.getItem("aufgaben-pass") || "";
   let projekte = [];
   let aufgaben = [];
+  let termine = [];
+  let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
+  let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
 
   async function api(action, extra = {}) {
     const res = await fetch(API_URL, {
@@ -201,7 +265,9 @@
     const data = await api("liste");
     projekte = data.projekte || [];
     aufgaben = data.aufgaben || [];
+    termine = data.termine || [];
     render();
+    renderKalender();
   }
 
   function badgeHtml(cls, text) {
@@ -360,6 +426,160 @@
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
+
+  // ==========================================================
+  // Tabs
+  // ==========================================================
+  document.getElementById("tab-aufgaben").addEventListener("click", () => {
+    document.getElementById("tab-aufgaben").classList.add("active");
+    document.getElementById("tab-kalender").classList.remove("active");
+    document.getElementById("view-aufgaben").classList.remove("hidden");
+    document.getElementById("view-kalender").classList.add("hidden");
+  });
+  document.getElementById("tab-kalender").addEventListener("click", () => {
+    document.getElementById("tab-kalender").classList.add("active");
+    document.getElementById("tab-aufgaben").classList.remove("active");
+    document.getElementById("view-kalender").classList.remove("hidden");
+    document.getElementById("view-aufgaben").classList.add("hidden");
+    renderKalender();
+  });
+
+  // ==========================================================
+  // Kalender
+  // ==========================================================
+  const MONATSNAMEN = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+  const TAGLABEL = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+
+  function dateToISO(d) {
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+
+  function termineAmTag(isoDatum) {
+    return termine.filter((t) => t.datum === isoDatum).sort((a,b) => (a.uhrzeit||"99:99").localeCompare(b.uhrzeit||"99:99"));
+  }
+
+  document.getElementById("cal-prev").addEventListener("click", () => {
+    calMonat.setMonth(calMonat.getMonth() - 1);
+    renderKalender();
+  });
+  document.getElementById("cal-next").addEventListener("click", () => {
+    calMonat.setMonth(calMonat.getMonth() + 1);
+    renderKalender();
+  });
+
+  function renderKalender() {
+    document.getElementById("cal-monat-label").textContent =
+      MONATSNAMEN[calMonat.getMonth()] + " " + calMonat.getFullYear();
+
+    const jahr = calMonat.getFullYear();
+    const monat = calMonat.getMonth();
+    const ersterTag = new Date(jahr, monat, 1);
+    const anzahlTage = new Date(jahr, monat + 1, 0).getDate();
+    // Montag = 0 ... Sonntag = 6
+    const startOffset = (ersterTag.getDay() + 6) % 7;
+    const heuteIso = dateToISO(new Date());
+
+    let html = TAGLABEL.map((l) => `<div class="cal-daylabel">${l}</div>`).join("");
+    for (let i = 0; i < startOffset; i++) html += `<div class="cal-day empty"></div>`;
+
+    for (let tag = 1; tag <= anzahlTage; tag++) {
+      const iso = dateToISO(new Date(jahr, monat, tag));
+      const anzahl = termineAmTag(iso).length;
+      const classes = ["cal-day"];
+      if (iso === heuteIso) classes.push("today");
+      if (iso === calAusgewaehlterTag) classes.push("selected");
+      html += `<div class="${classes.join(" ")}" onclick="calTagAuswaehlen('${iso}')">
+        <span>${tag}</span>
+        ${anzahl > 0 ? '<span class="dot"></span>' : ""}
+      </div>`;
+    }
+    document.getElementById("cal-grid").innerHTML = html;
+
+    renderUpcoming();
+    renderCalDayPanel();
+  }
+
+  function renderUpcoming() {
+    const heuteIso = dateToISO(new Date());
+    const kommende = termine
+      .filter((t) => t.datum >= heuteIso)
+      .sort((a,b) => (a.datum + (a.uhrzeit||"99:99")).localeCompare(b.datum + (b.uhrzeit||"99:99")))
+      .slice(0, 5);
+
+    if (kommende.length === 0) {
+      document.getElementById("upcoming-bereich").innerHTML = "";
+      return;
+    }
+    const html = kommende.map((t) => `
+      <div class="upcoming-item">
+        <span class="upcoming-datum">${formatDatumKurz(t.datum)}${t.uhrzeit ? " · " + t.uhrzeit.slice(0,5) : ""}</span>
+        <span>${escapeHtml(t.titel)}</span>
+      </div>`).join("");
+    document.getElementById("upcoming-bereich").innerHTML =
+      `<div class="project-heading">Nächste Termine</div><div class="upcoming-list">${html}</div>`;
+  }
+
+  function formatDatumKurz(iso) {
+    const [j,m,t] = iso.split("-");
+    return t + "." + m + ".";
+  }
+
+  window.calTagAuswaehlen = function(iso) {
+    calAusgewaehlterTag = (calAusgewaehlterTag === iso) ? null : iso;
+    renderKalender();
+  };
+
+  function renderCalDayPanel() {
+    const panel = document.getElementById("cal-day-panel");
+    if (!calAusgewaehlterTag) { panel.innerHTML = ""; return; }
+
+    const liste = termineAmTag(calAusgewaehlterTag);
+    const [j,m,t] = calAusgewaehlterTag.split("-");
+    const titel = `${t}. ${MONATSNAMEN[parseInt(m,10)-1]} ${j}`;
+
+    const itemsHtml = liste.length === 0
+      ? `<p class="empty-text" style="margin:0 0 0.6rem;">Noch keine Termine an diesem Tag.</p>`
+      : liste.map((t) => `
+          <div class="termin-item">
+            <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) : ""}</span>
+            <span class="termin-titel">${escapeHtml(t.titel)}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
+            <button class="task-delete" onclick="terminLoeschen('${t.id}')">×</button>
+          </div>`).join("");
+
+    panel.innerHTML = `
+      <div class="cal-day-panel">
+        <h3>${titel}</h3>
+        ${itemsHtml}
+        <div class="termin-form">
+          <input type="text" id="termin-titel" placeholder="Titel">
+          <input type="time" id="termin-uhrzeit" style="width:8rem;">
+          <input type="text" id="termin-notiz" placeholder="Notiz (optional)">
+          <button class="btn-primary" id="btn-termin-hinzufuegen">Eintragen</button>
+        </div>
+      </div>`;
+
+    document.getElementById("btn-termin-hinzufuegen").addEventListener("click", terminHinzufuegen);
+    document.getElementById("termin-titel").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") terminHinzufuegen();
+    });
+  }
+
+  async function terminHinzufuegen() {
+    const titel = document.getElementById("termin-titel").value.trim();
+    if (!titel || !calAusgewaehlterTag) return;
+    const uhrzeit = document.getElementById("termin-uhrzeit").value || null;
+    const notiz = document.getElementById("termin-notiz").value.trim() || null;
+
+    await api("termin_hinzufuegen", { titel, datum: calAusgewaehlterTag, uhrzeit, notiz });
+    await ladeDaten();
+    renderKalender();
+  }
+
+  window.terminLoeschen = async function(id) {
+    await api("termin_loeschen", { id });
+    await ladeDaten();
+    renderKalender();
+  };
 </script>
 </body>
 </html>
