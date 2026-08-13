@@ -178,6 +178,15 @@
     background: var(--bg); color: var(--ink); cursor: pointer; font-size: 0.85rem;
   }
   .export-buttons button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .verlauf-item {
+    display: flex; align-items: baseline; gap: 0.7rem; padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border); font-size: 0.9rem;
+  }
+  .verlauf-item:last-child { border-bottom: none; }
+  .verlauf-zeit { color: var(--ink-dim); font-size: 0.78rem; min-width: 7rem; flex-shrink: 0; }
+  .verlauf-text { flex: 1; }
+  .verlauf-kategorie { color: var(--accent); font-weight: 500; }
 </style>
 </head>
 <body>
@@ -206,6 +215,8 @@
         <button class="tab-btn" id="tab-links">Links</button>
         <button class="tab-btn" id="tab-reflexion">Reflexion</button>
         <button class="tab-btn" id="tab-export">Export</button>
+        <button class="tab-btn" id="tab-einkauf">Einkauf</button>
+        <button class="tab-btn" id="tab-verlauf">Verlauf</button>
       </div>
 
       <div id="view-heute">
@@ -303,6 +314,25 @@
         <p class="hero-text">Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen.</p>
         <div id="export-liste"></div>
       </div>
+
+      <div id="view-einkauf" class="hidden">
+        <h1>Einkaufsliste</h1>
+        <p class="hero-text">Was besorgt werden muss – abhaken statt vergessen.</p>
+
+        <div class="row">
+          <input type="text" id="neuer-einkauf" placeholder="Artikel eintragen …">
+          <button class="btn-primary" id="btn-einkauf-hinzufuegen">Hinzufügen</button>
+        </div>
+
+        <div id="einkauf-bereich"></div>
+      </div>
+
+      <div id="view-verlauf" class="hidden">
+        <h1>Verlauf</h1>
+        <p class="hero-text">Die letzten 50 Aktivitäten im Dashboard, neueste zuerst.</p>
+
+        <div id="verlauf-bereich"></div>
+      </div>
     </main>
   </div>
 
@@ -321,6 +351,8 @@
   let notizen = [];
   let links = [];
   let reflexionen = [];
+  let einkaufsliste = [];
+  let verlauf = [];
   let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
   let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
 
@@ -402,6 +434,8 @@
     notizen = data.notizen || [];
     links = data.links || [];
     reflexionen = data.reflexionen || [];
+    einkaufsliste = data.einkaufsliste || [];
+    verlauf = data.verlauf || [];
     render();
     renderKalender();
     renderHeute();
@@ -409,6 +443,8 @@
     renderLinks();
     renderReflexionen();
     renderExport();
+    renderEinkauf();
+    renderVerlauf();
   }
 
   function badgeHtml(cls, text) {
@@ -591,8 +627,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -607,6 +643,8 @@
   document.getElementById("tab-links").addEventListener("click", () => tabWechseln("links"));
   document.getElementById("tab-reflexion").addEventListener("click", () => tabWechseln("reflexion"));
   document.getElementById("tab-export").addEventListener("click", () => tabWechseln("export"));
+  document.getElementById("tab-einkauf").addEventListener("click", () => tabWechseln("einkauf"));
+  document.getElementById("tab-verlauf").addEventListener("click", () => tabWechseln("verlauf"));
 
   function renderHeute() {
     const heuteIso = heuteISO();
@@ -1086,6 +1124,82 @@
     }
     document.getElementById("export-liste").innerHTML = html;
   }
+
+  // ==========================================================
+  // Einkaufsliste
+  // ==========================================================
+  function renderEinkauf() {
+    const offen = einkaufsliste.filter((e) => !e.erledigt);
+    const erledigt = einkaufsliste.filter((e) => e.erledigt);
+
+    let html = "";
+    if (offen.length === 0 && erledigt.length === 0) {
+      html = '<p class="empty-text">Nichts auf der Liste.</p>';
+    } else {
+      html += '<div class="task-list">' + offen.map((e) => `
+        <div class="task">
+          <button class="task-check" onclick="einkaufUmschalten('${e.id}')"></button>
+          <div class="task-info"><span class="task-titel">${escapeHtml(e.text)}</span></div>
+          <button class="task-delete" onclick="einkaufLoeschen('${e.id}')">×</button>
+        </div>`).join("") + '</div>';
+
+      if (erledigt.length > 0) {
+        html += `<div class="project-heading" style="margin-top:1.4rem;">Erledigt (${erledigt.length})</div><div class="task-list">` +
+          erledigt.map((e) => `
+            <div class="task">
+              <button class="task-check done" onclick="einkaufUmschalten('${e.id}')">✓</button>
+              <div class="task-info"><span class="task-titel done">${escapeHtml(e.text)}</span></div>
+              <button class="task-delete" onclick="einkaufLoeschen('${e.id}')">×</button>
+            </div>`).join("") + '</div>';
+      }
+    }
+    document.getElementById("einkauf-bereich").innerHTML = html;
+  }
+
+  document.getElementById("btn-einkauf-hinzufuegen").addEventListener("click", einkaufHinzufuegen);
+  document.getElementById("neuer-einkauf").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") einkaufHinzufuegen();
+  });
+
+  async function einkaufHinzufuegen() {
+    const text = document.getElementById("neuer-einkauf").value.trim();
+    if (!text) return;
+    await api("einkauf_hinzufuegen", { text });
+    document.getElementById("neuer-einkauf").value = "";
+    await ladeDaten();
+  }
+
+  window.einkaufUmschalten = async function(id) {
+    await api("einkauf_umschalten", { id });
+    await ladeDaten();
+  };
+
+  window.einkaufLoeschen = async function(id) {
+    await api("einkauf_loeschen", { id });
+    await ladeDaten();
+  };
+
+  // ==========================================================
+  // Verlauf
+  // ==========================================================
+  function renderVerlauf() {
+    const bereich = document.getElementById("verlauf-bereich");
+    if (verlauf.length === 0) {
+      bereich.innerHTML = '<p class="empty-text">Noch keine Aktivitäten aufgezeichnet.</p>';
+      return;
+    }
+    bereich.innerHTML = verlauf.map((v) => {
+      const dt = new Date(v.erstellt_am);
+      const zeit = dt.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }) + " · " +
+        dt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+      return `
+        <div class="verlauf-item">
+          <span class="verlauf-zeit">${zeit}</span>
+          <span class="verlauf-text"><span class="verlauf-kategorie">${escapeHtml(v.kategorie)}</span> ${escapeHtml(v.aktion)}${v.beschreibung ? ": " + escapeHtml(v.beschreibung) : ""}</span>
+        </div>`;
+    }).join("");
+  }
+
 </script>
 </body>
 </html>
