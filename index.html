@@ -371,7 +371,7 @@
 
       <div id="view-frei" class="hidden">
         <h1>Frei</h1>
-        <p class="hero-text">Freie Zeiten an einem Tag – berechnet aus Terminen, Blockzeiten und deinem Zeitrahmen für diesen Wochentag.</p>
+        <p class="hero-text">Freie Zeiten an einem Tag – berechnet aus Terminen, Aufgaben mit Uhrzeit, Blockzeiten und deinem Zeitrahmen für diesen Wochentag.</p>
 
         <div class="cal-header">
           <div class="cal-nav"><button id="frei-prev">‹</button></div>
@@ -1246,13 +1246,15 @@
   // ==========================================================
   // Frei – Zeitleiste mit Lücken-Berechnung
   //
-  // Annahmen (falls du das anders willst, sag Bescheid):
-  // - Nur Termine MIT Uhrzeit blockieren Zeit. Termine ohne Uhrzeit
-  //   ("ganztägig") tauchen hier nicht als Block auf.
-  // - Termine ohne Endzeit blockieren pauschal 30 Minuten ab Beginn.
-  // - Ist für einen Wochentag noch kein Zeitrahmen gespeichert,
-  //   wird 08:00–20:00 als Vorschlag angezeigt (erst gültig, wenn
-  //   du auf "Speichern" tippst).
+  // Was blockiert Zeit:
+  // - Termine MIT Uhrzeit (ganztägige Termine ohne Uhrzeit nicht)
+  // - offene Aufgaben MIT Uhrzeit (erledigte nicht)
+  // - Blockzeiten (wiederkehrend oder einmalig)
+  // Fehlt bei einem Termin/einer Aufgabe die Endzeit, werden
+  // pauschal 30 Minuten ab Beginn blockiert.
+  // Ist für einen Wochentag noch kein Zeitrahmen gespeichert,
+  // wird 08:00–20:00 als Vorschlag angezeigt (erst gültig, wenn
+  // du auf "Speichern" tippst).
   // ==========================================================
   const WOCHENTAGSNAMEN = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
   let freiTag = new Date();
@@ -1311,6 +1313,12 @@
       const start = t.uhrzeit.slice(0,5);
       const ende = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0,5) : minutenZuZeit(zeitZuMinuten(start) + 30);
       bloecke.push({ start, ende, titel: t.titel, typ: "Termin", id: t.id });
+    });
+
+    aufgaben.filter((a) => !a.erledigt && a.faellig_am === tagIso && a.uhrzeit).forEach((a) => {
+      const start = a.uhrzeit.slice(0,5);
+      const ende = a.ende_uhrzeit ? a.ende_uhrzeit.slice(0,5) : minutenZuZeit(zeitZuMinuten(start) + 30);
+      bloecke.push({ start, ende, titel: a.titel, typ: "Aufgabe", id: a.id });
     });
 
     blockzeiten.forEach((b) => {
