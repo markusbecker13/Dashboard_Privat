@@ -928,6 +928,28 @@
         `</div>`;
     }
 
+    const jetztMinuten = (() => { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); })();
+    const heuteWtIndex = wochentagIndex(new Date());
+    const heuteRahmen = freiRahmenFuerWochentag(heuteWtIndex);
+    let freiHeuteListe = [];
+    if (heuteRahmen.aktiv) {
+      const heuteBloecke = freiBusyBloecke(heuteIso, heuteWtIndex);
+      const heuteLuecken = freiLueckenBerechnen(heuteRahmen.start_zeit, heuteRahmen.end_zeit, heuteBloecke);
+      freiHeuteListe = heuteLuecken
+        .map((l) => ({ start: minutenZuZeit(Math.max(zeitZuMinuten(l.start), jetztMinuten)), ende: l.ende }))
+        .filter((l) => zeitZuMinuten(l.ende) > jetztMinuten)
+        .slice(0, 3);
+    }
+
+    if (freiHeuteListe.length > 0) {
+      html += `<div class="project-heading" style="margin-top:1.6rem;">Frei heute</div><div class="upcoming-list">` +
+        freiHeuteListe.map((l) => `
+          <div class="upcoming-item" style="cursor:pointer;" onclick="heuteFreiOeffnen()">
+            <span class="upcoming-datum">${l.start}–${l.ende}</span>
+          </div>`).join("") +
+        `</div>`;
+    }
+
     document.getElementById("heute-bereich").innerHTML = html;
   }
 
@@ -2075,6 +2097,11 @@
     if (!text) return;
     await api("ziel_schritt_hinzufuegen", { ziel_id: zielId, text });
     await ladeDaten();
+  };
+
+  window.heuteFreiOeffnen = function() {
+    freiTag = new Date();
+    tabWechseln("frei");
   };
 
   window.zielKachelKlick = function(id) {
