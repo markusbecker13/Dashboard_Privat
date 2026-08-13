@@ -654,6 +654,7 @@
     const termineHeute = termine
       .filter((t) => t.datum === heuteIso)
       .sort((a, b) => (a.uhrzeit || "99:99").localeCompare(b.uhrzeit || "99:99"));
+    const einkaufOffen = einkaufsliste.filter((e) => !e.erledigt);
 
     let html = "";
 
@@ -675,7 +676,17 @@
       html += `<div class="project-heading" style="margin-top:1.6rem;">Erinnerungen</div><div class="task-list">${erinnerungenHeute.map((a) => taskHtml(a, false)).join("")}</div>`;
     }
 
-    if (termineHeute.length === 0 && faelligHeute.length === 0 && erinnerungenHeute.length === 0) {
+    if (einkaufOffen.length > 0) {
+      html += `<div class="project-heading" style="margin-top:1.6rem;">Einkaufsliste</div><div class="task-list">` +
+        einkaufOffen.map((e) => `
+          <div class="task">
+            <button class="task-check" onclick="einkaufUmschalten('${e.id}')"></button>
+            <div class="task-info"><span class="task-titel">${escapeHtml(e.text)}</span></div>
+          </div>`).join("") +
+        `</div>`;
+    }
+
+    if (termineHeute.length === 0 && faelligHeute.length === 0 && erinnerungenHeute.length === 0 && einkaufOffen.length === 0) {
       html = '<p class="empty-text">Nichts Dringendes für heute — guter Tag.</p>';
     }
 
