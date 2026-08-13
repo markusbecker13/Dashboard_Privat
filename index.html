@@ -123,6 +123,14 @@
   .upcoming-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.6rem; }
   .upcoming-item { display: flex; gap: 0.6rem; align-items: baseline; font-size: 0.9rem; }
   .upcoming-datum { color: var(--accent); font-weight: 500; min-width: 4.2rem; font-size: 0.82rem; }
+
+  .notiz-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .notiz-item {
+    display: flex; align-items: flex-start; gap: 0.7rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem;
+  }
+  .notiz-text { flex: 1; font-size: 0.92rem; white-space: pre-wrap; }
+  .notiz-meta { display: block; color: var(--ink-dim); font-size: 0.75rem; margin-top: 0.3rem; }
 </style>
 </head>
 <body>
@@ -147,6 +155,7 @@
         <button class="tab-btn active" id="tab-heute">Heute</button>
         <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
         <button class="tab-btn" id="tab-kalender">Kalender</button>
+        <button class="tab-btn" id="tab-notizen">Notizen</button>
       </div>
 
       <div id="view-heute">
@@ -195,6 +204,19 @@
 
         <div id="cal-day-panel"></div>
       </div>
+
+      <div id="view-notizen" class="hidden">
+        <h1>Notizen</h1>
+        <p class="hero-text">Schnell rein, schnell wieder raus – für spontane Ideen und Gedanken.</p>
+
+        <div class="row">
+          <input type="text" id="neue-notiz" placeholder="Notiz eintragen …">
+          <select id="notiz-projekt"><option value="">Ohne Projekt</option></select>
+          <button class="btn-primary" id="btn-notiz-hinzufuegen">Speichern</button>
+        </div>
+
+        <div id="notizen-bereich"></div>
+      </div>
     </main>
   </div>
 
@@ -210,6 +232,7 @@
   let projekte = [];
   let aufgaben = [];
   let termine = [];
+  let notizen = [];
   let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
   let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
 
@@ -288,9 +311,11 @@
     projekte = data.projekte || [];
     aufgaben = data.aufgaben || [];
     termine = data.termine || [];
+    notizen = data.notizen || [];
     render();
     renderKalender();
     renderHeute();
+    renderNotizen();
   }
 
   function badgeHtml(cls, text) {
@@ -467,8 +492,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -479,6 +504,7 @@
   document.getElementById("tab-heute").addEventListener("click", () => tabWechseln("heute"));
   document.getElementById("tab-aufgaben").addEventListener("click", () => tabWechseln("aufgaben"));
   document.getElementById("tab-kalender").addEventListener("click", () => tabWechseln("kalender"));
+  document.getElementById("tab-notizen").addEventListener("click", () => tabWechseln("notizen"));
 
   function renderHeute() {
     const heuteIso = heuteISO();
@@ -651,6 +677,53 @@
     await api("termin_loeschen", { id });
     await ladeDaten();
     renderKalender();
+  };
+
+  // ==========================================================
+  // Notizen
+  // ==========================================================
+  function renderNotizen() {
+    const select = document.getElementById("notiz-projekt");
+    select.innerHTML = '<option value="">Ohne Projekt</option>' +
+      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+
+    const bereich = document.getElementById("notizen-bereich");
+    if (notizen.length === 0) {
+      bereich.innerHTML = '<p class="empty-text">Noch keine Notizen.</p>';
+      return;
+    }
+    const html = notizen.map((n) => {
+      const projekt = projekte.find((p) => p.id === n.projekt_id);
+      const datum = new Date(n.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+      return `
+        <div class="notiz-item">
+          <div style="flex:1;">
+            <span class="notiz-text">${escapeHtml(n.text)}</span>
+            <span class="notiz-meta">${datum}${projekt ? " · " + escapeHtml(projekt.name) : ""}</span>
+          </div>
+          <button class="task-delete" onclick="notizLoeschen('${n.id}')">×</button>
+        </div>`;
+    }).join("");
+    bereich.innerHTML = `<div class="notiz-list">${html}</div>`;
+  }
+
+  document.getElementById("btn-notiz-hinzufuegen").addEventListener("click", notizHinzufuegen);
+  document.getElementById("neue-notiz").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") notizHinzufuegen();
+  });
+
+  async function notizHinzufuegen() {
+    const text = document.getElementById("neue-notiz").value.trim();
+    if (!text) return;
+    const projekt_id = document.getElementById("notiz-projekt").value || null;
+    await api("notiz_hinzufuegen", { text, projekt_id });
+    document.getElementById("neue-notiz").value = "";
+    await ladeDaten();
+  }
+
+  window.notizLoeschen = async function(id) {
+    await api("notiz_loeschen", { id });
+    await ladeDaten();
   };
 </script>
 </body>
