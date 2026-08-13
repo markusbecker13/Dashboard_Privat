@@ -132,6 +132,7 @@
     <div class="topbar">
       <span class="brand">Dashboard</span>
       <span class="brand-sub">Aufgaben</span>
+      <button id="btn-abmelden" class="link-btn" style="margin-left:auto;">Abmelden</button>
     </div>
 
     <main>
@@ -227,6 +228,13 @@
   document.getElementById("login-btn").addEventListener("click", anmelden);
   document.getElementById("login-pass").addEventListener("keydown", (e) => {
     if (e.key === "Enter") anmelden();
+  });
+
+  document.getElementById("btn-abmelden").addEventListener("click", () => {
+    localStorage.removeItem("aufgaben-pass");
+    pass = "";
+    document.getElementById("login-pass").value = "";
+    zeigeLogin();
   });
 
   async function anmelden() {
