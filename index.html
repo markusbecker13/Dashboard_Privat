@@ -200,10 +200,16 @@
     padding: 0.9rem 1rem; margin-bottom: 0.7rem;
   }
   .ziel-kopf { display: flex; align-items: center; gap: 0.6rem; }
+  .ziel-toggle {
+    background: none; border: none; color: var(--ink-dim); cursor: pointer;
+    font-size: 0.85rem; padding: 0; width: 1rem; flex-shrink: 0;
+  }
+  .ziel-toggle:hover { color: var(--accent); }
   .ziel-titel { font-family: "Fraunces", serif; font-weight: 600; font-size: 1rem; flex: 1; }
   .ziel-fortschritt { font-size: 0.78rem; color: var(--ink-dim); }
-  .ziel-uebergeordnet { font-size: 0.78rem; color: var(--accent); margin-top: 0.15rem; }
-  .ziel-schritte { margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.4rem; }
+  .ziel-uebergeordnet { font-size: 0.78rem; color: var(--accent); margin-top: 0.15rem; margin-left: 1.6rem; }
+  .ziel-details { margin-top: 0.7rem; margin-left: 1.6rem; }
+  .ziel-schritte { display: flex; flex-direction: column; gap: 0.4rem; }
   .ziel-schritt { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
   .ziel-schritt-text.done { color: var(--ink-dim); text-decoration: line-through; }
   .ziel-schritt-add { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
@@ -233,13 +239,14 @@
   <div id="app" class="hidden">
     <div class="topbar">
       <span class="brand">Dashboard</span>
-      <span class="brand-sub">Aufgaben</span>
+      <span class="brand-sub" id="brand-sub">Aufgaben</span>
+      <button class="project-edit-btn" onclick="untertitelBearbeiten()" title="Untertitel ändern">✎</button>
       <button id="btn-abmelden" class="link-btn" style="margin-left:auto;">Abmelden</button>
     </div>
 
     <main>
       <div class="tabs">
-        <button class="tab-btn active" id="tab-heute">Heute</button>
+        <button class="tab-btn active" id="tab-heute">Start</button>
         <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
         <button class="tab-btn" id="tab-kalender">Kalender</button>
         <button class="tab-btn" id="tab-notizen">Notizen</button>
@@ -252,7 +259,7 @@
       </div>
 
       <div id="view-heute">
-        <h1>Heute</h1>
+        <h1>Start</h1>
         <p class="hero-text">Was heute ansteht – Aufgaben und Termine kombiniert.</p>
         <div id="heute-bereich"></div>
       </div>
@@ -419,6 +426,7 @@
   let zielSchritte = [];
   let planTyp = "woche";
   let planAnker = new Date();
+  let zielExpandiert = new Set();
   let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
   let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
 
@@ -446,7 +454,21 @@
   function zeigeApp() {
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("app").classList.remove("hidden");
+    untertitelAnzeigen();
   }
+
+  function untertitelAnzeigen() {
+    const gespeichert = localStorage.getItem("dashboard-untertitel");
+    document.getElementById("brand-sub").textContent = gespeichert || "Aufgaben";
+  }
+
+  window.untertitelBearbeiten = function() {
+    const aktuell = localStorage.getItem("dashboard-untertitel") || "Aufgaben";
+    const neu = prompt("Wie soll dein Dashboard heißen?", aktuell);
+    if (neu === null) return;
+    localStorage.setItem("dashboard-untertitel", neu.trim());
+    untertitelAnzeigen();
+  };
 
   document.getElementById("login-btn").addEventListener("click", anmelden);
   document.getElementById("login-pass").addEventListener("keydown", (e) => {
@@ -759,6 +781,23 @@
 
     if (termineHeute.length === 0 && faelligHeute.length === 0 && erinnerungenHeute.length === 0 && einkaufOffen.length === 0) {
       html = '<p class="empty-text">Nichts Dringendes für heute — guter Tag.</p>';
+    }
+
+    const projektStatus = projekte
+      .map((p) => {
+        const zugehoerig = aufgaben.filter((a) => a.projekt_id === p.id);
+        return { projekt: p, offen: zugehoerig.filter((a) => !a.erledigt).length, gesamt: zugehoerig.length };
+      })
+      .filter((ps) => ps.gesamt > 0);
+
+    if (projektStatus.length > 0) {
+      html += `<div class="project-heading" style="margin-top:1.6rem;">Projekte</div><div class="upcoming-list">` +
+        projektStatus.map((ps) => `
+          <div class="upcoming-item">
+            <span class="upcoming-datum">${ps.offen}/${ps.gesamt}</span>
+            <span>${escapeHtml(ps.projekt.name)}</span>
+          </div>`).join("") +
+        `</div>`;
     }
 
     document.getElementById("heute-bereich").innerHTML = html;
@@ -1387,6 +1426,12 @@
     await ladeDaten();
   };
 
+  window.zielKarteUmschalten = function(id) {
+    if (zielExpandiert.has(id)) zielExpandiert.delete(id);
+    else zielExpandiert.add(id);
+    renderPlanung();
+  };
+
   window.zielSchrittUmschalten = async function(id) {
     await api("ziel_schritt_umschalten", { id });
     await ladeDaten();
@@ -1401,26 +1446,30 @@
     const schritte = zielSchritte.filter((s) => s.ziel_id === z.id);
     const erledigtCount = schritte.filter((s) => s.erledigt).length;
     const parent = z.uebergeordnetes_ziel_id ? ziele.find((p) => p.id === z.uebergeordnetes_ziel_id) : null;
+    const offen = zielExpandiert.has(z.id);
 
     return `
       <div class="ziel-card">
         <div class="ziel-kopf">
-          <span class="ziel-titel">${escapeHtml(z.titel)}</span>
+          <button class="ziel-toggle" onclick="zielKarteUmschalten('${z.id}')" title="${offen ? "Einklappen" : "Ausklappen"}">${offen ? "▾" : "▸"}</button>
+          <span class="ziel-titel" onclick="zielKarteUmschalten('${z.id}')" style="cursor:pointer;">${escapeHtml(z.titel)}</span>
           <span class="ziel-fortschritt">${schritte.length > 0 ? erledigtCount + "/" + schritte.length : ""}</span>
           <button class="task-delete" onclick="zielLoeschen('${z.id}')">×</button>
         </div>
         ${parent ? `<div class="ziel-uebergeordnet">→ ${escapeHtml(parent.titel)}</div>` : ""}
-        <div class="ziel-schritte">
-          ${schritte.map((s) => `
-            <div class="ziel-schritt">
-              <button class="task-check ${s.erledigt ? "done" : ""}" onclick="zielSchrittUmschalten('${s.id}')">${s.erledigt ? "✓" : ""}</button>
-              <span class="ziel-schritt-text ${s.erledigt ? "done" : ""}">${escapeHtml(s.text)}</span>
-              <button class="task-delete" style="margin-left:auto;" onclick="zielSchrittLoeschen('${s.id}')">×</button>
-            </div>`).join("")}
-        </div>
-        <div class="ziel-schritt-add">
-          <input type="text" placeholder="Schritt hinzufügen …" onkeydown="if(event.key==='Enter') zielSchrittHinzufuegen('${z.id}', this)">
-          <button onclick="zielSchrittHinzufuegen('${z.id}', this.previousElementSibling)">+</button>
+        <div class="ziel-details ${offen ? "" : "hidden"}">
+          <div class="ziel-schritte">
+            ${schritte.map((s) => `
+              <div class="ziel-schritt">
+                <button class="task-check ${s.erledigt ? "done" : ""}" onclick="zielSchrittUmschalten('${s.id}')">${s.erledigt ? "✓" : ""}</button>
+                <span class="ziel-schritt-text ${s.erledigt ? "done" : ""}">${escapeHtml(s.text)}</span>
+                <button class="task-delete" style="margin-left:auto;" onclick="zielSchrittLoeschen('${s.id}')">×</button>
+              </div>`).join("")}
+          </div>
+          <div class="ziel-schritt-add">
+            <input type="text" placeholder="Schritt hinzufügen …" onkeydown="if(event.key==='Enter') zielSchrittHinzufuegen('${z.id}', this)">
+            <button onclick="zielSchrittHinzufuegen('${z.id}', this.previousElementSibling)">+</button>
+          </div>
         </div>
       </div>`;
   }
