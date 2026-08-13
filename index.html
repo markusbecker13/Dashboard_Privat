@@ -224,6 +224,21 @@
   .plan-overview-heading {
     font-family: "Fraunces", serif; font-size: 1.05rem; font-weight: 600; margin: 0 0 0.8rem;
   }
+
+  .ziel-kachel-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem;
+  }
+  .ziel-kachel {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.8rem 0.9rem; cursor: pointer; text-align: left; font-family: "Work Sans", sans-serif;
+  }
+  .ziel-kachel:hover { border-color: var(--accent); }
+  .ziel-kachel-typ {
+    font-size: 0.7rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .ziel-kachel-titel { font-weight: 500; font-size: 0.92rem; line-height: 1.3; }
+  .ziel-kachel-fortschritt { font-size: 0.78rem; color: var(--ink-dim); }
 </style>
 </head>
 <body>
@@ -783,20 +798,24 @@
       html = '<p class="empty-text">Nichts Dringendes für heute — guter Tag.</p>';
     }
 
-    const projektStatus = projekte
-      .map((p) => {
-        const zugehoerig = aufgaben.filter((a) => a.projekt_id === p.id);
-        return { projekt: p, offen: zugehoerig.filter((a) => !a.erledigt).length, gesamt: zugehoerig.length };
-      })
-      .filter((ps) => ps.gesamt > 0);
+    const TYP_LABEL = { woche: "Woche", monat: "Monat", jahr: "Jahr" };
+    const aktuelleZiele = ["woche", "monat", "jahr"].flatMap((typ) => {
+      const startIso = dateToISO(periodStart(typ, new Date()));
+      return ziele.filter((z) => z.zeitraum_typ === typ && z.zeitraum_start === startIso);
+    });
 
-    if (projektStatus.length > 0) {
-      html += `<div class="project-heading" style="margin-top:1.6rem;">Projekte</div><div class="upcoming-list">` +
-        projektStatus.map((ps) => `
-          <div class="upcoming-item">
-            <span class="upcoming-datum">${ps.offen}/${ps.gesamt}</span>
-            <span>${escapeHtml(ps.projekt.name)}</span>
-          </div>`).join("") +
+    if (aktuelleZiele.length > 0) {
+      html += `<div class="project-heading" style="margin-top:1.6rem;">Ziele</div><div class="ziel-kachel-grid">` +
+        aktuelleZiele.map((z) => {
+          const schritte = zielSchritte.filter((s) => s.ziel_id === z.id);
+          const erledigtCount = schritte.filter((s) => s.erledigt).length;
+          return `
+            <button class="ziel-kachel" onclick="zielKachelKlick('${z.id}')">
+              <span class="ziel-kachel-typ">${TYP_LABEL[z.zeitraum_typ]}</span>
+              <span class="ziel-kachel-titel">${escapeHtml(z.titel)}</span>
+              <span class="ziel-kachel-fortschritt">${schritte.length > 0 ? erledigtCount + " / " + schritte.length + " Schritte" : "keine Schritte"}</span>
+            </button>`;
+        }).join("") +
         `</div>`;
     }
 
@@ -1426,6 +1445,19 @@
     await ladeDaten();
   };
 
+  window.zielKachelKlick = function(id) {
+    const z = ziele.find((zz) => zz.id === id);
+    if (!z) return;
+    planTyp = z.zeitraum_typ;
+    planAnker = new Date(z.zeitraum_start + "T00:00:00");
+    zielExpandiert.add(id);
+    tabWechseln("planung");
+    requestAnimationFrame(() => {
+      const el = document.getElementById("ziel-" + id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
   window.zielKarteUmschalten = function(id) {
     if (zielExpandiert.has(id)) zielExpandiert.delete(id);
     else zielExpandiert.add(id);
@@ -1449,7 +1481,7 @@
     const offen = zielExpandiert.has(z.id);
 
     return `
-      <div class="ziel-card">
+      <div class="ziel-card" id="ziel-${z.id}">
         <div class="ziel-kopf">
           <button class="ziel-toggle" onclick="zielKarteUmschalten('${z.id}')" title="${offen ? "Einklappen" : "Ausklappen"}">${offen ? "▾" : "▸"}</button>
           <span class="ziel-titel" onclick="zielKarteUmschalten('${z.id}')" style="cursor:pointer;">${escapeHtml(z.titel)}</span>
