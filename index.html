@@ -187,6 +187,37 @@
   .verlauf-zeit { color: var(--ink-dim); font-size: 0.78rem; min-width: 7rem; flex-shrink: 0; }
   .verlauf-text { flex: 1; }
   .verlauf-kategorie { color: var(--accent); font-weight: 500; }
+
+  .plan-typ-tabs { display: flex; gap: 0.4rem; margin-bottom: 1.2rem; }
+  .plan-typ-btn {
+    padding: 0.45rem 0.9rem; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--panel); color: var(--ink-dim); cursor: pointer; font-size: 0.85rem;
+  }
+  .plan-typ-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .ziel-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.9rem 1rem; margin-bottom: 0.7rem;
+  }
+  .ziel-kopf { display: flex; align-items: center; gap: 0.6rem; }
+  .ziel-titel { font-family: "Fraunces", serif; font-weight: 600; font-size: 1rem; flex: 1; }
+  .ziel-fortschritt { font-size: 0.78rem; color: var(--ink-dim); }
+  .ziel-uebergeordnet { font-size: 0.78rem; color: var(--accent); margin-top: 0.15rem; }
+  .ziel-schritte { margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.4rem; }
+  .ziel-schritt { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+  .ziel-schritt-text.done { color: var(--ink-dim); text-decoration: line-through; }
+  .ziel-schritt-add { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
+  .ziel-schritt-add input {
+    flex: 1; padding: 0.45rem 0.6rem; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--ink); font-family: "Work Sans", sans-serif; font-size: 0.85rem;
+  }
+  .ziel-schritt-add button {
+    padding: 0.45rem 0.7rem; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--ink); cursor: pointer; font-size: 0.85rem;
+  }
+  .plan-overview-heading {
+    font-family: "Fraunces", serif; font-size: 1.05rem; font-weight: 600; margin: 0 0 0.8rem;
+  }
 </style>
 </head>
 <body>
@@ -217,6 +248,7 @@
         <button class="tab-btn" id="tab-export">Export</button>
         <button class="tab-btn" id="tab-einkauf">Einkauf</button>
         <button class="tab-btn" id="tab-verlauf">Verlauf</button>
+        <button class="tab-btn" id="tab-planung">Planung</button>
       </div>
 
       <div id="view-heute">
@@ -333,6 +365,36 @@
 
         <div id="verlauf-bereich"></div>
       </div>
+
+      <div id="view-planung" class="hidden">
+        <h1>Planung</h1>
+        <p class="hero-text">Ziele mit Unterschritten, plus was in diesem Zeitraum ansteht.</p>
+
+        <div class="plan-typ-tabs">
+          <button class="plan-typ-btn active" id="plantyp-woche" data-typ="woche">Woche</button>
+          <button class="plan-typ-btn" id="plantyp-monat" data-typ="monat">Monat</button>
+          <button class="plan-typ-btn" id="plantyp-jahr" data-typ="jahr">Jahr</button>
+        </div>
+
+        <div class="cal-header">
+          <div class="cal-nav"><button id="plan-prev">‹</button></div>
+          <h2 id="plan-zeitraum-label"></h2>
+          <div class="cal-nav"><button id="plan-next">›</button></div>
+        </div>
+
+        <div style="margin-bottom:1.6rem;">
+          <button class="link-btn" id="toggle-ziel-form">▸ Neues Ziel für diesen Zeitraum</button>
+          <div class="row hidden" id="ziel-form" style="margin-top:0.5rem;">
+            <input type="text" id="neues-ziel" placeholder="Zieltitel">
+            <select id="ziel-uebergeordnet"><option value="">Kein übergeordnetes Ziel</option></select>
+            <button class="btn-primary" id="btn-ziel-anlegen">Anlegen</button>
+          </div>
+        </div>
+
+        <div id="ziele-bereich"></div>
+
+        <div id="plan-overview-bereich" style="margin-top:2rem;"></div>
+      </div>
     </main>
   </div>
 
@@ -353,6 +415,10 @@
   let reflexionen = [];
   let einkaufsliste = [];
   let verlauf = [];
+  let ziele = [];
+  let zielSchritte = [];
+  let planTyp = "woche";
+  let planAnker = new Date();
   let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
   let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
 
@@ -436,6 +502,8 @@
     reflexionen = data.reflexionen || [];
     einkaufsliste = data.einkaufsliste || [];
     verlauf = data.verlauf || [];
+    ziele = data.ziele || [];
+    zielSchritte = data.ziel_schritte || [];
     render();
     renderKalender();
     renderHeute();
@@ -445,6 +513,7 @@
     renderExport();
     renderEinkauf();
     renderVerlauf();
+    renderPlanung();
   }
 
   function badgeHtml(cls, text) {
@@ -627,14 +696,15 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
     }
     if (aktiv === "kalender") renderKalender();
     if (aktiv === "heute") renderHeute();
+    if (aktiv === "planung") renderPlanung();
   }
   document.getElementById("tab-heute").addEventListener("click", () => tabWechseln("heute"));
   document.getElementById("tab-aufgaben").addEventListener("click", () => tabWechseln("aufgaben"));
@@ -645,6 +715,7 @@
   document.getElementById("tab-export").addEventListener("click", () => tabWechseln("export"));
   document.getElementById("tab-einkauf").addEventListener("click", () => tabWechseln("einkauf"));
   document.getElementById("tab-verlauf").addEventListener("click", () => tabWechseln("verlauf"));
+  document.getElementById("tab-planung").addEventListener("click", () => tabWechseln("planung"));
 
   function renderHeute() {
     const heuteIso = heuteISO();
@@ -1209,6 +1280,207 @@
           <span class="verlauf-text"><span class="verlauf-kategorie">${escapeHtml(v.kategorie)}</span> ${escapeHtml(v.aktion)}${v.beschreibung ? ": " + escapeHtml(v.beschreibung) : ""}</span>
         </div>`;
     }).join("");
+  }
+
+  // ==========================================================
+  // Planung (Wochen-, Monats-, Jahresziele)
+  // ==========================================================
+  function wochenStart(d) {
+    const tag = (d.getDay() + 6) % 7; // Montag = 0
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    start.setDate(start.getDate() - tag);
+    return start;
+  }
+  function monatStart(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+  function jahrStart(d) { return new Date(d.getFullYear(), 0, 1); }
+
+  function periodStart(typ, anker) {
+    if (typ === "woche") return wochenStart(anker);
+    if (typ === "monat") return monatStart(anker);
+    return jahrStart(anker);
+  }
+  function periodEnd(typ, start) {
+    if (typ === "woche") {
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      return end;
+    }
+    if (typ === "monat") return new Date(start.getFullYear(), start.getMonth() + 1, 0);
+    return new Date(start.getFullYear(), 11, 31);
+  }
+  function planAnkerVerschieben(richtung) {
+    const a = new Date(planAnker);
+    if (planTyp === "woche") {
+      a.setDate(a.getDate() + richtung * 7);
+    } else if (planTyp === "monat") {
+      // Erst auf Tag 1 setzen, dann Monat wechseln - verhindert, dass z.B.
+      // der 31. beim Sprung in einen kürzeren Monat (Februar) überläuft.
+      a.setDate(1);
+      a.setMonth(a.getMonth() + richtung);
+    } else {
+      a.setDate(1);
+      a.setFullYear(a.getFullYear() + richtung);
+    }
+    planAnker = a;
+  }
+  function planLabel(typ, start, end) {
+    if (typ === "jahr") return String(start.getFullYear());
+    if (typ === "monat") return MONATSNAMEN[start.getMonth()] + " " + start.getFullYear();
+    const fmt = (d) => d.getDate() + "." + (d.getMonth() + 1) + ".";
+    return "Woche vom " + fmt(start) + "–" + fmt(end) + " " + end.getFullYear();
+  }
+  function uebergeordneterTyp(typ) {
+    if (typ === "woche") return "monat";
+    if (typ === "monat") return "jahr";
+    return null;
+  }
+
+  ["woche", "monat", "jahr"].forEach((t) => {
+    document.getElementById("plantyp-" + t).addEventListener("click", () => {
+      planTyp = t;
+      renderPlanung();
+    });
+  });
+  document.getElementById("plan-prev").addEventListener("click", () => {
+    planAnkerVerschieben(-1);
+    renderPlanung();
+  });
+  document.getElementById("plan-next").addEventListener("click", () => {
+    planAnkerVerschieben(1);
+    renderPlanung();
+  });
+  document.getElementById("toggle-ziel-form").addEventListener("click", (e) => {
+    const form = document.getElementById("ziel-form");
+    form.classList.toggle("hidden");
+    e.target.textContent = (form.classList.contains("hidden") ? "▸" : "▾") + " Neues Ziel für diesen Zeitraum";
+  });
+  document.getElementById("btn-ziel-anlegen").addEventListener("click", zielAnlegen);
+  document.getElementById("neues-ziel").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") zielAnlegen();
+  });
+
+  async function zielAnlegen() {
+    const titel = document.getElementById("neues-ziel").value.trim();
+    if (!titel) return;
+    const start = periodStart(planTyp, planAnker);
+    const startIso = dateToISO(start);
+    const uebergeordnetesZielId = document.getElementById("ziel-uebergeordnet").value || null;
+    await api("ziel_hinzufuegen", {
+      titel,
+      zeitraum_typ: planTyp,
+      zeitraum_start: startIso,
+      uebergeordnetes_ziel_id: uebergeordnetesZielId,
+    });
+    document.getElementById("neues-ziel").value = "";
+    await ladeDaten();
+  }
+
+  window.zielLoeschen = async function(id) {
+    await api("ziel_loeschen", { id });
+    await ladeDaten();
+  };
+
+  window.zielSchrittHinzufuegen = async function(zielId, inputEl) {
+    const text = inputEl.value.trim();
+    if (!text) return;
+    await api("ziel_schritt_hinzufuegen", { ziel_id: zielId, text });
+    await ladeDaten();
+  };
+
+  window.zielSchrittUmschalten = async function(id) {
+    await api("ziel_schritt_umschalten", { id });
+    await ladeDaten();
+  };
+
+  window.zielSchrittLoeschen = async function(id) {
+    await api("ziel_schritt_loeschen", { id });
+    await ladeDaten();
+  };
+
+  function zielKarteHtml(z) {
+    const schritte = zielSchritte.filter((s) => s.ziel_id === z.id);
+    const erledigtCount = schritte.filter((s) => s.erledigt).length;
+    const parent = z.uebergeordnetes_ziel_id ? ziele.find((p) => p.id === z.uebergeordnetes_ziel_id) : null;
+
+    return `
+      <div class="ziel-card">
+        <div class="ziel-kopf">
+          <span class="ziel-titel">${escapeHtml(z.titel)}</span>
+          <span class="ziel-fortschritt">${schritte.length > 0 ? erledigtCount + "/" + schritte.length : ""}</span>
+          <button class="task-delete" onclick="zielLoeschen('${z.id}')">×</button>
+        </div>
+        ${parent ? `<div class="ziel-uebergeordnet">→ ${escapeHtml(parent.titel)}</div>` : ""}
+        <div class="ziel-schritte">
+          ${schritte.map((s) => `
+            <div class="ziel-schritt">
+              <button class="task-check ${s.erledigt ? "done" : ""}" onclick="zielSchrittUmschalten('${s.id}')">${s.erledigt ? "✓" : ""}</button>
+              <span class="ziel-schritt-text ${s.erledigt ? "done" : ""}">${escapeHtml(s.text)}</span>
+              <button class="task-delete" style="margin-left:auto;" onclick="zielSchrittLoeschen('${s.id}')">×</button>
+            </div>`).join("")}
+        </div>
+        <div class="ziel-schritt-add">
+          <input type="text" placeholder="Schritt hinzufügen …" onkeydown="if(event.key==='Enter') zielSchrittHinzufuegen('${z.id}', this)">
+          <button onclick="zielSchrittHinzufuegen('${z.id}', this.previousElementSibling)">+</button>
+        </div>
+      </div>`;
+  }
+
+  function renderPlanung() {
+    const start = periodStart(planTyp, planAnker);
+    const end = periodEnd(planTyp, start);
+    const startIso = dateToISO(start);
+    const endIso = dateToISO(end);
+
+    document.getElementById("plan-zeitraum-label").textContent = planLabel(planTyp, start, end);
+
+    ["woche", "monat", "jahr"].forEach((t) => {
+      document.getElementById("plantyp-" + t).classList.toggle("active", t === planTyp);
+    });
+
+    const parentTyp = uebergeordneterTyp(planTyp);
+    const parentSelect = document.getElementById("ziel-uebergeordnet");
+    if (!parentTyp) {
+      parentSelect.innerHTML = '<option value="">Kein übergeordnetes Ziel</option>';
+      parentSelect.disabled = true;
+    } else {
+      parentSelect.disabled = false;
+      const parentZiele = ziele.filter((z) => z.zeitraum_typ === parentTyp);
+      parentSelect.innerHTML = '<option value="">Kein übergeordnetes Ziel</option>' +
+        parentZiele.map((z) => `<option value="${z.id}">${escapeHtml(z.titel)}</option>`).join("");
+    }
+
+    const zieleHier = ziele.filter((z) => z.zeitraum_typ === planTyp && z.zeitraum_start === startIso);
+    const zieleBereich = document.getElementById("ziele-bereich");
+    zieleBereich.innerHTML = zieleHier.length === 0
+      ? '<p class="empty-text">Noch keine Ziele für diesen Zeitraum.</p>'
+      : zieleHier.map(zielKarteHtml).join("");
+
+    const termineImZeitraum = termine
+      .filter((t) => t.datum >= startIso && t.datum <= endIso)
+      .sort((a, b) => (a.datum + (a.uhrzeit || "99:99")).localeCompare(b.datum + (b.uhrzeit || "99:99")));
+    const aufgabenImZeitraum = aufgaben
+      .filter((a) => !a.erledigt && a.faellig_am && a.faellig_am >= startIso && a.faellig_am <= endIso)
+      .map(enrich)
+      .sort((a, b) => a.faellig_am.localeCompare(b.faellig_am));
+
+    let overviewHtml = `<div class="plan-overview-heading">In diesem Zeitraum</div>`;
+    if (termineImZeitraum.length === 0 && aufgabenImZeitraum.length === 0) {
+      overviewHtml += '<p class="empty-text">Keine Termine oder fälligen Aufgaben in diesem Zeitraum.</p>';
+    } else {
+      if (termineImZeitraum.length > 0) {
+        overviewHtml += '<div class="upcoming-list" style="margin-bottom:1rem;">' +
+          termineImZeitraum.map((t) => `
+            <div class="upcoming-item">
+              <span class="upcoming-datum">${formatDatumKurz(t.datum)}${t.uhrzeit ? " · " + t.uhrzeit.slice(0,5) : ""}</span>
+              <span>${escapeHtml(t.titel)}</span>
+            </div>`).join("") + '</div>';
+      }
+      if (aufgabenImZeitraum.length > 0) {
+        overviewHtml += '<div class="task-list">' +
+          aufgabenImZeitraum.map((a) => taskHtml(a, false)).join("") + '</div>';
+      }
+    }
+    document.getElementById("plan-overview-bereich").innerHTML = overviewHtml;
   }
 
 </script>
