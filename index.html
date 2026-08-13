@@ -140,6 +140,23 @@
   .link-titel:hover { color: var(--accent); }
   .link-url { display: block; color: var(--ink-dim); font-size: 0.78rem; margin-top: 0.1rem; word-break: break-all; }
   .link-notiz { display: block; color: var(--ink-dim); font-size: 0.85rem; margin-top: 0.3rem; }
+
+  .reflex-form { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.6rem; }
+  .reflex-form input[type="date"] { align-self: flex-start; }
+  .reflex-form textarea {
+    padding: 0.75rem 0.8rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); color: var(--ink); font-family: "Work Sans", sans-serif;
+    font-size: 0.92rem; resize: vertical;
+  }
+  .reflex-item {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.9rem 1rem; margin-bottom: 0.7rem;
+  }
+  .reflex-datum {
+    font-family: "Fraunces", serif; font-weight: 600; font-size: 0.9rem;
+    color: var(--accent); margin-bottom: 0.4rem; display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .reflex-text { white-space: pre-wrap; font-size: 0.92rem; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -166,6 +183,7 @@
         <button class="tab-btn" id="tab-kalender">Kalender</button>
         <button class="tab-btn" id="tab-notizen">Notizen</button>
         <button class="tab-btn" id="tab-links">Links</button>
+        <button class="tab-btn" id="tab-reflexion">Reflexion</button>
       </div>
 
       <div id="view-heute">
@@ -244,6 +262,19 @@
 
         <div id="links-bereich" style="margin-top:1rem;"></div>
       </div>
+
+      <div id="view-reflexion" class="hidden">
+        <h1>Reflexion</h1>
+        <p class="hero-text">Kurze Einträge nach Einheiten oder Tagen – zum Rückblättern, nicht zum Teilen.</p>
+
+        <div class="reflex-form">
+          <input type="date" id="reflex-datum">
+          <textarea id="reflex-text" rows="4" placeholder="Was ist dir heute aufgefallen …"></textarea>
+          <button class="btn-primary" id="btn-reflex-hinzufuegen">Eintragen</button>
+        </div>
+
+        <div id="reflexion-bereich" style="margin-top:1.4rem;"></div>
+      </div>
     </main>
   </div>
 
@@ -261,6 +292,7 @@
   let termine = [];
   let notizen = [];
   let links = [];
+  let reflexionen = [];
   let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
   let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
 
@@ -341,11 +373,13 @@
     termine = data.termine || [];
     notizen = data.notizen || [];
     links = data.links || [];
+    reflexionen = data.reflexionen || [];
     render();
     renderKalender();
     renderHeute();
     renderNotizen();
     renderLinks();
+    renderReflexionen();
   }
 
   function badgeHtml(cls, text) {
@@ -522,8 +556,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -536,6 +570,7 @@
   document.getElementById("tab-kalender").addEventListener("click", () => tabWechseln("kalender"));
   document.getElementById("tab-notizen").addEventListener("click", () => tabWechseln("notizen"));
   document.getElementById("tab-links").addEventListener("click", () => tabWechseln("links"));
+  document.getElementById("tab-reflexion").addEventListener("click", () => tabWechseln("reflexion"));
 
   function renderHeute() {
     const heuteIso = heuteISO();
@@ -823,6 +858,51 @@
 
   window.linkLoeschen = async function(id) {
     await api("link_loeschen", { id });
+    await ladeDaten();
+  };
+
+  // ==========================================================
+  // Reflexion
+  // ==========================================================
+  document.getElementById("reflex-datum").value = heuteISO();
+
+  function formatDatumLang(iso) {
+    const [j, m, t] = iso.split("-");
+    const monate = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+    return `${parseInt(t,10)}. ${monate[parseInt(m,10)-1]} ${j}`;
+  }
+
+  function renderReflexionen() {
+    const bereich = document.getElementById("reflexion-bereich");
+    if (reflexionen.length === 0) {
+      bereich.innerHTML = '<p class="empty-text">Noch keine Einträge.</p>';
+      return;
+    }
+    bereich.innerHTML = reflexionen.map((r) => `
+      <div class="reflex-item">
+        <div class="reflex-datum">
+          <span>${formatDatumLang(r.datum)}</span>
+          <button class="task-delete" style="font-size:1rem;" onclick="reflexionLoeschen('${r.id}')">×</button>
+        </div>
+        <div class="reflex-text">${escapeHtml(r.text)}</div>
+      </div>`).join("");
+  }
+
+  document.getElementById("btn-reflex-hinzufuegen").addEventListener("click", reflexionHinzufuegen);
+
+  async function reflexionHinzufuegen() {
+    const text = document.getElementById("reflex-text").value.trim();
+    if (!text) return;
+    const datum = document.getElementById("reflex-datum").value || heuteISO();
+
+    await api("reflexion_hinzufuegen", { text, datum });
+    document.getElementById("reflex-text").value = "";
+    document.getElementById("reflex-datum").value = heuteISO();
+    await ladeDaten();
+  }
+
+  window.reflexionLoeschen = async function(id) {
+    await api("reflexion_loeschen", { id });
     await ladeDaten();
   };
 </script>
