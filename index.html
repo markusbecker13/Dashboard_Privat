@@ -45,7 +45,14 @@
   .project-heading {
     font-size: 0.78rem; font-weight: 600; color: var(--ink-dim);
     text-transform: uppercase; letter-spacing: 0.04em; margin: 1.6rem 0 0.6rem;
+    display: flex; align-items: center; gap: 0.4rem;
   }
+  .project-edit-btn {
+    text-transform: none; letter-spacing: normal; font-weight: 400;
+    background: none; border: none; color: var(--ink-dim); opacity: 0.55;
+    cursor: pointer; font-size: 0.8rem; padding: 0;
+  }
+  .project-edit-btn:hover { opacity: 1; color: var(--accent); }
   .task-list { display: flex; flex-direction: column; gap: 0.5rem; }
   .task {
     display: flex; align-items: center; gap: 0.7rem; background: var(--panel);
@@ -340,7 +347,7 @@
       html += `<div class="project-heading">Ohne Projekt</div><div class="task-list">${ohneProjekt.map((a) => taskHtml(a, false)).join("")}</div>`;
     }
     for (const g of gruppen) {
-      html += `<div class="project-heading">${escapeHtml(g.projekt.name)}</div><div class="task-list">${g.liste.map((a) => taskHtml(a, false)).join("")}</div>`;
+      html += `<div class="project-heading">${escapeHtml(g.projekt.name)} <button class="project-edit-btn" onclick="projektUmbenennen('${g.projekt.id}')" title="Projekt umbenennen">✎</button></div><div class="task-list">${g.liste.map((a) => taskHtml(a, false)).join("")}</div>`;
     }
     if (ohneProjekt.length === 0 && gruppen.length === 0) {
       html = '<p class="empty-text">Keine offenen Aufgaben — gut gemacht.</p>';
@@ -401,6 +408,19 @@
     document.getElementById("neues-projekt").value = "";
     await ladeDaten();
   }
+
+  window.projektUmbenennen = async function(id) {
+    const projekt = projekte.find((p) => p.id === id);
+    if (!projekt) return;
+    const neuerName = prompt("Neuer Projektname:", projekt.name);
+    if (!neuerName || !neuerName.trim() || neuerName.trim() === projekt.name) return;
+    try {
+      await api("projekt_umbenennen", { id, name: neuerName.trim() });
+      await ladeDaten();
+    } catch (e) {
+      alert("Umbenennen fehlgeschlagen – existiert der Name schon?");
+    }
+  };
 
   async function umschalten(id) {
     await api("aufgabe_umschalten", { id });
