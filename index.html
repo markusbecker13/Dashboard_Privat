@@ -131,6 +131,20 @@
   .upcoming-item { display: flex; gap: 0.6rem; align-items: baseline; font-size: 0.9rem; }
   .upcoming-datum { color: var(--accent); font-weight: 500; min-width: 4.2rem; font-size: 0.82rem; }
 
+  .frei-item {
+    display: flex; align-items: center; gap: 0.7rem; border-radius: 8px;
+    padding: 0.7rem 0.8rem; margin-bottom: 0.5rem; font-size: 0.92rem;
+  }
+  .frei-belegt { background: var(--panel); border: 1px solid var(--border); }
+  .frei-luecke {
+    background: #e7f7ec; border: 1px dashed #8fd6a8; cursor: pointer; color: var(--ink);
+  }
+  .frei-luecke:hover { border-color: #4caf72; }
+  .frei-zeit { font-weight: 500; min-width: 6.5rem; color: var(--ink-dim); font-size: 0.85rem; }
+  .frei-label { flex: 1; }
+  .frei-typ { font-size: 0.72rem; color: var(--ink-dim); margin-left: 0.4rem; }
+  .frei-plus { font-weight: 600; color: #2e8b52; font-size: 1.1rem; }
+
   .notiz-list { display: flex; flex-direction: column; gap: 0.5rem; }
   .notiz-item {
     display: flex; align-items: flex-start; gap: 0.7rem; background: var(--panel);
@@ -265,6 +279,7 @@
         <button class="tab-btn active" id="tab-heute">Start</button>
         <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
         <button class="tab-btn" id="tab-kalender">Kalender</button>
+        <button class="tab-btn" id="tab-frei">Frei</button>
         <button class="tab-btn" id="tab-notizen">Notizen</button>
         <button class="tab-btn" id="tab-links">Links</button>
         <button class="tab-btn" id="tab-reflexion">Reflexion</button>
@@ -288,6 +303,7 @@
         <input type="text" id="neue-aufgabe" placeholder="Neue Aufgabe eintragen …">
         <select id="aufgabe-projekt"><option value="">Ohne Projekt</option></select>
         <input type="date" id="aufgabe-faellig" title="Fälligkeitsdatum (optional)">
+        <input type="time" id="aufgabe-uhrzeit" style="width:8rem;" title="Uhrzeit (optional)">
         <input type="number" id="aufgabe-intervall" min="1" placeholder="alle X Tage" title="Wiederkehrende Erinnerung">
         <button class="btn-primary" id="btn-hinzufuegen">Hinzufügen</button>
       </div>
@@ -319,6 +335,64 @@
         <div class="cal-grid" id="cal-grid"></div>
 
         <div id="cal-day-panel"></div>
+
+        <div class="project-heading" style="margin-top:2rem;">Blockzeiten</div>
+        <p class="hero-text" style="margin:0 0 0.8rem;">Feste "nicht stören"-Zeiten – wiederkehrend oder einmalig. Werden ab der nächsten Etappe bei der Lücken-Berechnung mitgezählt.</p>
+        <div id="blockzeiten-liste"></div>
+        <div style="margin:0.8rem 0 1.6rem;">
+          <button class="link-btn" id="toggle-blockzeit-form">▸ Neue Blockzeit anlegen</button>
+          <div class="hidden" id="blockzeit-form" style="margin-top:0.6rem;">
+            <div class="row">
+              <input type="text" id="blockzeit-titel" placeholder="Titel (z.B. Mittagspause)">
+              <input type="time" id="blockzeit-start" style="width:8rem;" title="Start">
+              <input type="time" id="blockzeit-ende" style="width:8rem;" title="Ende">
+            </div>
+            <div class="row" style="align-items:center;">
+              <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.85rem;">
+                <input type="radio" name="blockzeit-art" id="blockzeit-art-wiederkehrend" checked> wiederkehrend
+              </label>
+              <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.85rem;">
+                <input type="radio" name="blockzeit-art" id="blockzeit-art-einmalig"> einmalig
+              </label>
+            </div>
+            <div class="row" id="blockzeit-wochentage-row"></div>
+            <div class="row hidden" id="blockzeit-datum-row">
+              <input type="date" id="blockzeit-datum">
+            </div>
+            <div class="row">
+              <input type="text" id="blockzeit-notiz" placeholder="Notiz (optional)">
+              <button class="btn-primary" id="btn-blockzeit-anlegen">Anlegen</button>
+              <button class="btn-secondary hidden" id="btn-blockzeit-abbrechen">Abbrechen</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-frei" class="hidden">
+        <h1>Frei</h1>
+        <p class="hero-text">Freie Zeiten an einem Tag – berechnet aus Terminen, Blockzeiten und deinem Zeitrahmen für diesen Wochentag.</p>
+
+        <div class="cal-header">
+          <div class="cal-nav"><button id="frei-prev">‹</button></div>
+          <h2 id="frei-tag-label"></h2>
+          <div class="cal-nav"><button id="frei-next">›</button></div>
+        </div>
+
+        <div class="cal-day-panel" style="margin-bottom:1.2rem;">
+          <div class="project-heading" style="margin:0 0 0.6rem;">Zeitrahmen für diesen Wochentag</div>
+          <div class="row" style="align-items:center;">
+            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.88rem;">
+              <input type="checkbox" id="frei-rahmen-aktiv" checked> aktiv
+            </label>
+            <input type="time" id="frei-rahmen-start" style="width:8rem;">
+            <input type="time" id="frei-rahmen-ende" style="width:8rem;">
+            <button class="btn-secondary" id="btn-frei-rahmen-speichern">Speichern</button>
+          </div>
+        </div>
+
+        <div id="frei-timeline"></div>
+
+        <div id="frei-formular-bereich" style="margin-top:1rem;"></div>
       </div>
 
       <div id="view-notizen" class="hidden">
@@ -358,7 +432,10 @@
         <div class="reflex-form">
           <input type="date" id="reflex-datum">
           <textarea id="reflex-text" rows="4" placeholder="Was ist dir heute aufgefallen …"></textarea>
-          <button class="btn-primary" id="btn-reflex-hinzufuegen">Eintragen</button>
+          <div class="row" style="margin:0;">
+            <button class="btn-primary" id="btn-reflex-hinzufuegen">Eintragen</button>
+            <button class="btn-secondary hidden" id="btn-reflex-abbrechen">Abbrechen</button>
+          </div>
         </div>
 
         <div id="reflexion-bereich" style="margin-top:1.4rem;"></div>
@@ -446,6 +523,8 @@
   let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
   let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
   let calBearbeiteterTermin = null; // id des gerade bearbeiteten Termins oder null
+  let blockzeiten = [];
+  let tagesrahmen = [];
 
   async function api(action, extra = {}) {
     const res = await fetch(API_URL, {
@@ -557,6 +636,8 @@
     verlauf = data.verlauf || [];
     ziele = data.ziele || [];
     zielSchritte = data.ziel_schritte || [];
+    blockzeiten = data.blockzeiten || [];
+    tagesrahmen = data.tagesrahmen || [];
     render();
     renderKalender();
     renderHeute();
@@ -567,6 +648,7 @@
     renderEinkauf();
     renderVerlauf();
     renderPlanung();
+    renderBlockzeiten();
   }
 
   function badgeHtml(cls, text) {
@@ -578,9 +660,12 @@
     let meta = "";
     if (done && projekt) meta += badgeHtml("", projekt.name);
     if (!done && a.faellig_am) {
-      if (a.status === "ueberfaellig") meta += badgeHtml("overdue", "überfällig · " + a.faellig_am);
-      else if (a.status === "heute") meta += badgeHtml("today", "heute fällig");
-      else meta += badgeHtml("", "fällig " + a.faellig_am);
+      const zeitZusatz = a.uhrzeit ? " · " + a.uhrzeit.slice(0,5) : "";
+      if (a.status === "ueberfaellig") meta += badgeHtml("overdue", "überfällig · " + a.faellig_am + zeitZusatz);
+      else if (a.status === "heute") meta += badgeHtml("today", "heute fällig" + zeitZusatz);
+      else meta += badgeHtml("", "fällig " + a.faellig_am + zeitZusatz);
+    } else if (!done && a.uhrzeit) {
+      meta += badgeHtml("", a.uhrzeit.slice(0,5) + " Uhr");
     }
     if (!done && a.erinnere_alle_tage) meta += badgeHtml("reminder", "alle " + a.erinnere_alle_tage + " Tage");
 
@@ -665,11 +750,13 @@
     if (!titel) return;
     const projekt_id = document.getElementById("aufgabe-projekt").value || null;
     const faellig_am = document.getElementById("aufgabe-faellig").value || null;
+    const uhrzeit = document.getElementById("aufgabe-uhrzeit").value || null;
     const erinnere_alle_tage = document.getElementById("aufgabe-intervall").value || null;
 
-    await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am, erinnere_alle_tage });
+    await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am, uhrzeit, erinnere_alle_tage });
     document.getElementById("neue-aufgabe").value = "";
     document.getElementById("aufgabe-faellig").value = "";
+    document.getElementById("aufgabe-uhrzeit").value = "";
     document.getElementById("aufgabe-intervall").value = "";
     await ladeDaten();
   }
@@ -749,8 +836,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -758,10 +845,12 @@
     if (aktiv === "kalender") renderKalender();
     if (aktiv === "heute") renderHeute();
     if (aktiv === "planung") renderPlanung();
+    if (aktiv === "frei") renderFrei();
   }
   document.getElementById("tab-heute").addEventListener("click", () => tabWechseln("heute"));
   document.getElementById("tab-aufgaben").addEventListener("click", () => tabWechseln("aufgaben"));
   document.getElementById("tab-kalender").addEventListener("click", () => tabWechseln("kalender"));
+  document.getElementById("tab-frei").addEventListener("click", () => tabWechseln("frei"));
   document.getElementById("tab-notizen").addEventListener("click", () => tabWechseln("notizen"));
   document.getElementById("tab-links").addEventListener("click", () => tabWechseln("links"));
   document.getElementById("tab-reflexion").addEventListener("click", () => tabWechseln("reflexion"));
@@ -786,7 +875,7 @@
       html += `<div class="project-heading">Termine heute</div><div class="upcoming-list" style="margin-bottom:1.6rem;">` +
         termineHeute.map((t) => `
           <div class="upcoming-item">
-            <span class="upcoming-datum">${t.uhrzeit ? t.uhrzeit.slice(0,5) : "ganztägig"}</span>
+            <span class="upcoming-datum">${t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : "ganztägig"}</span>
             <span>${escapeHtml(t.titel)}</span>
           </div>`).join("") +
         `</div>`;
@@ -906,7 +995,7 @@
     }
     const html = kommende.map((t) => `
       <div class="upcoming-item">
-        <span class="upcoming-datum">${formatDatumKurz(t.datum)}${t.uhrzeit ? " · " + t.uhrzeit.slice(0,5) : ""}</span>
+        <span class="upcoming-datum">${formatDatumKurz(t.datum)}${t.uhrzeit ? " · " + t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
         <span>${escapeHtml(t.titel)}</span>
       </div>`).join("");
     document.getElementById("upcoming-bereich").innerHTML =
@@ -942,7 +1031,7 @@
       ? `<p class="empty-text" style="margin:0 0 0.6rem;">Noch keine Termine an diesem Tag.</p>`
       : liste.map((t) => `
           <div class="termin-item">
-            <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) : ""}</span>
+            <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
             <span class="termin-titel">${escapeHtml(t.titel)}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
             <button class="task-snooze" onclick="terminBearbeitenStart('${t.id}')" title="Bearbeiten">✎</button>
             <button class="task-delete" onclick="terminLoeschen('${t.id}')">×</button>
@@ -961,7 +1050,8 @@
         ${formTitel ? `<div class="project-heading" style="margin:1rem 0 0.4rem;">${formTitel}</div>` : ""}
         <div class="termin-form">
           <input type="text" id="termin-titel" placeholder="Titel" value="${bearbeiteterTermin ? escapeAttr(bearbeiteterTermin.titel) : ""}">
-          <input type="time" id="termin-uhrzeit" style="width:8rem;" value="${bearbeiteterTermin && bearbeiteterTermin.uhrzeit ? bearbeiteterTermin.uhrzeit.slice(0,5) : ""}">
+          <input type="time" id="termin-uhrzeit" style="width:8rem;" title="Beginn (optional)" value="${bearbeiteterTermin && bearbeiteterTermin.uhrzeit ? bearbeiteterTermin.uhrzeit.slice(0,5) : ""}">
+          <input type="time" id="termin-ende" style="width:8rem;" title="Ende (optional)" value="${bearbeiteterTermin && bearbeiteterTermin.ende_uhrzeit ? bearbeiteterTermin.ende_uhrzeit.slice(0,5) : ""}">
           <input type="text" id="termin-notiz" placeholder="Notiz (optional)" value="${bearbeiteterTermin && bearbeiteterTermin.notiz ? escapeAttr(bearbeiteterTermin.notiz) : ""}">
           <button class="btn-primary" id="btn-termin-hinzufuegen">${buttonLabel}</button>
           ${abbrechenHtml}
@@ -989,9 +1079,10 @@
     const titel = document.getElementById("termin-titel").value.trim();
     if (!titel || !calAusgewaehlterTag) return;
     const uhrzeit = document.getElementById("termin-uhrzeit").value || null;
+    const ende_uhrzeit = document.getElementById("termin-ende").value || null;
     const notiz = document.getElementById("termin-notiz").value.trim() || null;
 
-    await api("termin_hinzufuegen", { titel, datum: calAusgewaehlterTag, uhrzeit, notiz });
+    await api("termin_hinzufuegen", { titel, datum: calAusgewaehlterTag, uhrzeit, ende_uhrzeit, notiz });
     await ladeDaten();
     renderKalender();
   }
@@ -1001,9 +1092,10 @@
     const titel = document.getElementById("termin-titel").value.trim();
     if (!titel || !id) return;
     const uhrzeit = document.getElementById("termin-uhrzeit").value || null;
+    const ende_uhrzeit = document.getElementById("termin-ende").value || null;
     const notiz = document.getElementById("termin-notiz").value.trim() || null;
 
-    await api("termin_aktualisieren", { id, titel, uhrzeit, notiz });
+    await api("termin_aktualisieren", { id, titel, uhrzeit, ende_uhrzeit, notiz });
     calBearbeiteterTermin = null;
     await ladeDaten();
     renderKalender();
@@ -1015,6 +1107,363 @@
     await ladeDaten();
     renderKalender();
   };
+
+  // ==========================================================
+  // Blockzeiten ("nicht stören" – wiederkehrend oder einmalig)
+  // ==========================================================
+  let blockzeitBearbeiteterId = null;
+
+  document.getElementById("toggle-blockzeit-form").addEventListener("click", (e) => {
+    const form = document.getElementById("blockzeit-form");
+    form.classList.toggle("hidden");
+    e.target.textContent = (form.classList.contains("hidden") ? "▸" : "▾") + " Neue Blockzeit anlegen";
+  });
+
+  document.querySelectorAll('input[name="blockzeit-art"]').forEach((radio) => {
+    radio.addEventListener("change", blockzeitArtUmschalten);
+  });
+
+  function blockzeitArtUmschalten() {
+    const wiederkehrend = document.getElementById("blockzeit-art-wiederkehrend").checked;
+    document.getElementById("blockzeit-wochentage-row").classList.toggle("hidden", !wiederkehrend);
+    document.getElementById("blockzeit-datum-row").classList.toggle("hidden", wiederkehrend);
+  }
+
+  function renderBlockzeitWochentage() {
+    const row = document.getElementById("blockzeit-wochentage-row");
+    row.innerHTML = TAGLABEL.map((label, i) => `
+      <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.82rem;">
+        <input type="checkbox" class="blockzeit-wochentag-cb" value="${i}"> ${label}
+      </label>`).join("");
+  }
+  renderBlockzeitWochentage();
+
+  document.getElementById("btn-blockzeit-anlegen").addEventListener("click", blockzeitSpeichern);
+  document.getElementById("btn-blockzeit-abbrechen").addEventListener("click", blockzeitFormZuruecksetzen);
+
+  function blockzeitFormZuruecksetzen() {
+    blockzeitBearbeiteterId = null;
+    document.getElementById("blockzeit-titel").value = "";
+    document.getElementById("blockzeit-start").value = "";
+    document.getElementById("blockzeit-ende").value = "";
+    document.getElementById("blockzeit-notiz").value = "";
+    document.getElementById("blockzeit-datum").value = "";
+    document.getElementById("blockzeit-art-wiederkehrend").checked = true;
+    document.querySelectorAll(".blockzeit-wochentag-cb").forEach((cb) => { cb.checked = false; });
+    blockzeitArtUmschalten();
+    document.getElementById("btn-blockzeit-anlegen").textContent = "Anlegen";
+    document.getElementById("btn-blockzeit-abbrechen").classList.add("hidden");
+  }
+
+  window.blockzeitBearbeitenStart = function(id) {
+    const b = blockzeiten.find((bb) => bb.id === id);
+    if (!b) return;
+    blockzeitBearbeiteterId = id;
+    document.getElementById("blockzeit-form").classList.remove("hidden");
+    document.getElementById("toggle-blockzeit-form").textContent = "▾ Neue Blockzeit anlegen";
+    document.getElementById("blockzeit-titel").value = b.titel;
+    document.getElementById("blockzeit-start").value = b.start_zeit ? b.start_zeit.slice(0,5) : "";
+    document.getElementById("blockzeit-ende").value = b.end_zeit ? b.end_zeit.slice(0,5) : "";
+    document.getElementById("blockzeit-notiz").value = b.notiz || "";
+    document.querySelectorAll(".blockzeit-wochentag-cb").forEach((cb) => { cb.checked = false; });
+    if (b.datum) {
+      document.getElementById("blockzeit-art-einmalig").checked = true;
+      document.getElementById("blockzeit-datum").value = b.datum;
+    } else {
+      document.getElementById("blockzeit-art-wiederkehrend").checked = true;
+      document.querySelectorAll(".blockzeit-wochentag-cb").forEach((cb) => {
+        cb.checked = (b.wochentage || []).includes(parseInt(cb.value, 10));
+      });
+    }
+    blockzeitArtUmschalten();
+    document.getElementById("btn-blockzeit-anlegen").textContent = "Speichern";
+    document.getElementById("btn-blockzeit-abbrechen").classList.remove("hidden");
+    document.getElementById("blockzeit-titel").scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  async function blockzeitSpeichern() {
+    const titel = document.getElementById("blockzeit-titel").value.trim();
+    const start_zeit = document.getElementById("blockzeit-start").value;
+    const end_zeit = document.getElementById("blockzeit-ende").value;
+    if (!titel || !start_zeit || !end_zeit) return;
+
+    const wiederkehrend = document.getElementById("blockzeit-art-wiederkehrend").checked;
+    let wochentage = null;
+    let datum = null;
+    if (wiederkehrend) {
+      wochentage = Array.from(document.querySelectorAll(".blockzeit-wochentag-cb:checked")).map((cb) => parseInt(cb.value, 10));
+      if (wochentage.length === 0) { alert("Bitte mindestens einen Wochentag auswählen."); return; }
+    } else {
+      datum = document.getElementById("blockzeit-datum").value;
+      if (!datum) { alert("Bitte ein Datum auswählen."); return; }
+    }
+    const notiz = document.getElementById("blockzeit-notiz").value.trim() || null;
+
+    if (blockzeitBearbeiteterId) {
+      await api("blockzeit_aktualisieren", { id: blockzeitBearbeiteterId, titel, start_zeit, end_zeit, wochentage, datum, notiz });
+    } else {
+      await api("blockzeit_hinzufuegen", { titel, start_zeit, end_zeit, wochentage, datum, notiz });
+    }
+    blockzeitFormZuruecksetzen();
+    await ladeDaten();
+  }
+
+  window.blockzeitLoeschen = async function(id) {
+    if (blockzeitBearbeiteterId === id) blockzeitFormZuruecksetzen();
+    await api("blockzeit_loeschen", { id });
+    await ladeDaten();
+  };
+
+  function blockzeitWiederholungText(b) {
+    if (b.datum) return "einmalig · " + formatDatumKurz(b.datum);
+    if (b.wochentage && b.wochentage.length > 0) {
+      const sortiert = [...b.wochentage].sort((x, y) => x - y);
+      return sortiert.map((i) => TAGLABEL[i]).join(", ");
+    }
+    return "";
+  }
+
+  function renderBlockzeiten() {
+    const bereich = document.getElementById("blockzeiten-liste");
+    if (blockzeiten.length === 0) {
+      bereich.innerHTML = '<p class="empty-text">Noch keine Blockzeiten.</p>';
+      return;
+    }
+    const sortiert = [...blockzeiten].sort((a, b) => (a.start_zeit || "").localeCompare(b.start_zeit || ""));
+    bereich.innerHTML = sortiert.map((b) => `
+      <div class="termin-item">
+        <span class="termin-zeit">${b.start_zeit ? b.start_zeit.slice(0,5) : ""}${b.end_zeit ? "–" + b.end_zeit.slice(0,5) : ""}</span>
+        <span class="termin-titel">${escapeHtml(b.titel)}<span class="termin-notiz">${blockzeitWiederholungText(b)}${b.notiz ? " · " + escapeHtml(b.notiz) : ""}</span></span>
+        <button class="task-snooze" onclick="blockzeitBearbeitenStart('${b.id}')" title="Bearbeiten">✎</button>
+        <button class="task-delete" onclick="blockzeitLoeschen('${b.id}')">×</button>
+      </div>`).join("");
+  }
+
+  // ==========================================================
+  // Frei – Zeitleiste mit Lücken-Berechnung
+  //
+  // Annahmen (falls du das anders willst, sag Bescheid):
+  // - Nur Termine MIT Uhrzeit blockieren Zeit. Termine ohne Uhrzeit
+  //   ("ganztägig") tauchen hier nicht als Block auf.
+  // - Termine ohne Endzeit blockieren pauschal 30 Minuten ab Beginn.
+  // - Ist für einen Wochentag noch kein Zeitrahmen gespeichert,
+  //   wird 08:00–20:00 als Vorschlag angezeigt (erst gültig, wenn
+  //   du auf "Speichern" tippst).
+  // ==========================================================
+  const WOCHENTAGSNAMEN = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
+  let freiTag = new Date();
+  let freiAusgewaehlteLuecke = null;
+  let freiFormularTyp = "termin";
+
+  function wochentagIndex(d) {
+    return (d.getDay() + 6) % 7; // 0=Mo … 6=So
+  }
+  function zeitZuMinuten(t) {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  }
+  function minutenZuZeit(min) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+  }
+
+  document.getElementById("frei-prev").addEventListener("click", () => {
+    freiTag.setDate(freiTag.getDate() - 1);
+    freiFormularSchliessen();
+    renderFrei();
+  });
+  document.getElementById("frei-next").addEventListener("click", () => {
+    freiTag.setDate(freiTag.getDate() + 1);
+    freiFormularSchliessen();
+    renderFrei();
+  });
+  document.getElementById("btn-frei-rahmen-speichern").addEventListener("click", freiRahmenSpeichern);
+
+  function freiRahmenFuerWochentag(wtIndex) {
+    const eintrag = tagesrahmen.find((r) => r.wochentag === wtIndex);
+    if (eintrag) {
+      return { start_zeit: eintrag.start_zeit.slice(0,5), end_zeit: eintrag.end_zeit.slice(0,5), aktiv: eintrag.aktiv };
+    }
+    return { start_zeit: "08:00", end_zeit: "20:00", aktiv: true }; // Vorschlag, noch nicht gespeichert
+  }
+
+  async function freiRahmenSpeichern() {
+    const wochentag = wochentagIndex(freiTag);
+    const start_zeit = document.getElementById("frei-rahmen-start").value;
+    const end_zeit = document.getElementById("frei-rahmen-ende").value;
+    const aktiv = document.getElementById("frei-rahmen-aktiv").checked;
+    if (!start_zeit || !end_zeit) return;
+    await api("tagesrahmen_speichern", { wochentag, start_zeit, end_zeit, aktiv });
+    await ladeDaten();
+    renderFrei();
+  }
+
+  function freiBusyBloecke(tagIso, wtIndex) {
+    const bloecke = [];
+
+    termine.filter((t) => t.datum === tagIso && t.uhrzeit).forEach((t) => {
+      const start = t.uhrzeit.slice(0,5);
+      const ende = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0,5) : minutenZuZeit(zeitZuMinuten(start) + 30);
+      bloecke.push({ start, ende, titel: t.titel, typ: "Termin" });
+    });
+
+    blockzeiten.forEach((b) => {
+      const trifftZu = (b.datum && b.datum === tagIso) || (!b.datum && b.wochentage && b.wochentage.includes(wtIndex));
+      if (trifftZu) {
+        bloecke.push({ start: b.start_zeit.slice(0,5), ende: b.end_zeit.slice(0,5), titel: b.titel, typ: "Blockzeit" });
+      }
+    });
+
+    return bloecke.sort((a, b) => zeitZuMinuten(a.start) - zeitZuMinuten(b.start));
+  }
+
+  function freiLueckenBerechnen(rahmenStart, rahmenEnde, bloecke) {
+    const rStart = zeitZuMinuten(rahmenStart);
+    const rEnde = zeitZuMinuten(rahmenEnde);
+    if (rEnde <= rStart) return [];
+
+    const intervalle = bloecke
+      .map((b) => [Math.max(rStart, zeitZuMinuten(b.start)), Math.min(rEnde, zeitZuMinuten(b.ende))])
+      .filter(([s, e]) => e > s)
+      .sort((a, b) => a[0] - b[0]);
+
+    const verschmolzen = [];
+    for (const [s, e] of intervalle) {
+      if (verschmolzen.length > 0 && s <= verschmolzen[verschmolzen.length - 1][1]) {
+        verschmolzen[verschmolzen.length - 1][1] = Math.max(verschmolzen[verschmolzen.length - 1][1], e);
+      } else {
+        verschmolzen.push([s, e]);
+      }
+    }
+
+    const luecken = [];
+    let cursor = rStart;
+    for (const [s, e] of verschmolzen) {
+      if (s > cursor) luecken.push([cursor, s]);
+      cursor = Math.max(cursor, e);
+    }
+    if (cursor < rEnde) luecken.push([cursor, rEnde]);
+
+    return luecken.map(([s, e]) => ({ start: minutenZuZeit(s), ende: minutenZuZeit(e) }));
+  }
+
+  function renderFrei() {
+    const iso = dateToISO(freiTag);
+    const wtIndex = wochentagIndex(freiTag);
+
+    document.getElementById("frei-tag-label").textContent = WOCHENTAGSNAMEN[wtIndex] + ", " + formatDatumLang(iso);
+
+    const rahmen = freiRahmenFuerWochentag(wtIndex);
+    document.getElementById("frei-rahmen-aktiv").checked = rahmen.aktiv;
+    document.getElementById("frei-rahmen-start").value = rahmen.start_zeit;
+    document.getElementById("frei-rahmen-ende").value = rahmen.end_zeit;
+
+    const timelineEl = document.getElementById("frei-timeline");
+
+    if (!rahmen.aktiv) {
+      timelineEl.innerHTML = '<p class="empty-text">Für diesen Wochentag ist kein Zeitrahmen aktiv.</p>';
+      freiFormularSchliessen();
+      return;
+    }
+
+    const bloecke = freiBusyBloecke(iso, wtIndex);
+    const luecken = freiLueckenBerechnen(rahmen.start_zeit, rahmen.end_zeit, bloecke);
+
+    const eintraege = [
+      ...bloecke.map((b) => ({ ...b, art: "belegt" })),
+      ...luecken.map((l) => ({ start: l.start, ende: l.ende, art: "frei" })),
+    ].sort((a, b) => zeitZuMinuten(a.start) - zeitZuMinuten(b.start));
+
+    if (eintraege.length === 0) {
+      timelineEl.innerHTML = '<p class="empty-text">Kein Zeitrahmen für diesen Tag eingestellt.</p>';
+      return;
+    }
+
+    timelineEl.innerHTML = eintraege.map((e) => {
+      if (e.art === "frei") {
+        return `
+          <div class="frei-item frei-luecke" onclick="freiLueckeAuswaehlen('${e.start}','${e.ende}')">
+            <span class="frei-zeit">${e.start}–${e.ende}</span>
+            <span class="frei-label">frei</span>
+            <span class="frei-plus">+</span>
+          </div>`;
+      }
+      return `
+        <div class="frei-item frei-belegt">
+          <span class="frei-zeit">${e.start}–${e.ende}</span>
+          <span class="frei-label">${escapeHtml(e.titel)}<span class="frei-typ">${e.typ}</span></span>
+        </div>`;
+    }).join("");
+  }
+
+  window.freiLueckeAuswaehlen = function(start, ende) {
+    freiAusgewaehlteLuecke = { start, ende };
+    freiFormularTyp = "termin";
+    renderFreiFormular();
+    document.getElementById("frei-formular-bereich").scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  function freiFormularSchliessen() {
+    freiAusgewaehlteLuecke = null;
+    document.getElementById("frei-formular-bereich").innerHTML = "";
+  }
+
+  function renderFreiFormular() {
+    const bereich = document.getElementById("frei-formular-bereich");
+    if (!freiAusgewaehlteLuecke) { bereich.innerHTML = ""; return; }
+
+    const { start, ende } = freiAusgewaehlteLuecke;
+    const projektOptions = '<option value="">Ohne Projekt</option>' +
+      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+
+    bereich.innerHTML = `
+      <div class="cal-day-panel">
+        <div class="project-heading" style="margin:0 0 0.6rem;">${start}–${ende} eintragen</div>
+        <div class="row" style="align-items:center;">
+          <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.85rem;">
+            <input type="radio" name="frei-typ" id="frei-typ-termin" ${freiFormularTyp === "termin" ? "checked" : ""}> Termin
+          </label>
+          <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.85rem;">
+            <input type="radio" name="frei-typ" id="frei-typ-aufgabe" ${freiFormularTyp === "aufgabe" ? "checked" : ""}> Aufgabe
+          </label>
+        </div>
+        <div class="row">
+          <input type="text" id="frei-titel" placeholder="Titel">
+          <input type="time" id="frei-start" style="width:8rem;" value="${start}">
+          ${freiFormularTyp === "termin"
+            ? `<input type="time" id="frei-ende" style="width:8rem;" value="${ende}">`
+            : `<select id="frei-projekt">${projektOptions}</select>`}
+        </div>
+        <div class="row">
+          <button class="btn-primary" id="btn-frei-eintragen">Eintragen</button>
+          <button class="btn-secondary" id="btn-frei-abbrechen">Abbrechen</button>
+        </div>
+      </div>`;
+
+    document.getElementById("frei-typ-termin").addEventListener("change", () => { freiFormularTyp = "termin"; renderFreiFormular(); });
+    document.getElementById("frei-typ-aufgabe").addEventListener("change", () => { freiFormularTyp = "aufgabe"; renderFreiFormular(); });
+    document.getElementById("btn-frei-eintragen").addEventListener("click", freiEintragen);
+    document.getElementById("btn-frei-abbrechen").addEventListener("click", freiFormularSchliessen);
+  }
+
+  async function freiEintragen() {
+    const titel = document.getElementById("frei-titel").value.trim();
+    if (!titel) return;
+    const iso = dateToISO(freiTag);
+    const start = document.getElementById("frei-start").value || freiAusgewaehlteLuecke.start;
+
+    if (freiFormularTyp === "termin") {
+      const ende = document.getElementById("frei-ende").value || null;
+      await api("termin_hinzufuegen", { titel, datum: iso, uhrzeit: start, ende_uhrzeit: ende, notiz: null });
+    } else {
+      const projekt_id = document.getElementById("frei-projekt").value || null;
+      await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am: iso, uhrzeit: start, erinnere_alle_tage: null });
+    }
+    freiFormularSchliessen();
+    await ladeDaten();
+    renderFrei();
+  }
 
   // ==========================================================
   // Notizen
@@ -1136,6 +1585,7 @@
   // Reflexion
   // ==========================================================
   document.getElementById("reflex-datum").value = heuteISO();
+  let reflexBearbeiteterId = null;
 
   function formatDatumLang(iso) {
     const [j, m, t] = iso.split("-");
@@ -1153,26 +1603,53 @@
       <div class="reflex-item">
         <div class="reflex-datum">
           <span>${formatDatumLang(r.datum)}</span>
-          <button class="task-delete" style="font-size:1rem;" onclick="reflexionLoeschen('${r.id}')">×</button>
+          <span>
+            <button class="task-snooze" style="padding:0.2rem 0.5rem;" onclick="reflexionBearbeitenStart('${r.id}')" title="Bearbeiten">✎</button>
+            <button class="task-delete" style="font-size:1rem;" onclick="reflexionLoeschen('${r.id}')">×</button>
+          </span>
         </div>
         <div class="reflex-text">${escapeHtml(r.text)}</div>
       </div>`).join("");
   }
 
-  document.getElementById("btn-reflex-hinzufuegen").addEventListener("click", reflexionHinzufuegen);
+  function reflexFormZuruecksetzen() {
+    reflexBearbeiteterId = null;
+    document.getElementById("reflex-text").value = "";
+    document.getElementById("reflex-datum").value = heuteISO();
+    document.getElementById("btn-reflex-hinzufuegen").textContent = "Eintragen";
+    document.getElementById("btn-reflex-abbrechen").classList.add("hidden");
+  }
 
-  async function reflexionHinzufuegen() {
+  window.reflexionBearbeitenStart = function(id) {
+    const r = reflexionen.find((rr) => rr.id === id);
+    if (!r) return;
+    reflexBearbeiteterId = id;
+    document.getElementById("reflex-datum").value = r.datum;
+    document.getElementById("reflex-text").value = r.text;
+    document.getElementById("btn-reflex-hinzufuegen").textContent = "Speichern";
+    document.getElementById("btn-reflex-abbrechen").classList.remove("hidden");
+    document.getElementById("reflex-text").scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  document.getElementById("btn-reflex-hinzufuegen").addEventListener("click", reflexSpeichern);
+  document.getElementById("btn-reflex-abbrechen").addEventListener("click", reflexFormZuruecksetzen);
+
+  async function reflexSpeichern() {
     const text = document.getElementById("reflex-text").value.trim();
     if (!text) return;
     const datum = document.getElementById("reflex-datum").value || heuteISO();
 
-    await api("reflexion_hinzufuegen", { text, datum });
-    document.getElementById("reflex-text").value = "";
-    document.getElementById("reflex-datum").value = heuteISO();
+    if (reflexBearbeiteterId) {
+      await api("reflexion_aktualisieren", { id: reflexBearbeiteterId, text, datum });
+    } else {
+      await api("reflexion_hinzufuegen", { text, datum });
+    }
+    reflexFormZuruecksetzen();
     await ladeDaten();
   }
 
   window.reflexionLoeschen = async function(id) {
+    if (reflexBearbeiteterId === id) reflexFormZuruecksetzen();
     await api("reflexion_loeschen", { id });
     await ladeDaten();
   };
@@ -1188,6 +1665,7 @@
         Projekt: p ? p.name : "",
         Erledigt: a.erledigt ? "Ja" : "Nein",
         "Fällig am": a.faellig_am || "",
+        Uhrzeit: a.uhrzeit ? a.uhrzeit.slice(0, 5) : "",
         "Erinnerung alle X Tage": a.erinnere_alle_tage || "",
         "Erstellt am": a.erstellt_am ? a.erstellt_am.slice(0, 10) : "",
       };
@@ -1197,7 +1675,8 @@
     return termine.map((t) => ({
       Titel: t.titel,
       Datum: t.datum,
-      Uhrzeit: t.uhrzeit ? t.uhrzeit.slice(0, 5) : "",
+      Beginn: t.uhrzeit ? t.uhrzeit.slice(0, 5) : "",
+      Ende: t.ende_uhrzeit ? t.ende_uhrzeit.slice(0, 5) : "",
       Notiz: t.notiz || "",
     }));
   }
@@ -1228,6 +1707,36 @@
       Text: r.text,
     }));
   }
+  function fE() {
+    return einkaufsliste.map((e) => ({
+      Artikel: e.text,
+      Erledigt: e.erledigt ? "Ja" : "Nein",
+      "Erstellt am": e.erstellt_am ? e.erstellt_am.slice(0, 10) : "",
+    }));
+  }
+  function fV() {
+    return verlauf.map((v) => ({
+      Zeitpunkt: v.erstellt_am ? new Date(v.erstellt_am).toLocaleString("de-DE") : "",
+      Kategorie: v.kategorie,
+      Aktion: v.aktion,
+      Beschreibung: v.beschreibung || "",
+    }));
+  }
+  function fZ() {
+    const TYP_LABEL = { woche: "Woche", monat: "Monat", jahr: "Jahr" };
+    return ziele.map((z) => {
+      const schritte = zielSchritte.filter((s) => s.ziel_id === z.id);
+      const erledigtCount = schritte.filter((s) => s.erledigt).length;
+      const parent = z.uebergeordnetes_ziel_id ? ziele.find((p) => p.id === z.uebergeordnetes_ziel_id) : null;
+      return {
+        Titel: z.titel,
+        Zeitraum: TYP_LABEL[z.zeitraum_typ] || z.zeitraum_typ,
+        "Zeitraum-Start": z.zeitraum_start,
+        "Übergeordnetes Ziel": parent ? parent.titel : "",
+        Fortschritt: schritte.length > 0 ? `${erledigtCount}/${schritte.length}` : "keine Schritte",
+      };
+    });
+  }
 
   const EXPORT_KATEGORIEN = [
     { id: "aufgaben", name: "Aufgaben", daten: fA },
@@ -1235,6 +1744,9 @@
     { id: "notizen", name: "Notizen", daten: fN },
     { id: "links", name: "Links", daten: fL },
     { id: "reflexion", name: "Reflexion", daten: fR },
+    { id: "einkauf", name: "Einkaufsliste", daten: fE },
+    { id: "verlauf", name: "Verlauf", daten: fV },
+    { id: "ziele", name: "Ziele", daten: fZ },
   ];
 
   function downloadDatei(filename, content, mime) {
@@ -1609,7 +2121,7 @@
         overviewHtml += '<div class="upcoming-list" style="margin-bottom:1rem;">' +
           termineImZeitraum.map((t) => `
             <div class="upcoming-item">
-              <span class="upcoming-datum">${formatDatumKurz(t.datum)}${t.uhrzeit ? " · " + t.uhrzeit.slice(0,5) : ""}</span>
+              <span class="upcoming-datum">${formatDatumKurz(t.datum)}${t.uhrzeit ? " · " + t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
               <span>${escapeHtml(t.titel)}</span>
             </div>`).join("") + '</div>';
       }
