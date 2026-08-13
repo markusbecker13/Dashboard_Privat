@@ -131,6 +131,15 @@
   }
   .notiz-text { flex: 1; font-size: 0.92rem; white-space: pre-wrap; }
   .notiz-meta { display: block; color: var(--ink-dim); font-size: 0.75rem; margin-top: 0.3rem; }
+
+  .link-item {
+    display: flex; align-items: flex-start; gap: 0.7rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem;
+  }
+  .link-titel { font-size: 0.95rem; color: var(--ink); text-decoration: none; font-weight: 500; }
+  .link-titel:hover { color: var(--accent); }
+  .link-url { display: block; color: var(--ink-dim); font-size: 0.78rem; margin-top: 0.1rem; word-break: break-all; }
+  .link-notiz { display: block; color: var(--ink-dim); font-size: 0.85rem; margin-top: 0.3rem; }
 </style>
 </head>
 <body>
@@ -156,6 +165,7 @@
         <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
         <button class="tab-btn" id="tab-kalender">Kalender</button>
         <button class="tab-btn" id="tab-notizen">Notizen</button>
+        <button class="tab-btn" id="tab-links">Links</button>
       </div>
 
       <div id="view-heute">
@@ -217,6 +227,23 @@
 
         <div id="notizen-bereich"></div>
       </div>
+
+      <div id="view-links" class="hidden">
+        <h1>Links</h1>
+        <p class="hero-text">Wichtige Adressen und Materialien, schnell wiederfindbar.</p>
+
+        <div class="row">
+          <input type="text" id="neuer-link-titel" placeholder="Titel">
+          <input type="text" id="neuer-link-url" placeholder="URL (z.B. beispiel.de/seite)">
+          <select id="link-projekt"><option value="">Ohne Projekt</option></select>
+          <button class="btn-primary" id="btn-link-hinzufuegen">Speichern</button>
+        </div>
+        <div class="row" style="margin-top:-0.5rem;">
+          <input type="text" id="neuer-link-notiz" placeholder="Notiz (optional)" style="flex:1;">
+        </div>
+
+        <div id="links-bereich" style="margin-top:1rem;"></div>
+      </div>
     </main>
   </div>
 
@@ -233,6 +260,7 @@
   let aufgaben = [];
   let termine = [];
   let notizen = [];
+  let links = [];
   let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
   let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
 
@@ -312,10 +340,12 @@
     aufgaben = data.aufgaben || [];
     termine = data.termine || [];
     notizen = data.notizen || [];
+    links = data.links || [];
     render();
     renderKalender();
     renderHeute();
     renderNotizen();
+    renderLinks();
   }
 
   function badgeHtml(cls, text) {
@@ -492,8 +522,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -505,6 +535,7 @@
   document.getElementById("tab-aufgaben").addEventListener("click", () => tabWechseln("aufgaben"));
   document.getElementById("tab-kalender").addEventListener("click", () => tabWechseln("kalender"));
   document.getElementById("tab-notizen").addEventListener("click", () => tabWechseln("notizen"));
+  document.getElementById("tab-links").addEventListener("click", () => tabWechseln("links"));
 
   function renderHeute() {
     const heuteIso = heuteISO();
@@ -723,6 +754,75 @@
 
   window.notizLoeschen = async function(id) {
     await api("notiz_loeschen", { id });
+    await ladeDaten();
+  };
+
+  // ==========================================================
+  // Links
+  // ==========================================================
+  function linkHtml(l) {
+    return `
+      <div class="link-item">
+        <div style="flex:1; min-width:0;">
+          <a class="link-titel" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.titel)}</a>
+          <span class="link-url">${escapeHtml(l.url)}</span>
+          ${l.notiz ? `<span class="link-notiz">${escapeHtml(l.notiz)}</span>` : ""}
+        </div>
+        <button class="task-delete" onclick="linkLoeschen('${l.id}')">×</button>
+      </div>`;
+  }
+
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/"/g, "&quot;");
+  }
+
+  function renderLinks() {
+    const select = document.getElementById("link-projekt");
+    select.innerHTML = '<option value="">Ohne Projekt</option>' +
+      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+
+    const ohneProjekt = links.filter((l) => !l.projekt_id);
+    const gruppen = projekte
+      .map((p) => ({ projekt: p, liste: links.filter((l) => l.projekt_id === p.id) }))
+      .filter((g) => g.liste.length > 0);
+
+    let html = "";
+    if (ohneProjekt.length > 0) {
+      html += `<div class="project-heading">Ohne Projekt</div><div class="task-list">${ohneProjekt.map(linkHtml).join("")}</div>`;
+    }
+    for (const g of gruppen) {
+      html += `<div class="project-heading">${escapeHtml(g.projekt.name)}</div><div class="task-list">${g.liste.map(linkHtml).join("")}</div>`;
+    }
+    if (links.length === 0) {
+      html = '<p class="empty-text">Noch keine Links gespeichert.</p>';
+    }
+    document.getElementById("links-bereich").innerHTML = html;
+  }
+
+  document.getElementById("btn-link-hinzufuegen").addEventListener("click", linkHinzufuegen);
+  document.getElementById("neuer-link-titel").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") linkHinzufuegen();
+  });
+  document.getElementById("neuer-link-url").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") linkHinzufuegen();
+  });
+
+  async function linkHinzufuegen() {
+    const titel = document.getElementById("neuer-link-titel").value.trim();
+    const url = document.getElementById("neuer-link-url").value.trim();
+    if (!titel || !url) return;
+    const notiz = document.getElementById("neuer-link-notiz").value.trim() || null;
+    const projekt_id = document.getElementById("link-projekt").value || null;
+
+    await api("link_hinzufuegen", { titel, url, notiz, projekt_id });
+    document.getElementById("neuer-link-titel").value = "";
+    document.getElementById("neuer-link-url").value = "";
+    document.getElementById("neuer-link-notiz").value = "";
+    await ladeDaten();
+  }
+
+  window.linkLoeschen = async function(id) {
+    await api("link_loeschen", { id });
     await ladeDaten();
   };
 </script>
