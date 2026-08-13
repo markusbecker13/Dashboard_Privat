@@ -6,11 +6,173 @@
 <title>Aufgaben</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2f6fed">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://juxoxltaeugsmtvirfcm.supabase.co; img-src 'self' data:; script-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #cfe6fb; --panel: #f2f8fe; --ink: #1d3557; --ink-dim: #4a6c94;
+    --accent: #2f6fed; --accent-2: #ff8a65; --border: #a9cdf0;
+    --overdue-bg: #fde2e1; --overdue-text: #b3261e; --overdue-border: #f5b7b4;
+    --today-bg: #fdead1; --today-text: #935e00; --today-border: #f3cf8e;
+    --reminder-bg: #e4ecfd;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Work Sans", system-ui, sans-serif; min-height: 100vh; }
+  .topbar { display: flex; align-items: baseline; gap: 0.6rem; padding: 1.4rem 1.6rem; border-bottom: 1px solid var(--border); }
+  .brand { font-family: "Fraunces", serif; font-weight: 600; font-size: 1.15rem; }
+  .brand-sub { color: var(--ink-dim); font-size: 0.85rem; }
+  main { max-width: 700px; margin: 0 auto; padding: 2.4rem 1.4rem 4rem; }
+  h1 { font-family: "Fraunces", serif; font-weight: 700; font-size: 2rem; margin: 0 0 0.4rem; }
+  .hero-text { color: var(--ink-dim); margin: 0 0 1.6rem; max-width: 46ch; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+  input, select, button { font-family: "Work Sans", sans-serif; font-size: 0.9rem; }
+  input, select {
+    padding: 0.75rem 0.8rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); color: var(--ink);
+  }
+  input[type="text"] { flex: 1 1 200px; }
+  input[type="number"] { width: 8rem; }
+  .btn-primary {
+    padding: 0.75rem 1.1rem; border: none; border-radius: 8px;
+    background: var(--accent); color: #fff; font-weight: 500; cursor: pointer;
+  }
+  .btn-secondary {
+    padding: 0.6rem 1rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); color: var(--ink); cursor: pointer; font-size: 0.85rem;
+  }
+  .link-btn { background: none; border: none; color: var(--ink-dim); cursor: pointer; padding: 0; font-size: 0.85rem; }
+  .project-heading {
+    font-size: 0.78rem; font-weight: 600; color: var(--ink-dim);
+    text-transform: uppercase; letter-spacing: 0.04em; margin: 1.6rem 0 0.6rem;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .project-edit-btn {
+    text-transform: none; letter-spacing: normal; font-weight: 400;
+    background: none; border: none; color: var(--ink-dim); opacity: 0.55;
+    cursor: pointer; font-size: 0.8rem; padding: 0;
+  }
+  .project-edit-btn:hover { opacity: 1; color: var(--accent); }
+  .task-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .task {
+    display: flex; align-items: center; gap: 0.7rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem;
+  }
+  .task.ueberfaellig { border-left: 3px solid var(--overdue-text); }
+  .task.heute { border-left: 3px solid var(--accent-2); }
+  .task-check {
+    width: 1.4rem; height: 1.4rem; border-radius: 50%; border: 1.5px solid var(--ink-dim);
+    background: transparent; cursor: pointer; flex-shrink: 0; color: #fff; font-size: 0.75rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .task-check.done { background: var(--accent); border-color: var(--accent); }
+  .task-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+  .task-titel { font-size: 0.95rem; }
+  .task-titel.done { color: var(--ink-dim); text-decoration: line-through; }
+  .task-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .badge {
+    font-size: 0.72rem; padding: 0.12rem 0.5rem; border-radius: 999px;
+    background: var(--bg); color: var(--ink-dim); border: 1px solid var(--border); display: inline-block;
+  }
+  .badge.overdue { background: var(--overdue-bg); color: var(--overdue-text); border-color: var(--overdue-border); }
+  .badge.today { background: var(--today-bg); color: var(--today-text); border-color: var(--today-border); }
+  .badge.reminder { background: var(--reminder-bg); color: var(--accent); }
+  .task-snooze { border: 1px solid var(--border); border-radius: 6px; background: none; color: var(--ink-dim); padding: 0.35rem 0.55rem; cursor: pointer; flex-shrink: 0; }
+  .task-delete { background: none; border: none; color: var(--ink-dim); font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.5rem; flex-shrink: 0; }
+  .empty-text { color: var(--ink-dim); }
+  #login-screen { max-width: 320px; margin: 4rem auto; padding: 0 1.4rem; text-align: center; }
+  #login-screen input { width: 100%; margin-bottom: 0.8rem; }
+  #login-screen button { width: 100%; }
+  #login-error { color: var(--overdue-text); font-size: 0.85rem; margin-top: 0.6rem; min-height: 1.2rem; }
+  .hidden { display: none !important; }
+
+  .tabs { display: flex; gap: 0.4rem; margin-bottom: 1.6rem; border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    background: none; border: none; padding: 0.7rem 0.2rem; margin-right: 1.2rem;
+    font-size: 0.95rem; color: var(--ink-dim); cursor: pointer; border-bottom: 2px solid transparent;
+  }
+  .tab-btn.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 500; }
+
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .cal-header h2 { font-family: "Fraunces", serif; font-size: 1.2rem; margin: 0; }
+  .cal-nav button {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    width: 2rem; height: 2rem; cursor: pointer; color: var(--ink); font-size: 1rem;
+  }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.3rem; margin-bottom: 1.6rem; }
+  .cal-daylabel { text-align: center; font-size: 0.72rem; color: var(--ink-dim); padding-bottom: 0.3rem; }
+  .cal-day {
+    aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--border); background: var(--panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 0.85rem; color: var(--ink); position: relative; gap: 0.15rem;
+  }
+  .cal-day.empty { border: none; background: none; cursor: default; }
+  .cal-day.today { border-color: var(--accent); border-width: 2px; }
+  .cal-day.selected { background: var(--accent); color: #fff; }
+  .cal-day .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-2); }
+  .cal-day.selected .dot { background: #fff; }
+  .cal-day-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .cal-day-panel h3 { font-family: "Fraunces", serif; font-size: 1rem; margin: 0 0 0.8rem; }
+  .termin-item { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+  .termin-item:last-of-type { border-bottom: none; }
+  .termin-zeit { color: var(--ink-dim); font-size: 0.82rem; min-width: 3.2rem; }
+  .termin-titel { flex: 1; font-size: 0.92rem; }
+  .termin-notiz { color: var(--ink-dim); font-size: 0.8rem; display: block; }
+  .termin-form { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
+  .termin-form input[type="text"] { flex: 1 1 160px; }
+  .upcoming-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.6rem; }
+  .upcoming-item { display: flex; gap: 0.6rem; align-items: baseline; font-size: 0.9rem; }
+  .upcoming-datum { color: var(--accent); font-weight: 500; min-width: 4.2rem; font-size: 0.82rem; }
+
+  .notiz-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .notiz-item {
+    display: flex; align-items: flex-start; gap: 0.7rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem;
+  }
+  .notiz-text { flex: 1; font-size: 0.92rem; white-space: pre-wrap; }
+  .notiz-meta { display: block; color: var(--ink-dim); font-size: 0.75rem; margin-top: 0.3rem; }
+
+  .link-item {
+    display: flex; align-items: flex-start; gap: 0.7rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem;
+  }
+  .link-titel { font-size: 0.95rem; color: var(--ink); text-decoration: none; font-weight: 500; }
+  .link-titel:hover { color: var(--accent); }
+  .link-url { display: block; color: var(--ink-dim); font-size: 0.78rem; margin-top: 0.1rem; word-break: break-all; }
+  .link-notiz { display: block; color: var(--ink-dim); font-size: 0.85rem; margin-top: 0.3rem; }
+
+  .reflex-form { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.6rem; }
+  .reflex-form input[type="date"] { align-self: flex-start; }
+  .reflex-form textarea {
+    padding: 0.75rem 0.8rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); color: var(--ink); font-family: "Work Sans", sans-serif;
+    font-size: 0.92rem; resize: vertical;
+  }
+  .reflex-item {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.9rem 1rem; margin-bottom: 0.7rem;
+  }
+  .reflex-datum {
+    font-family: "Fraunces", serif; font-weight: 600; font-size: 0.9rem;
+    color: var(--accent); margin-bottom: 0.4rem; display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .reflex-text { white-space: pre-wrap; font-size: 0.92rem; line-height: 1.5; }
+
+  .export-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.8rem 1rem; margin-bottom: 0.6rem;
+  }
+  .export-row.export-alle { border-color: var(--accent); }
+  .export-name { font-weight: 500; font-size: 0.95rem; }
+  .export-buttons { display: flex; gap: 0.5rem; flex-shrink: 0; }
+  .export-buttons button {
+    padding: 0.5rem 0.9rem; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--ink); cursor: pointer; font-size: 0.85rem;
+  }
+  .export-buttons button:hover { border-color: var(--accent); color: var(--accent); }
+</style>
 </head>
 <body>
 
@@ -36,6 +198,8 @@
         <button class="tab-btn" id="tab-kalender">Kalender</button>
         <button class="tab-btn" id="tab-notizen">Notizen</button>
         <button class="tab-btn" id="tab-links">Links</button>
+        <button class="tab-btn" id="tab-reflexion">Reflexion</button>
+        <button class="tab-btn" id="tab-export">Export</button>
       </div>
 
       <div id="view-heute">
@@ -114,9 +278,808 @@
 
         <div id="links-bereich" style="margin-top:1rem;"></div>
       </div>
+
+      <div id="view-reflexion" class="hidden">
+        <h1>Reflexion</h1>
+        <p class="hero-text">Kurze Einträge nach Einheiten oder Tagen – zum Rückblättern, nicht zum Teilen.</p>
+
+        <div class="reflex-form">
+          <input type="date" id="reflex-datum">
+          <textarea id="reflex-text" rows="4" placeholder="Was ist dir heute aufgefallen …"></textarea>
+          <button class="btn-primary" id="btn-reflex-hinzufuegen">Eintragen</button>
+        </div>
+
+        <div id="reflexion-bereich" style="margin-top:1.4rem;"></div>
+      </div>
+
+      <div id="view-export" class="hidden">
+        <h1>Export</h1>
+        <p class="hero-text">Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen.</p>
+        <div id="export-liste"></div>
+      </div>
     </main>
   </div>
 
-<script src="app.js"></script>
+<script>
+  // ==========================================================
+  // WICHTIG: Diese URL nach dem Deployment der Edge Function
+  // aus dem Supabase-Dashboard eintragen (siehe SETUP.md).
+  // Beispiel: https://xxxxxxxx.supabase.co/functions/v1/aufgaben-api
+  // ==========================================================
+  const API_URL = "https://juxoxltaeugsmtvirfcm.supabase.co/functions/v1/bright-endpoint";
+
+  let pass = localStorage.getItem("aufgaben-pass") || "";
+  let projekte = [];
+  let aufgaben = [];
+  let termine = [];
+  let notizen = [];
+  let links = [];
+  let reflexionen = [];
+  let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
+  let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
+
+  async function api(action, extra = {}) {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, pass, ...extra }),
+    });
+    if (res.status === 401) {
+      localStorage.removeItem("aufgaben-pass");
+      zeigeLogin("Passwort falsch oder abgelaufen.");
+      throw new Error("unauthorized");
+    }
+    if (!res.ok) throw new Error("Serverfehler");
+    return res.json();
+  }
+
+  function zeigeLogin(fehler) {
+    document.getElementById("app").classList.add("hidden");
+    document.getElementById("login-screen").classList.remove("hidden");
+    document.getElementById("login-error").textContent = fehler || "";
+  }
+
+  function zeigeApp() {
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+  }
+
+  document.getElementById("login-btn").addEventListener("click", anmelden);
+  document.getElementById("login-pass").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") anmelden();
+  });
+
+  document.getElementById("btn-abmelden").addEventListener("click", () => {
+    localStorage.removeItem("aufgaben-pass");
+    pass = "";
+    document.getElementById("login-pass").value = "";
+    zeigeLogin();
+  });
+
+  async function anmelden() {
+    pass = document.getElementById("login-pass").value;
+    try {
+      await ladeDaten();
+      localStorage.setItem("aufgaben-pass", pass);
+      zeigeApp();
+    } catch (e) {
+      // Fehlermeldung wurde schon in api() gesetzt
+    }
+  }
+
+  function heuteISO() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function addTage(datumISO, tage) {
+    const d = new Date(datumISO + "T00:00:00");
+    d.setDate(d.getDate() + tage);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function enrich(a) {
+    const heute = heuteISO();
+    let status = "normal";
+    if (a.faellig_am) {
+      if (a.faellig_am < heute) status = "ueberfaellig";
+      else if (a.faellig_am === heute) status = "heute";
+    }
+    const erinnerungFaellig = !!(a.naechste_erinnerung && a.naechste_erinnerung <= heute);
+    return { ...a, status, erinnerungFaellig };
+  }
+
+  async function ladeDaten() {
+    const data = await api("liste");
+    projekte = data.projekte || [];
+    aufgaben = data.aufgaben || [];
+    termine = data.termine || [];
+    notizen = data.notizen || [];
+    links = data.links || [];
+    reflexionen = data.reflexionen || [];
+    render();
+    renderKalender();
+    renderHeute();
+    renderNotizen();
+    renderLinks();
+    renderReflexionen();
+    renderExport();
+  }
+
+  function badgeHtml(cls, text) {
+    return `<span class="badge ${cls}">${text}</span>`;
+  }
+
+  function taskHtml(a, done) {
+    const projekt = projekte.find((p) => p.id === a.projekt_id);
+    let meta = "";
+    if (done && projekt) meta += badgeHtml("", projekt.name);
+    if (!done && a.faellig_am) {
+      if (a.status === "ueberfaellig") meta += badgeHtml("overdue", "überfällig · " + a.faellig_am);
+      else if (a.status === "heute") meta += badgeHtml("today", "heute fällig");
+      else meta += badgeHtml("", "fällig " + a.faellig_am);
+    }
+    if (!done && a.erinnere_alle_tage) meta += badgeHtml("reminder", "alle " + a.erinnere_alle_tage + " Tage");
+
+    const snoozeBtn = !done && a.erinnerungFaellig
+      ? `<button class="task-snooze" onclick="erinnerungVerschieben('${a.id}')" title="Später erneut erinnern">↻</button>`
+      : "";
+
+    return `
+      <div class="task ${!done ? a.status : ""}">
+        <button class="task-check ${done ? "done" : ""}" onclick="umschalten('${a.id}')">${done ? "✓" : ""}</button>
+        <div class="task-info">
+          <span class="task-titel ${done ? "done" : ""}">${escapeHtml(a.titel)}</span>
+          <div class="task-meta">${meta}</div>
+        </div>
+        ${snoozeBtn}
+        <button class="task-delete" onclick="loeschen('${a.id}')">×</button>
+      </div>`;
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function render() {
+    const select = document.getElementById("aufgabe-projekt");
+    select.innerHTML = '<option value="">Ohne Projekt</option>' +
+      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+
+    const offen = aufgaben.filter((a) => !a.erledigt).map(enrich);
+    const erledigt = aufgaben.filter((a) => a.erledigt);
+
+    const sortiere = (liste) => [...liste].sort((a, b) => {
+      const ad = a.faellig_am || "9999-99-99";
+      const bd = b.faellig_am || "9999-99-99";
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      return b.erstellt_am < a.erstellt_am ? -1 : 1;
+    });
+
+    const ohneProjekt = sortiere(offen.filter((a) => !a.projekt_id));
+    const gruppen = projekte
+      .map((p) => ({ projekt: p, liste: sortiere(offen.filter((a) => a.projekt_id === p.id)) }))
+      .filter((g) => g.liste.length > 0);
+
+    let html = "";
+    if (ohneProjekt.length > 0) {
+      html += `<div class="project-heading">Ohne Projekt</div><div class="task-list">${ohneProjekt.map((a) => taskHtml(a, false)).join("")}</div>`;
+    }
+    for (const g of gruppen) {
+      html += `<div class="project-heading">${escapeHtml(g.projekt.name)} <button class="project-edit-btn" onclick="projektUmbenennen('${g.projekt.id}')" title="Projekt umbenennen">✎</button></div><div class="task-list">${g.liste.map((a) => taskHtml(a, false)).join("")}</div>`;
+    }
+    if (ohneProjekt.length === 0 && gruppen.length === 0) {
+      html = '<p class="empty-text">Keine offenen Aufgaben — gut gemacht.</p>';
+    }
+    document.getElementById("listen-bereich").innerHTML = html;
+
+    const erledigtBereich = document.getElementById("erledigt-bereich");
+    if (erledigt.length > 0) {
+      erledigtBereich.innerHTML = `
+        <button class="link-btn" id="toggle-erledigt">▸ Erledigt (${erledigt.length})</button>
+        <div class="task-list hidden" id="erledigt-liste" style="margin-top:0.6rem;">
+          ${erledigt.map((a) => taskHtml(a, true)).join("")}
+        </div>`;
+      document.getElementById("toggle-erledigt").addEventListener("click", (e) => {
+        const liste = document.getElementById("erledigt-liste");
+        liste.classList.toggle("hidden");
+        e.target.textContent = (liste.classList.contains("hidden") ? "▸" : "▾") + ` Erledigt (${erledigt.length})`;
+      });
+    } else {
+      erledigtBereich.innerHTML = "";
+    }
+  }
+
+  document.getElementById("btn-hinzufuegen").addEventListener("click", aufgabeHinzufuegen);
+  document.getElementById("neue-aufgabe").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") aufgabeHinzufuegen();
+  });
+
+  async function aufgabeHinzufuegen() {
+    const titel = document.getElementById("neue-aufgabe").value.trim();
+    if (!titel) return;
+    const projekt_id = document.getElementById("aufgabe-projekt").value || null;
+    const faellig_am = document.getElementById("aufgabe-faellig").value || null;
+    const erinnere_alle_tage = document.getElementById("aufgabe-intervall").value || null;
+
+    await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am, erinnere_alle_tage });
+    document.getElementById("neue-aufgabe").value = "";
+    document.getElementById("aufgabe-faellig").value = "";
+    document.getElementById("aufgabe-intervall").value = "";
+    await ladeDaten();
+  }
+
+  document.getElementById("toggle-projekt-form").addEventListener("click", (e) => {
+    const form = document.getElementById("projekt-form");
+    form.classList.toggle("hidden");
+    e.target.textContent = (form.classList.contains("hidden") ? "▸" : "▾") + " Neues Projekt anlegen";
+  });
+
+  document.getElementById("btn-projekt-anlegen").addEventListener("click", projektAnlegen);
+  document.getElementById("neues-projekt").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") projektAnlegen();
+  });
+
+  async function projektAnlegen() {
+    const name = document.getElementById("neues-projekt").value.trim();
+    if (!name) return;
+    await api("projekt_hinzufuegen", { name });
+    document.getElementById("neues-projekt").value = "";
+    await ladeDaten();
+  }
+
+  window.projektUmbenennen = async function(id) {
+    const projekt = projekte.find((p) => p.id === id);
+    if (!projekt) return;
+    const neuerName = prompt("Neuer Projektname:", projekt.name);
+    if (!neuerName || !neuerName.trim() || neuerName.trim() === projekt.name) return;
+    try {
+      await api("projekt_umbenennen", { id, name: neuerName.trim() });
+      await ladeDaten();
+    } catch (e) {
+      alert("Umbenennen fehlgeschlagen – existiert der Name schon?");
+    }
+  };
+
+  async function umschalten(id) {
+    await api("aufgabe_umschalten", { id });
+    await ladeDaten();
+  }
+
+  async function loeschen(id) {
+    await api("aufgabe_loeschen", { id });
+    await ladeDaten();
+  }
+
+  async function erinnerungVerschieben(id) {
+    await api("erinnerung_verschieben", { id });
+    await ladeDaten();
+  }
+
+  // Beim Start: automatisch anmelden, falls Passwort schon gespeichert
+  (async function init() {
+    if (pass) {
+      try {
+        await ladeDaten();
+        zeigeApp();
+        // Falls über eine App-Verknüpfung mit ?tab=... geöffnet wurde
+        // (z.B. Android-Schnellzugriff "Neue Notiz"), direkt dorthin springen.
+        const gewuenschterTab = new URLSearchParams(location.search).get("tab");
+        if (gewuenschterTab && document.getElementById("tab-" + gewuenschterTab)) {
+          tabWechseln(gewuenschterTab);
+        }
+        return;
+      } catch (e) {
+        // Passwort ungültig geworden -> Login zeigen
+      }
+    }
+    zeigeLogin();
+  })();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+
+  // ==========================================================
+  // Tabs
+  // ==========================================================
+  function tabWechseln(aktiv) {
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export" };
+    for (const key in tabs) {
+      document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
+      document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
+    }
+    if (aktiv === "kalender") renderKalender();
+    if (aktiv === "heute") renderHeute();
+  }
+  document.getElementById("tab-heute").addEventListener("click", () => tabWechseln("heute"));
+  document.getElementById("tab-aufgaben").addEventListener("click", () => tabWechseln("aufgaben"));
+  document.getElementById("tab-kalender").addEventListener("click", () => tabWechseln("kalender"));
+  document.getElementById("tab-notizen").addEventListener("click", () => tabWechseln("notizen"));
+  document.getElementById("tab-links").addEventListener("click", () => tabWechseln("links"));
+  document.getElementById("tab-reflexion").addEventListener("click", () => tabWechseln("reflexion"));
+  document.getElementById("tab-export").addEventListener("click", () => tabWechseln("export"));
+
+  function renderHeute() {
+    const heuteIso = heuteISO();
+    const offenEnriched = aufgaben.filter((a) => !a.erledigt).map(enrich);
+    const faelligHeute = offenEnriched.filter((a) => a.status === "ueberfaellig" || a.status === "heute");
+    const erinnerungenHeute = offenEnriched.filter((a) => a.erinnerungFaellig);
+    const termineHeute = termine
+      .filter((t) => t.datum === heuteIso)
+      .sort((a, b) => (a.uhrzeit || "99:99").localeCompare(b.uhrzeit || "99:99"));
+
+    let html = "";
+
+    if (termineHeute.length > 0) {
+      html += `<div class="project-heading">Termine heute</div><div class="upcoming-list" style="margin-bottom:1.6rem;">` +
+        termineHeute.map((t) => `
+          <div class="upcoming-item">
+            <span class="upcoming-datum">${t.uhrzeit ? t.uhrzeit.slice(0,5) : "ganztägig"}</span>
+            <span>${escapeHtml(t.titel)}</span>
+          </div>`).join("") +
+        `</div>`;
+    }
+
+    if (faelligHeute.length > 0) {
+      html += `<div class="project-heading">Fällige Aufgaben</div><div class="task-list">${faelligHeute.map((a) => taskHtml(a, false)).join("")}</div>`;
+    }
+
+    if (erinnerungenHeute.length > 0) {
+      html += `<div class="project-heading" style="margin-top:1.6rem;">Erinnerungen</div><div class="task-list">${erinnerungenHeute.map((a) => taskHtml(a, false)).join("")}</div>`;
+    }
+
+    if (termineHeute.length === 0 && faelligHeute.length === 0 && erinnerungenHeute.length === 0) {
+      html = '<p class="empty-text">Nichts Dringendes für heute — guter Tag.</p>';
+    }
+
+    document.getElementById("heute-bereich").innerHTML = html;
+  }
+
+  // ==========================================================
+  // Kalender
+  // ==========================================================
+  const MONATSNAMEN = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+  const TAGLABEL = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+
+  function dateToISO(d) {
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+
+  function termineAmTag(isoDatum) {
+    return termine.filter((t) => t.datum === isoDatum).sort((a,b) => (a.uhrzeit||"99:99").localeCompare(b.uhrzeit||"99:99"));
+  }
+
+  document.getElementById("cal-prev").addEventListener("click", () => {
+    calMonat.setMonth(calMonat.getMonth() - 1);
+    renderKalender();
+  });
+  document.getElementById("cal-next").addEventListener("click", () => {
+    calMonat.setMonth(calMonat.getMonth() + 1);
+    renderKalender();
+  });
+
+  function renderKalender() {
+    document.getElementById("cal-monat-label").textContent =
+      MONATSNAMEN[calMonat.getMonth()] + " " + calMonat.getFullYear();
+
+    const jahr = calMonat.getFullYear();
+    const monat = calMonat.getMonth();
+    const ersterTag = new Date(jahr, monat, 1);
+    const anzahlTage = new Date(jahr, monat + 1, 0).getDate();
+    // Montag = 0 ... Sonntag = 6
+    const startOffset = (ersterTag.getDay() + 6) % 7;
+    const heuteIso = dateToISO(new Date());
+
+    let html = TAGLABEL.map((l) => `<div class="cal-daylabel">${l}</div>`).join("");
+    for (let i = 0; i < startOffset; i++) html += `<div class="cal-day empty"></div>`;
+
+    for (let tag = 1; tag <= anzahlTage; tag++) {
+      const iso = dateToISO(new Date(jahr, monat, tag));
+      const anzahl = termineAmTag(iso).length;
+      const classes = ["cal-day"];
+      if (iso === heuteIso) classes.push("today");
+      if (iso === calAusgewaehlterTag) classes.push("selected");
+      html += `<div class="${classes.join(" ")}" onclick="calTagAuswaehlen('${iso}')">
+        <span>${tag}</span>
+        ${anzahl > 0 ? '<span class="dot"></span>' : ""}
+      </div>`;
+    }
+    document.getElementById("cal-grid").innerHTML = html;
+
+    renderUpcoming();
+    renderCalDayPanel();
+  }
+
+  function renderUpcoming() {
+    const heuteIso = dateToISO(new Date());
+    const kommende = termine
+      .filter((t) => t.datum >= heuteIso)
+      .sort((a,b) => (a.datum + (a.uhrzeit||"99:99")).localeCompare(b.datum + (b.uhrzeit||"99:99")))
+      .slice(0, 5);
+
+    if (kommende.length === 0) {
+      document.getElementById("upcoming-bereich").innerHTML = "";
+      return;
+    }
+    const html = kommende.map((t) => `
+      <div class="upcoming-item">
+        <span class="upcoming-datum">${formatDatumKurz(t.datum)}${t.uhrzeit ? " · " + t.uhrzeit.slice(0,5) : ""}</span>
+        <span>${escapeHtml(t.titel)}</span>
+      </div>`).join("");
+    document.getElementById("upcoming-bereich").innerHTML =
+      `<div class="project-heading">Nächste Termine</div><div class="upcoming-list">${html}</div>`;
+  }
+
+  function formatDatumKurz(iso) {
+    const [j,m,t] = iso.split("-");
+    return t + "." + m + ".";
+  }
+
+  window.calTagAuswaehlen = function(iso) {
+    calAusgewaehlterTag = (calAusgewaehlterTag === iso) ? null : iso;
+    renderKalender();
+  };
+
+  function renderCalDayPanel() {
+    const panel = document.getElementById("cal-day-panel");
+    if (!calAusgewaehlterTag) { panel.innerHTML = ""; return; }
+
+    const liste = termineAmTag(calAusgewaehlterTag);
+    const [j,m,t] = calAusgewaehlterTag.split("-");
+    const titel = `${t}. ${MONATSNAMEN[parseInt(m,10)-1]} ${j}`;
+
+    const itemsHtml = liste.length === 0
+      ? `<p class="empty-text" style="margin:0 0 0.6rem;">Noch keine Termine an diesem Tag.</p>`
+      : liste.map((t) => `
+          <div class="termin-item">
+            <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) : ""}</span>
+            <span class="termin-titel">${escapeHtml(t.titel)}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
+            <button class="task-delete" onclick="terminLoeschen('${t.id}')">×</button>
+          </div>`).join("");
+
+    panel.innerHTML = `
+      <div class="cal-day-panel">
+        <h3>${titel}</h3>
+        ${itemsHtml}
+        <div class="termin-form">
+          <input type="text" id="termin-titel" placeholder="Titel">
+          <input type="time" id="termin-uhrzeit" style="width:8rem;">
+          <input type="text" id="termin-notiz" placeholder="Notiz (optional)">
+          <button class="btn-primary" id="btn-termin-hinzufuegen">Eintragen</button>
+        </div>
+      </div>`;
+
+    document.getElementById("btn-termin-hinzufuegen").addEventListener("click", terminHinzufuegen);
+    document.getElementById("termin-titel").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") terminHinzufuegen();
+    });
+  }
+
+  async function terminHinzufuegen() {
+    const titel = document.getElementById("termin-titel").value.trim();
+    if (!titel || !calAusgewaehlterTag) return;
+    const uhrzeit = document.getElementById("termin-uhrzeit").value || null;
+    const notiz = document.getElementById("termin-notiz").value.trim() || null;
+
+    await api("termin_hinzufuegen", { titel, datum: calAusgewaehlterTag, uhrzeit, notiz });
+    await ladeDaten();
+    renderKalender();
+  }
+
+  window.terminLoeschen = async function(id) {
+    await api("termin_loeschen", { id });
+    await ladeDaten();
+    renderKalender();
+  };
+
+  // ==========================================================
+  // Notizen
+  // ==========================================================
+  function renderNotizen() {
+    const select = document.getElementById("notiz-projekt");
+    select.innerHTML = '<option value="">Ohne Projekt</option>' +
+      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+
+    const bereich = document.getElementById("notizen-bereich");
+    if (notizen.length === 0) {
+      bereich.innerHTML = '<p class="empty-text">Noch keine Notizen.</p>';
+      return;
+    }
+    const html = notizen.map((n) => {
+      const projekt = projekte.find((p) => p.id === n.projekt_id);
+      const datum = new Date(n.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+      return `
+        <div class="notiz-item">
+          <div style="flex:1;">
+            <span class="notiz-text">${escapeHtml(n.text)}</span>
+            <span class="notiz-meta">${datum}${projekt ? " · " + escapeHtml(projekt.name) : ""}</span>
+          </div>
+          <button class="task-delete" onclick="notizLoeschen('${n.id}')">×</button>
+        </div>`;
+    }).join("");
+    bereich.innerHTML = `<div class="notiz-list">${html}</div>`;
+  }
+
+  document.getElementById("btn-notiz-hinzufuegen").addEventListener("click", notizHinzufuegen);
+  document.getElementById("neue-notiz").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") notizHinzufuegen();
+  });
+
+  async function notizHinzufuegen() {
+    const text = document.getElementById("neue-notiz").value.trim();
+    if (!text) return;
+    const projekt_id = document.getElementById("notiz-projekt").value || null;
+    await api("notiz_hinzufuegen", { text, projekt_id });
+    document.getElementById("neue-notiz").value = "";
+    await ladeDaten();
+  }
+
+  window.notizLoeschen = async function(id) {
+    await api("notiz_loeschen", { id });
+    await ladeDaten();
+  };
+
+  // ==========================================================
+  // Links
+  // ==========================================================
+  function linkHtml(l) {
+    return `
+      <div class="link-item">
+        <div style="flex:1; min-width:0;">
+          <a class="link-titel" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.titel)}</a>
+          <span class="link-url">${escapeHtml(l.url)}</span>
+          ${l.notiz ? `<span class="link-notiz">${escapeHtml(l.notiz)}</span>` : ""}
+        </div>
+        <button class="task-delete" onclick="linkLoeschen('${l.id}')">×</button>
+      </div>`;
+  }
+
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/"/g, "&quot;");
+  }
+
+  function renderLinks() {
+    const select = document.getElementById("link-projekt");
+    select.innerHTML = '<option value="">Ohne Projekt</option>' +
+      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+
+    const ohneProjekt = links.filter((l) => !l.projekt_id);
+    const gruppen = projekte
+      .map((p) => ({ projekt: p, liste: links.filter((l) => l.projekt_id === p.id) }))
+      .filter((g) => g.liste.length > 0);
+
+    let html = "";
+    if (ohneProjekt.length > 0) {
+      html += `<div class="project-heading">Ohne Projekt</div><div class="task-list">${ohneProjekt.map(linkHtml).join("")}</div>`;
+    }
+    for (const g of gruppen) {
+      html += `<div class="project-heading">${escapeHtml(g.projekt.name)}</div><div class="task-list">${g.liste.map(linkHtml).join("")}</div>`;
+    }
+    if (links.length === 0) {
+      html = '<p class="empty-text">Noch keine Links gespeichert.</p>';
+    }
+    document.getElementById("links-bereich").innerHTML = html;
+  }
+
+  document.getElementById("btn-link-hinzufuegen").addEventListener("click", linkHinzufuegen);
+  document.getElementById("neuer-link-titel").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") linkHinzufuegen();
+  });
+  document.getElementById("neuer-link-url").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") linkHinzufuegen();
+  });
+
+  async function linkHinzufuegen() {
+    const titel = document.getElementById("neuer-link-titel").value.trim();
+    const url = document.getElementById("neuer-link-url").value.trim();
+    if (!titel || !url) return;
+    const notiz = document.getElementById("neuer-link-notiz").value.trim() || null;
+    const projekt_id = document.getElementById("link-projekt").value || null;
+
+    await api("link_hinzufuegen", { titel, url, notiz, projekt_id });
+    document.getElementById("neuer-link-titel").value = "";
+    document.getElementById("neuer-link-url").value = "";
+    document.getElementById("neuer-link-notiz").value = "";
+    await ladeDaten();
+  }
+
+  window.linkLoeschen = async function(id) {
+    await api("link_loeschen", { id });
+    await ladeDaten();
+  };
+
+  // ==========================================================
+  // Reflexion
+  // ==========================================================
+  document.getElementById("reflex-datum").value = heuteISO();
+
+  function formatDatumLang(iso) {
+    const [j, m, t] = iso.split("-");
+    const monate = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+    return `${parseInt(t,10)}. ${monate[parseInt(m,10)-1]} ${j}`;
+  }
+
+  function renderReflexionen() {
+    const bereich = document.getElementById("reflexion-bereich");
+    if (reflexionen.length === 0) {
+      bereich.innerHTML = '<p class="empty-text">Noch keine Einträge.</p>';
+      return;
+    }
+    bereich.innerHTML = reflexionen.map((r) => `
+      <div class="reflex-item">
+        <div class="reflex-datum">
+          <span>${formatDatumLang(r.datum)}</span>
+          <button class="task-delete" style="font-size:1rem;" onclick="reflexionLoeschen('${r.id}')">×</button>
+        </div>
+        <div class="reflex-text">${escapeHtml(r.text)}</div>
+      </div>`).join("");
+  }
+
+  document.getElementById("btn-reflex-hinzufuegen").addEventListener("click", reflexionHinzufuegen);
+
+  async function reflexionHinzufuegen() {
+    const text = document.getElementById("reflex-text").value.trim();
+    if (!text) return;
+    const datum = document.getElementById("reflex-datum").value || heuteISO();
+
+    await api("reflexion_hinzufuegen", { text, datum });
+    document.getElementById("reflex-text").value = "";
+    document.getElementById("reflex-datum").value = heuteISO();
+    await ladeDaten();
+  }
+
+  window.reflexionLoeschen = async function(id) {
+    await api("reflexion_loeschen", { id });
+    await ladeDaten();
+  };
+
+  // ==========================================================
+  // Export (Excel & Word) – läuft komplett im Browser
+  // ==========================================================
+  function fA() {
+    return aufgaben.map((a) => {
+      const p = projekte.find((pr) => pr.id === a.projekt_id);
+      return {
+        Titel: a.titel,
+        Projekt: p ? p.name : "",
+        Erledigt: a.erledigt ? "Ja" : "Nein",
+        "Fällig am": a.faellig_am || "",
+        "Erinnerung alle X Tage": a.erinnere_alle_tage || "",
+        "Erstellt am": a.erstellt_am ? a.erstellt_am.slice(0, 10) : "",
+      };
+    });
+  }
+  function fT() {
+    return termine.map((t) => ({
+      Titel: t.titel,
+      Datum: t.datum,
+      Uhrzeit: t.uhrzeit ? t.uhrzeit.slice(0, 5) : "",
+      Notiz: t.notiz || "",
+    }));
+  }
+  function fN() {
+    return notizen.map((n) => {
+      const p = projekte.find((pr) => pr.id === n.projekt_id);
+      return {
+        Text: n.text,
+        Projekt: p ? p.name : "",
+        "Erstellt am": n.erstellt_am ? n.erstellt_am.slice(0, 10) : "",
+      };
+    });
+  }
+  function fL() {
+    return links.map((l) => {
+      const p = projekte.find((pr) => pr.id === l.projekt_id);
+      return {
+        Titel: l.titel,
+        URL: l.url,
+        Notiz: l.notiz || "",
+        Projekt: p ? p.name : "",
+      };
+    });
+  }
+  function fR() {
+    return reflexionen.map((r) => ({
+      Datum: r.datum,
+      Text: r.text,
+    }));
+  }
+
+  const EXPORT_KATEGORIEN = [
+    { id: "aufgaben", name: "Aufgaben", daten: fA },
+    { id: "termine", name: "Termine", daten: fT },
+    { id: "notizen", name: "Notizen", daten: fN },
+    { id: "links", name: "Links", daten: fL },
+    { id: "reflexion", name: "Reflexion", daten: fR },
+  ];
+
+  function downloadDatei(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function tabelleAlsHtml(titel, daten) {
+    if (daten.length === 0) return `<h2>${escapeHtml(titel)}</h2><p>Keine Einträge.</p>`;
+    const spalten = Object.keys(daten[0]);
+    let html = `<h2>${escapeHtml(titel)}</h2><table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:13px;">`;
+    html += `<tr>${spalten.map((s) => `<th style="background:#eee;text-align:left;">${escapeHtml(s)}</th>`).join("")}</tr>`;
+    for (const row of daten) {
+      html += `<tr>${spalten.map((s) => `<td>${escapeHtml(String(row[s] ?? ""))}</td>`).join("")}</tr>`;
+    }
+    html += `</table>`;
+    return html;
+  }
+
+  function wordDokument(titel, innerHtml) {
+    return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8"><title>${escapeHtml(titel)}</title></head>
+      <body>${innerHtml}</body></html>`;
+  }
+
+  window.exportExcel = function(kategorieId) {
+    if (typeof XLSX === "undefined") { alert("Export-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen."); return; }
+    const k = EXPORT_KATEGORIEN.find((k) => k.id === kategorieId);
+    const daten = k.daten();
+    const ws = XLSX.utils.json_to_sheet(daten.length ? daten : [{ Hinweis: "Keine Einträge" }]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, k.name.slice(0, 31));
+    XLSX.writeFile(wb, `${k.name}.xlsx`);
+  };
+
+  window.exportWord = function(kategorieId) {
+    const k = EXPORT_KATEGORIEN.find((k) => k.id === kategorieId);
+    const html = wordDokument(k.name, tabelleAlsHtml(k.name, k.daten()));
+    downloadDatei(`${k.name}.doc`, html, "application/msword");
+  };
+
+  window.exportAllesExcel = function() {
+    if (typeof XLSX === "undefined") { alert("Export-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen."); return; }
+    const wb = XLSX.utils.book_new();
+    for (const k of EXPORT_KATEGORIEN) {
+      const daten = k.daten();
+      const ws = XLSX.utils.json_to_sheet(daten.length ? daten : [{ Hinweis: "Keine Einträge" }]);
+      XLSX.utils.book_append_sheet(wb, ws, k.name.slice(0, 31));
+    }
+    XLSX.writeFile(wb, "dashboard-export.xlsx");
+  };
+
+  window.exportAllesWord = function() {
+    const teile = EXPORT_KATEGORIEN.map((k) => tabelleAlsHtml(k.name, k.daten())).join("<br>");
+    const html = wordDokument("Dashboard Export", `<h1>Dashboard Export</h1>${teile}`);
+    downloadDatei("dashboard-export.doc", html, "application/msword");
+  };
+
+  function renderExport() {
+    let html = `
+      <div class="export-row export-alle">
+        <span class="export-name">Alles</span>
+        <div class="export-buttons">
+          <button onclick="exportAllesExcel()">Excel</button>
+          <button onclick="exportAllesWord()">Word</button>
+        </div>
+      </div>`;
+    for (const k of EXPORT_KATEGORIEN) {
+      html += `
+        <div class="export-row">
+          <span class="export-name">${escapeHtml(k.name)}</span>
+          <div class="export-buttons">
+            <button onclick="exportExcel('${k.id}')">Excel</button>
+            <button onclick="exportWord('${k.id}')">Word</button>
+          </div>
+        </div>`;
+    }
+    document.getElementById("export-liste").innerHTML = html;
+  }
+</script>
 </body>
 </html>
