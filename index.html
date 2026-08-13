@@ -303,7 +303,8 @@
         <input type="text" id="neue-aufgabe" placeholder="Neue Aufgabe eintragen …">
         <select id="aufgabe-projekt"><option value="">Ohne Projekt</option></select>
         <input type="date" id="aufgabe-faellig" title="Fälligkeitsdatum (optional)">
-        <input type="time" id="aufgabe-uhrzeit" style="width:8rem;" title="Uhrzeit (optional)">
+        <input type="time" id="aufgabe-uhrzeit" style="width:8rem;" title="Beginn (optional)">
+        <input type="time" id="aufgabe-ende" style="width:8rem;" title="Ende (optional)">
         <input type="number" id="aufgabe-intervall" min="1" placeholder="alle X Tage" title="Wiederkehrende Erinnerung">
         <button class="btn-primary" id="btn-hinzufuegen">Hinzufügen</button>
       </div>
@@ -660,12 +661,13 @@
     let meta = "";
     if (done && projekt) meta += badgeHtml("", projekt.name);
     if (!done && a.faellig_am) {
-      const zeitZusatz = a.uhrzeit ? " · " + a.uhrzeit.slice(0,5) : "";
+      const start = a.uhrzeit ? a.uhrzeit.slice(0,5) : "";
+      const zeitZusatz = start ? " · " + start + (a.ende_uhrzeit ? "–" + a.ende_uhrzeit.slice(0,5) : "") : "";
       if (a.status === "ueberfaellig") meta += badgeHtml("overdue", "überfällig · " + a.faellig_am + zeitZusatz);
       else if (a.status === "heute") meta += badgeHtml("today", "heute fällig" + zeitZusatz);
       else meta += badgeHtml("", "fällig " + a.faellig_am + zeitZusatz);
     } else if (!done && a.uhrzeit) {
-      meta += badgeHtml("", a.uhrzeit.slice(0,5) + " Uhr");
+      meta += badgeHtml("", a.uhrzeit.slice(0,5) + (a.ende_uhrzeit ? "–" + a.ende_uhrzeit.slice(0,5) : "") + " Uhr");
     }
     if (!done && a.erinnere_alle_tage) meta += badgeHtml("reminder", "alle " + a.erinnere_alle_tage + " Tage");
 
@@ -751,12 +753,14 @@
     const projekt_id = document.getElementById("aufgabe-projekt").value || null;
     const faellig_am = document.getElementById("aufgabe-faellig").value || null;
     const uhrzeit = document.getElementById("aufgabe-uhrzeit").value || null;
+    const ende_uhrzeit = document.getElementById("aufgabe-ende").value || null;
     const erinnere_alle_tage = document.getElementById("aufgabe-intervall").value || null;
 
-    await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am, uhrzeit, erinnere_alle_tage });
+    await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am, uhrzeit, ende_uhrzeit, erinnere_alle_tage });
     document.getElementById("neue-aufgabe").value = "";
     document.getElementById("aufgabe-faellig").value = "";
     document.getElementById("aufgabe-uhrzeit").value = "";
+    document.getElementById("aufgabe-ende").value = "";
     document.getElementById("aufgabe-intervall").value = "";
     await ladeDaten();
   }
@@ -1254,6 +1258,7 @@
   let freiTag = new Date();
   let freiAusgewaehlteLuecke = null;
   let freiFormularTyp = "termin";
+  let freiBearbeiteterTermin = null;
 
   function wochentagIndex(d) {
     return (d.getDay() + 6) % 7; // 0=Mo … 6=So
@@ -1305,7 +1310,7 @@
     termine.filter((t) => t.datum === tagIso && t.uhrzeit).forEach((t) => {
       const start = t.uhrzeit.slice(0,5);
       const ende = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0,5) : minutenZuZeit(zeitZuMinuten(start) + 30);
-      bloecke.push({ start, ende, titel: t.titel, typ: "Termin" });
+      bloecke.push({ start, ende, titel: t.titel, typ: "Termin", id: t.id });
     });
 
     blockzeiten.forEach((b) => {
@@ -1393,11 +1398,13 @@
         <div class="frei-item frei-belegt">
           <span class="frei-zeit">${e.start}–${e.ende}</span>
           <span class="frei-label">${escapeHtml(e.titel)}<span class="frei-typ">${e.typ}</span></span>
+          ${e.typ === "Termin" ? `<button class="task-snooze" onclick="freiTerminBearbeitenStart('${e.id}')" title="Bearbeiten">✎</button>` : ""}
         </div>`;
     }).join("");
   }
 
   window.freiLueckeAuswaehlen = function(start, ende) {
+    freiBearbeiteterTermin = null;
     freiAusgewaehlteLuecke = { start, ende };
     freiFormularTyp = "termin";
     renderFreiFormular();
@@ -1406,7 +1413,55 @@
 
   function freiFormularSchliessen() {
     freiAusgewaehlteLuecke = null;
+    freiBearbeiteterTermin = null;
     document.getElementById("frei-formular-bereich").innerHTML = "";
+  }
+
+  window.freiTerminBearbeitenStart = function(id) {
+    freiAusgewaehlteLuecke = null;
+    freiBearbeiteterTermin = id;
+    renderFreiTerminFormular();
+    document.getElementById("frei-formular-bereich").scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  function renderFreiTerminFormular() {
+    const bereich = document.getElementById("frei-formular-bereich");
+    const t = termine.find((tt) => tt.id === freiBearbeiteterTermin);
+    if (!t) { bereich.innerHTML = ""; return; }
+
+    bereich.innerHTML = `
+      <div class="cal-day-panel">
+        <div class="project-heading" style="margin:0 0 0.6rem;">Termin bearbeiten</div>
+        <div class="row">
+          <input type="text" id="frei-termin-titel" placeholder="Titel" value="${escapeAttr(t.titel)}">
+          <input type="time" id="frei-termin-start" style="width:8rem;" value="${t.uhrzeit ? t.uhrzeit.slice(0,5) : ""}">
+          <input type="time" id="frei-termin-ende" style="width:8rem;" value="${t.ende_uhrzeit ? t.ende_uhrzeit.slice(0,5) : ""}">
+        </div>
+        <div class="row">
+          <input type="text" id="frei-termin-notiz" placeholder="Notiz (optional)" value="${t.notiz ? escapeAttr(t.notiz) : ""}">
+        </div>
+        <div class="row">
+          <button class="btn-primary" id="btn-frei-termin-speichern">Speichern</button>
+          <button class="btn-secondary" id="btn-frei-termin-abbrechen">Abbrechen</button>
+        </div>
+      </div>`;
+
+    document.getElementById("btn-frei-termin-speichern").addEventListener("click", freiTerminSpeichern);
+    document.getElementById("btn-frei-termin-abbrechen").addEventListener("click", freiFormularSchliessen);
+  }
+
+  async function freiTerminSpeichern() {
+    const id = freiBearbeiteterTermin;
+    const titel = document.getElementById("frei-termin-titel").value.trim();
+    if (!titel || !id) return;
+    const uhrzeit = document.getElementById("frei-termin-start").value || null;
+    const ende_uhrzeit = document.getElementById("frei-termin-ende").value || null;
+    const notiz = document.getElementById("frei-termin-notiz").value.trim() || null;
+
+    await api("termin_aktualisieren", { id, titel, uhrzeit, ende_uhrzeit, notiz });
+    freiFormularSchliessen();
+    await ladeDaten();
+    renderFrei();
   }
 
   function renderFreiFormular() {
@@ -1431,10 +1486,9 @@
         <div class="row">
           <input type="text" id="frei-titel" placeholder="Titel">
           <input type="time" id="frei-start" style="width:8rem;" value="${start}">
-          ${freiFormularTyp === "termin"
-            ? `<input type="time" id="frei-ende" style="width:8rem;" value="${ende}">`
-            : `<select id="frei-projekt">${projektOptions}</select>`}
+          <input type="time" id="frei-ende" style="width:8rem;" value="${ende}">
         </div>
+        ${freiFormularTyp === "aufgabe" ? `<div class="row"><select id="frei-projekt">${projektOptions}</select></div>` : ""}
         <div class="row">
           <button class="btn-primary" id="btn-frei-eintragen">Eintragen</button>
           <button class="btn-secondary" id="btn-frei-abbrechen">Abbrechen</button>
@@ -1452,13 +1506,13 @@
     if (!titel) return;
     const iso = dateToISO(freiTag);
     const start = document.getElementById("frei-start").value || freiAusgewaehlteLuecke.start;
+    const ende = document.getElementById("frei-ende").value || null;
 
     if (freiFormularTyp === "termin") {
-      const ende = document.getElementById("frei-ende").value || null;
       await api("termin_hinzufuegen", { titel, datum: iso, uhrzeit: start, ende_uhrzeit: ende, notiz: null });
     } else {
       const projekt_id = document.getElementById("frei-projekt").value || null;
-      await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am: iso, uhrzeit: start, erinnere_alle_tage: null });
+      await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am: iso, uhrzeit: start, ende_uhrzeit: ende, erinnere_alle_tage: null });
     }
     freiFormularSchliessen();
     await ladeDaten();
@@ -1665,7 +1719,8 @@
         Projekt: p ? p.name : "",
         Erledigt: a.erledigt ? "Ja" : "Nein",
         "Fällig am": a.faellig_am || "",
-        Uhrzeit: a.uhrzeit ? a.uhrzeit.slice(0, 5) : "",
+        Beginn: a.uhrzeit ? a.uhrzeit.slice(0, 5) : "",
+        Ende: a.ende_uhrzeit ? a.ende_uhrzeit.slice(0, 5) : "",
         "Erinnerung alle X Tage": a.erinnere_alle_tage || "",
         "Erstellt am": a.erstellt_am ? a.erstellt_am.slice(0, 10) : "",
       };
