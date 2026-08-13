@@ -144,11 +144,18 @@
 
     <main>
       <div class="tabs">
-        <button class="tab-btn active" id="tab-aufgaben">Aufgaben</button>
+        <button class="tab-btn active" id="tab-heute">Heute</button>
+        <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
         <button class="tab-btn" id="tab-kalender">Kalender</button>
       </div>
 
-      <div id="view-aufgaben">
+      <div id="view-heute">
+        <h1>Heute</h1>
+        <p class="hero-text">Was heute ansteht – Aufgaben und Termine kombiniert.</p>
+        <div id="heute-bereich"></div>
+      </div>
+
+      <div id="view-aufgaben" class="hidden">
       <h1>Aufgaben</h1>
       <p class="hero-text">Nach Projekten sortiert, mit Fälligkeit und wiederkehrender Erinnerung.</p>
 
@@ -283,6 +290,7 @@
     termine = data.termine || [];
     render();
     renderKalender();
+    renderHeute();
   }
 
   function badgeHtml(cls, text) {
@@ -458,19 +466,55 @@
   // ==========================================================
   // Tabs
   // ==========================================================
-  document.getElementById("tab-aufgaben").addEventListener("click", () => {
-    document.getElementById("tab-aufgaben").classList.add("active");
-    document.getElementById("tab-kalender").classList.remove("active");
-    document.getElementById("view-aufgaben").classList.remove("hidden");
-    document.getElementById("view-kalender").classList.add("hidden");
-  });
-  document.getElementById("tab-kalender").addEventListener("click", () => {
-    document.getElementById("tab-kalender").classList.add("active");
-    document.getElementById("tab-aufgaben").classList.remove("active");
-    document.getElementById("view-kalender").classList.remove("hidden");
-    document.getElementById("view-aufgaben").classList.add("hidden");
-    renderKalender();
-  });
+  function tabWechseln(aktiv) {
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender" };
+    for (const key in tabs) {
+      document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
+      document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
+    }
+    if (aktiv === "kalender") renderKalender();
+    if (aktiv === "heute") renderHeute();
+  }
+  document.getElementById("tab-heute").addEventListener("click", () => tabWechseln("heute"));
+  document.getElementById("tab-aufgaben").addEventListener("click", () => tabWechseln("aufgaben"));
+  document.getElementById("tab-kalender").addEventListener("click", () => tabWechseln("kalender"));
+
+  function renderHeute() {
+    const heuteIso = heuteISO();
+    const offenEnriched = aufgaben.filter((a) => !a.erledigt).map(enrich);
+    const faelligHeute = offenEnriched.filter((a) => a.status === "ueberfaellig" || a.status === "heute");
+    const erinnerungenHeute = offenEnriched.filter((a) => a.erinnerungFaellig);
+    const termineHeute = termine
+      .filter((t) => t.datum === heuteIso)
+      .sort((a, b) => (a.uhrzeit || "99:99").localeCompare(b.uhrzeit || "99:99"));
+
+    let html = "";
+
+    if (termineHeute.length > 0) {
+      html += `<div class="project-heading">Termine heute</div><div class="upcoming-list" style="margin-bottom:1.6rem;">` +
+        termineHeute.map((t) => `
+          <div class="upcoming-item">
+            <span class="upcoming-datum">${t.uhrzeit ? t.uhrzeit.slice(0,5) : "ganztägig"}</span>
+            <span>${escapeHtml(t.titel)}</span>
+          </div>`).join("") +
+        `</div>`;
+    }
+
+    if (faelligHeute.length > 0) {
+      html += `<div class="project-heading">Fällige Aufgaben</div><div class="task-list">${faelligHeute.map((a) => taskHtml(a, false)).join("")}</div>`;
+    }
+
+    if (erinnerungenHeute.length > 0) {
+      html += `<div class="project-heading" style="margin-top:1.6rem;">Erinnerungen</div><div class="task-list">${erinnerungenHeute.map((a) => taskHtml(a, false)).join("")}</div>`;
+    }
+
+    if (termineHeute.length === 0 && faelligHeute.length === 0 && erinnerungenHeute.length === 0) {
+      html = '<p class="empty-text">Nichts Dringendes für heute — guter Tag.</p>';
+    }
+
+    document.getElementById("heute-bereich").innerHTML = html;
+  }
 
   // ==========================================================
   // Kalender
