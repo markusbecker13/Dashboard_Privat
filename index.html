@@ -253,7 +253,8 @@
 
   <div id="app" class="hidden">
     <div class="topbar">
-      <span class="brand">Dashboard</span>
+      <span class="brand" id="brand-name">Dashboard</span>
+      <button class="project-edit-btn" onclick="dashboardNameBearbeiten()" title="Name ändern">✎</button>
       <span class="brand-sub" id="brand-sub">Aufgaben</span>
       <button class="project-edit-btn" onclick="untertitelBearbeiten()" title="Untertitel ändern">✎</button>
       <button id="btn-abmelden" class="link-btn" style="margin-left:auto;">Abmelden</button>
@@ -444,6 +445,7 @@
   let zielExpandiert = new Set();
   let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
   let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
+  let calBearbeiteterTermin = null; // id des gerade bearbeiteten Termins oder null
 
   async function api(action, extra = {}) {
     const res = await fetch(API_URL, {
@@ -469,8 +471,22 @@
   function zeigeApp() {
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("app").classList.remove("hidden");
+    dashboardNameAnzeigen();
     untertitelAnzeigen();
   }
+
+  function dashboardNameAnzeigen() {
+    const gespeichert = localStorage.getItem("dashboard-name");
+    document.getElementById("brand-name").textContent = gespeichert || "Dashboard";
+  }
+
+  window.dashboardNameBearbeiten = function() {
+    const aktuell = localStorage.getItem("dashboard-name") || "Dashboard";
+    const neu = prompt("Wie soll dein Dashboard heißen?", aktuell);
+    if (neu === null || !neu.trim()) return;
+    localStorage.setItem("dashboard-name", neu.trim());
+    dashboardNameAnzeigen();
+  };
 
   function untertitelAnzeigen() {
     const gespeichert = localStorage.getItem("dashboard-untertitel");
@@ -479,7 +495,7 @@
 
   window.untertitelBearbeiten = function() {
     const aktuell = localStorage.getItem("dashboard-untertitel") || "Aufgaben";
-    const neu = prompt("Wie soll dein Dashboard heißen?", aktuell);
+    const neu = prompt("Welcher Untertitel soll neben dem Namen stehen?", aktuell);
     if (neu === null) return;
     localStorage.setItem("dashboard-untertitel", neu.trim());
     untertitelAnzeigen();
@@ -915,32 +931,59 @@
     const [j,m,t] = calAusgewaehlterTag.split("-");
     const titel = `${t}. ${MONATSNAMEN[parseInt(m,10)-1]} ${j}`;
 
+    // Falls der gerade bearbeitete Termin nicht mehr auf diesem Tag ist
+    // (z.B. Tag gewechselt), Bearbeitungsmodus verlassen.
+    const bearbeiteterTermin = calBearbeiteterTermin
+      ? liste.find((t) => t.id === calBearbeiteterTermin)
+      : null;
+    if (calBearbeiteterTermin && !bearbeiteterTermin) calBearbeiteterTermin = null;
+
     const itemsHtml = liste.length === 0
       ? `<p class="empty-text" style="margin:0 0 0.6rem;">Noch keine Termine an diesem Tag.</p>`
       : liste.map((t) => `
           <div class="termin-item">
             <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) : ""}</span>
             <span class="termin-titel">${escapeHtml(t.titel)}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
+            <button class="task-snooze" onclick="terminBearbeitenStart('${t.id}')" title="Bearbeiten">✎</button>
             <button class="task-delete" onclick="terminLoeschen('${t.id}')">×</button>
           </div>`).join("");
+
+    const formTitel = bearbeiteterTermin ? "Termin bearbeiten" : "";
+    const buttonLabel = bearbeiteterTermin ? "Speichern" : "Eintragen";
+    const abbrechenHtml = bearbeiteterTermin
+      ? `<button class="btn-secondary" id="btn-termin-abbrechen">Abbrechen</button>`
+      : "";
 
     panel.innerHTML = `
       <div class="cal-day-panel">
         <h3>${titel}</h3>
         ${itemsHtml}
+        ${formTitel ? `<div class="project-heading" style="margin:1rem 0 0.4rem;">${formTitel}</div>` : ""}
         <div class="termin-form">
-          <input type="text" id="termin-titel" placeholder="Titel">
-          <input type="time" id="termin-uhrzeit" style="width:8rem;">
-          <input type="text" id="termin-notiz" placeholder="Notiz (optional)">
-          <button class="btn-primary" id="btn-termin-hinzufuegen">Eintragen</button>
+          <input type="text" id="termin-titel" placeholder="Titel" value="${bearbeiteterTermin ? escapeAttr(bearbeiteterTermin.titel) : ""}">
+          <input type="time" id="termin-uhrzeit" style="width:8rem;" value="${bearbeiteterTermin && bearbeiteterTermin.uhrzeit ? bearbeiteterTermin.uhrzeit.slice(0,5) : ""}">
+          <input type="text" id="termin-notiz" placeholder="Notiz (optional)" value="${bearbeiteterTermin && bearbeiteterTermin.notiz ? escapeAttr(bearbeiteterTermin.notiz) : ""}">
+          <button class="btn-primary" id="btn-termin-hinzufuegen">${buttonLabel}</button>
+          ${abbrechenHtml}
         </div>
       </div>`;
 
-    document.getElementById("btn-termin-hinzufuegen").addEventListener("click", terminHinzufuegen);
+    document.getElementById("btn-termin-hinzufuegen").addEventListener("click", bearbeiteterTermin ? terminAktualisieren : terminHinzufuegen);
     document.getElementById("termin-titel").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") terminHinzufuegen();
+      if (e.key === "Enter") (bearbeiteterTermin ? terminAktualisieren : terminHinzufuegen)();
     });
+    if (bearbeiteterTermin) {
+      document.getElementById("btn-termin-abbrechen").addEventListener("click", () => {
+        calBearbeiteterTermin = null;
+        renderCalDayPanel();
+      });
+    }
   }
+
+  window.terminBearbeitenStart = function(id) {
+    calBearbeiteterTermin = id;
+    renderCalDayPanel();
+  };
 
   async function terminHinzufuegen() {
     const titel = document.getElementById("termin-titel").value.trim();
@@ -953,7 +996,21 @@
     renderKalender();
   }
 
+  async function terminAktualisieren() {
+    const id = calBearbeiteterTermin;
+    const titel = document.getElementById("termin-titel").value.trim();
+    if (!titel || !id) return;
+    const uhrzeit = document.getElementById("termin-uhrzeit").value || null;
+    const notiz = document.getElementById("termin-notiz").value.trim() || null;
+
+    await api("termin_aktualisieren", { id, titel, uhrzeit, notiz });
+    calBearbeiteterTermin = null;
+    await ladeDaten();
+    renderKalender();
+  }
+
   window.terminLoeschen = async function(id) {
+    if (calBearbeiteterTermin === id) calBearbeiteterTermin = null;
     await api("termin_loeschen", { id });
     await ladeDaten();
     renderKalender();
