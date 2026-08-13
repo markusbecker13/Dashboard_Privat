@@ -9,6 +9,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #cfe6fb; --panel: #f2f8fe; --ink: #1d3557; --ink-dim: #4a6c94;
@@ -157,6 +158,20 @@
     color: var(--accent); margin-bottom: 0.4rem; display: flex; justify-content: space-between; align-items: baseline;
   }
   .reflex-text { white-space: pre-wrap; font-size: 0.92rem; line-height: 1.5; }
+
+  .export-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.8rem 1rem; margin-bottom: 0.6rem;
+  }
+  .export-row.export-alle { border-color: var(--accent); }
+  .export-name { font-weight: 500; font-size: 0.95rem; }
+  .export-buttons { display: flex; gap: 0.5rem; flex-shrink: 0; }
+  .export-buttons button {
+    padding: 0.5rem 0.9rem; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--ink); cursor: pointer; font-size: 0.85rem;
+  }
+  .export-buttons button:hover { border-color: var(--accent); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -184,6 +199,7 @@
         <button class="tab-btn" id="tab-notizen">Notizen</button>
         <button class="tab-btn" id="tab-links">Links</button>
         <button class="tab-btn" id="tab-reflexion">Reflexion</button>
+        <button class="tab-btn" id="tab-export">Export</button>
       </div>
 
       <div id="view-heute">
@@ -274,6 +290,12 @@
         </div>
 
         <div id="reflexion-bereich" style="margin-top:1.4rem;"></div>
+      </div>
+
+      <div id="view-export" class="hidden">
+        <h1>Export</h1>
+        <p class="hero-text">Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen.</p>
+        <div id="export-liste"></div>
       </div>
     </main>
   </div>
@@ -380,6 +402,7 @@
     renderNotizen();
     renderLinks();
     renderReflexionen();
+    renderExport();
   }
 
   function badgeHtml(cls, text) {
@@ -556,8 +579,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -571,6 +594,7 @@
   document.getElementById("tab-notizen").addEventListener("click", () => tabWechseln("notizen"));
   document.getElementById("tab-links").addEventListener("click", () => tabWechseln("links"));
   document.getElementById("tab-reflexion").addEventListener("click", () => tabWechseln("reflexion"));
+  document.getElementById("tab-export").addEventListener("click", () => tabWechseln("export"));
 
   function renderHeute() {
     const heuteIso = heuteISO();
@@ -905,6 +929,151 @@
     await api("reflexion_loeschen", { id });
     await ladeDaten();
   };
+
+  // ==========================================================
+  // Export (Excel & Word) – läuft komplett im Browser
+  // ==========================================================
+  function fA() {
+    return aufgaben.map((a) => {
+      const p = projekte.find((pr) => pr.id === a.projekt_id);
+      return {
+        Titel: a.titel,
+        Projekt: p ? p.name : "",
+        Erledigt: a.erledigt ? "Ja" : "Nein",
+        "Fällig am": a.faellig_am || "",
+        "Erinnerung alle X Tage": a.erinnere_alle_tage || "",
+        "Erstellt am": a.erstellt_am ? a.erstellt_am.slice(0, 10) : "",
+      };
+    });
+  }
+  function fT() {
+    return termine.map((t) => ({
+      Titel: t.titel,
+      Datum: t.datum,
+      Uhrzeit: t.uhrzeit ? t.uhrzeit.slice(0, 5) : "",
+      Notiz: t.notiz || "",
+    }));
+  }
+  function fN() {
+    return notizen.map((n) => {
+      const p = projekte.find((pr) => pr.id === n.projekt_id);
+      return {
+        Text: n.text,
+        Projekt: p ? p.name : "",
+        "Erstellt am": n.erstellt_am ? n.erstellt_am.slice(0, 10) : "",
+      };
+    });
+  }
+  function fL() {
+    return links.map((l) => {
+      const p = projekte.find((pr) => pr.id === l.projekt_id);
+      return {
+        Titel: l.titel,
+        URL: l.url,
+        Notiz: l.notiz || "",
+        Projekt: p ? p.name : "",
+      };
+    });
+  }
+  function fR() {
+    return reflexionen.map((r) => ({
+      Datum: r.datum,
+      Text: r.text,
+    }));
+  }
+
+  const EXPORT_KATEGORIEN = [
+    { id: "aufgaben", name: "Aufgaben", daten: fA },
+    { id: "termine", name: "Termine", daten: fT },
+    { id: "notizen", name: "Notizen", daten: fN },
+    { id: "links", name: "Links", daten: fL },
+    { id: "reflexion", name: "Reflexion", daten: fR },
+  ];
+
+  function downloadDatei(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function tabelleAlsHtml(titel, daten) {
+    if (daten.length === 0) return `<h2>${escapeHtml(titel)}</h2><p>Keine Einträge.</p>`;
+    const spalten = Object.keys(daten[0]);
+    let html = `<h2>${escapeHtml(titel)}</h2><table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:13px;">`;
+    html += `<tr>${spalten.map((s) => `<th style="background:#eee;text-align:left;">${escapeHtml(s)}</th>`).join("")}</tr>`;
+    for (const row of daten) {
+      html += `<tr>${spalten.map((s) => `<td>${escapeHtml(String(row[s] ?? ""))}</td>`).join("")}</tr>`;
+    }
+    html += `</table>`;
+    return html;
+  }
+
+  function wordDokument(titel, innerHtml) {
+    return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8"><title>${escapeHtml(titel)}</title></head>
+      <body>${innerHtml}</body></html>`;
+  }
+
+  window.exportExcel = function(kategorieId) {
+    if (typeof XLSX === "undefined") { alert("Export-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen."); return; }
+    const k = EXPORT_KATEGORIEN.find((k) => k.id === kategorieId);
+    const daten = k.daten();
+    const ws = XLSX.utils.json_to_sheet(daten.length ? daten : [{ Hinweis: "Keine Einträge" }]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, k.name.slice(0, 31));
+    XLSX.writeFile(wb, `${k.name}.xlsx`);
+  };
+
+  window.exportWord = function(kategorieId) {
+    const k = EXPORT_KATEGORIEN.find((k) => k.id === kategorieId);
+    const html = wordDokument(k.name, tabelleAlsHtml(k.name, k.daten()));
+    downloadDatei(`${k.name}.doc`, html, "application/msword");
+  };
+
+  window.exportAllesExcel = function() {
+    if (typeof XLSX === "undefined") { alert("Export-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen."); return; }
+    const wb = XLSX.utils.book_new();
+    for (const k of EXPORT_KATEGORIEN) {
+      const daten = k.daten();
+      const ws = XLSX.utils.json_to_sheet(daten.length ? daten : [{ Hinweis: "Keine Einträge" }]);
+      XLSX.utils.book_append_sheet(wb, ws, k.name.slice(0, 31));
+    }
+    XLSX.writeFile(wb, "dashboard-export.xlsx");
+  };
+
+  window.exportAllesWord = function() {
+    const teile = EXPORT_KATEGORIEN.map((k) => tabelleAlsHtml(k.name, k.daten())).join("<br>");
+    const html = wordDokument("Dashboard Export", `<h1>Dashboard Export</h1>${teile}`);
+    downloadDatei("dashboard-export.doc", html, "application/msword");
+  };
+
+  function renderExport() {
+    let html = `
+      <div class="export-row export-alle">
+        <span class="export-name">Alles</span>
+        <div class="export-buttons">
+          <button onclick="exportAllesExcel()">Excel</button>
+          <button onclick="exportAllesWord()">Word</button>
+        </div>
+      </div>`;
+    for (const k of EXPORT_KATEGORIEN) {
+      html += `
+        <div class="export-row">
+          <span class="export-name">${escapeHtml(k.name)}</span>
+          <div class="export-buttons">
+            <button onclick="exportExcel('${k.id}')">Excel</button>
+            <button onclick="exportWord('${k.id}')">Word</button>
+          </div>
+        </div>`;
+    }
+    document.getElementById("export-liste").innerHTML = html;
+  }
 </script>
 </body>
 </html>
