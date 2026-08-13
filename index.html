@@ -94,6 +94,12 @@
   }
   .tab-btn.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 500; }
 
+  @media (max-width: 640px) {
+    .tabs { flex-wrap: wrap; row-gap: 0.2rem; border-bottom: none; }
+    .tab-btn { margin-right: 0.7rem; padding: 0.4rem 0.15rem; font-size: 0.85rem; border-bottom: 2px solid transparent; }
+    .tab-btn.active { border-bottom-color: var(--accent); }
+  }
+
   .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
   .cal-header h2 { font-family: "Fraunces", serif; font-size: 1.2rem; margin: 0; }
   .cal-nav button {
