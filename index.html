@@ -868,20 +868,48 @@
     const offenEnriched = aufgaben.filter((a) => !a.erledigt).map(enrich);
     const faelligHeute = offenEnriched.filter((a) => a.status === "ueberfaellig" || a.status === "heute");
     const erinnerungenHeute = offenEnriched.filter((a) => a.erinnerungFaellig);
-    const termineHeute = termine
-      .filter((t) => t.datum === heuteIso)
-      .sort((a, b) => (a.uhrzeit || "99:99").localeCompare(b.uhrzeit || "99:99"));
+    const termineGanztags = termine
+      .filter((t) => t.datum === heuteIso && !t.uhrzeit)
+      .sort((a, b) => a.titel.localeCompare(b.titel));
     const einkaufOffen = einkaufsliste.filter((e) => !e.erledigt);
+
+    const jetztMinuten = (() => { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); })();
+    const heuteWtIndex = wochentagIndex(new Date());
+    const heuteEintraege = freiTagEintraege(heuteIso, heuteWtIndex);
+    const tagesablauf = (heuteEintraege || [])
+      .filter((e) => zeitZuMinuten(e.ende) > jetztMinuten)
+      .map((e) => e.art === "frei"
+        ? { ...e, start: minutenZuZeit(Math.max(zeitZuMinuten(e.start), jetztMinuten)) }
+        : e);
 
     let html = "";
 
-    if (termineHeute.length > 0) {
-      html += `<div class="project-heading">Termine heute</div><div class="upcoming-list" style="margin-bottom:1.6rem;">` +
-        termineHeute.map((t) => `
+    if (termineGanztags.length > 0) {
+      html += `<div class="project-heading">Ganztägig</div><div class="upcoming-list" style="margin-bottom:1.6rem;">` +
+        termineGanztags.map((t) => `
           <div class="upcoming-item">
-            <span class="upcoming-datum">${t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : "ganztägig"}</span>
+            <span class="upcoming-datum">ganztägig</span>
             <span>${escapeHtml(t.titel)}</span>
           </div>`).join("") +
+        `</div>`;
+    }
+
+    if (tagesablauf.length > 0) {
+      const MAX_ANZEIGEN = 8;
+      const sichtbar = tagesablauf.slice(0, MAX_ANZEIGEN);
+      const rest = tagesablauf.length - sichtbar.length;
+      html += `<div class="project-heading">Tagesablauf</div><div class="upcoming-list" style="margin-bottom:1.6rem;">` +
+        sichtbar.map((e) => e.art === "frei"
+          ? `<div class="upcoming-item" style="cursor:pointer;" onclick="heuteFreiOeffnen()">
+               <span class="upcoming-datum" style="color:#2e8b52;">${e.start}–${e.ende}</span>
+               <span style="color:var(--ink-dim);">frei</span>
+             </div>`
+          : `<div class="upcoming-item" style="cursor:pointer;" onclick="heuteFreiOeffnen()">
+               <span class="upcoming-datum">${e.start}–${e.ende}</span>
+               <span>${escapeHtml(e.titel)}</span>
+             </div>`
+        ).join("") +
+        (rest > 0 ? `<div class="upcoming-item" style="cursor:pointer; color:var(--accent);" onclick="heuteFreiOeffnen()"><span>+${rest} weitere im Frei-Reiter →</span></div>` : "") +
         `</div>`;
     }
 
@@ -903,7 +931,7 @@
         `</div>`;
     }
 
-    if (termineHeute.length === 0 && faelligHeute.length === 0 && erinnerungenHeute.length === 0 && einkaufOffen.length === 0) {
+    if (termineGanztags.length === 0 && tagesablauf.length === 0 && faelligHeute.length === 0 && erinnerungenHeute.length === 0 && einkaufOffen.length === 0) {
       html = '<p class="empty-text">Nichts Dringendes für heute — guter Tag.</p>';
     }
 
@@ -925,28 +953,6 @@
               <span class="ziel-kachel-fortschritt">${schritte.length > 0 ? erledigtCount + " / " + schritte.length + " Schritte" : "keine Schritte"}</span>
             </button>`;
         }).join("") +
-        `</div>`;
-    }
-
-    const jetztMinuten = (() => { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); })();
-    const heuteWtIndex = wochentagIndex(new Date());
-    const heuteRahmen = freiRahmenFuerWochentag(heuteWtIndex);
-    let freiHeuteListe = [];
-    if (heuteRahmen.aktiv) {
-      const heuteBloecke = freiBusyBloecke(heuteIso, heuteWtIndex);
-      const heuteLuecken = freiLueckenBerechnen(heuteRahmen.start_zeit, heuteRahmen.end_zeit, heuteBloecke);
-      freiHeuteListe = heuteLuecken
-        .map((l) => ({ start: minutenZuZeit(Math.max(zeitZuMinuten(l.start), jetztMinuten)), ende: l.ende }))
-        .filter((l) => zeitZuMinuten(l.ende) > jetztMinuten)
-        .slice(0, 3);
-    }
-
-    if (freiHeuteListe.length > 0) {
-      html += `<div class="project-heading" style="margin-top:1.6rem;">Frei heute</div><div class="upcoming-list">` +
-        freiHeuteListe.map((l) => `
-          <div class="upcoming-item" style="cursor:pointer;" onclick="heuteFreiOeffnen()">
-            <span class="upcoming-datum">${l.start}–${l.ende}</span>
-          </div>`).join("") +
         `</div>`;
     }
 
@@ -1383,6 +1389,19 @@
     return luecken.map(([s, e]) => ({ start: minutenZuZeit(s), ende: minutenZuZeit(e) }));
   }
 
+  // Liefert die belegten Blöcke + Lücken eines Tages chronologisch gemischt,
+  // oder null, wenn für diesen Wochentag kein Zeitrahmen aktiv ist.
+  function freiTagEintraege(tagIso, wtIndex) {
+    const rahmen = freiRahmenFuerWochentag(wtIndex);
+    if (!rahmen.aktiv) return null;
+    const bloecke = freiBusyBloecke(tagIso, wtIndex);
+    const luecken = freiLueckenBerechnen(rahmen.start_zeit, rahmen.end_zeit, bloecke);
+    return [
+      ...bloecke.map((b) => ({ ...b, art: "belegt" })),
+      ...luecken.map((l) => ({ start: l.start, ende: l.ende, art: "frei" })),
+    ].sort((a, b) => zeitZuMinuten(a.start) - zeitZuMinuten(b.start));
+  }
+
   function renderFrei() {
     const iso = dateToISO(freiTag);
     const wtIndex = wochentagIndex(freiTag);
@@ -1395,20 +1414,13 @@
     document.getElementById("frei-rahmen-ende").value = rahmen.end_zeit;
 
     const timelineEl = document.getElementById("frei-timeline");
+    const eintraege = freiTagEintraege(iso, wtIndex);
 
-    if (!rahmen.aktiv) {
+    if (!eintraege) {
       timelineEl.innerHTML = '<p class="empty-text">Für diesen Wochentag ist kein Zeitrahmen aktiv.</p>';
       freiFormularSchliessen();
       return;
     }
-
-    const bloecke = freiBusyBloecke(iso, wtIndex);
-    const luecken = freiLueckenBerechnen(rahmen.start_zeit, rahmen.end_zeit, bloecke);
-
-    const eintraege = [
-      ...bloecke.map((b) => ({ ...b, art: "belegt" })),
-      ...luecken.map((l) => ({ start: l.start, ende: l.ende, art: "frei" })),
-    ].sort((a, b) => zeitZuMinuten(a.start) - zeitZuMinuten(b.start));
 
     if (eintraege.length === 0) {
       timelineEl.innerHTML = '<p class="empty-text">Kein Zeitrahmen für diesen Tag eingestellt.</p>';
@@ -1429,9 +1441,24 @@
           <span class="frei-zeit">${e.start}–${e.ende}</span>
           <span class="frei-label">${escapeHtml(e.titel)}<span class="frei-typ">${e.typ}</span></span>
           ${e.typ === "Termin" ? `<button class="task-snooze" onclick="freiTerminBearbeitenStart('${e.id}')" title="Bearbeiten">✎</button>` : ""}
+          ${e.typ === "Termin" ? `<button class="task-delete" onclick="freiTerminEntfernen('${e.id}')" title="Entfernen">×</button>` : ""}
+          ${e.typ === "Aufgabe" ? `<button class="task-delete" onclick="freiAufgabeEntfernen('${e.id}')" title="Entfernen">×</button>` : ""}
         </div>`;
     }).join("");
   }
+
+  window.freiTerminEntfernen = async function(id) {
+    if (freiBearbeiteterTermin === id) freiFormularSchliessen();
+    await api("termin_loeschen", { id });
+    await ladeDaten();
+    renderFrei();
+  };
+
+  window.freiAufgabeEntfernen = async function(id) {
+    await api("aufgabe_loeschen", { id });
+    await ladeDaten();
+    renderFrei();
+  };
 
   window.freiLueckeAuswaehlen = function(start, ende) {
     freiBearbeiteterTermin = null;
