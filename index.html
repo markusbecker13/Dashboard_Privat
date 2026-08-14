@@ -1289,6 +1289,7 @@
   let freiAusgewaehlteLuecke = null;
   let freiFormularTyp = "termin";
   let freiBearbeiteterTermin = null;
+  let freiBearbeiteteAufgabe = null;
 
   function wochentagIndex(d) {
     return (d.getDay() + 6) % 7; // 0=Mo … 6=So
@@ -1442,6 +1443,7 @@
           <span class="frei-label">${escapeHtml(e.titel)}<span class="frei-typ">${e.typ}</span></span>
           ${e.typ === "Termin" ? `<button class="task-snooze" onclick="freiTerminBearbeitenStart('${e.id}')" title="Bearbeiten">✎</button>` : ""}
           ${e.typ === "Termin" ? `<button class="task-delete" onclick="freiTerminEntfernen('${e.id}')" title="Entfernen">×</button>` : ""}
+          ${e.typ === "Aufgabe" ? `<button class="task-snooze" onclick="freiAufgabeBearbeitenStart('${e.id}')" title="Bearbeiten">✎</button>` : ""}
           ${e.typ === "Aufgabe" ? `<button class="task-delete" onclick="freiAufgabeEntfernen('${e.id}')" title="Entfernen">×</button>` : ""}
         </div>`;
     }).join("");
@@ -1462,6 +1464,7 @@
 
   window.freiLueckeAuswaehlen = function(start, ende) {
     freiBearbeiteterTermin = null;
+    freiBearbeiteteAufgabe = null;
     freiAusgewaehlteLuecke = { start, ende };
     freiFormularTyp = "termin";
     renderFreiFormular();
@@ -1471,11 +1474,13 @@
   function freiFormularSchliessen() {
     freiAusgewaehlteLuecke = null;
     freiBearbeiteterTermin = null;
+    freiBearbeiteteAufgabe = null;
     document.getElementById("frei-formular-bereich").innerHTML = "";
   }
 
   window.freiTerminBearbeitenStart = function(id) {
     freiAusgewaehlteLuecke = null;
+    freiBearbeiteteAufgabe = null;
     freiBearbeiteterTermin = id;
     renderFreiTerminFormular();
     document.getElementById("frei-formular-bereich").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1488,9 +1493,12 @@
 
     bereich.innerHTML = `
       <div class="cal-day-panel">
-        <div class="project-heading" style="margin:0 0 0.6rem;">Termin bearbeiten</div>
+        <div class="project-heading" style="margin:0 0 0.6rem;">Termin verschieben / bearbeiten</div>
         <div class="row">
           <input type="text" id="frei-termin-titel" placeholder="Titel" value="${escapeAttr(t.titel)}">
+        </div>
+        <div class="row">
+          <input type="date" id="frei-termin-datum" value="${t.datum}">
           <input type="time" id="frei-termin-start" style="width:8rem;" value="${t.uhrzeit ? t.uhrzeit.slice(0,5) : ""}">
           <input type="time" id="frei-termin-ende" style="width:8rem;" value="${t.ende_uhrzeit ? t.ende_uhrzeit.slice(0,5) : ""}">
         </div>
@@ -1511,13 +1519,69 @@
     const id = freiBearbeiteterTermin;
     const titel = document.getElementById("frei-termin-titel").value.trim();
     if (!titel || !id) return;
+    const datum = document.getElementById("frei-termin-datum").value || null;
     const uhrzeit = document.getElementById("frei-termin-start").value || null;
     const ende_uhrzeit = document.getElementById("frei-termin-ende").value || null;
     const notiz = document.getElementById("frei-termin-notiz").value.trim() || null;
 
-    await api("termin_aktualisieren", { id, titel, uhrzeit, ende_uhrzeit, notiz });
+    await api("termin_aktualisieren", { id, titel, datum, uhrzeit, ende_uhrzeit, notiz });
     freiFormularSchliessen();
     await ladeDaten();
+    if (datum && datum !== dateToISO(freiTag)) freiTag = new Date(datum + "T00:00:00");
+    renderFrei();
+  }
+
+  window.freiAufgabeBearbeitenStart = function(id) {
+    freiAusgewaehlteLuecke = null;
+    freiBearbeiteterTermin = null;
+    freiBearbeiteteAufgabe = id;
+    renderFreiAufgabeFormular();
+    document.getElementById("frei-formular-bereich").scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  function renderFreiAufgabeFormular() {
+    const bereich = document.getElementById("frei-formular-bereich");
+    const a = aufgaben.find((aa) => aa.id === freiBearbeiteteAufgabe);
+    if (!a) { bereich.innerHTML = ""; return; }
+
+    const projektOptions = '<option value="">Ohne Projekt</option>' +
+      projekte.map((p) => `<option value="${p.id}" ${p.id === a.projekt_id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
+
+    bereich.innerHTML = `
+      <div class="cal-day-panel">
+        <div class="project-heading" style="margin:0 0 0.6rem;">Aufgabe verschieben / bearbeiten</div>
+        <div class="row">
+          <input type="text" id="frei-aufgabe-titel" placeholder="Titel" value="${escapeAttr(a.titel)}">
+          <select id="frei-aufgabe-projekt">${projektOptions}</select>
+        </div>
+        <div class="row">
+          <input type="date" id="frei-aufgabe-datum" value="${a.faellig_am || ""}">
+          <input type="time" id="frei-aufgabe-start" style="width:8rem;" value="${a.uhrzeit ? a.uhrzeit.slice(0,5) : ""}">
+          <input type="time" id="frei-aufgabe-ende" style="width:8rem;" value="${a.ende_uhrzeit ? a.ende_uhrzeit.slice(0,5) : ""}">
+        </div>
+        <div class="row">
+          <button class="btn-primary" id="btn-frei-aufgabe-speichern">Speichern</button>
+          <button class="btn-secondary" id="btn-frei-aufgabe-abbrechen">Abbrechen</button>
+        </div>
+      </div>`;
+
+    document.getElementById("btn-frei-aufgabe-speichern").addEventListener("click", freiAufgabeSpeichern);
+    document.getElementById("btn-frei-aufgabe-abbrechen").addEventListener("click", freiFormularSchliessen);
+  }
+
+  async function freiAufgabeSpeichern() {
+    const id = freiBearbeiteteAufgabe;
+    const titel = document.getElementById("frei-aufgabe-titel").value.trim();
+    if (!titel || !id) return;
+    const projekt_id = document.getElementById("frei-aufgabe-projekt").value || null;
+    const faellig_am = document.getElementById("frei-aufgabe-datum").value || null;
+    const uhrzeit = document.getElementById("frei-aufgabe-start").value || null;
+    const ende_uhrzeit = document.getElementById("frei-aufgabe-ende").value || null;
+
+    await api("aufgabe_aktualisieren", { id, titel, projekt_id, faellig_am, uhrzeit, ende_uhrzeit });
+    freiFormularSchliessen();
+    await ladeDaten();
+    if (faellig_am && faellig_am !== dateToISO(freiTag)) freiTag = new Date(faellig_am + "T00:00:00");
     renderFrei();
   }
 
