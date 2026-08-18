@@ -246,7 +246,31 @@
   .fin-quick-form .row { align-items: center; }
   .fin-quick-save { width: 100%; padding: 0.9rem; font-size: 1rem; }
   .fin-buchung-item { display: flex; align-items: center; gap: 0.7rem; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.4rem; }
+  .fin-buchung-item-bearbeitet { border-color: var(--accent); border-width: 2px; }
   .fin-buchung-datum { color: var(--ink-dim); font-size: 0.78rem; min-width: 3.2rem; }
+
+  /* Fixkosten-Kandidaten: Bestätigungs-Fenster nach dem CSV-Import */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(29, 53, 87, 0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem; z-index: 100;
+  }
+  .modal-box {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    max-width: 640px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 1.2rem;
+  }
+  .modal-box h2 { margin-top: 0; }
+  .kandidat-row {
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem;
+    margin-bottom: 0.6rem; display: flex; flex-direction: column; gap: 0.45rem;
+  }
+  .kandidat-kopf { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .kandidat-hinweis { color: var(--ink-dim); font-size: 0.78rem; }
+  .kandidat-felder { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .kandidat-felder input[type="text"] { flex: 1; min-width: 8rem; }
+  .kandidat-felder input[type="number"] { width: 6.5rem; }
+  .kandidat-loeschen { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--ink-dim); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; position: sticky; bottom: 0; background: var(--panel); padding-top: 0.6rem; }
   .fin-buchung-info { flex: 1; min-width: 0; }
   .fin-buchung-kat { font-size: 0.92rem; font-weight: 500; }
   .fin-buchung-notiz { color: var(--ink-dim); font-size: 0.8rem; }
@@ -596,6 +620,7 @@
   let finJahr = 2026;
   let finBuchMonat = new Date().getMonth() + 1;
   let finBuchJahr = new Date().getFullYear();
+  let finBearbeiteteBuchung = null; // id der Buchung, die gerade im Formular bearbeitet wird
 
   async function api(action, extra = {}) {
     const res = await fetch(API_URL, {
@@ -2302,15 +2327,19 @@
     renderFinanzen();
   }
 
+  let finBearbeiteteSonderausgabe = null;
+
   function renderFinSonderausgaben() {
     const el = document.getElementById("fin-sonderausgaben-bereich");
     const jahr = new Date().getFullYear();
     const liste = sonderausgaben.filter((s) => Number(s.jahr) === jahr);
     const summe = liste.reduce((s, x) => s + finZahl(x.betrag), 0);
+    const bearbeitet = finBearbeiteteSonderausgabe ? sonderausgaben.find((s) => s.id === finBearbeiteteSonderausgabe) : null;
+    if (finBearbeiteteSonderausgabe && !bearbeitet) finBearbeiteteSonderausgabe = null;
 
     const cards = liste.length
       ? liste.map((s) => `
-        <div class="fin-card">
+        <div class="fin-card${s.id === finBearbeiteteSonderausgabe ? " fin-buchung-item-bearbeitet" : ""}">
           <div class="fin-card-info">
             <div class="fin-card-titel">${escapeHtml(s.bezeichnung)}</div>
             <div class="fin-card-meta">
@@ -2320,6 +2349,7 @@
             </div>
           </div>
           <div class="fin-betrag">${finEuro(s.betrag)}</div>
+          <button class="fin-loesch-btn" onclick="sonderausgabeBearbeitenStart('${s.id}')" title="Bearbeiten">✎</button>
           <button class="fin-loesch-btn" onclick="sonderausgabeLoeschen('${s.id}')" title="Löschen">×</button>
         </div>
       `).join("")
@@ -2335,26 +2365,57 @@
 
       ${cards}
 
-      <button class="link-btn" id="toggle-sonder-form" style="margin-top:0.8rem;">▸ Neue Sonderausgabe anlegen</button>
-      <div class="row hidden" id="sonder-form" style="margin-top:0.6rem;">
-        <input type="text" id="neue-sonder-bezeichnung" placeholder="Bezeichnung">
-        <input type="text" id="neue-sonder-kategorie" placeholder="Kategorie" style="width:8rem;">
-        <input type="number" step="0.01" id="neue-sonder-betrag" placeholder="Betrag €" style="width:7rem;">
+      <button class="link-btn" id="toggle-sonder-form" style="margin-top:0.8rem;">${bearbeitet ? "▾ Sonderausgabe bearbeiten" : "▸ Neue Sonderausgabe anlegen"}</button>
+      <div class="row ${bearbeitet ? "" : "hidden"}" id="sonder-form" style="margin-top:0.6rem;">
+        <input type="text" id="neue-sonder-bezeichnung" placeholder="Bezeichnung" value="${bearbeitet ? escapeAttr(bearbeitet.bezeichnung) : ""}">
+        <input type="text" id="neue-sonder-kategorie" placeholder="Kategorie" style="width:8rem;" value="${bearbeitet ? escapeAttr(bearbeitet.kategorie || "") : ""}">
+        <input type="number" step="0.01" id="neue-sonder-betrag" placeholder="Betrag €" style="width:7rem;" value="${bearbeitet ? finZahl(bearbeitet.betrag) : ""}">
         <select id="neue-sonder-monat">
           <option value="">Monat noch offen</option>
-          ${MONATSNAMEN.map((m, i) => `<option value="${i + 1}">${m}</option>`).join("")}
+          ${MONATSNAMEN.map((m, i) => `<option value="${i + 1}" ${bearbeitet && bearbeitet.monat === i + 1 ? "selected" : ""}>${m}</option>`).join("")}
         </select>
-        <input type="text" id="neue-sonder-notiz" placeholder="Notiz (optional)">
-        <button class="btn-primary" id="btn-sonder-anlegen">Anlegen</button>
+        <input type="text" id="neue-sonder-notiz" placeholder="Notiz (optional)" value="${bearbeitet ? escapeAttr(bearbeitet.notiz || "") : ""}">
+        <button class="btn-primary" id="btn-sonder-anlegen">${bearbeitet ? "Aktualisieren" : "Anlegen"}</button>
+        ${bearbeitet ? `<button class="btn-secondary" id="btn-sonder-abbrechen">Abbrechen</button>` : ""}
       </div>
     `;
 
     document.getElementById("toggle-sonder-form").addEventListener("click", (e) => {
+      if (bearbeitet) return; // im Bearbeiten-Modus per "Abbrechen" verlassen, nicht einklappen
       const form = document.getElementById("sonder-form");
       form.classList.toggle("hidden");
       e.target.textContent = form.classList.contains("hidden") ? "▸ Neue Sonderausgabe anlegen" : "▾ Neue Sonderausgabe anlegen";
     });
-    document.getElementById("btn-sonder-anlegen").addEventListener("click", sonderausgabeHinzufuegen);
+    document.getElementById("btn-sonder-anlegen").addEventListener("click", bearbeitet ? sonderausgabeAktualisieren : sonderausgabeHinzufuegen);
+    if (bearbeitet) {
+      document.getElementById("btn-sonder-abbrechen").addEventListener("click", () => {
+        finBearbeiteteSonderausgabe = null;
+        renderFinSonderausgaben();
+      });
+    }
+  }
+
+  window.sonderausgabeBearbeitenStart = function (id) {
+    finBearbeiteteSonderausgabe = id;
+    renderFinSonderausgaben();
+  };
+
+  async function sonderausgabeAktualisieren() {
+    const id = finBearbeiteteSonderausgabe;
+    if (!id) return;
+    const bezeichnung = document.getElementById("neue-sonder-bezeichnung").value.trim();
+    if (!bezeichnung) return;
+    const kategorie = document.getElementById("neue-sonder-kategorie").value.trim();
+    const betrag = document.getElementById("neue-sonder-betrag").value;
+    const monat = document.getElementById("neue-sonder-monat").value;
+    const notiz = document.getElementById("neue-sonder-notiz").value.trim();
+    await api("sonderausgabe_aktualisieren", {
+      id, bezeichnung, kategorie, betrag, monat: monat || null,
+      jahr: new Date().getFullYear(), notiz,
+    });
+    finBearbeiteteSonderausgabe = null;
+    await ladeDaten();
+    renderFinanzen();
   }
 
   async function sonderausgabeHinzufuegen() {
@@ -2747,13 +2808,14 @@
       ? diesenMonat.map((b) => {
         const istEinnahme = b.typ === "einnahme";
         return `
-        <div class="fin-buchung-item">
+        <div class="fin-buchung-item${b.id === finBearbeiteteBuchung ? " fin-buchung-item-bearbeitet" : ""}">
           <span class="fin-buchung-datum">${(b.datum || "").split("-").reverse().slice(0, 2).join(".")}</span>
           <div class="fin-buchung-info">
             <div class="fin-buchung-kat">${escapeHtml(b.kategorie || "Sonstiges")}${b.herkunft === "import" ? ' <span class="badge">importiert</span>' : ""}</div>
             ${b.notiz ? `<div class="fin-buchung-notiz">${escapeHtml(b.notiz)}</div>` : ""}
           </div>
           <div class="fin-betrag ${istEinnahme ? "fin-betrag-einnahme" : ""}">${istEinnahme ? "+" : "−"}${finEuro(b.betrag)}</div>
+          <button class="fin-loesch-btn" onclick="buchungBearbeitenStart('${b.id}')" title="Bearbeiten">✎</button>
           <button class="fin-loesch-btn" onclick="buchungLoeschen('${b.id}')" title="Löschen">×</button>
         </div>
       `;
@@ -2761,6 +2823,8 @@
       : `<p class="empty-text">Keine Buchungen in ${MONATSNAMEN[finBuchMonat - 1]} ${finBuchJahr}.</p>`;
 
     const kategorien = buchungTypAusgewaehlt === "einnahme" ? FIN_KAT_EINNAHME : FIN_KAT_AUSGABE;
+    const bearbeitet = finBearbeiteteBuchung ? buchungen.find((b) => b.id === finBearbeiteteBuchung) : null;
+    if (finBearbeiteteBuchung && !bearbeitet) finBearbeiteteBuchung = null; // wurde inzwischen gelöscht o.ä.
 
     el.innerHTML = `
       <div class="fin-quick-form">
@@ -2769,7 +2833,7 @@
           <button type="button" class="plan-typ-btn ${buchungTypAusgewaehlt === "einnahme" ? "active" : ""}" onclick="buchungTypWaehlen('einnahme')">Einnahme</button>
         </div>
 
-        <input type="number" step="0.01" id="neue-buchung-betrag" class="fin-quick-betrag" placeholder="0,00 €" inputmode="decimal">
+        <input type="number" step="0.01" id="neue-buchung-betrag" class="fin-quick-betrag" placeholder="0,00 €" inputmode="decimal" value="${bearbeitet ? finZahl(bearbeitet.betrag) : ""}">
 
         <div class="fin-kat-grid">
           ${kategorien.map((k) => `
@@ -2779,11 +2843,12 @@
         </div>
 
         <div class="row">
-          <input type="date" id="neue-buchung-datum" value="${heuteISOFin()}">
-          <input type="text" id="neue-buchung-notiz" placeholder="Notiz (optional)">
+          <input type="date" id="neue-buchung-datum" value="${bearbeitet ? bearbeitet.datum : heuteISOFin()}">
+          <input type="text" id="neue-buchung-notiz" placeholder="Notiz (optional)" value="${bearbeitet ? escapeAttr(bearbeitet.notiz || "") : ""}">
         </div>
 
-        <button class="btn-primary fin-quick-save" id="btn-buchung-speichern">Speichern</button>
+        <button class="btn-primary fin-quick-save" id="btn-buchung-speichern">${bearbeitet ? "Aktualisieren" : "Speichern"}</button>
+        ${bearbeitet ? `<button class="btn-secondary" id="btn-buchung-abbrechen" style="width:100%; margin-top:0.5rem;">Abbrechen</button>` : ""}
 
         <div class="row" style="margin-top:0.6rem;">
           <button type="button" class="link-btn" id="btn-csv-import">⇪ CSV importieren</button>
@@ -2811,7 +2876,13 @@
       ${liste}
     `;
 
-    document.getElementById("btn-buchung-speichern").addEventListener("click", buchungHinzufuegen);
+    document.getElementById("btn-buchung-speichern").addEventListener("click", bearbeitet ? buchungAktualisieren : buchungHinzufuegen);
+    if (bearbeitet) {
+      document.getElementById("btn-buchung-abbrechen").addEventListener("click", () => {
+        finBearbeiteteBuchung = null;
+        renderFinBuchungen();
+      });
+    }
 
     document.getElementById("btn-csv-import").addEventListener("click", () => {
       document.getElementById("csv-import-input").click();
@@ -2832,6 +2903,34 @@
         btn.disabled = false;
       }
     });
+  }
+
+  window.buchungBearbeitenStart = function (id) {
+    const b = buchungen.find((x) => x.id === id);
+    if (!b) return;
+    finBearbeiteteBuchung = id;
+    buchungTypAusgewaehlt = b.typ === "einnahme" ? "einnahme" : "ausgabe";
+    buchungKategorieAusgewaehlt = b.kategorie || (buchungTypAusgewaehlt === "einnahme" ? FIN_KAT_EINNAHME[0] : FIN_KAT_AUSGABE[0]);
+    renderFinBuchungen();
+  };
+
+  async function buchungAktualisieren() {
+    const id = finBearbeiteteBuchung;
+    if (!id) return;
+    const betragFeld = document.getElementById("neue-buchung-betrag");
+    const betrag = betragFeld.value;
+    if (!betrag || finZahl(betrag) <= 0) { betragFeld.focus(); return; }
+    const datum = document.getElementById("neue-buchung-datum").value || heuteISOFin();
+    const notiz = document.getElementById("neue-buchung-notiz").value.trim();
+
+    await api("buchung_aktualisieren", {
+      id, datum, betrag, notiz,
+      typ: buchungTypAusgewaehlt,
+      kategorie: buchungKategorieAusgewaehlt,
+    });
+    finBearbeiteteBuchung = null;
+    await ladeDaten();
+    renderFinanzen();
   }
 
   async function buchungHinzufuegen() {
