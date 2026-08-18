@@ -250,6 +250,7 @@
   .fin-buchung-info { flex: 1; min-width: 0; }
   .fin-buchung-kat { font-size: 0.92rem; font-weight: 500; }
   .fin-buchung-notiz { color: var(--ink-dim); font-size: 0.8rem; }
+  .fin-betrag-einnahme { color: #2e7d32; }
 
   .ziel-card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
@@ -2378,8 +2379,16 @@
     renderFinanzen();
   }
 
-  const FIN_BUCHUNG_KATEGORIEN = ["Lebensmittel", "Tanken", "Hygiene", "Haus", "Sonstiges"];
+  const FIN_KAT_AUSGABE = ["Lebensmittel", "Tanken", "Hygiene", "Haus", "Sonstiges"];
+  const FIN_KAT_EINNAHME = ["Gehalt", "Rückerstattung", "Geschenk", "Sonstiges"];
+  let buchungTypAusgewaehlt = "ausgabe"; // "ausgabe" | "einnahme"
   let buchungKategorieAusgewaehlt = "Lebensmittel";
+
+  window.buchungTypWaehlen = function(typ) {
+    buchungTypAusgewaehlt = typ;
+    buchungKategorieAusgewaehlt = (typ === "einnahme" ? FIN_KAT_EINNAHME : FIN_KAT_AUSGABE)[0];
+    renderFinBuchungen();
+  };
 
   window.buchungKategorieWaehlen = function(kat) {
     buchungKategorieAusgewaehlt = kat;
@@ -2408,28 +2417,39 @@
     const diesenMonat = buchungen
       .filter((b) => b.datum && b.datum.slice(0, 7) === `${jahrStr}-${monatStr}`)
       .sort((a, b) => (b.datum || "").localeCompare(a.datum || ""));
-    const summe = diesenMonat.reduce((s, b) => s + finZahl(b.betrag), 0);
+    const ausgabenSumme = diesenMonat.filter((b) => b.typ !== "einnahme").reduce((s, b) => s + finZahl(b.betrag), 0);
+    const einnahmenSumme = diesenMonat.filter((b) => b.typ === "einnahme").reduce((s, b) => s + finZahl(b.betrag), 0);
 
     const liste = diesenMonat.length
-      ? diesenMonat.map((b) => `
+      ? diesenMonat.map((b) => {
+        const istEinnahme = b.typ === "einnahme";
+        return `
         <div class="fin-buchung-item">
           <span class="fin-buchung-datum">${(b.datum || "").split("-").reverse().slice(0, 2).join(".")}</span>
           <div class="fin-buchung-info">
             <div class="fin-buchung-kat">${escapeHtml(b.kategorie || "Sonstiges")}${b.herkunft === "import" ? ' <span class="badge">importiert</span>' : ""}</div>
             ${b.notiz ? `<div class="fin-buchung-notiz">${escapeHtml(b.notiz)}</div>` : ""}
           </div>
-          <div class="fin-betrag">${finEuro(b.betrag)}</div>
+          <div class="fin-betrag ${istEinnahme ? "fin-betrag-einnahme" : ""}">${istEinnahme ? "+" : "−"}${finEuro(b.betrag)}</div>
           <button class="fin-loesch-btn" onclick="buchungLoeschen('${b.id}')" title="Löschen">×</button>
         </div>
-      `).join("")
+      `;
+      }).join("")
       : `<p class="empty-text">Keine Buchungen in ${MONATSNAMEN[finBuchMonat - 1]} ${finBuchJahr}.</p>`;
+
+    const kategorien = buchungTypAusgewaehlt === "einnahme" ? FIN_KAT_EINNAHME : FIN_KAT_AUSGABE;
 
     el.innerHTML = `
       <div class="fin-quick-form">
+        <div class="plan-typ-tabs">
+          <button type="button" class="plan-typ-btn ${buchungTypAusgewaehlt === "ausgabe" ? "active" : ""}" onclick="buchungTypWaehlen('ausgabe')">Ausgabe</button>
+          <button type="button" class="plan-typ-btn ${buchungTypAusgewaehlt === "einnahme" ? "active" : ""}" onclick="buchungTypWaehlen('einnahme')">Einnahme</button>
+        </div>
+
         <input type="number" step="0.01" id="neue-buchung-betrag" class="fin-quick-betrag" placeholder="0,00 €" inputmode="decimal">
 
         <div class="fin-kat-grid">
-          ${FIN_BUCHUNG_KATEGORIEN.map((k) => `
+          ${kategorien.map((k) => `
             <button type="button" class="fin-kat-btn ${k === buchungKategorieAusgewaehlt ? "active" : ""}"
               data-kat="${escapeAttr(k)}" onclick="buchungKategorieWaehlen('${escapeAttr(k)}')">${escapeHtml(k)}</button>
           `).join("")}
@@ -2451,8 +2471,12 @@
 
       <div class="fin-summary-row">
         <div class="fin-summary-item">
-          <div class="fin-summary-label">Summe ${MONATSNAMEN[finBuchMonat - 1]}</div>
-          <div class="fin-summary-value">${finEuro(summe)}</div>
+          <div class="fin-summary-label">Ausgaben</div>
+          <div class="fin-summary-value">${finEuro(ausgabenSumme)}</div>
+        </div>
+        <div class="fin-summary-item">
+          <div class="fin-summary-label">Einnahmen</div>
+          <div class="fin-summary-value fin-betrag-einnahme">${finEuro(einnahmenSumme)}</div>
         </div>
       </div>
 
@@ -2471,6 +2495,7 @@
 
     await api("buchung_hinzufuegen", {
       datum, betrag, notiz,
+      typ: buchungTypAusgewaehlt,
       kategorie: buchungKategorieAusgewaehlt,
       herkunft: "manuell",
     });
