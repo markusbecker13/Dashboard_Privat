@@ -2409,6 +2409,147 @@
   }
   window.finBuchungMonatVerschieben = finBuchungMonatVerschieben;
 
+  // ==========================================================
+  // CSV-Import (Buchungen) – läuft komplett im Browser, dieselbe
+  // Spalten-/Format-Erkennung wie zuvor im Python-Import-Skript.
+  // ==========================================================
+  const CSV_DATUM_SPALTEN = ["Buchungstag", "Valuta", "Datum", "Valutadatum"];
+  const CSV_BETRAG_SPALTEN = ["Betrag", "Umsatz", "Betrag (EUR)"];
+  const CSV_PARTNER_SPALTEN = ["Zahler/Empfänger", "Auftraggeber/Empfänger", "Empfänger/Zahlungspflichtiger", "Name Zahlungsbeteiligter"];
+  const CSV_ZWECK_SPALTEN = ["Verwendungszweck", "Buchungstext"];
+
+  // Liest die Datei als Bytes und entscheidet zwischen UTF-8 und
+  // Windows-1252 (viele Bank-Exporte sind nicht UTF-8), erkennbar an
+  // Ersatzzeichen bzw. typischen Umlaut-Fehlkodierungen.
+  async function liesCsvDatei(file) {
+    const buffer = await file.arrayBuffer();
+    let text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+    if (text.includes("\uFFFD") || /Ã[¤¶¼ŸŸŠ¤]/.test(text)) {
+      text = new TextDecoder("windows-1252").decode(buffer);
+    }
+    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+    return text;
+  }
+
+  // Einfacher CSV-Parser mit Unterstützung für Anführungszeichen und
+  // automatischer Erkennung von "," oder ";" als Trennzeichen.
+  function parseCsvText(text) {
+    const ersteZeile = text.split(/\r?\n/)[0] || "";
+    const anzahlSemikolon = (ersteZeile.match(/;/g) || []).length;
+    const anzahlKomma = (ersteZeile.match(/,/g) || []).length;
+    const trenner = anzahlSemikolon >= anzahlKomma ? ";" : ",";
+
+    const zeilen = [];
+    let feld = "", zeile = [], inAnfuehrung = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inAnfuehrung) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { feld += '"'; i++; }
+          else inAnfuehrung = false;
+        } else feld += c;
+      } else if (c === '"') {
+        inAnfuehrung = true;
+      } else if (c === trenner) {
+        zeile.push(feld); feld = "";
+      } else if (c === "\n") {
+        zeile.push(feld); zeilen.push(zeile); zeile = []; feld = "";
+      } else if (c === "\r") {
+        // wird ignoriert, \n folgt direkt danach
+      } else {
+        feld += c;
+      }
+    }
+    if (feld.length || zeile.length) { zeile.push(feld); zeilen.push(zeile); }
+    if (!zeilen.length) return { header: [], rows: [] };
+    const header = zeilen[0].map((h) => h.trim());
+    const rows = zeilen.slice(1).filter((r) => r.some((c) => c.trim() !== ""));
+    return { header, rows };
+  }
+
+  function findeSpalte(header, aliase) {
+    const norm = header.map((h) => h.trim().toLowerCase());
+    for (const a of aliase) {
+      const idx = norm.indexOf(a.toLowerCase());
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  }
+
+  function parseCsvBetrag(raw) {
+    let s = (raw || "").trim().replace("€", "").replace(/\s/g, "");
+    if (s.includes(",") && s.includes(".")) s = s.replace(/\./g, "").replace(",", ".");
+    else if (s.includes(",")) s = s.replace(",", ".");
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function parseCsvDatum(raw) {
+    const s = (raw || "").trim();
+    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2})$/);
+    if (m) return `20${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    return null;
+  }
+
+  async function csvImportieren(file) {
+    const text = await liesCsvDatei(file);
+    const { header, rows } = parseCsvText(text);
+
+    const idxDatum = findeSpalte(header, CSV_DATUM_SPALTEN);
+    const idxBetrag = findeSpalte(header, CSV_BETRAG_SPALTEN);
+    const idxPartner = findeSpalte(header, CSV_PARTNER_SPALTEN);
+    const idxZweck = findeSpalte(header, CSV_ZWECK_SPALTEN);
+
+    if (idxDatum === -1 || idxBetrag === -1) {
+      alert("Datum- oder Betrag-Spalte wurde in der CSV nicht gefunden.\n\nGefundene Spalten: " + header.join(", "));
+      renderFinBuchungen();
+      return;
+    }
+
+    const zeilen = [];
+    let nichtLesbar = 0;
+    for (const r of rows) {
+      const datum = parseCsvDatum(r[idxDatum]);
+      const betrag = parseCsvBetrag(r[idxBetrag]);
+      if (!datum || betrag === null || betrag === 0) { nichtLesbar++; continue; }
+      const partner = idxPartner !== -1 ? (r[idxPartner] || "").trim() : "";
+      const zweck = idxZweck !== -1 ? (r[idxZweck] || "").trim() : "";
+      const notiz = `${partner} ${zweck}`.trim().slice(0, 200);
+      zeilen.push({ datum, betrag, notiz });
+    }
+
+    if (!zeilen.length) {
+      alert("Keine verwertbaren Buchungen in der Datei gefunden.");
+      renderFinBuchungen();
+      return;
+    }
+
+    const ergebnis = await api("buchungen_batch_import", { zeilen });
+
+    let meldung = "Import abgeschlossen\n\n" +
+      `Neue Ausgaben: ${ergebnis.importiert_ausgaben}\n` +
+      `Neue Einnahmen: ${ergebnis.importiert_einnahmen}\n` +
+      `Bereits vorhanden (Duplikate): ${ergebnis.uebersprungen_duplikate}\n` +
+      `Als Fixkosten erkannt & übersprungen: ${ergebnis.uebersprungen_fixkosten}\n` +
+      (nichtLesbar ? `Nicht lesbare Zeilen: ${nichtLesbar}\n` : "");
+
+    const treffer = Object.entries(ergebnis.fixkosten_treffer || {});
+    if (treffer.length) {
+      treffer.sort((a, b) => b[1] - a[1]);
+      meldung += "\nErkannte Fixkosten (Beispiele):\n" + treffer.slice(0, 8).map(([k, v]) => `  ${k}: ${v}x`).join("\n");
+    }
+    alert(meldung);
+
+    await ladeDaten();
+    renderFinanzen();
+  }
+
   function renderFinBuchungen() {
     const el = document.getElementById("fin-buchungen-bereich");
     const monatStr = String(finBuchMonat).padStart(2, "0");
@@ -2461,6 +2602,11 @@
         </div>
 
         <button class="btn-primary fin-quick-save" id="btn-buchung-speichern">Speichern</button>
+
+        <div class="row" style="margin-top:0.6rem;">
+          <button type="button" class="link-btn" id="btn-csv-import">⇪ CSV importieren</button>
+          <input type="file" id="csv-import-input" accept=".csv,text/csv" class="hidden">
+        </div>
       </div>
 
       <div class="cal-header">
@@ -2484,6 +2630,26 @@
     `;
 
     document.getElementById("btn-buchung-speichern").addEventListener("click", buchungHinzufuegen);
+
+    document.getElementById("btn-csv-import").addEventListener("click", () => {
+      document.getElementById("csv-import-input").click();
+    });
+    document.getElementById("csv-import-input").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      const btn = document.getElementById("btn-csv-import");
+      btn.textContent = "Importiere …";
+      btn.disabled = true;
+      try {
+        await csvImportieren(file);
+      } catch (err) {
+        console.error(err);
+        alert("Import fehlgeschlagen: " + (err.message || err));
+        btn.textContent = "⇪ CSV importieren";
+        btn.disabled = false;
+      }
+    });
   }
 
   async function buchungHinzufuegen() {
