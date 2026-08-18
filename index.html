@@ -209,6 +209,32 @@
   }
   .plan-typ-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+  /* Finanzen-Modul */
+  .fin-tabelle-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1.6rem; }
+  .fin-tabelle { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  .fin-tabelle th, .fin-tabelle td { padding: 0.4rem 0.35rem; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .fin-tabelle th { color: var(--ink-dim); font-weight: 500; font-size: 0.75rem; background: var(--panel); position: sticky; top: 0; }
+  .fin-tabelle td.fin-bez { text-align: left; min-width: 13rem; position: sticky; left: 0; background: var(--bg); }
+  .fin-tabelle th.fin-bez-th { text-align: left; position: sticky; left: 0; z-index: 2; }
+  .fin-tabelle td.fin-kat { text-align: left; min-width: 8rem; color: var(--ink-dim); font-size: 0.78rem; }
+  .fin-tabelle input[type="number"] { width: 4.6rem; padding: 0.3rem 0.35rem; text-align: right; font-size: 0.8rem; }
+  .fin-tabelle-summe td { font-weight: 600; background: var(--panel); }
+  .fin-gruppe-titel { font-weight: 600; padding: 0.5rem 0.35rem !important; background: var(--bg) !important; text-align: left !important; }
+  .fin-loesch-btn { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 1.1rem; padding: 0 0.3rem; }
+  .fin-loesch-btn:hover { color: var(--overdue-text); }
+  .fin-card {
+    display: flex; align-items: flex-start; gap: 0.7rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem; margin-bottom: 0.5rem;
+  }
+  .fin-card-info { flex: 1; }
+  .fin-card-titel { font-size: 0.92rem; font-weight: 500; }
+  .fin-card-meta { color: var(--ink-dim); font-size: 0.8rem; margin-top: 0.15rem; }
+  .fin-betrag { font-weight: 600; }
+  .fin-summary-row { display: flex; gap: 1.4rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
+  .fin-summary-item { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 1rem; min-width: 9rem; }
+  .fin-summary-label { color: var(--ink-dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .fin-summary-value { font-size: 1.15rem; font-weight: 600; margin-top: 0.15rem; }
+
   .ziel-card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
     padding: 0.9rem 1rem; margin-bottom: 0.7rem;
@@ -287,6 +313,7 @@
         <button class="tab-btn" id="tab-einkauf">Einkauf</button>
         <button class="tab-btn" id="tab-verlauf">Verlauf</button>
         <button class="tab-btn" id="tab-planung">Planung</button>
+        <button class="tab-btn" id="tab-finanzen">Finanzen</button>
       </div>
 
       <div id="view-heute">
@@ -496,6 +523,19 @@
 
         <div id="plan-overview-bereich" style="margin-top:2rem;"></div>
       </div>
+
+      <div id="view-finanzen" class="hidden">
+        <h1>Finanzen</h1>
+        <p class="hero-text">Fixkosten, feste Einnahmen und Sonderausgaben für 2026.</p>
+
+        <div class="plan-typ-tabs">
+          <button class="plan-typ-btn active" id="fintyp-fixkosten" data-fintyp="fixkosten">Fixkosten</button>
+          <button class="plan-typ-btn" id="fintyp-sonderausgaben" data-fintyp="sonderausgaben">Sonderausgaben</button>
+        </div>
+
+        <div id="fin-fixkosten-bereich"></div>
+        <div id="fin-sonderausgaben-bereich" class="hidden"></div>
+      </div>
     </main>
   </div>
 
@@ -526,6 +566,11 @@
   let calBearbeiteterTermin = null; // id des gerade bearbeiteten Termins oder null
   let blockzeiten = [];
   let tagesrahmen = [];
+  let fixkosten = [];
+  let sonderausgaben = [];
+  let buchungen = [];
+  let finanzEinstellungen = [];
+  let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben"
 
   async function api(action, extra = {}) {
     const res = await fetch(API_URL, {
@@ -639,6 +684,10 @@
     zielSchritte = data.ziel_schritte || [];
     blockzeiten = data.blockzeiten || [];
     tagesrahmen = data.tagesrahmen || [];
+    fixkosten = data.fixkosten || [];
+    sonderausgaben = data.sonderausgaben || [];
+    buchungen = data.buchungen || [];
+    finanzEinstellungen = data.finanz_einstellungen || [];
     render();
     renderKalender();
     renderHeute();
@@ -840,8 +889,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung", finanzen: "tab-finanzen" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung", finanzen: "view-finanzen" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -850,6 +899,7 @@
     if (aktiv === "heute") renderHeute();
     if (aktiv === "planung") renderPlanung();
     if (aktiv === "frei") renderFrei();
+    if (aktiv === "finanzen") renderFinanzen();
   }
   document.getElementById("tab-heute").addEventListener("click", () => tabWechseln("heute"));
   document.getElementById("tab-aufgaben").addEventListener("click", () => tabWechseln("aufgaben"));
@@ -862,6 +912,7 @@
   document.getElementById("tab-einkauf").addEventListener("click", () => tabWechseln("einkauf"));
   document.getElementById("tab-verlauf").addEventListener("click", () => tabWechseln("verlauf"));
   document.getElementById("tab-planung").addEventListener("click", () => tabWechseln("planung"));
+  document.getElementById("tab-finanzen").addEventListener("click", () => tabWechseln("finanzen"));
 
   function renderHeute() {
     const heuteIso = heuteISO();
@@ -2083,6 +2134,217 @@
           <span class="verlauf-text"><span class="verlauf-kategorie">${escapeHtml(v.kategorie)}</span> ${escapeHtml(v.aktion)}${v.beschreibung ? ": " + escapeHtml(v.beschreibung) : ""}</span>
         </div>`;
     }).join("");
+  }
+
+  // ==========================================================
+  // Finanzen (Fixkosten, Sonderausgaben)
+  // ==========================================================
+  const FIN_MONAT_SPALTEN = ["jan","feb","mar","apr","mai","jun","jul","aug","sep","okt","nov","dez"];
+  const FIN_MONAT_KURZ = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  const FIN_KATEGORIEN = ["Wohnen","Versicherungen","Fahrzeug","Bank & Gebühren","Kredite & Darlehen","Alltag & Haushalt","Abos & Mitgliedschaften","Familie & Tiere","Energie","Öffentliche Stellen","Familie","Ehrenamt/Verein","Gehalt","Versicherung Cashback"];
+
+  function finZahl(v) {
+    const n = Number(v || 0);
+    return Number.isFinite(n) ? n : 0;
+  }
+  function finEuro(n) {
+    return finZahl(n).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+  }
+
+  document.querySelectorAll("[data-fintyp]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      finTyp = btn.dataset.fintyp;
+      renderFinanzen();
+    });
+  });
+
+  function renderFinanzen() {
+    document.getElementById("fintyp-fixkosten").classList.toggle("active", finTyp === "fixkosten");
+    document.getElementById("fintyp-sonderausgaben").classList.toggle("active", finTyp === "sonderausgaben");
+    document.getElementById("fin-fixkosten-bereich").classList.toggle("hidden", finTyp !== "fixkosten");
+    document.getElementById("fin-sonderausgaben-bereich").classList.toggle("hidden", finTyp !== "sonderausgaben");
+    renderFinFixkosten();
+    renderFinSonderausgaben();
+  }
+
+  function finKategorieOptionsHtml() {
+    return FIN_KATEGORIEN.map((k) => `<option value="${escapeAttr(k)}">`).join("");
+  }
+
+  function renderFinFixkosten() {
+    const el = document.getElementById("fin-fixkosten-bereich");
+
+    function tabelle(typ, titel) {
+      const zeilen = fixkosten.filter((f) => f.typ === typ);
+      const summenProMonat = FIN_MONAT_SPALTEN.map((spalte) =>
+        zeilen.reduce((s, f) => s + finZahl(f[spalte]), 0)
+      );
+      const jahresSumme = summenProMonat.reduce((a, b) => a + b, 0);
+
+      const kopf = `<tr><th class="fin-bez-th">${titel}</th><th>Kategorie</th>` +
+        FIN_MONAT_KURZ.map((m) => `<th>${m}</th>`).join("") +
+        `<th>Jahr</th><th></th></tr>`;
+
+      const rows = zeilen.map((f) => {
+        const jahressummeRow = FIN_MONAT_SPALTEN.reduce((s, spalte) => s + finZahl(f[spalte]), 0);
+        return `<tr>
+          <td class="fin-bez">${escapeHtml(f.bezeichnung)}</td>
+          <td class="fin-kat">
+            <input type="text" list="fin-kategorien-liste" value="${escapeAttr(f.kategorie || "")}"
+              style="width:7.5rem;" onchange="fixkostenFeldGeaendert('${f.id}','kategorie',this.value)">
+          </td>
+          ${FIN_MONAT_SPALTEN.map((spalte) => `
+            <td><input type="number" step="0.01" value="${finZahl(f[spalte])}"
+              onchange="fixkostenFeldGeaendert('${f.id}','${spalte}',this.value)"></td>
+          `).join("")}
+          <td>${finEuro(jahressummeRow)}</td>
+          <td><button class="fin-loesch-btn" onclick="fixkostenLoeschen('${f.id}')" title="Löschen">×</button></td>
+        </tr>`;
+      }).join("");
+
+      const summenzeile = `<tr class="fin-tabelle-summe">
+        <td>Summe</td><td></td>
+        ${summenProMonat.map((s) => `<td>${finEuro(s)}</td>`).join("")}
+        <td>${finEuro(jahresSumme)}</td><td></td>
+      </tr>`;
+
+      return zeilen.length
+        ? `<div class="fin-tabelle-wrap"><table class="fin-tabelle">${kopf}${rows}${summenzeile}</table></div>`
+        : `<p class="empty-text" style="margin-bottom:1.6rem;">Noch keine Einträge.</p>`;
+    }
+
+    el.innerHTML = `
+      <datalist id="fin-kategorien-liste">${finKategorieOptionsHtml()}</datalist>
+
+      <div class="project-heading">Ausgaben</div>
+      ${tabelle("ausgabe", "Bezeichnung")}
+
+      <div class="project-heading">Einnahmen</div>
+      ${tabelle("einnahme", "Bezeichnung")}
+
+      <button class="link-btn" id="toggle-fixkosten-form">▸ Neue Position anlegen</button>
+      <div class="row hidden" id="fixkosten-form" style="margin-top:0.6rem;">
+        <input type="text" id="neue-fixkosten-bezeichnung" placeholder="Bezeichnung">
+        <input type="text" id="neue-fixkosten-kategorie" placeholder="Kategorie" list="fin-kategorien-liste" style="width:9rem;">
+        <select id="neue-fixkosten-typ">
+          <option value="ausgabe">Ausgabe</option>
+          <option value="einnahme">Einnahme</option>
+        </select>
+        <button class="btn-primary" id="btn-fixkosten-anlegen">Anlegen</button>
+      </div>
+    `;
+
+    document.getElementById("toggle-fixkosten-form").addEventListener("click", (e) => {
+      const form = document.getElementById("fixkosten-form");
+      form.classList.toggle("hidden");
+      e.target.textContent = form.classList.contains("hidden") ? "▸ Neue Position anlegen" : "▾ Neue Position anlegen";
+    });
+    document.getElementById("btn-fixkosten-anlegen").addEventListener("click", fixkostenHinzufuegen);
+  }
+
+  async function fixkostenHinzufuegen() {
+    const bezeichnung = document.getElementById("neue-fixkosten-bezeichnung").value.trim();
+    if (!bezeichnung) return;
+    const kategorie = document.getElementById("neue-fixkosten-kategorie").value.trim();
+    const typ = document.getElementById("neue-fixkosten-typ").value;
+    await api("fixkosten_hinzufuegen", { bezeichnung, kategorie, typ });
+    await ladeDaten();
+    renderFinanzen();
+  }
+
+  async function fixkostenFeldGeaendert(id, feld, wert) {
+    const f = fixkosten.find((x) => x.id === id);
+    if (!f) return;
+    const update = { id, bezeichnung: f.bezeichnung, kategorie: f.kategorie };
+    for (const spalte of FIN_MONAT_SPALTEN) update[spalte] = f[spalte];
+    update[feld] = wert;
+    await api("fixkosten_aktualisieren", update);
+    await ladeDaten();
+    renderFinanzen();
+  }
+
+  async function fixkostenLoeschen(id) {
+    if (!confirm("Diese Fixkosten-Position wirklich löschen?")) return;
+    await api("fixkosten_loeschen", { id });
+    await ladeDaten();
+    renderFinanzen();
+  }
+
+  function renderFinSonderausgaben() {
+    const el = document.getElementById("fin-sonderausgaben-bereich");
+    const jahr = new Date().getFullYear();
+    const liste = sonderausgaben.filter((s) => Number(s.jahr) === jahr);
+    const summe = liste.reduce((s, x) => s + finZahl(x.betrag), 0);
+
+    const cards = liste.length
+      ? liste.map((s) => `
+        <div class="fin-card">
+          <div class="fin-card-info">
+            <div class="fin-card-titel">${escapeHtml(s.bezeichnung)}</div>
+            <div class="fin-card-meta">
+              ${s.kategorie ? escapeHtml(s.kategorie) + " · " : ""}
+              ${s.monat ? MONATSNAMEN[s.monat - 1] : "Monat noch offen"}
+              ${s.notiz ? " · " + escapeHtml(s.notiz) : ""}
+            </div>
+          </div>
+          <div class="fin-betrag">${finEuro(s.betrag)}</div>
+          <button class="fin-loesch-btn" onclick="sonderausgabeLoeschen('${s.id}')" title="Löschen">×</button>
+        </div>
+      `).join("")
+      : `<p class="empty-text">Noch keine Sonderausgaben für ${jahr}.</p>`;
+
+    el.innerHTML = `
+      <div class="fin-summary-row">
+        <div class="fin-summary-item">
+          <div class="fin-summary-label">Summe ${jahr}</div>
+          <div class="fin-summary-value">${finEuro(summe)}</div>
+        </div>
+      </div>
+
+      ${cards}
+
+      <button class="link-btn" id="toggle-sonder-form" style="margin-top:0.8rem;">▸ Neue Sonderausgabe anlegen</button>
+      <div class="row hidden" id="sonder-form" style="margin-top:0.6rem;">
+        <input type="text" id="neue-sonder-bezeichnung" placeholder="Bezeichnung">
+        <input type="text" id="neue-sonder-kategorie" placeholder="Kategorie" style="width:8rem;">
+        <input type="number" step="0.01" id="neue-sonder-betrag" placeholder="Betrag €" style="width:7rem;">
+        <select id="neue-sonder-monat">
+          <option value="">Monat noch offen</option>
+          ${MONATSNAMEN.map((m, i) => `<option value="${i + 1}">${m}</option>`).join("")}
+        </select>
+        <input type="text" id="neue-sonder-notiz" placeholder="Notiz (optional)">
+        <button class="btn-primary" id="btn-sonder-anlegen">Anlegen</button>
+      </div>
+    `;
+
+    document.getElementById("toggle-sonder-form").addEventListener("click", (e) => {
+      const form = document.getElementById("sonder-form");
+      form.classList.toggle("hidden");
+      e.target.textContent = form.classList.contains("hidden") ? "▸ Neue Sonderausgabe anlegen" : "▾ Neue Sonderausgabe anlegen";
+    });
+    document.getElementById("btn-sonder-anlegen").addEventListener("click", sonderausgabeHinzufuegen);
+  }
+
+  async function sonderausgabeHinzufuegen() {
+    const bezeichnung = document.getElementById("neue-sonder-bezeichnung").value.trim();
+    if (!bezeichnung) return;
+    const kategorie = document.getElementById("neue-sonder-kategorie").value.trim();
+    const betrag = document.getElementById("neue-sonder-betrag").value;
+    const monat = document.getElementById("neue-sonder-monat").value;
+    const notiz = document.getElementById("neue-sonder-notiz").value.trim();
+    await api("sonderausgabe_hinzufuegen", {
+      bezeichnung, kategorie, betrag, monat: monat || null,
+      jahr: new Date().getFullYear(), notiz,
+    });
+    await ladeDaten();
+    renderFinanzen();
+  }
+
+  async function sonderausgabeLoeschen(id) {
+    if (!confirm("Diese Sonderausgabe wirklich löschen?")) return;
+    await api("sonderausgabe_loeschen", { id });
+    await ladeDaten();
+    renderFinanzen();
   }
 
   // ==========================================================
