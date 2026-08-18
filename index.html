@@ -618,6 +618,7 @@
   let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben" | "buchungen" | "uebersicht"
   let finUebersichtZeilen = null;
   let finJahr = 2026;
+  let finKategorienMonat = null; // null = ganzes Jahr, sonst 1-12
   let finBuchMonat = new Date().getMonth() + 1;
   let finBuchJahr = new Date().getFullYear();
   let finBearbeiteteBuchung = null; // id der Buchung, die gerade im Formular bearbeitet wird
@@ -3009,6 +3010,65 @@
     </svg>`;
   }
 
+  // Ausgaben nach Kategorie – für "Ganzes Jahr" oder einen einzelnen
+  // Monat, zieht Fixkosten, variable Buchungen und Sonderausgaben
+  // zusammen. Läuft komplett clientseitig auf den ohnehin geladenen
+  // Daten, kein zusätzlicher Server-Aufruf nötig.
+  function finKategorienDaten(jahr, monat) {
+    const summenProKategorie = new Map();
+    const addiere = (kat, betrag) => {
+      const key = kat && kat.trim() ? kat.trim() : "Sonstiges";
+      summenProKategorie.set(key, (summenProKategorie.get(key) || 0) + finZahl(betrag));
+    };
+
+    fixkosten.filter((f) => f.typ === "ausgabe").forEach((f) => {
+      if (monat) {
+        addiere(f.kategorie, f[FIN_MONAT_SPALTEN[monat - 1]]);
+      } else {
+        const summe = FIN_MONAT_SPALTEN.reduce((s, m) => s + finZahl(f[m]), 0);
+        addiere(f.kategorie, summe);
+      }
+    });
+
+    buchungen
+      .filter((b) => b.typ !== "einnahme" && b.datum && b.datum.slice(0, 4) === String(jahr) && (!monat || Number(b.datum.slice(5, 7)) === monat))
+      .forEach((b) => addiere(b.kategorie, b.betrag));
+
+    sonderausgaben
+      .filter((s) => Number(s.jahr) === jahr && (!monat || Number(s.monat) === monat))
+      .forEach((s) => addiere(s.kategorie, s.betrag));
+
+    return [...summenProKategorie.entries()]
+      .map(([kategorie, betrag]) => ({ kategorie, betrag: finRound2(betrag) }))
+      .filter((e) => e.betrag > 0)
+      .sort((a, b) => b.betrag - a.betrag);
+  }
+
+  function finKategorienChart(daten) {
+    if (!daten.length) {
+      return `<p class="empty-text">Keine Ausgaben in diesem Zeitraum.</p>`;
+    }
+    const w = 640;
+    const rowH = 34;
+    const padL = 4, padR = 4, padT = 4;
+    const h = padT * 2 + daten.length * rowH;
+    const maxVal = Math.max(1, ...daten.map((d) => d.betrag));
+    const farben = ["var(--accent)", "var(--accent-2)"];
+
+    let inhalt = "";
+    daten.forEach((d, i) => {
+      const y = padT + i * rowH;
+      const breite = Math.max(3, (d.betrag / maxVal) * (w - padL - padR));
+      inhalt += `
+        <text x="${padL}" y="${y + 11}" font-size="11" fill="var(--ink)">${escapeHtml(d.kategorie)}</text>
+        <text x="${w - padR}" y="${y + 11}" font-size="11" fill="var(--ink-dim)" text-anchor="end">${finEuro(d.betrag)}</text>
+        <rect x="${padL}" y="${y + 16}" width="${breite.toFixed(1)}" height="10" fill="${farben[i % farben.length]}" rx="3"></rect>
+      `;
+    });
+
+    return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;margin-bottom:1.6rem;">${inhalt}</svg>`;
+  }
+
   function renderFinUebersicht() {
     const el = document.getElementById("fin-uebersicht-bereich");
     if (finTyp !== "uebersicht" && !finUebersichtZeilen) return; // nichts zu tun, noch nie geladen
@@ -3055,11 +3115,24 @@
       <div class="project-heading">Kontostand-Verlauf</div>
       ${finLinienChart(zeilen)}
 
+      <div class="project-heading" style="display:flex; align-items:center; justify-content:space-between; gap:0.6rem; flex-wrap:wrap;">
+        <span>Ausgaben nach Kategorie</span>
+        <select id="fin-kategorien-monat" style="width:auto; font-size:0.8rem; padding:0.3rem 0.5rem;">
+          <option value="">Ganzes Jahr ${finJahr}</option>
+          ${MONATSNAMEN.map((m, i) => `<option value="${i + 1}" ${finKategorienMonat === i + 1 ? "selected" : ""}>${m} ${finJahr}</option>`).join("")}
+        </select>
+      </div>
+      ${finKategorienChart(finKategorienDaten(finJahr, finKategorienMonat))}
+
       <div class="project-heading">Jahresübersicht</div>
       ${tabelle}
     `;
 
     document.getElementById("btn-startkapital-speichern").addEventListener("click", startkapitalSpeichern);
+    document.getElementById("fin-kategorien-monat").addEventListener("change", (e) => {
+      finKategorienMonat = e.target.value ? Number(e.target.value) : null;
+      renderFinUebersicht();
+    });
   }
 
   async function ladeFinUebersicht() {
