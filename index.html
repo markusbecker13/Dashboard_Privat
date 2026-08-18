@@ -235,6 +235,22 @@
   .fin-summary-label { color: var(--ink-dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
   .fin-summary-value { font-size: 1.15rem; font-weight: 600; margin-top: 0.15rem; }
 
+  .fin-quick-form { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.6rem; }
+  .fin-quick-betrag { width: 100%; font-size: 1.4rem; text-align: center; padding: 0.8rem; margin-bottom: 0.8rem; }
+  .fin-kat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.2rem, 1fr)); gap: 0.5rem; margin-bottom: 0.8rem; }
+  .fin-kat-btn {
+    padding: 0.9rem 0.5rem; border: 1.5px solid var(--border); border-radius: 10px;
+    background: var(--bg); color: var(--ink); cursor: pointer; font-size: 0.9rem; font-weight: 500;
+  }
+  .fin-kat-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .fin-quick-form .row { align-items: center; }
+  .fin-quick-save { width: 100%; padding: 0.9rem; font-size: 1rem; }
+  .fin-buchung-item { display: flex; align-items: center; gap: 0.7rem; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.4rem; }
+  .fin-buchung-datum { color: var(--ink-dim); font-size: 0.78rem; min-width: 3.2rem; }
+  .fin-buchung-info { flex: 1; min-width: 0; }
+  .fin-buchung-kat { font-size: 0.92rem; font-weight: 500; }
+  .fin-buchung-notiz { color: var(--ink-dim); font-size: 0.8rem; }
+
   .ziel-card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
     padding: 0.9rem 1rem; margin-bottom: 0.7rem;
@@ -531,10 +547,12 @@
         <div class="plan-typ-tabs">
           <button class="plan-typ-btn active" id="fintyp-fixkosten" data-fintyp="fixkosten">Fixkosten</button>
           <button class="plan-typ-btn" id="fintyp-sonderausgaben" data-fintyp="sonderausgaben">Sonderausgaben</button>
+          <button class="plan-typ-btn" id="fintyp-buchungen" data-fintyp="buchungen">Buchungen</button>
         </div>
 
         <div id="fin-fixkosten-bereich"></div>
         <div id="fin-sonderausgaben-bereich" class="hidden"></div>
+        <div id="fin-buchungen-bereich" class="hidden"></div>
       </div>
     </main>
   </div>
@@ -2161,10 +2179,13 @@
   function renderFinanzen() {
     document.getElementById("fintyp-fixkosten").classList.toggle("active", finTyp === "fixkosten");
     document.getElementById("fintyp-sonderausgaben").classList.toggle("active", finTyp === "sonderausgaben");
+    document.getElementById("fintyp-buchungen").classList.toggle("active", finTyp === "buchungen");
     document.getElementById("fin-fixkosten-bereich").classList.toggle("hidden", finTyp !== "fixkosten");
     document.getElementById("fin-sonderausgaben-bereich").classList.toggle("hidden", finTyp !== "sonderausgaben");
+    document.getElementById("fin-buchungen-bereich").classList.toggle("hidden", finTyp !== "buchungen");
     renderFinFixkosten();
     renderFinSonderausgaben();
+    renderFinBuchungen();
   }
 
   function finKategorieOptionsHtml() {
@@ -2343,6 +2364,99 @@
   async function sonderausgabeLoeschen(id) {
     if (!confirm("Diese Sonderausgabe wirklich löschen?")) return;
     await api("sonderausgabe_loeschen", { id });
+    await ladeDaten();
+    renderFinanzen();
+  }
+
+  const FIN_BUCHUNG_KATEGORIEN = ["Lebensmittel", "Tanken", "Hygiene", "Haus", "Sonstiges"];
+  let buchungKategorieAusgewaehlt = "Lebensmittel";
+
+  window.buchungKategorieWaehlen = function(kat) {
+    buchungKategorieAusgewaehlt = kat;
+    document.querySelectorAll(".fin-kat-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.kat === kat);
+    });
+  };
+
+  function heuteISOFin() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function renderFinBuchungen() {
+    const el = document.getElementById("fin-buchungen-bereich");
+    const heute = new Date();
+    const monatStr = String(heute.getMonth() + 1).padStart(2, "0");
+    const jahrStr = String(heute.getFullYear());
+    const diesenMonat = buchungen
+      .filter((b) => b.datum && b.datum.slice(0, 7) === `${jahrStr}-${monatStr}`)
+      .sort((a, b) => (b.datum || "").localeCompare(a.datum || ""));
+    const summe = diesenMonat.reduce((s, b) => s + finZahl(b.betrag), 0);
+
+    const liste = diesenMonat.length
+      ? diesenMonat.map((b) => `
+        <div class="fin-buchung-item">
+          <span class="fin-buchung-datum">${(b.datum || "").split("-").reverse().slice(0, 2).join(".")}</span>
+          <div class="fin-buchung-info">
+            <div class="fin-buchung-kat">${escapeHtml(b.kategorie || "Sonstiges")}${b.herkunft === "import" ? ' <span class="badge">importiert</span>' : ""}</div>
+            ${b.notiz ? `<div class="fin-buchung-notiz">${escapeHtml(b.notiz)}</div>` : ""}
+          </div>
+          <div class="fin-betrag">${finEuro(b.betrag)}</div>
+          <button class="fin-loesch-btn" onclick="buchungLoeschen('${b.id}')" title="Löschen">×</button>
+        </div>
+      `).join("")
+      : `<p class="empty-text">Noch keine Buchungen diesen Monat.</p>`;
+
+    el.innerHTML = `
+      <div class="fin-quick-form">
+        <input type="number" step="0.01" id="neue-buchung-betrag" class="fin-quick-betrag" placeholder="0,00 €" inputmode="decimal">
+
+        <div class="fin-kat-grid">
+          ${FIN_BUCHUNG_KATEGORIEN.map((k) => `
+            <button type="button" class="fin-kat-btn ${k === buchungKategorieAusgewaehlt ? "active" : ""}"
+              data-kat="${escapeAttr(k)}" onclick="buchungKategorieWaehlen('${escapeAttr(k)}')">${escapeHtml(k)}</button>
+          `).join("")}
+        </div>
+
+        <div class="row">
+          <input type="date" id="neue-buchung-datum" value="${heuteISOFin()}">
+          <input type="text" id="neue-buchung-notiz" placeholder="Notiz (optional)">
+        </div>
+
+        <button class="btn-primary fin-quick-save" id="btn-buchung-speichern">Speichern</button>
+      </div>
+
+      <div class="fin-summary-row">
+        <div class="fin-summary-item">
+          <div class="fin-summary-label">Diesen Monat</div>
+          <div class="fin-summary-value">${finEuro(summe)}</div>
+        </div>
+      </div>
+
+      ${liste}
+    `;
+
+    document.getElementById("btn-buchung-speichern").addEventListener("click", buchungHinzufuegen);
+  }
+
+  async function buchungHinzufuegen() {
+    const betragFeld = document.getElementById("neue-buchung-betrag");
+    const betrag = betragFeld.value;
+    if (!betrag || finZahl(betrag) <= 0) { betragFeld.focus(); return; }
+    const datum = document.getElementById("neue-buchung-datum").value || heuteISOFin();
+    const notiz = document.getElementById("neue-buchung-notiz").value.trim();
+
+    await api("buchung_hinzufuegen", {
+      datum, betrag, notiz,
+      kategorie: buchungKategorieAusgewaehlt,
+      herkunft: "manuell",
+    });
+    await ladeDaten();
+    renderFinanzen();
+  }
+
+  async function buchungLoeschen(id) {
+    if (!confirm("Diese Buchung wirklich löschen?")) return;
+    await api("buchung_loeschen", { id });
     await ladeDaten();
     renderFinanzen();
   }
