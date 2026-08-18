@@ -3014,6 +3014,10 @@
   // Monat, zieht Fixkosten, variable Buchungen und Sonderausgaben
   // zusammen. Läuft komplett clientseitig auf den ohnehin geladenen
   // Daten, kein zusätzlicher Server-Aufruf nötig.
+  // Ausgaben nach Kategorie – zieht bewusst nur die Buchungen heran
+  // (manuell erfasst + CSV-Import), nicht Fixkosten/Sonderausgaben,
+  // damit nichts doppelt gezählt wird. Läuft clientseitig auf den
+  // ohnehin geladenen Daten, kein zusätzlicher Server-Aufruf nötig.
   function finKategorienDaten(jahr, monat) {
     const summenProKategorie = new Map();
     const addiere = (kat, betrag) => {
@@ -3021,22 +3025,9 @@
       summenProKategorie.set(key, (summenProKategorie.get(key) || 0) + finZahl(betrag));
     };
 
-    fixkosten.filter((f) => f.typ === "ausgabe").forEach((f) => {
-      if (monat) {
-        addiere(f.kategorie, f[FIN_MONAT_SPALTEN[monat - 1]]);
-      } else {
-        const summe = FIN_MONAT_SPALTEN.reduce((s, m) => s + finZahl(f[m]), 0);
-        addiere(f.kategorie, summe);
-      }
-    });
-
     buchungen
       .filter((b) => b.typ !== "einnahme" && b.datum && b.datum.slice(0, 4) === String(jahr) && (!monat || Number(b.datum.slice(5, 7)) === monat))
       .forEach((b) => addiere(b.kategorie, b.betrag));
-
-    sonderausgaben
-      .filter((s) => Number(s.jahr) === jahr && (!monat || Number(s.monat) === monat))
-      .forEach((s) => addiere(s.kategorie, s.betrag));
 
     return [...summenProKategorie.entries()]
       .map(([kategorie, betrag]) => ({ kategorie, betrag: finRound2(betrag) }))
