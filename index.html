@@ -2548,6 +2548,188 @@
 
     await ladeDaten();
     renderFinanzen();
+
+    const importierteBuchungen = buchungen.filter((b) => b.herkunft === "import");
+    const kandidaten = finErkenneFixkostenKandidaten(importierteBuchungen);
+    if (kandidaten.length) {
+      zeigeFixkostenKandidaten(kandidaten);
+    }
+  }
+
+  // ==========================================================
+  // Automatische Fixkosten-Erkennung (läuft nach jedem CSV-Import)
+  // – Logik entspricht dem bisherigen erkennung.py / fixkosten_erstellen.py
+  // ==========================================================
+  const FIN_NOISE_WORDS = [
+    "KARTENZAHLUNG", "LASTSCHRIFT", "UEBERWEISUNG", "ÜBERWEISUNG",
+    "GUTSCHRIFT", "DAUERAUFTRAG", "ECHTZEITUEBERWEISUNG", "SEPA",
+  ];
+
+  function finRound2(n) {
+    return Math.round(finZahl(n) * 100) / 100;
+  }
+
+  function finNormalisiereSchluessel(notiz) {
+    let text = (notiz || "").toUpperCase();
+    for (const w of FIN_NOISE_WORDS) text = text.split(w).join(" ");
+    text = text.replace(/[0-9]+/g, " ");
+    text = text.replace(/[^A-ZÄÖÜẞ_\s]/g, " ");
+    text = text.replace(/\s+/g, " ").trim();
+    const woerter = text.split(" ").filter(Boolean);
+    return woerter.slice(0, 4).join(" ");
+  }
+
+  function finMonatVonDatum(datumIso) {
+    return datumIso ? datumIso.slice(0, 7) : null;
+  }
+
+  function finErkenneFixkostenKandidaten(buchungsListe, minMonate = 2, varianzSchwelle = 0.2) {
+    const gruppen = new Map();
+    for (const b of buchungsListe) {
+      const typ = b.typ === "einnahme" ? "einnahme" : "ausgabe";
+      const key = finNormalisiereSchluessel(b.notiz);
+      if (!key) continue;
+      const gruppenKey = `${typ}|${key}`;
+      if (!gruppen.has(gruppenKey)) gruppen.set(gruppenKey, { typ, eintraege: [] });
+      gruppen.get(gruppenKey).eintraege.push(b);
+    }
+
+    const kandidaten = [];
+    for (const { typ, eintraege } of gruppen.values()) {
+      const monate = new Set(eintraege.map((e) => finMonatVonDatum(e.datum)).filter(Boolean));
+      if (monate.size < minMonate) continue;
+
+      const betraege = eintraege.map((e) => finZahl(e.betrag)).filter((n) => Number.isFinite(n));
+      if (!betraege.length) continue;
+      const sortiert = [...betraege].sort((a, b) => a - b);
+      const median = sortiert.length % 2
+        ? sortiert[(sortiert.length - 1) / 2]
+        : (sortiert[sortiert.length / 2 - 1] + sortiert[sortiert.length / 2]) / 2;
+      const min = Math.min(...betraege);
+      const max = Math.max(...betraege);
+      const spanne = median ? (max - min) / median : 0;
+      const variabel = spanne > varianzSchwelle;
+
+      const notizCounts = new Map();
+      for (const e of eintraege) {
+        const n = (e.notiz || "").trim();
+        notizCounts.set(n, (notizCounts.get(n) || 0) + 1);
+      }
+      let bezeichnungVorschlag = "";
+      let bestCount = -1;
+      for (const [n, c] of notizCounts) {
+        if (c > bestCount) { bestCount = c; bezeichnungVorschlag = n; }
+      }
+      bezeichnungVorschlag = bezeichnungVorschlag.slice(0, 60);
+
+      kandidaten.push({
+        typ,
+        bezeichnung_vorschlag: bezeichnungVorschlag,
+        anzahl_monate: monate.size,
+        anzahl_buchungen: eintraege.length,
+        betrag_median: finRound2(median),
+        betrag_min: finRound2(min),
+        betrag_max: finRound2(max),
+        variabel,
+        buchung_ids: eintraege.map((e) => e.id).filter(Boolean),
+      });
+    }
+
+    kandidaten.sort((a, b) =>
+      b.anzahl_monate - a.anzahl_monate || a.bezeichnung_vorschlag.localeCompare(b.bezeichnung_vorschlag)
+    );
+    return kandidaten;
+  }
+
+  function zeigeFixkostenKandidaten(kandidaten) {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+
+    const zeilenHtml = kandidaten.map((k, i) => `
+      <div class="kandidat-row" data-idx="${i}">
+        <div class="kandidat-kopf">
+          <input type="checkbox" class="kand-uebernehmen" checked>
+          <strong>${k.typ === "einnahme" ? "Einnahme" : "Ausgabe"}</strong>
+          <span class="kandidat-hinweis">${k.anzahl_monate} Monate${k.variabel ? ` · schwankt ${finEuro(k.betrag_min)}–${finEuro(k.betrag_max)}` : ""}</span>
+        </div>
+        <div class="kandidat-felder">
+          <input type="text" class="kand-bezeichnung" value="${escapeAttr(k.bezeichnung_vorschlag)}" placeholder="Bezeichnung">
+          <input type="number" step="0.01" class="kand-betrag" value="${k.betrag_median}">
+        </div>
+        <label class="kandidat-loeschen">
+          <input type="checkbox" class="kand-loeschen" checked>
+          zugehörige Einzelbuchungen danach löschen
+        </label>
+      </div>
+    `).join("");
+
+    overlay.innerHTML = `
+      <div class="modal-box">
+        <h2>Fixkosten-Kandidaten</h2>
+        <p class="hero-text">Diese wiederkehrenden Muster wurden in den importierten Buchungen gefunden. Bitte prüfen, anpassen und auswählen, was als Fixkosten-Position angelegt werden soll.</p>
+        ${zeilenHtml}
+        <div class="modal-actions">
+          <button class="btn-secondary" id="kand-abbrechen">Überspringen</button>
+          <button class="btn-primary" id="kand-uebernehmen-btn">Ausgewählte anlegen</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById("kand-abbrechen").addEventListener("click", () => overlay.remove());
+    document.getElementById("kand-uebernehmen-btn").addEventListener("click", async () => {
+      const rows = overlay.querySelectorAll(".kandidat-row");
+      const ausgewaehlt = [];
+      for (const row of rows) {
+        const idx = Number(row.dataset.idx);
+        if (!row.querySelector(".kand-uebernehmen").checked) continue;
+        const bezeichnung = row.querySelector(".kand-bezeichnung").value.trim();
+        if (!bezeichnung) {
+          alert("Bitte für jede ausgewählte Position eine Bezeichnung eintragen.");
+          return;
+        }
+        const betrag = finZahl(row.querySelector(".kand-betrag").value);
+        const loeschen = row.querySelector(".kand-loeschen").checked;
+        ausgewaehlt.push({ ...kandidaten[idx], bezeichnung, betrag, loeschen });
+      }
+      if (!ausgewaehlt.length) {
+        alert("Es wurde keine Position ausgewählt.");
+        return;
+      }
+      overlay.remove();
+      await fixkostenAusKandidatenAnlegen(ausgewaehlt);
+    });
+  }
+
+  async function fixkostenAusKandidatenAnlegen(ausgewaehlt) {
+    let erstellt = 0, geloescht = 0, fehler = 0;
+    for (const pos of ausgewaehlt) {
+      const row = { bezeichnung: pos.bezeichnung, typ: pos.typ };
+      for (const m of FIN_MONAT_SPALTEN) row[m] = pos.betrag;
+      try {
+        await api("fixkosten_hinzufuegen", row);
+        erstellt++;
+        if (pos.loeschen) {
+          for (const id of pos.buchung_ids) {
+            try {
+              await api("buchung_loeschen", { id });
+              geloescht++;
+            } catch { /* einzelner Löschfehler bricht den Rest nicht ab */ }
+          }
+        }
+      } catch {
+        fehler++;
+      }
+    }
+    await ladeDaten();
+    renderFinanzen();
+    alert(
+      "Fixkosten übernommen\n\n" +
+      `Neue Fixkosten-Positionen: ${erstellt}\n` +
+      (fehler ? `Fehler: ${fehler}\n` : "") +
+      `Zugehörige Einzelbuchungen entfernt: ${geloescht}\n\n` +
+      "Bitte im Tab „Fixkosten\" die Kategorie ergänzen und die Monatsbeträge prüfen, falls sie schwanken (z. B. Strom)."
+    );
   }
 
   function renderFinBuchungen() {
