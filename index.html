@@ -593,6 +593,8 @@
   let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben" | "buchungen" | "uebersicht"
   let finUebersichtZeilen = null;
   let finJahr = 2026;
+  let finBuchMonat = new Date().getMonth() + 1;
+  let finBuchJahr = new Date().getFullYear();
 
   async function api(action, extra = {}) {
     const res = await fetch(API_URL, {
@@ -2390,11 +2392,19 @@
     return new Date().toISOString().slice(0, 10);
   }
 
+  function finBuchungMonatVerschieben(delta) {
+    finBuchMonat += delta;
+    if (finBuchMonat > 12) { finBuchMonat = 1; finBuchJahr += 1; }
+    if (finBuchMonat < 1) { finBuchMonat = 12; finBuchJahr -= 1; }
+    renderFinBuchungen();
+  }
+  window.finBuchungMonatVerschieben = finBuchungMonatVerschieben;
+
   function renderFinBuchungen() {
     const el = document.getElementById("fin-buchungen-bereich");
-    const heute = new Date();
-    const monatStr = String(heute.getMonth() + 1).padStart(2, "0");
-    const jahrStr = String(heute.getFullYear());
+    const monatStr = String(finBuchMonat).padStart(2, "0");
+    const jahrStr = String(finBuchJahr);
+    const istAktuellerMonat = finBuchMonat === (new Date().getMonth() + 1) && finBuchJahr === new Date().getFullYear();
     const diesenMonat = buchungen
       .filter((b) => b.datum && b.datum.slice(0, 7) === `${jahrStr}-${monatStr}`)
       .sort((a, b) => (b.datum || "").localeCompare(a.datum || ""));
@@ -2412,7 +2422,7 @@
           <button class="fin-loesch-btn" onclick="buchungLoeschen('${b.id}')" title="Löschen">×</button>
         </div>
       `).join("")
-      : `<p class="empty-text">Noch keine Buchungen diesen Monat.</p>`;
+      : `<p class="empty-text">Keine Buchungen in ${MONATSNAMEN[finBuchMonat - 1]} ${finBuchJahr}.</p>`;
 
     el.innerHTML = `
       <div class="fin-quick-form">
@@ -2433,9 +2443,15 @@
         <button class="btn-primary fin-quick-save" id="btn-buchung-speichern">Speichern</button>
       </div>
 
+      <div class="cal-header">
+        <div class="cal-nav"><button onclick="finBuchungMonatVerschieben(-1)">‹</button></div>
+        <h2>${MONATSNAMEN[finBuchMonat - 1]} ${finBuchJahr}${istAktuellerMonat ? " (aktuell)" : ""}</h2>
+        <div class="cal-nav"><button onclick="finBuchungMonatVerschieben(1)">›</button></div>
+      </div>
+
       <div class="fin-summary-row">
         <div class="fin-summary-item">
-          <div class="fin-summary-label">Diesen Monat</div>
+          <div class="fin-summary-label">Summe ${MONATSNAMEN[finBuchMonat - 1]}</div>
           <div class="fin-summary-value">${finEuro(summe)}</div>
         </div>
       </div>
