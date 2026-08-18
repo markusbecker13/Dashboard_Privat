@@ -548,11 +548,13 @@
           <button class="plan-typ-btn active" id="fintyp-fixkosten" data-fintyp="fixkosten">Fixkosten</button>
           <button class="plan-typ-btn" id="fintyp-sonderausgaben" data-fintyp="sonderausgaben">Sonderausgaben</button>
           <button class="plan-typ-btn" id="fintyp-buchungen" data-fintyp="buchungen">Buchungen</button>
+          <button class="plan-typ-btn" id="fintyp-uebersicht" data-fintyp="uebersicht">Übersicht</button>
         </div>
 
         <div id="fin-fixkosten-bereich"></div>
         <div id="fin-sonderausgaben-bereich" class="hidden"></div>
         <div id="fin-buchungen-bereich" class="hidden"></div>
+        <div id="fin-uebersicht-bereich" class="hidden"></div>
       </div>
     </main>
   </div>
@@ -588,7 +590,9 @@
   let sonderausgaben = [];
   let buchungen = [];
   let finanzEinstellungen = [];
-  let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben"
+  let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben" | "buchungen" | "uebersicht"
+  let finUebersichtZeilen = null;
+  let finJahr = 2026;
 
   async function api(action, extra = {}) {
     const res = await fetch(API_URL, {
@@ -2173,6 +2177,7 @@
     btn.addEventListener("click", () => {
       finTyp = btn.dataset.fintyp;
       renderFinanzen();
+      if (finTyp === "uebersicht") ladeFinUebersicht();
     });
   });
 
@@ -2180,12 +2185,15 @@
     document.getElementById("fintyp-fixkosten").classList.toggle("active", finTyp === "fixkosten");
     document.getElementById("fintyp-sonderausgaben").classList.toggle("active", finTyp === "sonderausgaben");
     document.getElementById("fintyp-buchungen").classList.toggle("active", finTyp === "buchungen");
+    document.getElementById("fintyp-uebersicht").classList.toggle("active", finTyp === "uebersicht");
     document.getElementById("fin-fixkosten-bereich").classList.toggle("hidden", finTyp !== "fixkosten");
     document.getElementById("fin-sonderausgaben-bereich").classList.toggle("hidden", finTyp !== "sonderausgaben");
     document.getElementById("fin-buchungen-bereich").classList.toggle("hidden", finTyp !== "buchungen");
+    document.getElementById("fin-uebersicht-bereich").classList.toggle("hidden", finTyp !== "uebersicht");
     renderFinFixkosten();
     renderFinSonderausgaben();
     renderFinBuchungen();
+    renderFinUebersicht();
   }
 
   function finKategorieOptionsHtml() {
@@ -2459,6 +2467,126 @@
     await api("buchung_loeschen", { id });
     await ladeDaten();
     renderFinanzen();
+  }
+
+  function finBalkenChart(zeilen) {
+    const w = 640, h = 220, padL = 8, padR = 8, padT = 10, padB = 22;
+    const innerW = w - padL - padR, innerH = h - padT - padB;
+    const maxVal = Math.max(1, ...zeilen.map((z) => Math.max(z.einnahmen_gesamt, z.ausgaben_gesamt)));
+    const groupW = innerW / zeilen.length;
+    const barW = Math.max(4, groupW / 2 - 4);
+    let bars = "";
+    zeilen.forEach((z, i) => {
+      const xGroup = padL + i * groupW;
+      const hEin = (z.einnahmen_gesamt / maxVal) * innerH;
+      const hAus = (z.ausgaben_gesamt / maxVal) * innerH;
+      bars += `<rect x="${(xGroup + groupW / 2 - barW - 1).toFixed(1)}" y="${(padT + innerH - hEin).toFixed(1)}" width="${barW.toFixed(1)}" height="${hEin.toFixed(1)}" fill="var(--accent)" rx="2"></rect>`;
+      bars += `<rect x="${(xGroup + groupW / 2 + 1).toFixed(1)}" y="${(padT + innerH - hAus).toFixed(1)}" width="${barW.toFixed(1)}" height="${hAus.toFixed(1)}" fill="var(--accent-2)" rx="2"></rect>`;
+    });
+    const labels = zeilen.map((z, i) =>
+      `<text x="${(padL + i * groupW + groupW / 2).toFixed(1)}" y="${h - 6}" font-size="9" fill="var(--ink-dim)" text-anchor="middle">${FIN_MONAT_KURZ[i]}</text>`
+    ).join("");
+    return `
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">
+        <line x1="${padL}" y1="${padT + innerH}" x2="${w - padR}" y2="${padT + innerH}" stroke="var(--border)"></line>
+        ${bars}${labels}
+      </svg>
+      <div style="display:flex;gap:1.2rem;font-size:0.78rem;color:var(--ink-dim);margin:0.2rem 0 1.4rem;">
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent);border-radius:2px;margin-right:5px;vertical-align:-1px;"></span>Einnahmen</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent-2);border-radius:2px;margin-right:5px;vertical-align:-1px;"></span>Ausgaben</span>
+      </div>
+    `;
+  }
+
+  function finLinienChart(zeilen) {
+    const w = 640, h = 200, padL = 10, padR = 10, padT = 14, padB = 22;
+    const innerW = w - padL - padR, innerH = h - padT - padB;
+    const values = zeilen.map((z) => z.kontostand_ende);
+    const minV = Math.min(...values, 0);
+    const maxV = Math.max(...values, 1);
+    const range = (maxV - minV) || 1;
+    const stepX = innerW / Math.max(1, zeilen.length - 1);
+    const points = values.map((v, i) => [
+      padL + i * stepX,
+      padT + innerH - ((v - minV) / range) * innerH,
+    ]);
+    const path = points.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+    const dots = points.map((p) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="var(--accent)"></circle>`).join("");
+    const labels = zeilen.map((z, i) =>
+      `<text x="${(padL + i * stepX).toFixed(1)}" y="${h - 4}" font-size="9" fill="var(--ink-dim)" text-anchor="middle">${FIN_MONAT_KURZ[i]}</text>`
+    ).join("");
+    return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;margin-bottom:1.6rem;">
+      <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2"></path>
+      ${dots}${labels}
+    </svg>`;
+  }
+
+  function renderFinUebersicht() {
+    const el = document.getElementById("fin-uebersicht-bereich");
+    if (finTyp !== "uebersicht" && !finUebersichtZeilen) return; // nichts zu tun, noch nie geladen
+    if (!finUebersichtZeilen) {
+      el.innerHTML = `<p class="empty-text">Lade Jahresübersicht …</p>`;
+      return;
+    }
+    const zeilen = finUebersichtZeilen;
+    const jahresEinnahmen = zeilen.reduce((s, z) => s + z.einnahmen_gesamt, 0);
+    const jahresAusgaben = zeilen.reduce((s, z) => s + z.ausgaben_gesamt, 0);
+    const startEinstellung = finanzEinstellungen.find((e) => Number(e.jahr) === finJahr);
+    const startWert = startEinstellung ? startEinstellung.start_kontostand : 0;
+    const kontostandEnde = zeilen.length ? zeilen[zeilen.length - 1].kontostand_ende : startWert;
+
+    const tabelle = `<div class="fin-tabelle-wrap"><table class="fin-tabelle">
+      <tr><th class="fin-bez-th">Monat</th><th>Start</th><th>Einnahmen</th><th>Ausgaben</th><th>Differenz</th><th>Ende</th></tr>
+      ${zeilen.map((z, i) => `<tr>
+        <td class="fin-bez">${FIN_MONAT_KURZ[i]}</td>
+        <td>${finEuro(z.startkapital)}</td>
+        <td>${finEuro(z.einnahmen_gesamt)}</td>
+        <td>${finEuro(z.ausgaben_gesamt)}</td>
+        <td>${finEuro(z.differenz)}</td>
+        <td>${finEuro(z.kontostand_ende)}</td>
+      </tr>`).join("")}
+      <tr class="fin-tabelle-summe">
+        <td>Jahressumme</td><td></td>
+        <td>${finEuro(jahresEinnahmen)}</td>
+        <td>${finEuro(jahresAusgaben)}</td>
+        <td>${finEuro(jahresEinnahmen - jahresAusgaben)}</td>
+        <td>${finEuro(kontostandEnde)}</td>
+      </tr>
+    </table></div>`;
+
+    el.innerHTML = `
+      <div class="row" style="align-items:center;">
+        <label style="font-size:0.85rem;color:var(--ink-dim);">Startkapital Januar ${finJahr}</label>
+        <input type="number" step="0.01" id="fin-startkapital-input" value="${startWert}" style="width:9rem;">
+        <button class="btn-secondary" id="btn-startkapital-speichern">Speichern</button>
+      </div>
+
+      <div class="project-heading">Einnahmen vs. Ausgaben</div>
+      ${finBalkenChart(zeilen)}
+
+      <div class="project-heading">Kontostand-Verlauf</div>
+      ${finLinienChart(zeilen)}
+
+      <div class="project-heading">Jahresübersicht</div>
+      ${tabelle}
+    `;
+
+    document.getElementById("btn-startkapital-speichern").addEventListener("click", startkapitalSpeichern);
+  }
+
+  async function ladeFinUebersicht() {
+    finUebersichtZeilen = null;
+    renderFinUebersicht();
+    const data = await api("finanzen_jahresuebersicht", { jahr: finJahr });
+    finUebersichtZeilen = data.zeilen || [];
+    renderFinUebersicht();
+  }
+
+  async function startkapitalSpeichern() {
+    const wert = document.getElementById("fin-startkapital-input").value;
+    await api("startkapital_speichern", { jahr: finJahr, start_kontostand: wert });
+    await ladeDaten();
+    await ladeFinUebersicht();
   }
 
   // ==========================================================
