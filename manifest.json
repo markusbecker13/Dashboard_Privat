@@ -1,21 +1,17 @@
 {
-  "name": "Dashboard",
-  "short_name": "Dashboard",
-  "description": "Privates Dashboard mit Aufgaben, Kalender, Notizen, Links und Reflexion",
+  "name": "AWO Jugendwerk Erftstadt – Planung",
+  "short_name": "AWO Planung",
+  "description": "Planungs-App für Programm, Personal, Gruppen und Eltern-Zugang der Aktionen (Ferienfreizeiten, Tagesausflüge, Gruppenstunden u.a.) — AWO Jugendwerk Erftstadt",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#cfe6fb",
-  "theme_color": "#2f6fed",
+  "orientation": "any",
+  "background_color": "#FAF7F2",
+  "theme_color": "#E2001A",
+  "lang": "de",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
-  ],
-  "shortcuts": [
-    {
-      "name": "Neue Notiz",
-      "short_name": "Notiz",
-      "url": "./index.html?tab=notizen",
-      "description": "Direkt eine neue Notiz eintragen"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
