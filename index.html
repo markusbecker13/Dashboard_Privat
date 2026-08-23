@@ -20,12 +20,11 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Work Sans", system-ui, sans-serif; min-height: 100vh; }
-  .app-shell { display: flex; align-items: flex-start; min-height: 100vh; }
+  .app-shell { display: flex; align-items: stretch; min-height: 100vh; }
   .sidebar {
     width: 190px; flex-shrink: 0; box-sizing: border-box;
     border-right: 1px solid var(--border);
     padding: 1.4rem 1rem; display: flex; flex-direction: column; gap: 1.6rem;
-    position: sticky; top: 0; height: 100vh; overflow-y: auto;
   }
   .topbar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; }
   .brand { font-family: "Fraunces", serif; font-weight: 600; font-size: 1.15rem; }
