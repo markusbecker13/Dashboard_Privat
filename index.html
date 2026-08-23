@@ -152,6 +152,8 @@
     padding: 0.7rem 0.8rem; margin-bottom: 0.5rem; font-size: 0.92rem;
   }
   .frei-belegt { background: var(--panel); border: 1px solid var(--border); }
+  .frei-erledigt { opacity: 0.55; }
+  .frei-erledigt .frei-label { text-decoration: line-through; }
   .frei-luecke {
     background: #e7f7ec; border: 1px dashed #8fd6a8; cursor: pointer; color: var(--ink);
   }
@@ -1357,22 +1359,22 @@
   function freiBusyBloecke(tagIso, wtIndex) {
     const bloecke = [];
 
-    termine.filter((t) => t.datum === tagIso && t.uhrzeit && !t.erledigt).forEach((t) => {
+    termine.filter((t) => t.datum === tagIso && t.uhrzeit).forEach((t) => {
       const start = t.uhrzeit.slice(0,5);
       const ende = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0,5) : minutenZuZeit(zeitZuMinuten(start) + 30);
-      bloecke.push({ start, ende, titel: t.titel, typ: "Termin", id: t.id });
+      bloecke.push({ start, ende, titel: t.titel, typ: "Termin", id: t.id, erledigt: !!t.erledigt });
     });
 
-    aufgaben.filter((a) => !a.erledigt && a.faellig_am === tagIso && a.uhrzeit).forEach((a) => {
+    aufgaben.filter((a) => a.faellig_am === tagIso && a.uhrzeit).forEach((a) => {
       const start = a.uhrzeit.slice(0,5);
       const ende = a.ende_uhrzeit ? a.ende_uhrzeit.slice(0,5) : minutenZuZeit(zeitZuMinuten(start) + 30);
-      bloecke.push({ start, ende, titel: a.titel, typ: "Aufgabe", id: a.id });
+      bloecke.push({ start, ende, titel: a.titel, typ: "Aufgabe", id: a.id, erledigt: !!a.erledigt });
     });
 
     blockzeiten.forEach((b) => {
       const trifftZu = (b.datum && b.datum === tagIso) || (!b.datum && b.wochentage && b.wochentage.includes(wtIndex));
       if (trifftZu) {
-        bloecke.push({ start: b.start_zeit.slice(0,5), ende: b.end_zeit.slice(0,5), titel: b.titel, typ: "Blockzeit" });
+        bloecke.push({ start: b.start_zeit.slice(0,5), ende: b.end_zeit.slice(0,5), titel: b.titel, typ: "Blockzeit", erledigt: false });
       }
     });
 
@@ -1415,9 +1417,12 @@
     const rahmen = freiRahmenFuerWochentag(wtIndex);
     if (!rahmen.aktiv) return null;
     const bloecke = freiBusyBloecke(tagIso, wtIndex);
-    const luecken = freiLueckenBerechnen(rahmen.start_zeit, rahmen.end_zeit, bloecke);
+    // Erledigte Termine/Aufgaben blockieren keine Zeit mehr (Lücke gilt als frei),
+    // bleiben aber als abgehakter Eintrag in der Zeitleiste sichtbar.
+    const bloeckeAktiv = bloecke.filter((b) => !b.erledigt);
+    const luecken = freiLueckenBerechnen(rahmen.start_zeit, rahmen.end_zeit, bloeckeAktiv);
     return [
-      ...bloecke.map((b) => ({ ...b, art: "belegt" })),
+      ...bloecke.map((b) => ({ ...b, art: b.erledigt ? "erledigt" : "belegt" })),
       ...luecken.map((l) => ({ start: l.start, ende: l.ende, art: "frei" })),
     ].sort((a, b) => zeitZuMinuten(a.start) - zeitZuMinuten(b.start));
   }
@@ -1456,13 +1461,14 @@
             <span class="frei-plus">+</span>
           </div>`;
       }
+      const istErledigt = e.art === "erledigt";
       const checkboxHtml = e.typ === "Termin"
-        ? `<button class="task-check" onclick="freiTerminUmschalten('${e.id}')" title="Erledigt"></button>`
+        ? `<button class="task-check ${istErledigt ? "done" : ""}" onclick="freiTerminUmschalten('${e.id}')" title="Erledigt">${istErledigt ? "✓" : ""}</button>`
         : e.typ === "Aufgabe"
-        ? `<button class="task-check" onclick="freiAufgabeUmschalten('${e.id}')" title="Erledigt"></button>`
+        ? `<button class="task-check ${istErledigt ? "done" : ""}" onclick="freiAufgabeUmschalten('${e.id}')" title="Erledigt">${istErledigt ? "✓" : ""}</button>`
         : `<span style="width:1.4rem; flex-shrink:0;"></span>`;
       return `
-        <div class="frei-item frei-belegt">
+        <div class="frei-item frei-belegt${istErledigt ? " frei-erledigt" : ""}">
           ${checkboxHtml}
           <span class="frei-zeit">${e.start}–${e.ende}</span>
           <span class="frei-label">${escapeHtml(e.titel)}<span class="frei-typ">${e.typ}</span></span>
