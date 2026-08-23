@@ -1417,10 +1417,8 @@
     const rahmen = freiRahmenFuerWochentag(wtIndex);
     if (!rahmen.aktiv) return null;
     const bloecke = freiBusyBloecke(tagIso, wtIndex);
-    // Erledigte Termine/Aufgaben blockieren keine Zeit mehr (Lücke gilt als frei),
-    // bleiben aber als abgehakter Eintrag in der Zeitleiste sichtbar.
-    const bloeckeAktiv = bloecke.filter((b) => !b.erledigt);
-    const luecken = freiLueckenBerechnen(rahmen.start_zeit, rahmen.end_zeit, bloeckeAktiv);
+    // Erledigt = nur abgehakt, blockiert aber weiterhin die Zeit (keine zusätzliche Lücke).
+    const luecken = freiLueckenBerechnen(rahmen.start_zeit, rahmen.end_zeit, bloecke);
     return [
       ...bloecke.map((b) => ({ ...b, art: b.erledigt ? "erledigt" : "belegt" })),
       ...luecken.map((l) => ({ start: l.start, ende: l.ende, art: "frei" })),
