@@ -1357,7 +1357,7 @@
   function freiBusyBloecke(tagIso, wtIndex) {
     const bloecke = [];
 
-    termine.filter((t) => t.datum === tagIso && t.uhrzeit).forEach((t) => {
+    termine.filter((t) => t.datum === tagIso && t.uhrzeit && !t.erledigt).forEach((t) => {
       const start = t.uhrzeit.slice(0,5);
       const ende = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0,5) : minutenZuZeit(zeitZuMinuten(start) + 30);
       bloecke.push({ start, ende, titel: t.titel, typ: "Termin", id: t.id });
@@ -1456,8 +1456,14 @@
             <span class="frei-plus">+</span>
           </div>`;
       }
+      const checkboxHtml = e.typ === "Termin"
+        ? `<button class="task-check" onclick="freiTerminUmschalten('${e.id}')" title="Erledigt"></button>`
+        : e.typ === "Aufgabe"
+        ? `<button class="task-check" onclick="freiAufgabeUmschalten('${e.id}')" title="Erledigt"></button>`
+        : `<span style="width:1.4rem; flex-shrink:0;"></span>`;
       return `
         <div class="frei-item frei-belegt">
+          ${checkboxHtml}
           <span class="frei-zeit">${e.start}–${e.ende}</span>
           <span class="frei-label">${escapeHtml(e.titel)}<span class="frei-typ">${e.typ}</span></span>
           ${e.typ === "Termin" ? `<button class="task-snooze" onclick="freiTerminBearbeitenStart('${e.id}')" title="Bearbeiten">✎</button>` : ""}
@@ -1467,6 +1473,18 @@
         </div>`;
     }).join("");
   }
+
+  window.freiTerminUmschalten = async function(id) {
+    await api("termin_umschalten", { id });
+    await ladeDaten();
+    renderFrei();
+  };
+
+  window.freiAufgabeUmschalten = async function(id) {
+    await api("aufgabe_umschalten", { id });
+    await ladeDaten();
+    renderFrei();
+  };
 
   window.freiTerminEntfernen = async function(id) {
     if (freiBearbeiteterTermin === id) freiFormularSchliessen();
