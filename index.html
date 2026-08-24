@@ -320,6 +320,33 @@
   .start-kachel.mod-einkauf { border-left-color: var(--mod-finanzen); }
   .start-kachel-zahl { font-family: "Fraunces", serif; font-size: 1.7rem; font-weight: 600; line-height: 1; }
   .start-kachel-label { font-size: 0.8rem; color: var(--ink-dim); }
+
+  /* Finanzen-Modul */
+  .fin-tabelle-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1.6rem; }
+  .fin-tabelle { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  .fin-tabelle th, .fin-tabelle td { padding: 0.4rem 0.35rem; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .fin-tabelle th { color: var(--ink-dim); font-weight: 500; font-size: 0.75rem; background: var(--panel); position: sticky; top: 0; z-index: 1; }
+  .fin-tabelle td.fin-bez { text-align: left; min-width: 12rem; position: sticky; left: 0; background: var(--panel); }
+  .fin-tabelle th.fin-bez-th { text-align: left; position: sticky; left: 0; z-index: 2; }
+  .fin-tabelle input[type="number"] { width: 4.6rem; padding: 0.3rem 0.35rem; text-align: right; font-size: 0.8rem; }
+  .fin-tabelle-summe td { font-weight: 600; background: var(--bg); }
+  .fin-gruppe-titel { font-weight: 600; padding: 0.55rem 0.35rem !important; background: var(--bg) !important; text-align: left !important; color: var(--mod-finanzen); }
+  .fin-loesch-btn { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 1.1rem; padding: 0 0.3rem; line-height: 1; }
+  .fin-loesch-btn:hover { color: var(--overdue-text); }
+  .fin-neu-form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.9rem 0 1.6rem; }
+  .fin-neu-form input[type="text"] { flex: 1 1 12rem; }
+  .fin-card {
+    display: flex; align-items: flex-start; gap: 0.7rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 0.9rem; margin-bottom: 0.5rem;
+  }
+  .fin-card-info { flex: 1; }
+  .fin-card-titel { font-size: 0.92rem; font-weight: 500; }
+  .fin-card-meta { color: var(--ink-dim); font-size: 0.8rem; margin-top: 0.15rem; }
+  .fin-betrag { font-weight: 600; white-space: nowrap; }
+  .fin-summary-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.6rem; }
+  .fin-summary-item { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--mod-finanzen); border-radius: 10px; padding: 0.7rem 1rem; min-width: 9rem; }
+  .fin-summary-label { color: var(--ink-dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .fin-summary-value { font-family: "Fraunces", serif; font-size: 1.2rem; font-weight: 600; margin-top: 0.15rem; }
 </style>
 </head>
 <body>
@@ -352,6 +379,7 @@
           <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
           <button class="tab-btn" id="tab-kalender">Kalender</button>
           <button class="tab-btn" id="tab-planung">Planung</button>
+          <button class="tab-btn" id="tab-finanzen">Finanzen</button>
         </div>
         <div class="tab-group">
           <span class="tab-group-label">Sammeln</span>
@@ -578,6 +606,19 @@
 
         <div id="plan-overview-bereich" style="margin-top:2rem;"></div>
       </div>
+
+      <div id="view-finanzen" class="hidden">
+        <h1>Finanzen</h1>
+        <p class="hero-text">Fixkosten, feste Einnahmen und Sonderausgaben.</p>
+
+        <div class="plan-typ-tabs">
+          <button class="plan-typ-btn active" id="fintyp-fixkosten" data-fintyp="fixkosten">Fixkosten</button>
+          <button class="plan-typ-btn" id="fintyp-sonderausgaben" data-fintyp="sonderausgaben">Sonderausgaben</button>
+        </div>
+
+        <div id="fin-fixkosten-bereich"></div>
+        <div id="fin-sonderausgaben-bereich" class="hidden"></div>
+      </div>
     </main>
   </div>
 
@@ -608,6 +649,15 @@
   let calBearbeiteterTermin = null; // id des gerade bearbeiteten Termins oder null
   let blockzeiten = [];
   let tagesrahmen = [];
+  let fixkosten = [];
+  let sonderausgaben = [];
+  let buchungen = [];
+  let finanzEinstellungen = [];
+  let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben"
+  let finBearbeitetesFixkosten = null; // id oder null
+  let finBearbeiteteSonderausgabe = null; // id oder null
+  const FIN_MONATE = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez"];
+  const FIN_MONATSNAMEN_KURZ = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
   async function api(action, extra = {}) {
     const res = await fetch(API_URL, {
@@ -721,6 +771,10 @@
     zielSchritte = data.ziel_schritte || [];
     blockzeiten = data.blockzeiten || [];
     tagesrahmen = data.tagesrahmen || [];
+    fixkosten = data.fixkosten || [];
+    sonderausgaben = data.sonderausgaben || [];
+    buchungen = data.buchungen || [];
+    finanzEinstellungen = data.finanz_einstellungen || [];
     render();
     renderKalender();
     renderHeute();
@@ -922,8 +976,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung", finanzen: "tab-finanzen" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung", finanzen: "view-finanzen" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -932,6 +986,7 @@
     if (aktiv === "heute") renderHeute();
     if (aktiv === "planung") renderPlanung();
     if (aktiv === "frei") renderFrei();
+    if (aktiv === "finanzen") renderFinanzen();
   }
   document.getElementById("tab-heute").addEventListener("click", () => tabWechseln("heute"));
   document.getElementById("tab-aufgaben").addEventListener("click", () => tabWechseln("aufgaben"));
@@ -944,6 +999,7 @@
   document.getElementById("tab-einkauf").addEventListener("click", () => tabWechseln("einkauf"));
   document.getElementById("tab-verlauf").addEventListener("click", () => tabWechseln("verlauf"));
   document.getElementById("tab-planung").addEventListener("click", () => tabWechseln("planung"));
+  document.getElementById("tab-finanzen").addEventListener("click", () => tabWechseln("finanzen"));
 
   function renderHeute() {
     const heuteIso = heuteISO();
@@ -2421,6 +2477,247 @@
     }
     document.getElementById("plan-overview-bereich").innerHTML = overviewHtml;
   }
+
+  // ==========================================================
+  // Finanzen-Modul: Fixkosten + Sonderausgaben
+  // ==========================================================
+  function finEuro(n) {
+    return Number(n || 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+  }
+  function finZahl(v) {
+    if (v === null || v === undefined || v === "") return 0;
+    const n = typeof v === "number" ? v : parseFloat(String(v).replace(",", "."));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  ["fixkosten", "sonderausgaben"].forEach((t) => {
+    document.getElementById("fintyp-" + t).addEventListener("click", () => {
+      finTyp = t;
+      document.getElementById("fintyp-fixkosten").classList.toggle("active", t === "fixkosten");
+      document.getElementById("fintyp-sonderausgaben").classList.toggle("active", t === "sonderausgaben");
+      document.getElementById("fin-fixkosten-bereich").classList.toggle("hidden", t !== "fixkosten");
+      document.getElementById("fin-sonderausgaben-bereich").classList.toggle("hidden", t !== "sonderausgaben");
+      renderFinanzen();
+    });
+  });
+
+  function renderFinanzen() {
+    if (finTyp === "fixkosten") renderFinFixkosten();
+    else renderFinSonderausgaben();
+  }
+
+  function fixkostenZeileHtml(f, istBearbeitet) {
+    const summe = FIN_MONATE.reduce((s, m) => s + finZahl(f[m]), 0);
+    if (istBearbeitet) {
+      return `
+        <tr data-fk-id="${f.id}">
+          <td class="fin-bez"><input type="text" id="fk-bez-${f.id}" value="${escapeAttr(f.bezeichnung)}"></td>
+          ${FIN_MONATE.map((m) => `<td><input type="number" step="0.01" id="fk-${m}-${f.id}" value="${finZahl(f[m])}"></td>`).join("")}
+          <td>${finEuro(summe)}</td>
+          <td>
+            <button class="fin-loesch-btn" onclick="fixkostenSpeichern('${f.id}')" title="Speichern">✓</button>
+            <button class="fin-loesch-btn" onclick="fixkostenBearbeitenAbbrechen()" title="Abbrechen">×</button>
+          </td>
+        </tr>`;
+    }
+    return `
+      <tr data-fk-id="${f.id}">
+        <td class="fin-bez" style="cursor:pointer;" onclick="fixkostenBearbeitenStart('${f.id}')">${escapeHtml(f.bezeichnung)}</td>
+        ${FIN_MONATE.map((m) => `<td>${finZahl(f[m]) ? finEuro(f[m]) : "–"}</td>`).join("")}
+        <td><strong>${finEuro(summe)}</strong></td>
+        <td><button class="fin-loesch-btn" onclick="fixkostenLoeschen('${f.id}')" title="Löschen">×</button></td>
+      </tr>`;
+  }
+
+  function fixkostenTabelleHtml(typ, titel) {
+    const zeilen = fixkosten.filter((f) => f.typ === typ);
+    const summenProMonat = FIN_MONATE.map((m) => zeilen.reduce((s, f) => s + finZahl(f[m]), 0));
+    const summeGesamt = summenProMonat.reduce((s, x) => s + x, 0);
+    return `
+      <div class="fin-tabelle-wrap">
+        <table class="fin-tabelle">
+          <thead>
+            <tr>
+              <th class="fin-bez-th">${titel}</th>
+              ${FIN_MONATSNAMEN_KURZ.map((m) => `<th>${m}</th>`).join("")}
+              <th>Summe</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${zeilen.length
+              ? zeilen.map((f) => fixkostenZeileHtml(f, f.id === finBearbeitetesFixkosten)).join("")
+              : `<tr><td class="fin-bez" colspan="14"><span class="empty-text">Noch keine Einträge.</span></td></tr>`}
+            <tr class="fin-tabelle-summe">
+              <td class="fin-bez">Summe ${titel}</td>
+              ${summenProMonat.map((s) => `<td>${finEuro(s)}</td>`).join("")}
+              <td>${finEuro(summeGesamt)}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  function renderFinFixkosten() {
+    const el = document.getElementById("fin-fixkosten-bereich");
+    el.innerHTML = `
+      ${fixkostenTabelleHtml("ausgabe", "Fixkosten")}
+      ${fixkostenTabelleHtml("einnahme", "Feste Einnahmen")}
+
+      <button class="link-btn" id="toggle-fixkosten-form">▸ Neue Position anlegen</button>
+      <div class="row hidden fin-neu-form" id="fixkosten-form" style="margin-top:0.6rem;">
+        <select id="neue-fk-typ">
+          <option value="ausgabe">Ausgabe</option>
+          <option value="einnahme">Einnahme</option>
+        </select>
+        <input type="text" id="neue-fk-bezeichnung" placeholder="Bezeichnung">
+        <input type="number" step="0.01" id="neue-fk-betrag" placeholder="Betrag/Monat">
+        <button class="btn-primary" id="btn-fixkosten-anlegen">Anlegen</button>
+      </div>
+    `;
+    document.getElementById("toggle-fixkosten-form").addEventListener("click", () => {
+      document.getElementById("fixkosten-form").classList.toggle("hidden");
+    });
+    document.getElementById("btn-fixkosten-anlegen").addEventListener("click", fixkostenHinzufuegen);
+  }
+
+  async function fixkostenHinzufuegen() {
+    const bezeichnung = document.getElementById("neue-fk-bezeichnung").value.trim();
+    if (!bezeichnung) return;
+    const typ = document.getElementById("neue-fk-typ").value;
+    const betrag = document.getElementById("neue-fk-betrag").value;
+    const zahlung = {};
+    FIN_MONATE.forEach((m) => { zahlung[m] = betrag; });
+    await api("fixkosten_hinzufuegen", { bezeichnung, typ, ...zahlung });
+    await ladeDaten();
+    renderFinanzen();
+  }
+
+  window.fixkostenBearbeitenStart = function (id) {
+    finBearbeitetesFixkosten = id;
+    renderFinFixkosten();
+  };
+  window.fixkostenBearbeitenAbbrechen = function () {
+    finBearbeitetesFixkosten = null;
+    renderFinFixkosten();
+  };
+  window.fixkostenSpeichern = async function (id) {
+    const bezeichnung = document.getElementById("fk-bez-" + id).value.trim();
+    if (!bezeichnung) return;
+    const zahlung = { id, bezeichnung };
+    FIN_MONATE.forEach((m) => { zahlung[m] = document.getElementById("fk-" + m + "-" + id).value; });
+    await api("fixkosten_aktualisieren", zahlung);
+    finBearbeitetesFixkosten = null;
+    await ladeDaten();
+    renderFinanzen();
+  };
+  window.fixkostenLoeschen = async function (id) {
+    await api("fixkosten_loeschen", { id });
+    await ladeDaten();
+    renderFinanzen();
+  };
+
+  function sonderausgabeKarteHtml(s) {
+    const bearbeitet = s.id === finBearbeiteteSonderausgabe;
+    if (bearbeitet) {
+      return `
+        <div class="fin-card">
+          <div class="fin-card-info">
+            <input type="text" id="sa-bez-${s.id}" value="${escapeAttr(s.bezeichnung)}" style="margin-bottom:0.4rem;">
+            <div class="row" style="margin-bottom:0;">
+              <input type="number" step="0.01" id="sa-betrag-${s.id}" value="${finZahl(s.betrag)}" placeholder="Betrag">
+              <select id="sa-monat-${s.id}">
+                <option value="">(kein Monat)</option>
+                ${FIN_MONATSNAMEN_KURZ.map((m, i) => `<option value="${i + 1}" ${s.monat === i + 1 ? "selected" : ""}>${m}</option>`).join("")}
+              </select>
+              <input type="text" id="sa-notiz-${s.id}" value="${escapeAttr(s.notiz || "")}" placeholder="Notiz (optional)">
+            </div>
+          </div>
+          <button class="fin-loesch-btn" onclick="sonderausgabeSpeichern('${s.id}')" title="Speichern">✓</button>
+          <button class="fin-loesch-btn" onclick="sonderausgabeBearbeitenAbbrechen()" title="Abbrechen">×</button>
+        </div>`;
+    }
+    const monatLabel = s.monat ? FIN_MONATSNAMEN_KURZ[s.monat - 1] + " " + s.jahr : String(s.jahr);
+    return `
+      <div class="fin-card">
+        <div class="fin-card-info" style="cursor:pointer;" onclick="sonderausgabeBearbeitenStart('${s.id}')">
+          <div class="fin-card-titel">${escapeHtml(s.bezeichnung)}</div>
+          <div class="fin-card-meta">${monatLabel}${s.notiz ? " · " + escapeHtml(s.notiz) : ""}</div>
+        </div>
+        <div class="fin-betrag">${finEuro(s.betrag)}</div>
+        <button class="fin-loesch-btn" onclick="sonderausgabeLoeschen('${s.id}')" title="Löschen">×</button>
+      </div>`;
+  }
+
+  function renderFinSonderausgaben() {
+    const el = document.getElementById("fin-sonderausgaben-bereich");
+    const jahr = new Date().getFullYear();
+    const zeilen = sonderausgaben.filter((s) => Number(s.jahr) === jahr);
+    const summe = zeilen.reduce((s, x) => s + finZahl(x.betrag), 0);
+    el.innerHTML = `
+      <div class="fin-summary-row">
+        <div class="fin-summary-item">
+          <div class="fin-summary-label">Summe ${jahr}</div>
+          <div class="fin-summary-value">${finEuro(summe)}</div>
+        </div>
+      </div>
+      ${zeilen.length ? zeilen.map(sonderausgabeKarteHtml).join("") : '<p class="empty-text">Noch keine Sonderausgaben für dieses Jahr.</p>'}
+
+      <button class="link-btn" id="toggle-sonderausgabe-form" style="margin-top:0.8rem;">▸ Neue Sonderausgabe anlegen</button>
+      <div class="row hidden fin-neu-form" id="sonderausgabe-form" style="margin-top:0.6rem;">
+        <input type="text" id="neue-sa-bezeichnung" placeholder="Bezeichnung">
+        <input type="number" step="0.01" id="neue-sa-betrag" placeholder="Betrag">
+        <select id="neue-sa-monat">
+          <option value="">(kein Monat)</option>
+          ${FIN_MONATSNAMEN_KURZ.map((m, i) => `<option value="${i + 1}">${m}</option>`).join("")}
+        </select>
+        <input type="text" id="neue-sa-notiz" placeholder="Notiz (optional)">
+        <button class="btn-primary" id="btn-sonderausgabe-anlegen">Anlegen</button>
+      </div>
+    `;
+    document.getElementById("toggle-sonderausgabe-form").addEventListener("click", () => {
+      document.getElementById("sonderausgabe-form").classList.toggle("hidden");
+    });
+    document.getElementById("btn-sonderausgabe-anlegen").addEventListener("click", sonderausgabeHinzufuegen);
+  }
+
+  async function sonderausgabeHinzufuegen() {
+    const bezeichnung = document.getElementById("neue-sa-bezeichnung").value.trim();
+    if (!bezeichnung) return;
+    const betrag = document.getElementById("neue-sa-betrag").value;
+    const monat = document.getElementById("neue-sa-monat").value;
+    const notiz = document.getElementById("neue-sa-notiz").value.trim();
+    await api("sonderausgabe_hinzufuegen", { bezeichnung, betrag, monat, notiz, jahr: new Date().getFullYear() });
+    await ladeDaten();
+    renderFinanzen();
+  }
+
+  window.sonderausgabeBearbeitenStart = function (id) {
+    finBearbeiteteSonderausgabe = id;
+    renderFinSonderausgaben();
+  };
+  window.sonderausgabeBearbeitenAbbrechen = function () {
+    finBearbeiteteSonderausgabe = null;
+    renderFinSonderausgaben();
+  };
+  window.sonderausgabeSpeichern = async function (id) {
+    const s = sonderausgaben.find((x) => x.id === id);
+    const bezeichnung = document.getElementById("sa-bez-" + id).value.trim();
+    if (!bezeichnung) return;
+    const betrag = document.getElementById("sa-betrag-" + id).value;
+    const monat = document.getElementById("sa-monat-" + id).value;
+    const notiz = document.getElementById("sa-notiz-" + id).value.trim();
+    await api("sonderausgabe_aktualisieren", { id, bezeichnung, betrag, monat, notiz, jahr: s ? s.jahr : new Date().getFullYear() });
+    finBearbeiteteSonderausgabe = null;
+    await ladeDaten();
+    renderFinanzen();
+  };
+  window.sonderausgabeLoeschen = async function (id) {
+    await api("sonderausgabe_loeschen", { id });
+    await ladeDaten();
+    renderFinanzen();
+  };
 
 </script>
 </body>
