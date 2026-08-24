@@ -5,21 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aufgaben</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2f6fed">
+<meta name="theme-color" content="#1c2430">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
-    --bg: #cfe6fb; --panel: #f2f8fe; --ink: #1d3557; --ink-dim: #4a6c94;
-    --accent: #2f6fed; --accent-2: #ff8a65; --border: #a9cdf0;
+    --bg: #eef1f5; --panel: #ffffff; --ink: #1c2430; --ink-dim: #5c6779;
+    --accent: #3b6ef6; --accent-2: #e8793f; --border: #dbe1ea;
+    --jetzt: #e8793f;
+    --mod-aufgaben: #3b6ef6; --mod-termine: #2f9e6f; --mod-finanzen: #c98a2c; --mod-planung: #8b5fd9;
     --overdue-bg: #fde2e1; --overdue-text: #b3261e; --overdue-border: #f5b7b4;
     --today-bg: #fdead1; --today-text: #935e00; --today-border: #f3cf8e;
     --reminder-bg: #e4ecfd;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Work Sans", system-ui, sans-serif; min-height: 100vh; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Inter", system-ui, sans-serif; min-height: 100vh; }
   .app-shell { display: flex; align-items: stretch; min-height: 100vh; }
   .sidebar {
     width: 190px; flex-shrink: 0; box-sizing: border-box;
@@ -34,7 +36,7 @@
   h1 { font-family: "Fraunces", serif; font-weight: 700; font-size: 2rem; margin: 0 0 0.4rem; }
   .hero-text { color: var(--ink-dim); margin: 0 0 1.6rem; max-width: 46ch; }
   .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
-  input, select, button { font-family: "Work Sans", sans-serif; font-size: 0.9rem; }
+  input, select, button { font-family: "Inter", sans-serif; font-size: 0.9rem; }
   input, select {
     padding: 0.75rem 0.8rem; border: 1px solid var(--border); border-radius: 8px;
     background: var(--panel); color: var(--ink);
@@ -184,7 +186,7 @@
   .reflex-form input[type="date"] { align-self: flex-start; }
   .reflex-form textarea {
     padding: 0.75rem 0.8rem; border: 1px solid var(--border); border-radius: 8px;
-    background: var(--panel); color: var(--ink); font-family: "Work Sans", sans-serif;
+    background: var(--panel); color: var(--ink); font-family: "Inter", sans-serif;
     font-size: 0.92rem; resize: vertical;
   }
   .reflex-item {
@@ -247,7 +249,7 @@
   .ziel-schritt-add { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
   .ziel-schritt-add input {
     flex: 1; padding: 0.45rem 0.6rem; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--bg); color: var(--ink); font-family: "Work Sans", sans-serif; font-size: 0.85rem;
+    background: var(--bg); color: var(--ink); font-family: "Inter", sans-serif; font-size: 0.85rem;
   }
   .ziel-schritt-add button {
     padding: 0.45rem 0.7rem; border: 1px solid var(--border); border-radius: 6px;
@@ -263,7 +265,7 @@
   .ziel-kachel {
     display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem;
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
-    padding: 0.8rem 0.9rem; cursor: pointer; text-align: left; font-family: "Work Sans", sans-serif;
+    padding: 0.8rem 0.9rem; cursor: pointer; text-align: left; font-family: "Inter", sans-serif;
   }
   .ziel-kachel:hover { border-color: var(--accent); }
   .ziel-kachel-typ {
