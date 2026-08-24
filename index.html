@@ -347,6 +347,24 @@
   .fin-summary-item { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--mod-finanzen); border-radius: 10px; padding: 0.7rem 1rem; min-width: 9rem; }
   .fin-summary-label { color: var(--ink-dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
   .fin-summary-value { font-family: "Fraunces", serif; font-size: 1.2rem; font-weight: 600; margin-top: 0.15rem; }
+
+  /* Buchungen-Tab */
+  .fin-quick-form { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.4rem; }
+  .fin-quick-betrag { width: 100%; font-size: 1.4rem; text-align: center; margin: 0.7rem 0; font-family: "Fraunces", serif; }
+  .fin-kat-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
+  .fin-kat-btn {
+    padding: 0.5rem 0.9rem; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--bg); color: var(--ink-dim); cursor: pointer; font-size: 0.82rem;
+  }
+  .fin-kat-btn.active { background: var(--mod-finanzen); color: #fff; border-color: var(--mod-finanzen); }
+  .fin-quick-save { width: 100%; }
+  .fin-betrag-einnahme { color: #2f9e6f; }
+  .fin-buchung-notiz { color: var(--ink-dim); font-size: 0.8rem; margin-top: 0.1rem; }
+  .fin-csv-btn {
+    width: 100%; margin-bottom: 1rem; padding: 0.65rem; border: 1px dashed var(--border);
+    border-radius: 8px; background: var(--bg); color: var(--ink-dim); cursor: pointer; font-size: 0.85rem;
+  }
+  .fin-csv-btn:hover { border-color: var(--mod-finanzen); color: var(--mod-finanzen); }
 </style>
 </head>
 <body>
@@ -614,10 +632,12 @@
         <div class="plan-typ-tabs">
           <button class="plan-typ-btn active" id="fintyp-fixkosten" data-fintyp="fixkosten">Fixkosten</button>
           <button class="plan-typ-btn" id="fintyp-sonderausgaben" data-fintyp="sonderausgaben">Sonderausgaben</button>
+          <button class="plan-typ-btn" id="fintyp-buchungen" data-fintyp="buchungen">Buchungen</button>
         </div>
 
         <div id="fin-fixkosten-bereich"></div>
         <div id="fin-sonderausgaben-bereich" class="hidden"></div>
+        <div id="fin-buchungen-bereich" class="hidden"></div>
       </div>
     </main>
   </div>
@@ -656,6 +676,17 @@
   let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben"
   let finBearbeitetesFixkosten = null; // id oder null
   let finBearbeiteteSonderausgabe = null; // id oder null
+  let finBearbeiteteBuchung = null; // id oder null
+  let buchungTypAusgewaehlt = "ausgabe"; // "ausgabe" | "einnahme"
+  let buchungKategorieAusgewaehlt = "Lebensmittel";
+  const FIN_KAT_AUSGABE = ["Lebensmittel", "Tanken", "Hygiene", "Haus", "Sonstiges"];
+  const FIN_KAT_EINNAHME = ["Gehalt", "Rückerstattung", "Geschenk", "Sonstiges"];
+  let finBuchMonat = new Date().getMonth() + 1;
+  let finBuchJahr = new Date().getFullYear();
+  const CSV_DATUM_SPALTEN = ["Buchungstag", "Valuta", "Datum", "Valutadatum"];
+  const CSV_BETRAG_SPALTEN = ["Betrag", "Umsatz", "Betrag (EUR)"];
+  const CSV_PARTNER_SPALTEN = ["Zahler/Empfänger", "Auftraggeber/Empfänger", "Empfänger/Zahlungspflichtiger", "Name Zahlungsbeteiligter"];
+  const CSV_ZWECK_SPALTEN = ["Verwendungszweck", "Buchungstext"];
   const FIN_MONATE = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez"];
   const FIN_MONATSNAMEN_KURZ = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
@@ -2490,20 +2521,23 @@
     return Number.isFinite(n) ? n : 0;
   }
 
-  ["fixkosten", "sonderausgaben"].forEach((t) => {
+  ["fixkosten", "sonderausgaben", "buchungen"].forEach((t) => {
     document.getElementById("fintyp-" + t).addEventListener("click", () => {
       finTyp = t;
       document.getElementById("fintyp-fixkosten").classList.toggle("active", t === "fixkosten");
       document.getElementById("fintyp-sonderausgaben").classList.toggle("active", t === "sonderausgaben");
+      document.getElementById("fintyp-buchungen").classList.toggle("active", t === "buchungen");
       document.getElementById("fin-fixkosten-bereich").classList.toggle("hidden", t !== "fixkosten");
       document.getElementById("fin-sonderausgaben-bereich").classList.toggle("hidden", t !== "sonderausgaben");
+      document.getElementById("fin-buchungen-bereich").classList.toggle("hidden", t !== "buchungen");
       renderFinanzen();
     });
   });
 
   function renderFinanzen() {
     if (finTyp === "fixkosten") renderFinFixkosten();
-    else renderFinSonderausgaben();
+    else if (finTyp === "sonderausgaben") renderFinSonderausgaben();
+    else renderFinBuchungen();
   }
 
   function fixkostenZeileHtml(f, istBearbeitet) {
@@ -2718,6 +2752,313 @@
     await ladeDaten();
     renderFinanzen();
   };
+
+  // ==========================================================
+  // Finanzen-Modul: Buchungen (Schnellerfassung, Liste, CSV-Import)
+  // ==========================================================
+  const MONATSNAMEN_FIN = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+  function heuteISOFin() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  window.buchungTypWaehlen = function (typ) {
+    buchungTypAusgewaehlt = typ;
+    buchungKategorieAusgewaehlt = (typ === "einnahme" ? FIN_KAT_EINNAHME : FIN_KAT_AUSGABE)[0];
+    renderFinBuchungen();
+  };
+  window.buchungKategorieWaehlen = function (kat) {
+    buchungKategorieAusgewaehlt = kat;
+    renderFinBuchungen();
+  };
+  window.finBuchungMonatVerschieben = function (delta) {
+    finBuchMonat += delta;
+    if (finBuchMonat < 1) { finBuchMonat = 12; finBuchJahr--; }
+    if (finBuchMonat > 12) { finBuchMonat = 1; finBuchJahr++; }
+    renderFinBuchungen();
+  };
+
+  function renderFinBuchungen() {
+    const el = document.getElementById("fin-buchungen-bereich");
+    const istAktuellerMonat = finBuchMonat === new Date().getMonth() + 1 && finBuchJahr === new Date().getFullYear();
+
+    const buchungenMonat = buchungen
+      .filter((b) => {
+        const [j, m] = (b.datum || "").split("-");
+        return Number(j) === finBuchJahr && Number(m) === finBuchMonat;
+      })
+      .sort((a, b) => b.datum.localeCompare(a.datum));
+
+    const summeAusgaben = buchungenMonat.filter((b) => b.typ !== "einnahme").reduce((s, b) => s + finZahl(b.betrag), 0);
+    const summeEinnahmen = buchungenMonat.filter((b) => b.typ === "einnahme").reduce((s, b) => s + finZahl(b.betrag), 0);
+
+    const listeHtml = buchungenMonat.length
+      ? buchungenMonat.map((b) => {
+          const istEinnahme = b.typ === "einnahme";
+          if (b.id === finBearbeiteteBuchung) {
+            return `
+              <div class="fin-card" data-buchung-id="${b.id}">
+                <div class="fin-card-info">
+                  <div class="row" style="margin-bottom:0.4rem;">
+                    <input type="date" id="edit-buchung-datum-${b.id}" value="${b.datum}">
+                    <input type="number" step="0.01" id="edit-buchung-betrag-${b.id}" value="${finZahl(b.betrag)}">
+                  </div>
+                  <div class="row" style="margin-bottom:0;">
+                    <select id="edit-buchung-typ-${b.id}">
+                      <option value="ausgabe" ${!istEinnahme ? "selected" : ""}>Ausgabe</option>
+                      <option value="einnahme" ${istEinnahme ? "selected" : ""}>Einnahme</option>
+                    </select>
+                    <input type="text" id="edit-buchung-kategorie-${b.id}" value="${escapeAttr(b.kategorie || "")}" placeholder="Kategorie">
+                    <input type="text" id="edit-buchung-notiz-${b.id}" value="${escapeAttr(b.notiz || "")}" placeholder="Notiz">
+                  </div>
+                </div>
+                <button class="fin-loesch-btn" onclick="buchungAktualisieren('${b.id}')" title="Speichern">✓</button>
+                <button class="fin-loesch-btn" onclick="buchungBearbeitenAbbrechen()" title="Abbrechen">×</button>
+              </div>`;
+          }
+          return `
+            <div class="fin-card" data-buchung-id="${b.id}">
+              <div class="fin-card-info" style="cursor:pointer;" onclick="buchungBearbeitenStart('${b.id}')">
+                <div class="fin-card-titel">${escapeHtml(b.kategorie || "Sonstiges")}</div>
+                <div class="fin-card-meta">${formatDatumKurz(b.datum)}${b.herkunft === "import" ? " · Import" : ""}</div>
+                ${b.notiz ? `<div class="fin-buchung-notiz">${escapeHtml(b.notiz)}</div>` : ""}
+              </div>
+              <div class="fin-betrag ${istEinnahme ? "fin-betrag-einnahme" : ""}">${istEinnahme ? "+" : "−"}${finEuro(b.betrag)}</div>
+              <button class="fin-loesch-btn" onclick="buchungLoeschen('${b.id}')" title="Löschen">×</button>
+            </div>`;
+        }).join("")
+      : `<p class="empty-text">Keine Buchungen in ${MONATSNAMEN_FIN[finBuchMonat - 1]} ${finBuchJahr}.</p>`;
+
+    const kategorien = buchungTypAusgewaehlt === "einnahme" ? FIN_KAT_EINNAHME : FIN_KAT_AUSGABE;
+
+    el.innerHTML = `
+      <div class="fin-quick-form">
+        <div class="plan-typ-tabs">
+          <button type="button" class="plan-typ-btn ${buchungTypAusgewaehlt === "ausgabe" ? "active" : ""}" onclick="buchungTypWaehlen('ausgabe')">Ausgabe</button>
+          <button type="button" class="plan-typ-btn ${buchungTypAusgewaehlt === "einnahme" ? "active" : ""}" onclick="buchungTypWaehlen('einnahme')">Einnahme</button>
+        </div>
+
+        <input type="number" step="0.01" id="neue-buchung-betrag" class="fin-quick-betrag" placeholder="0,00 €" inputmode="decimal">
+
+        <div class="fin-kat-grid">
+          ${kategorien.map((k) => `
+            <button type="button" class="fin-kat-btn ${k === buchungKategorieAusgewaehlt ? "active" : ""}"
+              onclick="buchungKategorieWaehlen('${escapeAttr(k)}')">${escapeHtml(k)}</button>
+          `).join("")}
+        </div>
+
+        <div class="row">
+          <input type="date" id="neue-buchung-datum" value="${heuteISOFin()}">
+          <input type="text" id="neue-buchung-notiz" placeholder="Notiz (optional)">
+        </div>
+
+        <button class="btn-primary fin-quick-save" id="btn-buchung-speichern">Speichern</button>
+      </div>
+
+      <button class="fin-csv-btn" id="btn-csv-import">⇪ CSV importieren</button>
+      <input type="file" id="csv-import-input" accept=".csv" class="hidden">
+
+      <div class="fin-summary-row">
+        <div class="fin-summary-item">
+          <div class="fin-summary-label">Ausgaben</div>
+          <div class="fin-summary-value">${finEuro(summeAusgaben)}</div>
+        </div>
+        <div class="fin-summary-item">
+          <div class="fin-summary-label">Einnahmen</div>
+          <div class="fin-summary-value">${finEuro(summeEinnahmen)}</div>
+        </div>
+      </div>
+
+      <div class="cal-header">
+        <div class="cal-nav"><button onclick="finBuchungMonatVerschieben(-1)">‹</button></div>
+        <h2>${MONATSNAMEN_FIN[finBuchMonat - 1]} ${finBuchJahr}${istAktuellerMonat ? " · aktuell" : ""}</h2>
+        <div class="cal-nav"><button onclick="finBuchungMonatVerschieben(1)">›</button></div>
+      </div>
+
+      ${listeHtml}
+    `;
+
+    document.getElementById("btn-buchung-speichern").addEventListener("click",
+      finBearbeiteteBuchung ? () => buchungAktualisieren(finBearbeiteteBuchung) : buchungHinzufuegen);
+
+    document.getElementById("btn-csv-import").addEventListener("click", () => {
+      document.getElementById("csv-import-input").click();
+    });
+    document.getElementById("csv-import-input").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      const btn = document.getElementById("btn-csv-import");
+      btn.textContent = "Importiere …";
+      btn.disabled = true;
+      try {
+        await csvImportieren(file);
+      } catch (err) {
+        console.error(err);
+        alert("Import fehlgeschlagen: " + (err.message || err));
+      } finally {
+        btn.textContent = "⇪ CSV importieren";
+        btn.disabled = false;
+      }
+    });
+  }
+
+  async function buchungHinzufuegen() {
+    const betragFeld = document.getElementById("neue-buchung-betrag");
+    const betrag = betragFeld.value;
+    if (!betrag || finZahl(betrag) <= 0) { betragFeld.focus(); return; }
+    const datum = document.getElementById("neue-buchung-datum").value || heuteISOFin();
+    const notiz = document.getElementById("neue-buchung-notiz").value.trim();
+    await api("buchung_hinzufuegen", {
+      datum, betrag, notiz,
+      typ: buchungTypAusgewaehlt,
+      kategorie: buchungKategorieAusgewaehlt,
+    });
+    await ladeDaten();
+    renderFinanzen();
+  }
+
+  window.buchungBearbeitenStart = function (id) {
+    finBearbeiteteBuchung = id;
+    renderFinBuchungen();
+  };
+  window.buchungBearbeitenAbbrechen = function () {
+    finBearbeiteteBuchung = null;
+    renderFinBuchungen();
+  };
+  window.buchungAktualisieren = async function (id) {
+    const datum = document.getElementById("edit-buchung-datum-" + id).value;
+    const betrag = document.getElementById("edit-buchung-betrag-" + id).value;
+    const typ = document.getElementById("edit-buchung-typ-" + id).value;
+    const kategorie = document.getElementById("edit-buchung-kategorie-" + id).value.trim();
+    const notiz = document.getElementById("edit-buchung-notiz-" + id).value.trim();
+    await api("buchung_aktualisieren", { id, datum, betrag, typ, kategorie, notiz });
+    finBearbeiteteBuchung = null;
+    await ladeDaten();
+    renderFinanzen();
+  };
+  window.buchungLoeschen = async function (id) {
+    await api("buchung_loeschen", { id });
+    await ladeDaten();
+    renderFinanzen();
+  };
+
+  // ---- CSV-Import ----
+  function findeSpalte(header, aliase) {
+    for (const alias of aliase) {
+      const idx = header.findIndex((h) => h.trim().toLowerCase() === alias.toLowerCase());
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  }
+
+  function parseCsvText(text) {
+    const erstenZeilen = text.split(/\r?\n/).slice(0, 5).join("\n");
+    const anzahlSemikolon = (erstenZeilen.match(/;/g) || []).length;
+    const anzahlKomma = (erstenZeilen.match(/,/g) || []).length;
+    const trenner = anzahlSemikolon >= anzahlKomma ? ";" : ",";
+
+    const zeilen = text.split(/\r?\n/).filter((z) => z.trim().length > 0);
+    const parseZeile = (z) => z.split(trenner).map((f) => f.trim().replace(/^"|"$/g, ""));
+
+    const header = parseZeile(zeilen[0]);
+    const rows = zeilen.slice(1).map(parseZeile);
+    return { header, rows };
+  }
+
+  function parseCsvBetrag(raw) {
+    let s = (raw || "").trim();
+    if (!s) return null;
+    if (s.includes(".") && s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+    else if (s.includes(",")) s = s.replace(",", ".");
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function parseCsvDatum(raw) {
+    const s = (raw || "").trim();
+    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2})$/);
+    if (m) return `20${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    return null;
+  }
+
+  function liesCsvDatei(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Datei konnte nicht gelesen werden"));
+      reader.onload = () => {
+        const buffer = reader.result;
+        const bytes = new Uint8Array(buffer);
+        // UTF-8-BOM prüfen
+        const hatBom = bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF;
+        try {
+          const utf8Text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+          resolve(hatBom ? utf8Text.slice(1) : utf8Text);
+        } catch {
+          // Kein gültiges UTF-8 -> vermutlich Windows-1252 (typisch für Bank-Exporte)
+          resolve(new TextDecoder("windows-1252").decode(buffer));
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function csvImportieren(file) {
+    const text = await liesCsvDatei(file);
+    const { header, rows } = parseCsvText(text);
+
+    const idxDatum = findeSpalte(header, CSV_DATUM_SPALTEN);
+    const idxBetrag = findeSpalte(header, CSV_BETRAG_SPALTEN);
+    const idxPartner = findeSpalte(header, CSV_PARTNER_SPALTEN);
+    const idxZweck = findeSpalte(header, CSV_ZWECK_SPALTEN);
+
+    if (idxDatum === -1 || idxBetrag === -1) {
+      alert("Datum- oder Betrag-Spalte wurde in der CSV nicht gefunden.\n\nGefundene Spalten: " + header.join(", "));
+      return;
+    }
+
+    const zeilen = [];
+    let nichtLesbar = 0;
+    for (const r of rows) {
+      const datum = parseCsvDatum(r[idxDatum]);
+      const betrag = parseCsvBetrag(r[idxBetrag]);
+      if (!datum || betrag === null || betrag === 0) { nichtLesbar++; continue; }
+      const partner = idxPartner !== -1 ? (r[idxPartner] || "").trim() : "";
+      const zweck = idxZweck !== -1 ? (r[idxZweck] || "").trim() : "";
+      const notiz = `${partner} ${zweck}`.trim().slice(0, 200);
+      zeilen.push({ datum, betrag, notiz });
+    }
+
+    if (!zeilen.length) {
+      alert("Keine verwertbaren Buchungen in der Datei gefunden.");
+      return;
+    }
+
+    const ergebnis = await api("buchungen_batch_import", { zeilen });
+
+    let meldung = "Import abgeschlossen\n\n" +
+      `Neue Ausgaben: ${ergebnis.importiert_ausgaben}\n` +
+      `Neue Einnahmen: ${ergebnis.importiert_einnahmen}\n` +
+      `Bereits vorhanden (Duplikate): ${ergebnis.uebersprungen_duplikate}\n` +
+      `Als Fixkosten erkannt & übersprungen: ${ergebnis.uebersprungen_fixkosten}\n` +
+      (nichtLesbar ? `Nicht lesbare Zeilen: ${nichtLesbar}\n` : "");
+
+    const treffer = Object.entries(ergebnis.fixkosten_treffer || {});
+    if (treffer.length) {
+      treffer.sort((a, b) => b[1] - a[1]);
+      meldung += "\nErkannte Fixkosten (Beispiele):\n" + treffer.slice(0, 8).map(([k, v]) => `  ${k}: ${v}x`).join("\n");
+    }
+    alert(meldung);
+
+    await ladeDaten();
+    renderFinanzen();
+  }
 
 </script>
 </body>
