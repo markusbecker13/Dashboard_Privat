@@ -364,6 +364,22 @@
       try {
         await ladeDaten();
         zeigeApp();
+
+        // Falls wir gerade von Googles OAuth-Login zurückkommen
+        // (URL enthält ?code=...), den Code gegen ein Google-Token
+        // tauschen und die URL danach wieder säubern.
+        const urlParams = new URLSearchParams(location.search);
+        const googleCode = urlParams.get("code");
+        if (googleCode) {
+          try {
+            await api("google_auth_callback", { code: googleCode });
+            alert("Google-Kalender erfolgreich verbunden.");
+          } catch (e) {
+            alert("Google-Verbindung fehlgeschlagen: " + e.message);
+          }
+          history.replaceState({}, "", location.pathname);
+        }
+
         // Falls über eine App-Verknüpfung mit ?tab=... geöffnet wurde
         // (z.B. Android-Schnellzugriff "Neue Notiz"), direkt dorthin springen.
         const gewuenschterTab = new URLSearchParams(location.search).get("tab");
@@ -377,6 +393,39 @@
     }
     zeigeLogin();
   })();
+
+  // Google-Kalender-Sync: Verbinden/Trennen. Vorläufig als einfache
+  // Funktionen, bekommen in einer späteren Etappe eine richtige
+  // Oberfläche mit Status-Anzeige im Kalender-Tab.
+  window.googleVerbinden = async function() {
+    try {
+      const { url } = await api("google_auth_start");
+      location.href = url;
+    } catch (e) {
+      alert("Konnte Google-Login nicht starten: " + e.message);
+    }
+  };
+
+  window.googleTrennen = async function() {
+    if (!confirm("Google-Kalender-Verknüpfung wirklich entfernen?")) return;
+    try {
+      await api("google_disconnect");
+      alert("Google-Kalender-Verknüpfung entfernt.");
+    } catch (e) {
+      alert("Fehler beim Trennen: " + e.message);
+    }
+  };
+
+  window.googleStatusAnzeigen = async function() {
+    try {
+      const status = await api("google_status");
+      alert(status.verbunden
+        ? "Verbunden seit: " + status.verbunden_seit
+        : "Nicht verbunden.");
+    } catch (e) {
+      alert("Fehler: " + e.message);
+    }
+  };
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
