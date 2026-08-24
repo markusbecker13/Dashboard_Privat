@@ -365,6 +365,32 @@
     border-radius: 8px; background: var(--bg); color: var(--ink-dim); cursor: pointer; font-size: 0.85rem;
   }
   .fin-csv-btn:hover { border-color: var(--mod-finanzen); color: var(--mod-finanzen); }
+
+  /* Wiederkehrend-Erkennung: Modal */
+  .fin-modal-overlay {
+    position: fixed; inset: 0; background: rgba(28,36,48,0.5);
+    display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem;
+  }
+  .fin-modal {
+    background: var(--panel); border-radius: 12px; max-width: 32rem; width: 100%;
+    max-height: 85vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .fin-modal-kopf { padding: 1.2rem 1.4rem 0.8rem; border-bottom: 1px solid var(--border); }
+  .fin-modal-kopf h2 { font-family: "Fraunces", serif; font-size: 1.2rem; margin: 0 0 0.3rem; }
+  .fin-modal-body { padding: 0.6rem 1.4rem; overflow-y: auto; flex: 1 1 auto; }
+  .fin-modal-fuss {
+    padding: 0.9rem 1.4rem; border-top: 1px solid var(--border);
+    display: flex; gap: 0.6rem; align-items: center; justify-content: space-between;
+  }
+  .fin-kandidat {
+    display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.7rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .fin-kandidat:last-child { border-bottom: none; }
+  .fin-kandidat input[type="checkbox"] { margin-top: 0.35rem; width: 1.1rem; height: 1.1rem; }
+  .fin-kandidat-felder { flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
+  .fin-kandidat-felder .row { margin-bottom: 0; }
+  .fin-kandidat-meta { color: var(--ink-dim); font-size: 0.78rem; }
 </style>
 </head>
 <body>
@@ -3057,7 +3083,186 @@
     alert(meldung);
 
     await ladeDaten();
+
+    const kandidaten = erkennKandidatenFin(buchungen);
+    if (kandidaten.length) {
+      zeigeErkennungsModal(kandidaten);
+    } else {
+      renderFinanzen();
+    }
+  }
+
+  // ---- Wiederkehrend-Erkennung (portiert aus erkennung.py) ----
+  const FIN_NOISE_WORDS = [
+    "KARTENZAHLUNG", "LASTSCHRIFT", "UEBERWEISUNG", "ÜBERWEISUNG",
+    "GUTSCHRIFT", "DAUERAUFTRAG", "ECHTZEITUEBERWEISUNG", "SEPA",
+  ];
+
+  function finNormalizeKey(notiz) {
+    let text = (notiz || "").toUpperCase();
+    FIN_NOISE_WORDS.forEach((w) => { text = text.split(w).join(" "); });
+    text = text.replace(/[0-9]+/g, " ");
+    text = text.replace(/[^A-ZÄÖÜẞ\s]/g, " ");
+    text = text.replace(/\s+/g, " ").trim();
+    return text.split(" ").filter(Boolean).slice(0, 4).join(" ");
+  }
+
+  function finMedian(zahlen) {
+    const sortiert = [...zahlen].sort((a, b) => a - b);
+    const mitte = Math.floor(sortiert.length / 2);
+    return sortiert.length % 2 !== 0 ? sortiert[mitte] : (sortiert[mitte - 1] + sortiert[mitte]) / 2;
+  }
+
+  function erkennKandidatenFin(alleBuchungen, minMonate = 2, varianzSchwelle = 0.2) {
+    const gruppen = new Map();
+    for (const b of alleBuchungen) {
+      const schluesselText = finNormalizeKey(b.notiz);
+      if (!schluesselText) continue;
+      const key = (b.typ || "ausgabe") + "|" + schluesselText;
+      if (!gruppen.has(key)) gruppen.set(key, []);
+      gruppen.get(key).push(b);
+    }
+
+    const kandidaten = [];
+    for (const [key, eintraege] of gruppen.entries()) {
+      const typ = key.split("|")[0];
+      const monate = new Set(eintraege.map((e) => (e.datum || "").slice(0, 7)).filter(Boolean));
+      if (monate.size < minMonate) continue;
+
+      const betraege = eintraege.map((e) => finZahl(e.betrag)).filter((b) => b);
+      if (!betraege.length) continue;
+      const median = finMedian(betraege);
+      const spanne = median ? (Math.max(...betraege) - Math.min(...betraege)) / median : 0;
+
+      const notizCounts = new Map();
+      eintraege.forEach((e) => {
+        const n = (e.notiz || "").trim();
+        notizCounts.set(n, (notizCounts.get(n) || 0) + 1);
+      });
+      let bezeichnungVorschlag = "";
+      let bestCount = 0;
+      for (const [n, c] of notizCounts.entries()) {
+        if (c > bestCount) { bestCount = c; bezeichnungVorschlag = n; }
+      }
+      bezeichnungVorschlag = (bezeichnungVorschlag || key).slice(0, 60);
+
+      kandidaten.push({
+        typ,
+        bezeichnungVorschlag,
+        anzahlMonate: monate.size,
+        anzahlBuchungen: eintraege.length,
+        betragMedian: Math.round(median * 100) / 100,
+        variabel: spanne > varianzSchwelle,
+        buchungIds: eintraege.map((e) => e.id).filter(Boolean),
+        ausgewaehlt: true,
+      });
+    }
+
+    kandidaten.sort((a, b) => b.anzahlMonate - a.anzahlMonate || a.bezeichnungVorschlag.localeCompare(b.bezeichnungVorschlag));
+    return kandidaten;
+  }
+
+  let finErkennungKandidaten = [];
+  let finBuchungenLoeschenNachUebernahme = true;
+
+  function zeigeErkennungsModal(kandidaten) {
+    finErkennungKandidaten = kandidaten;
+    const overlay = document.createElement("div");
+    overlay.className = "fin-modal-overlay";
+    overlay.id = "fin-erkennung-overlay";
+    document.body.appendChild(overlay);
+    renderErkennungsModal();
+  }
+
+  function renderErkennungsModal() {
+    const overlay = document.getElementById("fin-erkennung-overlay");
+    if (!overlay) return;
+    overlay.innerHTML = `
+      <div class="fin-modal">
+        <div class="fin-modal-kopf">
+          <h2>Wiederkehrende Buchungen erkannt</h2>
+          <p class="hero-text" style="margin:0;">${finErkennungKandidaten.length} Kandidat(en) gefunden – als Fixkosten übernehmen?</p>
+        </div>
+        <div class="fin-modal-body">
+          ${finErkennungKandidaten.map((k, i) => `
+            <div class="fin-kandidat">
+              <input type="checkbox" ${k.ausgewaehlt ? "checked" : ""} onchange="finKandidatUmschalten(${i})">
+              <div class="fin-kandidat-felder">
+                <input type="text" id="fin-kand-bez-${i}" value="${escapeAttr(k.bezeichnungVorschlag)}">
+                <div class="row">
+                  <select id="fin-kand-typ-${i}">
+                    <option value="ausgabe" ${k.typ === "ausgabe" ? "selected" : ""}>Ausgabe</option>
+                    <option value="einnahme" ${k.typ === "einnahme" ? "selected" : ""}>Einnahme</option>
+                  </select>
+                  <input type="number" step="0.01" id="fin-kand-betrag-${i}" value="${k.betragMedian}" style="width:7rem;">
+                </div>
+                <div class="fin-kandidat-meta">
+                  ${k.anzahlBuchungen}× über ${k.anzahlMonate} Monate${k.variabel ? " · Betrag schwankt" : ""}
+                </div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+        <div class="fin-modal-fuss">
+          <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; color:var(--ink-dim);">
+            <input type="checkbox" id="fin-erkennung-loeschen" ${finBuchungenLoeschenNachUebernahme ? "checked" : ""}>
+            Einzelbuchungen danach löschen
+          </label>
+          <div style="display:flex; gap:0.5rem;">
+            <button class="link-btn" id="fin-erkennung-verwerfen">Verwerfen</button>
+            <button class="btn-primary" id="fin-erkennung-uebernehmen">Übernehmen</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById("fin-erkennung-loeschen").addEventListener("change", (e) => {
+      finBuchungenLoeschenNachUebernahme = e.target.checked;
+    });
+    document.getElementById("fin-erkennung-verwerfen").addEventListener("click", schliesseErkennungsModal);
+    document.getElementById("fin-erkennung-uebernehmen").addEventListener("click", erkennungUebernehmen);
+  }
+
+  window.finKandidatUmschalten = function (i) {
+    finErkennungKandidaten[i].ausgewaehlt = !finErkennungKandidaten[i].ausgewaehlt;
+  };
+
+  function schliesseErkennungsModal() {
+    const overlay = document.getElementById("fin-erkennung-overlay");
+    if (overlay) overlay.remove();
+    finErkennungKandidaten = [];
     renderFinanzen();
+  }
+
+  async function erkennungUebernehmen() {
+    const ausgewaehlte = finErkennungKandidaten.filter((k) => k.ausgewaehlt);
+    let angelegt = 0;
+    let geloescht = 0;
+
+    for (let i = 0; i < finErkennungKandidaten.length; i++) {
+      const k = finErkennungKandidaten[i];
+      if (!k.ausgewaehlt) continue;
+      const bezeichnung = document.getElementById("fin-kand-bez-" + i).value.trim();
+      const typ = document.getElementById("fin-kand-typ-" + i).value;
+      const betrag = document.getElementById("fin-kand-betrag-" + i).value;
+      if (!bezeichnung) continue;
+
+      const zahlung = { bezeichnung, typ };
+      FIN_MONATE.forEach((m) => { zahlung[m] = betrag; });
+      await api("fixkosten_hinzufuegen", zahlung);
+      angelegt++;
+
+      if (finBuchungenLoeschenNachUebernahme) {
+        for (const id of k.buchungIds) {
+          await api("buchung_loeschen", { id });
+          geloescht++;
+        }
+      }
+    }
+
+    schliesseErkennungsModal();
+    await ladeDaten();
+    renderFinanzen();
+    alert(`${angelegt} Fixkosten-Position(en) angelegt` + (geloescht ? `, ${geloescht} Einzelbuchung(en) gelöscht.` : "."));
   }
 
 </script>
