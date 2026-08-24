@@ -97,6 +97,11 @@
   .hidden { display: none !important; }
 
   .tabs { display: flex; flex-direction: column; gap: 0.15rem; }
+  .tab-group { display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0.9rem; }
+  .tab-group-label {
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-dim); opacity: 0.65; padding: 0 0.7rem; margin-bottom: 0.2rem;
+  }
   .tab-btn {
     text-align: left; background: none; border: none; border-left: 3px solid transparent;
     padding: 0.6rem 0.7rem; border-radius: 0 8px 8px 0;
@@ -114,6 +119,8 @@
     }
     .sidebar-abmelden { margin-top: 0; margin-left: auto; }
     .tabs { flex-direction: row; flex-wrap: wrap; row-gap: 0.2rem; width: 100%; }
+    .tab-group { flex-direction: row; flex-wrap: wrap; margin-bottom: 0; align-items: center; gap: 0.15rem; }
+    .tab-group-label { display: none; }
     .tab-btn { margin-right: 0.7rem; padding: 0.4rem 0.15rem; font-size: 0.85rem; border-left: none; border-bottom: 2px solid transparent; border-radius: 0; }
     .tab-btn.active { border-left: none; background: none; border-bottom-color: var(--accent); }
   }
@@ -295,17 +302,29 @@
       </div>
 
       <div class="tabs">
-        <button class="tab-btn active" id="tab-heute">Start</button>
-        <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
-        <button class="tab-btn" id="tab-kalender">Kalender</button>
-        <button class="tab-btn" id="tab-frei">Frei</button>
-        <button class="tab-btn" id="tab-notizen">Notizen</button>
-        <button class="tab-btn" id="tab-links">Links</button>
-        <button class="tab-btn" id="tab-reflexion">Reflexion</button>
-        <button class="tab-btn" id="tab-export">Export</button>
-        <button class="tab-btn" id="tab-einkauf">Einkauf</button>
-        <button class="tab-btn" id="tab-verlauf">Verlauf</button>
-        <button class="tab-btn" id="tab-planung">Planung</button>
+        <div class="tab-group">
+          <span class="tab-group-label">Heute</span>
+          <button class="tab-btn active" id="tab-heute">Start</button>
+          <button class="tab-btn" id="tab-frei">Frei</button>
+        </div>
+        <div class="tab-group">
+          <span class="tab-group-label">Planen</span>
+          <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
+          <button class="tab-btn" id="tab-kalender">Kalender</button>
+          <button class="tab-btn" id="tab-planung">Planung</button>
+        </div>
+        <div class="tab-group">
+          <span class="tab-group-label">Sammeln</span>
+          <button class="tab-btn" id="tab-notizen">Notizen</button>
+          <button class="tab-btn" id="tab-links">Links</button>
+          <button class="tab-btn" id="tab-reflexion">Reflexion</button>
+          <button class="tab-btn" id="tab-einkauf">Einkauf</button>
+        </div>
+        <div class="tab-group">
+          <span class="tab-group-label">Verwalten</span>
+          <button class="tab-btn" id="tab-export">Export</button>
+          <button class="tab-btn" id="tab-verlauf">Verlauf</button>
+        </div>
       </div>
 
       <button id="btn-abmelden" class="link-btn sidebar-abmelden">Abmelden</button>
