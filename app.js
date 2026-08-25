@@ -427,6 +427,17 @@
     }
   };
 
+  window.googleSyncJetzt = async function() {
+    try {
+      const ergebnis = await api("google_sync");
+      alert(`Sync fertig: ${ergebnis.erstellt} neu, ${ergebnis.aktualisiert} aktualisiert, ${ergebnis.geloescht} gelöscht.`);
+      await ladeDaten();
+      render();
+    } catch (e) {
+      alert("Sync fehlgeschlagen: " + e.message);
+    }
+  };
+
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
