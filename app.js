@@ -64,7 +64,10 @@
       zeigeLogin(daten.error || "Zu viele Fehlversuche. Bitte kurz warten.");
       throw new Error("rate-limited");
     }
-    if (!res.ok) throw new Error("Serverfehler");
+    if (!res.ok) {
+      const daten = await res.json().catch(() => ({}));
+      throw new Error(daten.error || "Serverfehler");
+    }
     return res.json();
   }
 
