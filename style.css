@@ -75,6 +75,11 @@
   .badge.today { background: var(--today-bg); color: var(--today-text); border-color: var(--today-border); }
   .badge.reminder { background: var(--reminder-bg); color: var(--accent); }
   .task-snooze { border: 1px solid var(--border); border-radius: 6px; background: none; color: var(--ink-dim); padding: 0.35rem 0.55rem; cursor: pointer; flex-shrink: 0; }
+  .task-edit-btn { background: none; border: none; color: var(--ink-dim); font-size: 0.9rem; cursor: pointer; padding: 0.2rem 0.4rem; flex-shrink: 0; opacity: 0.55; }
+  .task-edit-btn:hover { opacity: 1; color: var(--accent); }
+  .task.task-edit { align-items: flex-start; }
+  .task-edit-felder { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.7rem; }
+  .task-edit-felder input, .task-edit-felder select { flex: 1 1 140px; }
   .task-delete { background: none; border: none; color: var(--ink-dim); font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.5rem; flex-shrink: 0; }
   .empty-text { color: var(--ink-dim); }
   #login-screen { max-width: 320px; margin: 4rem auto; padding: 0 1.4rem; text-align: center; }
