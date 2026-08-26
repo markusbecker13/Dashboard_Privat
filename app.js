@@ -210,7 +210,56 @@
     return `<span class="badge ${cls}">${text}</span>`;
   }
 
+  let aufgabeBearbeitenId = null;
+
+  window.aufgabeBearbeitenStart = function(id) {
+    aufgabeBearbeitenId = id;
+    render();
+  };
+
+  window.aufgabeBearbeitenAbbrechen = function() {
+    aufgabeBearbeitenId = null;
+    render();
+  };
+
+  window.aufgabeBearbeitenSpeichern = async function(id) {
+    const titel = document.getElementById("edit-aufgabe-titel").value.trim();
+    if (!titel) return;
+    const projekt_id = document.getElementById("edit-aufgabe-projekt").value || null;
+    const faellig_am = document.getElementById("edit-aufgabe-faellig").value || null;
+    const uhrzeit = document.getElementById("edit-aufgabe-uhrzeit").value || null;
+    const ende_uhrzeit = document.getElementById("edit-aufgabe-ende").value || null;
+    const erinnere_alle_tage = document.getElementById("edit-aufgabe-intervall").value || null;
+    await api("aufgabe_aktualisieren", { id, titel, projekt_id, faellig_am, uhrzeit, ende_uhrzeit, erinnere_alle_tage });
+    aufgabeBearbeitenId = null;
+    await ladeDaten();
+    render();
+  };
+
+  function taskEditHtml(a) {
+    const projektOptions = '<option value="">Ohne Projekt</option>' +
+      projekte.map((p) => `<option value="${p.id}" ${p.id === a.projekt_id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
+    return `
+      <div class="task task-edit">
+        <div class="task-info" style="width:100%;">
+          <div class="task-edit-felder">
+            <input type="text" id="edit-aufgabe-titel" value="${escapeAttr(a.titel)}" placeholder="Titel">
+            <select id="edit-aufgabe-projekt">${projektOptions}</select>
+            <input type="date" id="edit-aufgabe-faellig" value="${a.faellig_am || ""}" title="Fälligkeitsdatum (optional)">
+            <input type="time" id="edit-aufgabe-uhrzeit" style="width:8rem;" value="${a.uhrzeit ? a.uhrzeit.slice(0,5) : ""}" title="Beginn (optional)">
+            <input type="time" id="edit-aufgabe-ende" style="width:8rem;" value="${a.ende_uhrzeit ? a.ende_uhrzeit.slice(0,5) : ""}" title="Ende (optional)">
+            <input type="number" id="edit-aufgabe-intervall" min="1" placeholder="alle X Tage" value="${a.erinnere_alle_tage || ""}" title="Wiederkehrende Erinnerung">
+          </div>
+          <div class="row" style="margin:0;">
+            <button class="btn-primary" onclick="aufgabeBearbeitenSpeichern('${a.id}')">Speichern</button>
+            <button class="btn-secondary" onclick="aufgabeBearbeitenAbbrechen()">Abbrechen</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
   function taskHtml(a, done) {
+    if (a.id === aufgabeBearbeitenId) return taskEditHtml(a);
     const projekt = projekte.find((p) => p.id === a.projekt_id);
     let meta = "";
     if (done && projekt) meta += badgeHtml("", projekt.name);
@@ -237,6 +286,7 @@
           <div class="task-meta">${meta}</div>
         </div>
         ${snoozeBtn}
+        <button class="task-edit-btn" onclick="aufgabeBearbeitenStart('${a.id}')" title="Bearbeiten">✎</button>
         <button class="task-delete" onclick="loeschen('${a.id}')">×</button>
       </div>`;
   }
