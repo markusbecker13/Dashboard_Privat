@@ -1,4 +1,4 @@
-  :root {
+:root {
     --bg: #eef1f5; --panel: #ffffff; --ink: #1c2430; --ink-dim: #5c6779;
     --accent: #3b6ef6; --accent-2: #e8793f; --border: #dbe1ea;
     --jetzt: #e8793f;
@@ -292,6 +292,38 @@
   .jetzt-leiste-labels { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--ink-dim); margin-top: 0.35rem; }
   .jetzt-naechster { font-size: 0.88rem; color: var(--ink-dim); margin-top: 0.7rem; }
   .jetzt-naechster strong { color: var(--ink); font-weight: 500; }
+
+  .wetter-karte {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1rem 1.2rem; margin-bottom: 1.4rem;
+  }
+  .wetter-karte.wetter-laedt, .wetter-karte.wetter-fehler { color: var(--ink-dim); font-size: 0.9rem; }
+  .wetter-karte.wetter-fehler { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+  .wetter-kopf { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; }
+  .wetter-jetzt { display: flex; align-items: baseline; gap: 0.5rem; }
+  .wetter-jetzt-icon { font-size: 1.8rem; }
+  .wetter-jetzt-temp { font-family: "Fraunces", serif; font-size: 1.9rem; font-weight: 600; }
+  .wetter-jetzt-text { color: var(--ink-dim); font-size: 0.9rem; }
+  .wetter-ort-zeile { display: flex; align-items: center; gap: 0.3rem; color: var(--ink-dim); font-size: 0.85rem; }
+  .wetter-tage { display: flex; gap: 0.6rem; margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+  .wetter-kachel-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 0.6rem;
+    margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border);
+  }
+  .wetter-kachel {
+    display: flex; flex-direction: column; align-items: center; gap: 0.2rem; text-align: center;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.7rem 0.4rem; font-family: "Inter", sans-serif;
+  }
+  .wetter-kachel-tag { font-size: 0.78rem; color: var(--ink-dim); font-weight: 500; }
+  .wetter-kachel-icon { font-size: 1.5rem; margin: 0.1rem 0; }
+  .wetter-kachel-max { font-family: "Fraunces", serif; font-size: 1.15rem; font-weight: 600; line-height: 1; }
+  .wetter-kachel-min { font-size: 0.78rem; color: var(--ink-dim); }
+  .wetter-tag { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; font-size: 0.8rem; }
+  .wetter-tag-name { color: var(--ink-dim); font-weight: 500; }
+  .wetter-tag-icon { font-size: 1.2rem; }
+  .wetter-tag-max { font-weight: 600; }
+  .wetter-tag-min { color: var(--ink-dim); }
 
   .start-kachel-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.7rem; margin-bottom: 1.8rem;
