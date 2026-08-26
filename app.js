@@ -381,11 +381,12 @@
         if (googleCode) {
           try {
             await api("google_auth_callback", { code: googleCode });
-            alert("Google-Kalender erfolgreich verbunden.");
+            history.replaceState({}, "", location.pathname);
+            tabWechseln("kalender");
           } catch (e) {
             alert("Google-Verbindung fehlgeschlagen: " + e.message);
+            history.replaceState({}, "", location.pathname);
           }
-          history.replaceState({}, "", location.pathname);
         }
 
         // Falls über eine App-Verknüpfung mit ?tab=... geöffnet wurde
@@ -402,49 +403,125 @@
     zeigeLogin();
   })();
 
-  // Google-Kalender-Sync: Verbinden/Trennen. Vorläufig als einfache
-  // Funktionen, bekommen in einer späteren Etappe eine richtige
-  // Oberfläche mit Status-Anzeige im Kalender-Tab.
-  window.googleVerbinden = async function() {
+  // Google-Kalender-Sync: Statuskarte im Kalender-Tab mit Verbinden/
+  // Trennen/manuellem Abgleich. Automatischer Abgleich läuft serverseitig
+  // per pg_cron alle 15 Minuten unabhängig von dieser Oberfläche.
+  let googleSyncKarteLaedt = false;
+
+  function relativeZeitkurz(iso) {
+    if (!iso) return null;
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const min = Math.round(diffMs / 60000);
+    if (min < 1) return "gerade eben";
+    if (min < 60) return `vor ${min} Min.`;
+    const std = Math.round(min / 60);
+    if (std < 24) return `vor ${std} Std.`;
+    const tage = Math.round(std / 24);
+    return `vor ${tage} Tag${tage === 1 ? "" : "en"}`;
+  }
+
+  function formatDatumUhrzeit(iso) {
+    const dt = new Date(iso);
+    return dt.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
+
+  function renderGoogleSyncKarte(status) {
+    const el = document.getElementById("google-sync-karte");
+    if (!el) return;
+
+    if (!status.verbunden) {
+      el.innerHTML = `
+        <div class="sync-kopf"><span class="sync-punkt sync-punkt--aus"></span><span>Nicht mit Google Kalender verbunden</span></div>
+        <p class="hero-text" style="margin:0.3rem 0 0.8rem;">Verbinde deinen Google-Kalender, um Termine automatisch beidseitig abzugleichen.</p>
+        <button class="btn-primary" id="sync-verbinden-btn">Mit Google verbinden</button>
+      `;
+      document.getElementById("sync-verbinden-btn").addEventListener("click", googleVerbindenKlick);
+      return;
+    }
+
+    const letzterAbgleichText = status.letzter_sync
+      ? relativeZeitkurz(status.letzter_sync)
+      : "noch nie";
+
+    el.innerHTML = `
+      <div class="sync-kopf"><span class="sync-punkt sync-punkt--an"></span><span>Verbunden mit Google Kalender</span></div>
+      <div class="sync-meta">
+        <span>Verbunden seit ${formatDatumUhrzeit(status.verbunden_seit)}</span>
+        <span>·</span>
+        <span id="sync-letzter-abgleich">Letzter Abgleich: ${letzterAbgleichText}</span>
+      </div>
+      <p class="hero-text" style="margin:0.3rem 0 0;">Automatischer Abgleich alle 15 Minuten.</p>
+      <div class="sync-aktionen">
+        <button class="btn-secondary" id="sync-jetzt-btn">Jetzt synchronisieren</button>
+        <button class="sync-trennen-btn" id="sync-trennen-btn">Verbindung trennen</button>
+      </div>
+      <div id="sync-feedback" class="sync-feedback hidden"></div>
+    `;
+    document.getElementById("sync-jetzt-btn").addEventListener("click", googleSyncJetztKlick);
+    document.getElementById("sync-trennen-btn").addEventListener("click", googleTrennenKlick);
+  }
+
+  async function ladeGoogleSyncStatus() {
+    if (googleSyncKarteLaedt) return;
+    googleSyncKarteLaedt = true;
+    try {
+      const status = await api("google_status");
+      renderGoogleSyncKarte(status);
+    } catch (e) {
+      // Statuskarte bleibt beim vorherigen Zustand, kein hartes Fehlerbild
+      // nötig – der Nutzer sieht ohnehin am Kalender, ob etwas fehlt.
+      console.error("Google-Status konnte nicht geladen werden:", e);
+    } finally {
+      googleSyncKarteLaedt = false;
+    }
+  }
+
+  async function googleVerbindenKlick() {
     try {
       const { url } = await api("google_auth_start");
       location.href = url;
     } catch (e) {
       alert("Konnte Google-Login nicht starten: " + e.message);
     }
-  };
+  }
 
-  window.googleTrennen = async function() {
+  async function googleTrennenKlick() {
     if (!confirm("Google-Kalender-Verknüpfung wirklich entfernen?")) return;
+    const btn = document.getElementById("sync-trennen-btn");
+    if (btn) { btn.disabled = true; btn.textContent = "Trenne …"; }
     try {
       await api("google_disconnect");
-      alert("Google-Kalender-Verknüpfung entfernt.");
+      await ladeGoogleSyncStatus();
     } catch (e) {
       alert("Fehler beim Trennen: " + e.message);
+      if (btn) { btn.disabled = false; btn.textContent = "Verbindung trennen"; }
     }
-  };
+  }
 
-  window.googleStatusAnzeigen = async function() {
-    try {
-      const status = await api("google_status");
-      alert(status.verbunden
-        ? "Verbunden seit: " + status.verbunden_seit
-        : "Nicht verbunden.");
-    } catch (e) {
-      alert("Fehler: " + e.message);
-    }
-  };
-
-  window.googleSyncJetzt = async function() {
+  async function googleSyncJetztKlick() {
+    const btn = document.getElementById("sync-jetzt-btn");
+    const feedback = document.getElementById("sync-feedback");
+    if (btn) { btn.disabled = true; btn.textContent = "Synchronisiere …"; }
     try {
       const ergebnis = await api("google_sync");
-      alert(`Sync fertig: ${ergebnis.erstellt} neu, ${ergebnis.aktualisiert} aktualisiert, ${ergebnis.geloescht} gelöscht.`);
       await ladeDaten();
       render();
+      await ladeGoogleSyncStatus();
+      const neueFeedback = document.getElementById("sync-feedback");
+      if (neueFeedback) {
+        neueFeedback.textContent = `✓ ${ergebnis.erstellt} neu, ${ergebnis.aktualisiert} aktualisiert, ${ergebnis.geloescht} gelöscht`;
+        neueFeedback.classList.remove("hidden");
+        neueFeedback.classList.add("erfolg");
+      }
     } catch (e) {
-      alert("Sync fehlgeschlagen: " + e.message);
+      if (btn) { btn.disabled = false; btn.textContent = "Jetzt synchronisieren"; }
+      if (feedback) {
+        feedback.textContent = "Sync fehlgeschlagen: " + e.message;
+        feedback.classList.remove("hidden");
+        feedback.classList.add("fehler");
+      }
     }
-  };
+  }
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -460,7 +537,7 @@
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
     }
-    if (aktiv === "kalender") renderKalender();
+    if (aktiv === "kalender") { renderKalender(); ladeGoogleSyncStatus(); }
     if (aktiv === "heute") renderHeute();
     if (aktiv === "planung") renderPlanung();
     if (aktiv === "frei") renderFrei();
