@@ -1,4 +1,4 @@
-  // ==========================================================
+// ==========================================================
   // WICHTIG: Diese URL nach dem Deployment der Edge Function
   // aus dem Supabase-Dashboard eintragen (siehe SETUP.md).
   // Beispiel: https://xxxxxxxx.supabase.co/functions/v1/aufgaben-api
@@ -46,6 +46,10 @@
   const CSV_ZWECK_SPALTEN = ["Verwendungszweck", "Buchungstext"];
   const FIN_MONATE = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez"];
   const FIN_MONATSNAMEN_KURZ = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+  let wetterOrt = localStorage.getItem("wetter-ort") || "Erftstadt";
+  let wetterDaten = null; // letzte erfolgreiche Antwort vom Server
+  let wetterLetzterAbruf = 0; // Timestamp (ms), für einfaches Caching
+  const WETTER_CACHE_MS = 30 * 60 * 1000; // 30 Minuten
 
   async function api(action, extra = {}) {
     const res = await fetch(API_URL, {
@@ -191,6 +195,7 @@
     render();
     renderKalender();
     renderHeute();
+    ladeWetter();
     renderNotizen();
     renderLinks();
     renderReflexionen();
@@ -473,6 +478,94 @@
   document.getElementById("tab-verlauf").addEventListener("click", () => tabWechseln("verlauf"));
   document.getElementById("tab-planung").addEventListener("click", () => tabWechseln("planung"));
   document.getElementById("tab-finanzen").addEventListener("click", () => tabWechseln("finanzen"));
+
+  // ==========================================================
+  // Wetter (Start-Tab)
+  // ==========================================================
+  // WMO-Wettercodes (von Open-Meteo) grob zusammengefasst.
+  const WETTER_CODES = {
+    0: ["☀️", "Klar"], 1: ["🌤️", "Meist klar"], 2: ["⛅", "Teilweise bewölkt"], 3: ["☁️", "Bedeckt"],
+    45: ["🌫️", "Nebel"], 48: ["🌫️", "Reifnebel"],
+    51: ["🌦️", "Leichter Nieselregen"], 53: ["🌦️", "Nieselregen"], 55: ["🌦️", "Starker Nieselregen"],
+    61: ["🌧️", "Leichter Regen"], 63: ["🌧️", "Regen"], 65: ["🌧️", "Starker Regen"],
+    71: ["🌨️", "Leichter Schneefall"], 73: ["🌨️", "Schneefall"], 75: ["❄️", "Starker Schneefall"],
+    80: ["🌦️", "Regenschauer"], 81: ["🌧️", "Kräftiger Regenschauer"], 82: ["⛈️", "Heftiger Regenschauer"],
+    95: ["⛈️", "Gewitter"], 96: ["⛈️", "Gewitter mit Hagel"], 99: ["⛈️", "Starkes Gewitter mit Hagel"],
+  };
+  function wetterCodeInfo(code) {
+    return WETTER_CODES[code] || ["🌡️", "Unbekannt"];
+  }
+  const WETTER_WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+
+  async function ladeWetter(erzwingen = false) {
+    const container = document.getElementById("wetter-bereich");
+    if (!container) {
+      console.error("[Wetter] Container #wetter-bereich nicht im DOM gefunden – index.html nicht aktuell?");
+      return;
+    }
+    const jetzigerOrt = wetterOrt;
+    if (!erzwingen && wetterDaten && Date.now() - wetterLetzterAbruf < WETTER_CACHE_MS) {
+      renderWetter();
+      return;
+    }
+    container.innerHTML = `<div class="wetter-karte wetter-laedt">Wetter wird geladen …</div>`;
+    try {
+      const daten = await api("wetter_abrufen", { ort: jetzigerOrt });
+      // Falls der Ort zwischenzeitlich geändert wurde, veraltete Antwort verwerfen.
+      if (jetzigerOrt !== wetterOrt) return;
+      wetterDaten = daten;
+      wetterLetzterAbruf = Date.now();
+      renderWetter();
+    } catch (fehler) {
+      console.error("[Wetter] Laden fehlgeschlagen:", fehler);
+      container.innerHTML =
+        `<div class="wetter-karte wetter-fehler">Wetter konnte nicht geladen werden (${escapeHtml(fehler.message || "Fehler")}).
+         <button class="link-btn" onclick="ladeWetter(true)">Erneut versuchen</button></div>`;
+    }
+  }
+
+  function renderWetter() {
+    if (!wetterDaten) return;
+    const [aktIcon, aktText] = wetterCodeInfo(wetterDaten.aktueller_code);
+    const tage = (wetterDaten.tage || []).slice(0, 5).map((t) => {
+      const [icon] = wetterCodeInfo(t.code);
+      const datum = new Date(t.datum + "T00:00:00");
+      const wochentag = WETTER_WOCHENTAGE[datum.getDay()];
+      return `
+        <div class="wetter-tag">
+          <span class="wetter-tag-name">${wochentag}</span>
+          <span class="wetter-tag-icon">${icon}</span>
+          <span class="wetter-tag-max">${Math.round(t.max)}°</span>
+          <span class="wetter-tag-min">${Math.round(t.min)}°</span>
+        </div>`;
+    }).join("");
+
+    document.getElementById("wetter-bereich").innerHTML = `
+      <div class="wetter-karte">
+        <div class="wetter-kopf">
+          <div class="wetter-jetzt">
+            <span class="wetter-jetzt-icon">${aktIcon}</span>
+            <span class="wetter-jetzt-temp">${Math.round(wetterDaten.aktuelle_temperatur)}°</span>
+            <span class="wetter-jetzt-text">${aktText}</span>
+          </div>
+          <div class="wetter-ort-zeile">
+            <span>${escapeHtml(wetterDaten.ort_gefunden || wetterOrt)}</span>
+            <button class="project-edit-btn" onclick="wetterOrtBearbeiten()" title="Ort ändern">✎</button>
+          </div>
+        </div>
+        <div class="wetter-tage">${tage}</div>
+      </div>`;
+  }
+
+  window.wetterOrtBearbeiten = function () {
+    const neu = prompt("Ort für die Wettervorhersage:", wetterOrt);
+    if (neu === null) return;
+    const bereinigt = neu.trim();
+    if (!bereinigt || bereinigt === wetterOrt) return;
+    wetterOrt = bereinigt;
+    localStorage.setItem("wetter-ort", wetterOrt);
+    ladeWetter(true);
+  };
 
   function renderHeute() {
     const heuteIso = heuteISO();
@@ -2875,4 +2968,3 @@
 
     return `<svg viewBox="0 0 ${breite} ${hoehe}" style="width:100%; height:auto; display:block;">${balken}</svg>`;
   }
-
