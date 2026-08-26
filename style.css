@@ -1,4 +1,4 @@
-:root {
+  :root {
     --bg: #eef1f5; --panel: #ffffff; --ink: #1c2430; --ink-dim: #5c6779;
     --accent: #3b6ef6; --accent-2: #e8793f; --border: #dbe1ea;
     --jetzt: #e8793f;
@@ -78,6 +78,7 @@
   .task-delete { background: none; border: none; color: var(--ink-dim); font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.5rem; flex-shrink: 0; }
   .empty-text { color: var(--ink-dim); }
   #login-screen { max-width: 320px; margin: 4rem auto; padding: 0 1.4rem; text-align: center; }
+  .login-logo { width: 72px; height: 72px; margin-bottom: 1.2rem; border-radius: 18px; }
   #login-screen input { width: 100%; margin-bottom: 0.8rem; }
   #login-screen button { width: 100%; }
   #login-error { color: var(--overdue-text); font-size: 0.85rem; margin-top: 0.6rem; min-height: 1.2rem; }
