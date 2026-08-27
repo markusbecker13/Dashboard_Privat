@@ -2826,7 +2826,7 @@
   }
 
   let finErkennungKandidaten = [];
-  let finBuchungenLoeschenNachUebernahme = true;
+  let finBuchungenLoeschenNachUebernahme = false; // sicherer Default: nicht automatisch löschen
 
   function zeigeErkennungsModal(kandidaten) {
     finErkennungKandidaten = kandidaten;
@@ -2897,6 +2897,13 @@
   }
 
   async function erkennungUebernehmen() {
+    // Haken-Zustand direkt aus dem Formular lesen statt aus der separaten
+    // Variable – die wurde nur über das change-Event aktualisiert, was
+    // unzuverlässig war und dazu führte, dass Buchungen trotz deaktiviertem
+    // Haken gelöscht wurden.
+    const loeschenCheckbox = document.getElementById("fin-erkennung-loeschen");
+    const buchungenLoeschen = loeschenCheckbox ? loeschenCheckbox.checked : finBuchungenLoeschenNachUebernahme;
+
     const ausgewaehlte = finErkennungKandidaten.filter((k) => k.ausgewaehlt);
     let angelegt = 0;
     let geloescht = 0;
@@ -2914,7 +2921,7 @@
       await api("fixkosten_hinzufuegen", zahlung);
       angelegt++;
 
-      if (finBuchungenLoeschenNachUebernahme) {
+      if (buchungenLoeschen) {
         for (const id of k.buchungIds) {
           await api("buchung_loeschen", { id });
           geloescht++;
