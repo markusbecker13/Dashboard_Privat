@@ -592,7 +592,31 @@
     if (aktiv === "planung") renderPlanung();
     if (aktiv === "frei") renderFrei();
     if (aktiv === "finanzen") renderFinanzen();
+    menuSchliessen();
   }
+
+  // Mobiles Menü: Tabs stecken hinter dem Hamburger-Button und öffnen
+  // sich als Drawer. Auf breiten Bildschirmen (Desktop) bleibt der
+  // Drawer per CSS immer sichtbar, die open/close-Klassen wirken sich
+  // dort nicht sichtbar aus.
+  const menuToggleBtn = document.getElementById("menu-toggle");
+  const tabsMenuEl = document.getElementById("tabs-menu");
+  const menuBackdropEl = document.getElementById("menu-backdrop");
+
+  function menuOeffnen() {
+    tabsMenuEl.classList.add("open");
+    menuBackdropEl.classList.add("open");
+    menuToggleBtn.setAttribute("aria-expanded", "true");
+  }
+  function menuSchliessen() {
+    tabsMenuEl.classList.remove("open");
+    menuBackdropEl.classList.remove("open");
+    menuToggleBtn.setAttribute("aria-expanded", "false");
+  }
+  menuToggleBtn.addEventListener("click", () => {
+    if (tabsMenuEl.classList.contains("open")) menuSchliessen(); else menuOeffnen();
+  });
+  menuBackdropEl.addEventListener("click", menuSchliessen);
   document.getElementById("tab-heute").addEventListener("click", () => tabWechseln("heute"));
   document.getElementById("tab-aufgaben").addEventListener("click", () => tabWechseln("aufgaben"));
   document.getElementById("tab-kalender").addEventListener("click", () => tabWechseln("kalender"));
