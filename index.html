@@ -45,37 +45,41 @@
         <button class="project-edit-btn" onclick="dashboardNameBearbeiten()" title="Name ändern">✎</button>
         <span class="brand-sub" id="brand-sub">Aufgaben</span>
         <button class="project-edit-btn" onclick="untertitelBearbeiten()" title="Untertitel ändern">✎</button>
+        <button class="menu-toggle" id="menu-toggle" aria-label="Menü öffnen" aria-expanded="false">☰</button>
       </div>
 
-      <div class="tabs">
-        <div class="tab-group">
-          <span class="tab-group-label">Heute</span>
-          <button class="tab-btn active" id="tab-heute">Start</button>
-          <button class="tab-btn" id="tab-frei">Frei</button>
+      <div class="tabs-menu" id="tabs-menu">
+        <div class="tabs">
+          <div class="tab-group">
+            <span class="tab-group-label">Heute</span>
+            <button class="tab-btn active" id="tab-heute">Start</button>
+            <button class="tab-btn" id="tab-frei">Frei</button>
+          </div>
+          <div class="tab-group">
+            <span class="tab-group-label">Planen</span>
+            <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
+            <button class="tab-btn" id="tab-kalender">Kalender</button>
+            <button class="tab-btn" id="tab-planung">Planung</button>
+            <button class="tab-btn" id="tab-finanzen">Finanzen</button>
+          </div>
+          <div class="tab-group">
+            <span class="tab-group-label">Sammeln</span>
+            <button class="tab-btn" id="tab-notizen">Notizen</button>
+            <button class="tab-btn" id="tab-links">Links</button>
+            <button class="tab-btn" id="tab-reflexion">Reflexion</button>
+            <button class="tab-btn" id="tab-einkauf">Einkauf</button>
+          </div>
+          <div class="tab-group">
+            <span class="tab-group-label">Verwalten</span>
+            <button class="tab-btn" id="tab-export">Export</button>
+            <button class="tab-btn" id="tab-verlauf">Verlauf</button>
+          </div>
         </div>
-        <div class="tab-group">
-          <span class="tab-group-label">Planen</span>
-          <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
-          <button class="tab-btn" id="tab-kalender">Kalender</button>
-          <button class="tab-btn" id="tab-planung">Planung</button>
-          <button class="tab-btn" id="tab-finanzen">Finanzen</button>
-        </div>
-        <div class="tab-group">
-          <span class="tab-group-label">Sammeln</span>
-          <button class="tab-btn" id="tab-notizen">Notizen</button>
-          <button class="tab-btn" id="tab-links">Links</button>
-          <button class="tab-btn" id="tab-reflexion">Reflexion</button>
-          <button class="tab-btn" id="tab-einkauf">Einkauf</button>
-        </div>
-        <div class="tab-group">
-          <span class="tab-group-label">Verwalten</span>
-          <button class="tab-btn" id="tab-export">Export</button>
-          <button class="tab-btn" id="tab-verlauf">Verlauf</button>
-        </div>
-      </div>
 
-      <button id="btn-abmelden" class="link-btn sidebar-abmelden">Abmelden</button>
+        <button id="btn-abmelden" class="link-btn sidebar-abmelden">Abmelden</button>
+      </div>
     </nav>
+    <div class="menu-backdrop" id="menu-backdrop"></div>
 
     <main>
       <div id="view-heute">
