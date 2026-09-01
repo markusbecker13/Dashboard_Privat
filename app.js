@@ -274,7 +274,7 @@
 
   function taskEditHtml(a) {
     const projektOptions = '<option value="">Ohne Projekt</option>' +
-      projekte.map((p) => `<option value="${p.id}" ${p.id === a.projekt_id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
+      projekteAktuell().map((p) => `<option value="${p.id}" ${p.id === a.projekt_id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
     return `
       <div class="task task-edit">
         <div class="task-info" style="width:100%;">
@@ -296,7 +296,7 @@
 
   function taskHtml(a, done) {
     if (a.id === aufgabeBearbeitenId) return taskEditHtml(a);
-    const projekt = projekte.find((p) => p.id === a.projekt_id);
+    const projekt = projekteAktuell().find((p) => p.id === a.projekt_id);
     let meta = "";
     if (done && projekt) meta += badgeHtml("", projekt.name);
     if (!done && a.faellig_am) {
@@ -336,7 +336,7 @@
   function render() {
     const select = document.getElementById("aufgabe-projekt");
     select.innerHTML = '<option value="">Ohne Projekt</option>' +
-      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+      projekteAktuell().map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
 
     const aufgabenBereich = aufgaben.filter((a) => bereichVon(a) === aktiverBereich);
     const offen = aufgabenBereich.filter((a) => !a.erledigt).map(enrich);
@@ -350,7 +350,7 @@
     });
 
     const ohneProjekt = sortiere(offen.filter((a) => !a.projekt_id));
-    const gruppen = projekte
+    const gruppen = projekteAktuell()
       .map((p) => ({ projekt: p, liste: sortiere(offen.filter((a) => a.projekt_id === p.id)) }))
       .filter((g) => g.liste.length > 0);
 
@@ -420,13 +420,13 @@
   async function projektAnlegen() {
     const name = document.getElementById("neues-projekt").value.trim();
     if (!name) return;
-    await api("projekt_hinzufuegen", { name });
+    await api("projekt_hinzufuegen", { name, bereich: aktiverBereich });
     document.getElementById("neues-projekt").value = "";
     await ladeDaten();
   }
 
   window.projektUmbenennen = async function(id) {
-    const projekt = projekte.find((p) => p.id === id);
+    const projekt = projekteAktuell().find((p) => p.id === id);
     if (!projekt) return;
     const neuerName = prompt("Neuer Projektname:", projekt.name);
     if (!neuerName || !neuerName.trim() || neuerName.trim() === projekt.name) return;
@@ -631,6 +631,10 @@
   // Fehlt es (ältere Einträge), gilt Default "privat".
   function bereichVon(objekt) {
     return objekt.bereich || "privat";
+  }
+
+  function projekteAktuell() {
+    return projekte.filter((p) => bereichVon(p) === aktiverBereich);
   }
 
   const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar" };
@@ -1541,7 +1545,7 @@
     if (!a) { bereich.innerHTML = ""; return; }
 
     const projektOptions = '<option value="">Ohne Projekt</option>' +
-      projekte.map((p) => `<option value="${p.id}" ${p.id === a.projekt_id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
+      projekteAktuell().map((p) => `<option value="${p.id}" ${p.id === a.projekt_id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
 
     bereich.innerHTML = `
       <div class="cal-day-panel">
@@ -1587,7 +1591,7 @@
 
     const { start, ende } = freiAusgewaehlteLuecke;
     const projektOptions = '<option value="">Ohne Projekt</option>' +
-      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+      projekteAktuell().map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
 
     bereich.innerHTML = `
       <div class="cal-day-panel">
@@ -1642,7 +1646,7 @@
   function renderNotizen() {
     const select = document.getElementById("notiz-projekt");
     select.innerHTML = '<option value="">Ohne Projekt</option>' +
-      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+      projekteAktuell().map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
 
     const bereich = document.getElementById("notizen-bereich");
     const notizenBereich = notizen.filter((n) => bereichVon(n) === aktiverBereich);
@@ -1651,7 +1655,7 @@
       return;
     }
     const html = notizenBereich.map((n) => {
-      const projekt = projekte.find((p) => p.id === n.projekt_id);
+      const projekt = projekteAktuell().find((p) => p.id === n.projekt_id);
       const datum = new Date(n.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
       return `
         <div class="notiz-item">
@@ -2114,10 +2118,10 @@
   function renderLinks() {
     const select = document.getElementById("link-projekt");
     select.innerHTML = '<option value="">Ohne Projekt</option>' +
-      projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+      projekteAktuell().map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
 
     const ohneProjekt = links.filter((l) => !l.projekt_id);
-    const gruppen = projekte
+    const gruppen = projekteAktuell()
       .map((p) => ({ projekt: p, liste: links.filter((l) => l.projekt_id === p.id) }))
       .filter((g) => g.liste.length > 0);
 
@@ -2239,7 +2243,7 @@
   // ==========================================================
   function fA() {
     return aufgaben.map((a) => {
-      const p = projekte.find((pr) => pr.id === a.projekt_id);
+      const p = projekteAktuell().find((pr) => pr.id === a.projekt_id);
       return {
         Titel: a.titel,
         Projekt: p ? p.name : "",
@@ -2263,7 +2267,7 @@
   }
   function fN() {
     return notizen.map((n) => {
-      const p = projekte.find((pr) => pr.id === n.projekt_id);
+      const p = projekteAktuell().find((pr) => pr.id === n.projekt_id);
       return {
         Text: n.text,
         Projekt: p ? p.name : "",
@@ -2273,7 +2277,7 @@
   }
   function fL() {
     return links.map((l) => {
-      const p = projekte.find((pr) => pr.id === l.projekt_id);
+      const p = projekteAktuell().find((pr) => pr.id === l.projekt_id);
       return {
         Titel: l.titel,
         URL: l.url,
