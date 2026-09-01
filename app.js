@@ -47,6 +47,8 @@
   const FIN_MONATE = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez"];
   const FIN_MONATSNAMEN_KURZ = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
   let ogsIdeen = [];
+  let ogsInventar = [];
+  let ogsProjekte = [];
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
   let wetterOrt = localStorage.getItem("wetter-ort") || "Erftstadt";
   let wetterDaten = null; // letzte erfolgreiche Antwort vom Server
@@ -220,6 +222,8 @@
     buchungen = data.buchungen || [];
     finanzEinstellungen = data.finanz_einstellungen || [];
     ogsIdeen = data.ogs_ideen || [];
+    ogsInventar = data.ogs_inventar || [];
+    ogsProjekte = data.ogs_projekte || [];
     bereichAnwenden();
     render();
     renderKalender();
@@ -234,6 +238,8 @@
     renderPlanung();
     renderBlockzeiten();
     renderOgsIdeen();
+    renderInventar();
+    renderProjekte();
   }
 
   function badgeHtml(cls, text) {
@@ -668,8 +674,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung", finanzen: "tab-finanzen", ogsideen: "tab-ogs-ideen" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung", finanzen: "view-finanzen", ogsideen: "view-ogs-ideen" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung", finanzen: "tab-finanzen", ogsideen: "tab-ogs-ideen", ogsinventar: "tab-ogs-inventar", ogsprojekte: "tab-ogs-projekte" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung", finanzen: "view-finanzen", ogsideen: "view-ogs-ideen", ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -680,6 +686,8 @@
     if (aktiv === "frei") renderFrei();
     if (aktiv === "finanzen") renderFinanzen();
     if (aktiv === "ogsideen") renderOgsIdeen();
+    if (aktiv === "ogsinventar") renderInventar();
+    if (aktiv === "ogsprojekte") renderProjekte();
     menuSchliessen();
   }
 
@@ -718,6 +726,8 @@
   document.getElementById("tab-planung").addEventListener("click", () => tabWechseln("planung"));
   document.getElementById("tab-finanzen").addEventListener("click", () => tabWechseln("finanzen"));
   document.getElementById("tab-ogs-ideen").addEventListener("click", () => tabWechseln("ogsideen"));
+  document.getElementById("tab-ogs-inventar").addEventListener("click", () => tabWechseln("ogsinventar"));
+  document.getElementById("tab-ogs-projekte").addEventListener("click", () => tabWechseln("ogsprojekte"));
 
   // ==========================================================
   // Wetter (Start-Tab)
@@ -1733,6 +1743,354 @@
     await api("ogs_idee_loeschen", { id });
     await ladeDaten();
   };
+
+  // ==========================================================
+  // OGS Rapunzel – Inventar
+  // ==========================================================
+  const INV_ZUSTAND_LABEL = { gut: "✅ Gut", eingeschraenkt: "⚠️ Eingeschränkt nutzbar", defekt: "❌ Defekt" };
+  let invAktiveKategorie = "alle";
+  let invBearbeitenId = null;
+
+  function renderInventar() {
+    const filterBereich = document.getElementById("inv-filter-bereich");
+    const listeBereich = document.getElementById("inv-liste-bereich");
+    if (!filterBereich || !listeBereich) return;
+
+    const kategorien = [...new Set(ogsInventar.map((i) => i.kategorie))].sort((a, b) => a.localeCompare(b));
+
+    const datalist = document.getElementById("inv-kategorie-liste");
+    if (datalist) datalist.innerHTML = kategorien.map((k) => `<option value="${escapeAttr(k)}"></option>`).join("");
+
+    if (invAktiveKategorie !== "alle" && !kategorien.includes(invAktiveKategorie)) invAktiveKategorie = "alle";
+
+    filterBereich.innerHTML = `
+      <select id="inv-kategorie-filter" onchange="invFilterAendern(this.value)">
+        <option value="alle" ${invAktiveKategorie === "alle" ? "selected" : ""}>Alle Kategorien (${ogsInventar.length})</option>
+        ${kategorien.map((k) => {
+          const anzahl = ogsInventar.filter((i) => i.kategorie === k).length;
+          return `<option value="${escapeAttr(k)}" ${invAktiveKategorie === k ? "selected" : ""}>${escapeHtml(k)} (${anzahl})</option>`;
+        }).join("")}
+      </select>`;
+
+    const gefiltert = invAktiveKategorie === "alle" ? ogsInventar : ogsInventar.filter((i) => i.kategorie === invAktiveKategorie);
+
+    if (gefiltert.length === 0) {
+      listeBereich.innerHTML = '<p class="empty-text">Noch nichts im Inventar.</p>';
+      return;
+    }
+
+    const gruppen = {};
+    gefiltert.forEach((i) => { (gruppen[i.kategorie] = gruppen[i.kategorie] || []).push(i); });
+    const kategorienSortiert = Object.keys(gruppen).sort((a, b) => a.localeCompare(b));
+
+    listeBereich.innerHTML = kategorienSortiert.map((kat) => {
+      const items = gruppen[kat].sort((a, b) => a.name.localeCompare(b.name));
+      const zeilen = items.map((i) => {
+        if (invBearbeitenId === i.id) {
+          return `
+            <div class="notiz-item">
+              <div style="flex:1; display:flex; flex-wrap:wrap; gap:0.4rem;">
+                <input type="text" id="inv-edit-name-${i.id}" value="${escapeAttr(i.name)}" placeholder="Gegenstand">
+                <input type="text" id="inv-edit-kategorie-${i.id}" value="${escapeAttr(i.kategorie)}" placeholder="Kategorie" list="inv-kategorie-liste">
+                <input type="number" id="inv-edit-menge-${i.id}" value="${i.menge}" min="1" style="width:5rem;">
+                <input type="text" id="inv-edit-standort-${i.id}" value="${escapeAttr(i.standort || "")}" placeholder="Standort">
+                <select id="inv-edit-zustand-${i.id}">
+                  <option value="gut" ${i.zustand === "gut" ? "selected" : ""}>Gut</option>
+                  <option value="eingeschraenkt" ${i.zustand === "eingeschraenkt" ? "selected" : ""}>Eingeschränkt nutzbar</option>
+                  <option value="defekt" ${i.zustand === "defekt" ? "selected" : ""}>Defekt</option>
+                </select>
+                <button class="btn-primary" onclick="invBearbeitenSpeichern('${i.id}')">Speichern</button>
+                <button class="link-btn" onclick="invBearbeitenAbbrechen()">Abbrechen</button>
+              </div>
+            </div>`;
+        }
+        return `
+          <div class="notiz-item">
+            <div style="flex:1; cursor:pointer;" onclick="invBearbeitenStart('${i.id}')">
+              <span class="notiz-text">${escapeHtml(i.name)}</span>
+              <span class="notiz-meta">${i.menge}× ${i.standort ? "· " + escapeHtml(i.standort) + " " : ""}· ${INV_ZUSTAND_LABEL[i.zustand] || i.zustand}</span>
+            </div>
+            <button class="task-delete" onclick="invLoeschen('${i.id}')">×</button>
+          </div>`;
+      }).join("");
+      return `<h3 style="margin-top:1.2rem; margin-bottom:0.4rem; font-size:0.95rem; color:var(--ink-dim);">${escapeHtml(kat)}</h3><div class="notiz-list">${zeilen}</div>`;
+    }).join("");
+  }
+
+  window.invFilterAendern = function(wert) {
+    invAktiveKategorie = wert;
+    renderInventar();
+  };
+
+  document.getElementById("btn-inv-hinzufuegen").addEventListener("click", invHinzufuegen);
+
+  async function invHinzufuegen() {
+    const name = document.getElementById("neu-inv-name").value.trim();
+    const kategorie = document.getElementById("neu-inv-kategorie").value.trim();
+    if (!name || !kategorie) return;
+    const menge = document.getElementById("neu-inv-menge").value || 1;
+    const standort = document.getElementById("neu-inv-standort").value.trim() || null;
+    const zustand = document.getElementById("neu-inv-zustand").value;
+    await api("ogs_inventar_hinzufuegen", { name, kategorie, menge, standort, zustand });
+    document.getElementById("neu-inv-name").value = "";
+    document.getElementById("neu-inv-kategorie").value = "";
+    document.getElementById("neu-inv-menge").value = "1";
+    document.getElementById("neu-inv-standort").value = "";
+    document.getElementById("neu-inv-zustand").value = "gut";
+    await ladeDaten();
+  }
+
+  window.invBearbeitenStart = function(id) {
+    invBearbeitenId = id;
+    renderInventar();
+  };
+
+  window.invBearbeitenAbbrechen = function() {
+    invBearbeitenId = null;
+    renderInventar();
+  };
+
+  window.invBearbeitenSpeichern = async function(id) {
+    const name = document.getElementById(`inv-edit-name-${id}`).value.trim();
+    const kategorie = document.getElementById(`inv-edit-kategorie-${id}`).value.trim();
+    if (!name || !kategorie) return;
+    const menge = document.getElementById(`inv-edit-menge-${id}`).value || 1;
+    const standort = document.getElementById(`inv-edit-standort-${id}`).value.trim() || null;
+    const zustand = document.getElementById(`inv-edit-zustand-${id}`).value;
+    await api("ogs_inventar_aktualisieren", { id, name, kategorie, menge, standort, zustand });
+    invBearbeitenId = null;
+    await ladeDaten();
+  };
+
+  window.invLoeschen = async function(id) {
+    if (!confirm("Diesen Gegenstand wirklich löschen?")) return;
+    await api("ogs_inventar_loeschen", { id });
+    await ladeDaten();
+  };
+
+  // ==========================================================
+  // OGS Rapunzel – Projekte (mit Datei-Ablage)
+  // ==========================================================
+  const PROJ_ERLAUBTE_TYPEN = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ];
+  const PROJ_MAX_BYTES = 5 * 1024 * 1024;
+  let projBearbeitenId = null;
+
+  function dateiZuBase64(datei) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(datei);
+    });
+  }
+
+  function renderProjekte() {
+    const bereich = document.getElementById("proj-liste-bereich");
+    if (!bereich) return;
+
+    const datalist = document.getElementById("proj-kategorie-liste");
+    if (datalist) {
+      const kategorien = [...new Set(ogsProjekte.map((p) => p.kategorie).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      datalist.innerHTML = kategorien.map((k) => `<option value="${escapeAttr(k)}"></option>`).join("");
+    }
+
+    if (ogsProjekte.length === 0) {
+      bereich.innerHTML = '<p class="empty-text">Noch keine Projekte hinterlegt.</p>';
+      return;
+    }
+
+    const html = ogsProjekte.map((p) => {
+      const datum = new Date(p.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+      if (projBearbeitenId === p.id) {
+        return `
+          <div class="notiz-item">
+            <div style="flex:1; display:flex; flex-direction:column; gap:0.4rem;">
+              <input type="text" id="proj-edit-titel-${p.id}" value="${escapeAttr(p.titel)}" placeholder="Titel">
+              <input type="text" id="proj-edit-kategorie-${p.id}" value="${escapeAttr(p.kategorie || "")}" placeholder="Kategorie" list="proj-kategorie-liste">
+              <textarea id="proj-edit-beschreibung-${p.id}" rows="2" placeholder="Kurzbeschreibung">${escapeHtml(p.beschreibung || "")}</textarea>
+              <div>
+                <button class="btn-primary" onclick="projBearbeitenSpeichern('${p.id}')">Speichern</button>
+                <button class="link-btn" onclick="projBearbeitenAbbrechen()">Abbrechen</button>
+              </div>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="notiz-item">
+          <div style="flex:1; cursor:pointer;" onclick="projBearbeitenStart('${p.id}')">
+            <span class="notiz-text">${escapeHtml(p.titel)}</span>
+            ${p.beschreibung ? `<div class="notiz-meta" style="margin-top:0.2rem;">${escapeHtml(p.beschreibung)}</div>` : ""}
+            <div class="notiz-meta" style="margin-top:0.3rem;">
+              ${datum}${p.kategorie ? " · " + escapeHtml(p.kategorie) : ""}
+              ${p.datei_name
+                ? ` · <span onclick="event.stopPropagation(); projDateiOeffnen('${p.id}')" style="text-decoration:underline; cursor:pointer;">📎 ${escapeHtml(p.datei_name)}</span>`
+                : ` · <label style="text-decoration:underline; cursor:pointer;" onclick="event.stopPropagation();">📎 Datei anhängen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="projDateiNachreichen('${p.id}', this)"></label>`}
+            </div>
+          </div>
+          <button class="task-delete" onclick="projLoeschen('${p.id}')">×</button>
+        </div>`;
+    }).join("");
+    bereich.innerHTML = `<div class="notiz-list">${html}</div>`;
+  }
+
+  document.getElementById("btn-proj-hinzufuegen").addEventListener("click", projHinzufuegen);
+
+  async function projHinzufuegen() {
+    const titel = document.getElementById("neu-proj-titel").value.trim();
+    if (!titel) return;
+    const kategorie = document.getElementById("neu-proj-kategorie").value.trim() || null;
+    const beschreibung = document.getElementById("neu-proj-beschreibung").value.trim() || null;
+    const dateiInput = document.getElementById("neu-proj-datei");
+    const datei = dateiInput.files[0];
+
+    const payload = { titel, kategorie, beschreibung };
+    if (datei) {
+      if (!PROJ_ERLAUBTE_TYPEN.includes(datei.type)) {
+        alert("Nur PDF- und Word-Dateien (.docx) sind erlaubt.");
+        return;
+      }
+      if (datei.size > PROJ_MAX_BYTES) {
+        alert("Die Datei ist größer als 5 MB.");
+        return;
+      }
+      payload.datei_base64 = await dateiZuBase64(datei);
+      payload.datei_name = datei.name;
+      payload.datei_typ = datei.type;
+    }
+
+    await api("ogs_projekt_hinzufuegen", payload);
+    document.getElementById("neu-proj-titel").value = "";
+    document.getElementById("neu-proj-kategorie").value = "";
+    document.getElementById("neu-proj-beschreibung").value = "";
+    dateiInput.value = "";
+    await ladeDaten();
+  }
+
+  window.projBearbeitenStart = function(id) {
+    projBearbeitenId = id;
+    renderProjekte();
+  };
+
+  window.projBearbeitenAbbrechen = function() {
+    projBearbeitenId = null;
+    renderProjekte();
+  };
+
+  window.projBearbeitenSpeichern = async function(id) {
+    const titel = document.getElementById(`proj-edit-titel-${id}`).value.trim();
+    if (!titel) return;
+    const kategorie = document.getElementById(`proj-edit-kategorie-${id}`).value.trim() || null;
+    const beschreibung = document.getElementById(`proj-edit-beschreibung-${id}`).value.trim() || null;
+    await api("ogs_projekt_aktualisieren", { id, titel, kategorie, beschreibung });
+    projBearbeitenId = null;
+    await ladeDaten();
+  };
+
+  window.projLoeschen = async function(id) {
+    if (!confirm("Dieses Projekt inklusive hinterlegter Datei wirklich löschen?")) return;
+    await api("ogs_projekt_loeschen", { id });
+    await ladeDaten();
+  };
+
+  window.projDateiOeffnen = async function(id) {
+    try {
+      const res = await api("ogs_projekt_datei_url", { id });
+      window.open(res.url, "_blank", "noopener");
+    } catch (e) {
+      alert("Datei konnte nicht geöffnet werden: " + e.message);
+    }
+  };
+
+  window.projDateiNachreichen = async function(id, input) {
+    const datei = input.files[0];
+    if (!datei) return;
+    if (!PROJ_ERLAUBTE_TYPEN.includes(datei.type)) {
+      alert("Nur PDF- und Word-Dateien (.docx) sind erlaubt.");
+      input.value = "";
+      return;
+    }
+    if (datei.size > PROJ_MAX_BYTES) {
+      alert("Die Datei ist größer als 5 MB.");
+      input.value = "";
+      return;
+    }
+    const projekt = ogsProjekte.find((p) => p.id === id);
+    if (!projekt) return;
+    const datei_base64 = await dateiZuBase64(datei);
+    await api("ogs_projekt_datei_nachreichen", {
+      id, datei_base64, datei_name: datei.name, datei_typ: datei.type,
+    });
+    await ladeDaten();
+  };
+
+  // ==========================================================
+  // OGS Rapunzel – Projekte: CSV-Bulk-Import
+  // ==========================================================
+  document.getElementById("btn-proj-csv-import").addEventListener("click", projCsvImport);
+
+  function csvZeileSplitten(zeile) {
+    // Einfacher CSV-Parser: unterstützt Kommas innerhalb von "..."-Feldern.
+    const felder = [];
+    let aktuell = "";
+    let inQuotes = false;
+    for (let i = 0; i < zeile.length; i++) {
+      const zeichen = zeile[i];
+      if (zeichen === '"') {
+        if (inQuotes && zeile[i + 1] === '"') { aktuell += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if (zeichen === "," && !inQuotes) {
+        felder.push(aktuell);
+        aktuell = "";
+      } else {
+        aktuell += zeichen;
+      }
+    }
+    felder.push(aktuell);
+    return felder.map((f) => f.trim());
+  }
+
+  async function projCsvImport() {
+    const input = document.getElementById("proj-csv-datei");
+    const status = document.getElementById("proj-csv-status");
+    const datei = input.files[0];
+    if (!datei) { status.textContent = "Bitte zuerst eine CSV-Datei auswählen."; return; }
+
+    const text = await datei.text();
+    const zeilen = text.split(/\r?\n/).filter((z) => z.trim() !== "");
+    if (zeilen.length < 2) { status.textContent = "Datei enthält keine Datenzeilen."; return; }
+
+    const kopf = csvZeileSplitten(zeilen[0]).map((h) => h.toLowerCase());
+    const idxTitel = kopf.findIndex((h) => h.includes("titel"));
+    const idxBeschreibung = kopf.findIndex((h) => h.includes("beschreibung"));
+    const idxKategorie = kopf.findIndex((h) => h.includes("kategorie"));
+
+    if (idxTitel === -1) {
+      status.textContent = 'Spalte "Titel" nicht gefunden – bitte Kopfzeile prüfen.';
+      return;
+    }
+
+    const importZeilen = zeilen.slice(1).map((z) => {
+      const felder = csvZeileSplitten(z);
+      return {
+        titel: felder[idxTitel] || "",
+        beschreibung: idxBeschreibung > -1 ? felder[idxBeschreibung] || "" : "",
+        kategorie: idxKategorie > -1 ? felder[idxKategorie] || "" : "",
+      };
+    }).filter((z) => z.titel);
+
+    if (importZeilen.length === 0) {
+      status.textContent = "Keine gültigen Zeilen gefunden (Titel fehlt überall).";
+      return;
+    }
+
+    const res = await api("ogs_projekte_csv_import", { zeilen: importZeilen });
+    status.textContent = `${res.anzahl} Projekte importiert.`;
+    input.value = "";
+    await ladeDaten();
+  }
 
   // ==========================================================
   // Links
