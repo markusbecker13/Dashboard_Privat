@@ -24,10 +24,11 @@
   .hero-text { color: var(--ink-dim); margin: 0 0 1.6rem; max-width: 46ch; }
   .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
   input, select, button { font-family: "Inter", sans-serif; font-size: 0.9rem; }
-  input, select {
+  input, select, textarea {
     padding: 0.75rem 0.8rem; border: 1px solid var(--border); border-radius: 8px;
-    background: var(--panel); color: var(--ink);
+    background: var(--panel); color: var(--ink); font-family: "Inter", sans-serif; font-size: 0.9rem;
   }
+  textarea { resize: vertical; }
   input[type="text"] { flex: 1 1 200px; }
   input[type="number"] { width: 8rem; }
   .btn-primary {
