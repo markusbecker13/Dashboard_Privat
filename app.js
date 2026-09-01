@@ -156,6 +156,7 @@
 
   document.getElementById("btn-abmelden").addEventListener("click", abmelden);
   document.getElementById("bereich-screen-abmelden").addEventListener("click", abmelden);
+  document.getElementById("btn-bereich-wechseln").addEventListener("click", zeigeBereichAuswahl);
 
   async function anmelden() {
     const eingegebenesPass = document.getElementById("login-pass").value;
