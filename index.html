@@ -113,6 +113,436 @@
           <div class="tab-group" data-nur="ogs,awo">
             <span class="tab-group-label" id="tab-group-arbeit-label">OGS Rapunzel</span>
             <button class="tab-btn" id="tab-ogs-ideen">Ideen</button>
+            <button class="tab-btn" id="tab-ogs-inventar" data-nur="ogs">Inventar</button>
+            <button class="tab-btn" id="tab-ogs-projekte" data-nur="ogs">Projekte</button>
+          </div>
+          <div class="tab-group">
+            <span class="tab-group-label">Verwalten</span>
+            <button class="tab-btn" id="tab-export" data-nur="privat">Export</button>
+            <button class="tab-btn" id="tab-verlauf">Verlauf</button>
+          </div>
+        </div>
+
+        <button id="btn-abmelden" class="link-btn sidebar-abmelden">Abmelden</button>
+        <button id="btn-bereich-wechseln" class="link-btn">↔ Bereich wechseln</button>
+      </div>
+    </nav>
+    <div class="menu-backdrop" id="menu-backdrop"></div>
+
+    <main>
+      <div id="view-heute">
+        <h1>Start</h1>
+        <p class="hero-text">Was heute ansteht – Aufgaben und Termine kombiniert.</p>
+        <div id="wetter-bereich"></div>
+        <div id="heute-bereich"></div>
+      </div>
+
+      <div id="view-aufgaben" class="hidden">
+      <h1>Aufgaben</h1>
+      <p class="hero-text">Nach Projekten sortiert, mit Fälligkeit und wiederkehrender Erinnerung.</p>
+
+      <div class="row">
+        <input type="text" id="neue-aufgabe" placeholder="Neue Aufgabe eintragen …">
+        <select id="aufgabe-projekt"><option value="">Ohne Projekt</option></select>
+        <input type="date" id="aufgabe-faellig" title="Fälligkeitsdatum (optional)">
+        <input type="time" id="aufgabe-uhrzeit" style="width:8rem;" title="Beginn (optional)">
+        <input type="time" id="aufgabe-ende" style="width:8rem;" title="Ende (optional)">
+        <input type="number" id="aufgabe-intervall" min="1" placeholder="alle X Tage" title="Wiederkehrende Erinnerung">
+        <button class="btn-primary" id="btn-hinzufuegen">Hinzufügen</button>
+      </div>
+
+      <div style="margin-bottom:1.8rem;">
+        <button class="link-btn" id="toggle-projekt-form">▸ Neues Projekt anlegen</button>
+        <div class="row hidden" id="projekt-form" style="margin-top:0.5rem;">
+          <input type="text" id="neues-projekt" placeholder="Projektname">
+          <button class="btn-secondary" id="btn-projekt-anlegen">Anlegen</button>
+        </div>
+      </div>
+
+      <div id="listen-bereich"></div>
+
+      <div id="erledigt-bereich" style="margin-top:1.8rem;"></div>
+      </div>
+
+      <div id="view-kalender" class="hidden">
+        <h1>Kalender</h1>
+        <p class="hero-text">Termine eintragen und im Monatsüberblick behalten.</p>
+
+        <div id="google-sync-karte" class="sync-karte"></div>
+
+        <div id="upcoming-bereich"></div>
+
+        <div class="cal-header">
+          <div class="cal-nav"><button id="cal-prev">‹</button></div>
+          <h2 id="cal-monat-label"></h2>
+          <div class="cal-nav"><button id="cal-next">›</button></div>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+
+        <div id="cal-day-panel"></div>
+
+        <div class="project-heading" style="margin-top:2rem;">Blockzeiten</div>
+        <p class="hero-text" style="margin:0 0 0.8rem;">Feste "nicht stören"-Zeiten – wiederkehrend oder einmalig. Werden ab der nächsten Etappe bei der Lücken-Berechnung mitgezählt.</p>
+        <div id="blockzeiten-liste"></div>
+        <div style="margin:0.8rem 0 1.6rem;">
+          <button class="link-btn" id="toggle-blockzeit-form">▸ Neue Blockzeit anlegen</button>
+          <div class="hidden" id="blockzeit-form" style="margin-top:0.6rem;">
+            <div class="row">
+              <input type="text" id="blockzeit-titel" placeholder="Titel (z.B. Mittagspause)">
+              <input type="time" id="blockzeit-start" style="width:8rem;" title="Start">
+              <input type="time" id="blockzeit-ende" style="width:8rem;" title="Ende">
+            </div>
+            <div class="row" style="align-items:center;">
+              <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.85rem;">
+                <input type="radio" name="blockzeit-art" id="blockzeit-art-wiederkehrend" checked> wiederkehrend
+              </label>
+              <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.85rem;">
+                <input type="radio" name="blockzeit-art" id="blockzeit-art-einmalig"> einmalig
+              </label>
+            </div>
+            <div class="row" id="blockzeit-wochentage-row"></div>
+            <div class="row hidden" id="blockzeit-datum-row">
+              <input type="date" id="blockzeit-datum">
+            </div>
+            <div class="row">
+              <input type="text" id="blockzeit-notiz" placeholder="Notiz (optional)">
+              <button class="btn-primary" id="btn-blockzeit-anlegen">Anlegen</button>
+              <button class="btn-secondary hidden" id="btn-blockzeit-abbrechen">Abbrechen</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-frei" class="hidden">
+        <h1>Frei</h1>
+        <p class="hero-text">Freie Zeiten an einem Tag – berechnet aus Terminen, Aufgaben mit Uhrzeit, Blockzeiten und deinem Zeitrahmen für diesen Wochentag.</p>
+
+        <div class="cal-header">
+          <div class="cal-nav"><button id="frei-prev">‹</button></div>
+          <h2 id="frei-tag-label"></h2>
+          <div class="cal-nav"><button id="frei-next">›</button></div>
+        </div>
+
+        <div class="cal-day-panel" style="margin-bottom:1.2rem;">
+          <div class="project-heading" style="margin:0 0 0.6rem;">Zeitrahmen für diesen Wochentag</div>
+          <div class="row" style="align-items:center;">
+            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.88rem;">
+              <input type="checkbox" id="frei-rahmen-aktiv" checked> aktiv
+            </label>
+            <input type="time" id="frei-rahmen-start" style="width:8rem;">
+            <input type="time" id="frei-rahmen-ende" style="width:8rem;">
+            <button class="btn-secondary" id="btn-frei-rahmen-speichern">Speichern</button>
+          </div>
+        </div>
+
+        <div id="frei-timeline"></div>
+
+        <div id="frei-formular-bereich" style="margin-top:1rem;"></div>
+      </div>
+
+      <div id="view-notizen" class="hidden">
+        <h1>Notizen</h1>
+        <p class="hero-text">Schnell rein, schnell wieder raus – für spontane Ideen und Gedanken.</p>
+
+        <div class="row">
+          <input type="text" id="neue-notiz" placeholder="Notiz eintragen …">
+          <select id="notiz-projekt"><option value="">Ohne Projekt</option></select>
+          <button class="btn-primary" id="btn-notiz-hinzufuegen">Speichern</button>
+        </div>
+
+        <div id="notizen-bereich"></div>
+      </div>
+
+      <div id="view-links" class="hidden">
+        <h1>Links</h1>
+        <p class="hero-text">Wichtige Adressen und Materialien, schnell wiederfindbar.</p>
+
+        <div class="row">
+          <input type="text" id="neuer-link-titel" placeholder="Titel">
+          <input type="text" id="neuer-link-url" placeholder="URL (z.B. beispiel.de/seite)">
+          <select id="link-projekt"><option value="">Ohne Projekt</option></select>
+          <button class="btn-primary" id="btn-link-hinzufuegen">Speichern</button>
+        </div>
+        <div class="row" style="margin-top:-0.5rem;">
+          <input type="text" id="neuer-link-notiz" placeholder="Notiz (optional)" style="flex:1;">
+        </div>
+
+        <div id="links-bereich" style="margin-top:1rem;"></div>
+      </div>
+
+      <div id="view-reflexion" class="hidden">
+        <h1>Reflexion</h1>
+        <p class="hero-text">Kurze Einträge nach Einheiten oder Tagen – zum Rückblättern, nicht zum Teilen.</p>
+
+        <div class="reflex-form">
+          <input type="date" id="reflex-datum">
+          <textarea id="reflex-text" rows="4" placeholder="Was ist dir heute aufgefallen …"></textarea>
+          <div class="row" style="margin:0;">
+            <button class="btn-primary" id="btn-reflex-hinzufuegen">Eintragen</button>
+            <button class="btn-secondary hidden" id="btn-reflex-abbrechen">Abbrechen</button>
+          </div>
+        </div>
+
+        <div id="reflexion-bereich" style="margin-top:1.4rem;"></div>
+      </div>
+
+      <div id="view-export" class="hidden">
+        <h1>Export</h1>
+        <p class="hero-text">Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen.</p>
+        <div id="export-liste"></div>
+      </div>
+
+      <div id="view-einkauf" class="hidden">
+        <h1>Einkaufsliste</h1>
+        <p class="hero-text">Was besorgt werden muss – abhaken statt vergessen.</p>
+
+        <div class="row">
+          <input type="text" id="neuer-einkauf" placeholder="Artikel eintragen …">
+          <button class="btn-primary" id="btn-einkauf-hinzufuegen">Hinzufügen</button>
+        </div>
+
+        <div id="einkauf-bereich"></div>
+      </div>
+
+      <div id="view-verlauf" class="hidden">
+        <h1>Verlauf</h1>
+        <p class="hero-text">Die letzten 50 Aktivitäten im Dashboard, neueste zuerst.</p>
+
+        <div id="verlauf-bereich"></div>
+      </div>
+
+      <div id="view-planung" class="hidden">
+        <h1>Planung</h1>
+        <p class="hero-text">Ziele mit Unterschritten, plus was in diesem Zeitraum ansteht.</p>
+
+        <div class="plan-typ-tabs">
+          <button class="plan-typ-btn active" id="plantyp-woche" data-typ="woche">Woche</button>
+          <button class="plan-typ-btn" id="plantyp-monat" data-typ="monat">Monat</button>
+          <button class="plan-typ-btn" id="plantyp-jahr" data-typ="jahr">Jahr</button>
+        </div>
+
+        <div class="cal-header">
+          <div class="cal-nav"><button id="plan-prev">‹</button></div>
+          <h2 id="plan-zeitraum-label"></h2>
+          <div class="cal-nav"><button id="plan-next">›</button></div>
+        </div>
+
+        <div style="margin-bottom:1.6rem;">
+          <button class="link-btn" id="toggle-ziel-form">▸ Neues Ziel für diesen Zeitraum</button>
+          <div class="row hidden" id="ziel-form" style="margin-top:0.5rem;">
+            <input type="text" id="neues-ziel" placeholder="Zieltitel">
+            <select id="ziel-uebergeordnet"><option value="">Kein übergeordnetes Ziel</option></select>
+            <button class="btn-primary" id="btn-ziel-anlegen">Anlegen</button>
+          </div>
+        </div>
+
+        <div id="ziele-bereich"></div>
+
+        <div id="plan-overview-bereich" style="margin-top:2rem;"></div>
+      </div>
+
+      <div id="view-finanzen" class="hidden">
+        <h1>Finanzen</h1>
+        <p class="hero-text">Fixkosten, feste Einnahmen und Sonderausgaben.</p>
+
+        <div class="plan-typ-tabs">
+          <button class="plan-typ-btn active" id="fintyp-fixkosten" data-fintyp="fixkosten">Fixkosten</button>
+          <button class="plan-typ-btn" id="fintyp-sonderausgaben" data-fintyp="sonderausgaben">Sonderausgaben</button>
+          <button class="plan-typ-btn" id="fintyp-buchungen" data-fintyp="buchungen">Buchungen</button>
+          <button class="plan-typ-btn" id="fintyp-uebersicht" data-fintyp="uebersicht">Übersicht</button>
+        </div>
+
+        <div id="fin-fixkosten-bereich"></div>
+        <div id="fin-sonderausgaben-bereich" class="hidden"></div>
+        <div id="fin-buchungen-bereich" class="hidden"></div>
+        <div id="fin-uebersicht-bereich" class="hidden"></div>
+      </div>
+
+      <div id="view-ogs-ideen" class="hidden">
+        <h1 id="ogs-ideen-titel">Ideen</h1>
+        <p class="hero-text" id="ogs-ideen-untertitel">Ideen für Angebote und Projekte – sammeln, Status pflegen, wiederfinden.</p>
+
+        <div class="row" style="align-items:flex-start;">
+          <input type="text" id="neue-ogs-idee" placeholder="Idee eintragen …">
+          <input type="text" id="neue-ogs-idee-beschreibung" placeholder="Kurze Beschreibung (optional)">
+          <button class="btn-primary" id="btn-ogs-idee-hinzufuegen">Speichern</button>
+        </div>
+
+        <div id="ogs-ideen-bereich"></div>
+      </div>
+
+      <div id="view-ogs-inventar" class="hidden">
+        <h1>Inventar</h1>
+        <p class="hero-text">Material und Ausstattung der OGS Rapunzel – nach Kategorie sortiert.</p>
+
+        <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+          <input type="text" id="neu-inv-name" placeholder="Gegenstand">
+          <input type="text" id="neu-inv-kategorie" placeholder="Kategorie" list="inv-kategorie-liste">
+          <datalist id="inv-kategorie-liste"></datalist>
+          <input type="number" id="neu-inv-menge" placeholder="Menge" min="1" value="1" style="width:5rem;">
+          <input type="text" id="neu-inv-standort" placeholder="Standort (optional)">
+          <select id="neu-inv-zustand">
+            <option value="gut">Gut</option>
+            <option value="eingeschraenkt">Eingeschränkt nutzbar</option>
+            <option value="defekt">Defekt</option>
+          </select>
+          <button class="btn-primary" id="btn-inv-hinzufuegen">Speichern</button>
+        </div>
+
+        <div id="inv-filter-bereich" style="margin-top:0.8rem;"></div>
+        <div id="inv-liste-bereich"></div>
+      </div>
+
+      <div id="view-ogs-projekte" class="hidden">
+        <h1>Projekte</h1>
+        <p class="hero-text">Ausgearbeitete Konzepte und Projekte der OGS Rapunzel – mit Datei-Ablage.</p>
+
+        <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+          <input type="text" id="neu-proj-titel" placeholder="Titel">
+          <input type="text" id="neu-proj-kategorie" placeholder="Kategorie (optional)" list="proj-kategorie-liste">
+          <datalist id="proj-kategorie-liste"></datalist>
+        </div>
+        <div class="row" style="flex-wrap:wrap; align-items:flex-start; margin-top:0.5rem;">
+          <textarea id="neu-proj-beschreibung" placeholder="Kurzbeschreibung (optional)" rows="2" style="flex:1; min-width:200px;"></textarea>
+        </div>
+        <div class="row" style="flex-wrap:wrap; align-items:center; margin-top:0.5rem;">
+          <input type="file" id="neu-proj-datei" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+          <button class="btn-primary" id="btn-proj-hinzufuegen">Speichern</button>
+        </div>
+        <p class="empty-text" style="margin-top:0.3rem;">PDF oder Word (.docx), max. 5 MB. Datei ist optional.</p>
+
+        <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-top:1.4rem;">
+          <h3 style="margin-top: 0; font-size:0.95rem;">Mehrere Projekte auf einmal importieren</h3>
+          <p class="empty-text">CSV-Datei mit Spalten <code>Titel</code>, <code>Beschreibung</code>, <code>Kategorie</code> (Beschreibung/Kategorie optional). Dateien pro Projekt können danach einzeln nachgereicht werden.</p>
+          <div class="row" style="flex-wrap:wrap; align-items:center;">
+            <input type="file" id="proj-csv-datei" accept=".csv">
+            <button class="btn-primary" id="btn-proj-csv-import">Importieren</button>
+          </div>
+          <div id="proj-csv-status" class="empty-text"></div>
+        </div>
+
+        <div id="proj-liste-bereich" style="margin-top:1.2rem;"></div>
+      </div>
+    </main>
+  </div>
+
+<script src="app.js"></script>
+</body>
+</html><!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://juxoxltaeugsmtvirfcm.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'none';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1c2430">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="login-screen">
+    <svg class="login-logo" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logo">
+      <defs>
+        <linearGradient id="login-logo-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#232d3d"/>
+          <stop offset="100%" stop-color="#161d29"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="192" height="192" rx="42" fill="url(#login-logo-bg)"/>
+      <g fill="none" stroke="#f4f1ea" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 50 132 L 50 62 L 76 100 L 102 62 L 102 132"/>
+        <path d="M 102 62 L 120 62 C 136 62 136 92 120 92 L 102 92
+                 L 122 92 C 139 92 139 132 122 132 L 102 132"/>
+      </g>
+      <circle cx="102" cy="97" r="8" fill="#e8793f"/>
+    </svg>
+    <h1 style="font-size:1.5rem;">Dashboard</h1>
+    <p class="hero-text">Passwort eingeben, um dein Dashboard zu öffnen.</p>
+    <input type="password" id="login-pass" placeholder="Passwort">
+    <button class="btn-primary" id="login-btn">Anmelden</button>
+    <div id="login-error"></div>
+  </div>
+
+  <div id="bereich-screen" class="hidden">
+    <svg class="login-logo" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logo">
+      <defs>
+        <linearGradient id="bereich-logo-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#232d3d"/>
+          <stop offset="100%" stop-color="#161d29"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="192" height="192" rx="42" fill="url(#bereich-logo-bg)"/>
+      <g fill="none" stroke="#f4f1ea" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 50 132 L 50 62 L 76 100 L 102 62 L 102 132"/>
+        <path d="M 102 62 L 120 62 C 136 62 136 92 120 92 L 102 92
+                 L 122 92 C 139 92 139 132 122 132 L 102 132"/>
+      </g>
+      <circle cx="102" cy="97" r="8" fill="#e8793f"/>
+    </svg>
+    <h1 style="font-size:1.5rem;">Willkommen zurück</h1>
+    <p class="hero-text">Welchen Bereich möchtest du öffnen?</p>
+    <div class="bereich-tiles">
+      <button class="bereich-tile" onclick="bereichAuswaehlen('privat')">
+        <span class="bereich-tile-icon">🏠</span>
+        <span class="bereich-tile-label">Privat</span>
+      </button>
+      <button class="bereich-tile" onclick="bereichAuswaehlen('ogs')">
+        <span class="bereich-tile-icon">🏫</span>
+        <span class="bereich-tile-label">OGS Rapunzel</span>
+      </button>
+      <button class="bereich-tile" onclick="bereichAuswaehlen('awo')">
+        <span class="bereich-tile-icon">🤝</span>
+        <span class="bereich-tile-label">AWO OV Liblar</span>
+      </button>
+    </div>
+    <button class="link-btn" id="bereich-screen-abmelden" style="margin-top:1.4rem;">Abmelden</button>
+  </div>
+
+  <div id="app" class="hidden app-shell">
+    <nav class="sidebar">
+      <div class="topbar">
+        <span class="brand" id="brand-name">Dashboard</span>
+        <button class="project-edit-btn" onclick="dashboardNameBearbeiten()" title="Name ändern">✎</button>
+        <span class="brand-sub" id="brand-sub">Aufgaben</span>
+        <button class="project-edit-btn" onclick="untertitelBearbeiten()" title="Untertitel ändern">✎</button>
+        <button class="menu-toggle" id="menu-toggle" aria-label="Menü öffnen" aria-expanded="false">☰</button>
+      </div>
+
+      <div class="tabs-menu" id="tabs-menu">
+        <div class="bereich-switch" id="bereich-switch">
+          <button class="bereich-btn active" id="bereich-btn-privat" data-bereich="privat">🏠 Privat</button>
+          <button class="bereich-btn" id="bereich-btn-ogs" data-bereich="ogs">🏫 OGS</button>
+          <button class="bereich-btn" id="bereich-btn-awo" data-bereich="awo">🤝 AWO</button>
+        </div>
+
+        <div class="tabs">
+          <div class="tab-group">
+            <span class="tab-group-label">Heute</span>
+            <button class="tab-btn active" id="tab-heute">Start</button>
+            <button class="tab-btn" id="tab-frei" data-nur="privat">Frei</button>
+          </div>
+          <div class="tab-group">
+            <span class="tab-group-label">Planen</span>
+            <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
+            <button class="tab-btn" id="tab-kalender">Kalender</button>
+            <button class="tab-btn" id="tab-planung" data-nur="privat">Planung</button>
+            <button class="tab-btn" id="tab-finanzen" data-nur="privat">Finanzen</button>
+          </div>
+          <div class="tab-group">
+            <span class="tab-group-label">Sammeln</span>
+            <button class="tab-btn" id="tab-notizen">Notizen</button>
+            <button class="tab-btn" id="tab-links" data-nur="privat">Links</button>
+            <button class="tab-btn" id="tab-reflexion" data-nur="privat">Reflexion</button>
+            <button class="tab-btn" id="tab-einkauf" data-nur="privat">Einkauf</button>
+          </div>
+          <div class="tab-group" data-nur="ogs,awo">
+            <span class="tab-group-label" id="tab-group-arbeit-label">OGS Rapunzel</span>
+            <button class="tab-btn" id="tab-ogs-ideen">Ideen</button>
           </div>
           <div class="tab-group">
             <span class="tab-group-label">Verwalten</span>
