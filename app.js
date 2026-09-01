@@ -79,16 +79,37 @@
 
   function zeigeLogin(fehler) {
     document.getElementById("app").classList.add("hidden");
+    document.getElementById("bereich-screen").classList.add("hidden");
     document.getElementById("login-screen").classList.remove("hidden");
     document.getElementById("login-error").textContent = fehler || "";
   }
 
+  function zeigeBereichAuswahl() {
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("app").classList.add("hidden");
+    document.getElementById("bereich-screen").classList.remove("hidden");
+  }
+
   function zeigeApp() {
     document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("bereich-screen").classList.add("hidden");
     document.getElementById("app").classList.remove("hidden");
     dashboardNameAnzeigen();
     untertitelAnzeigen();
   }
+
+  window.bereichAuswaehlen = function(bereich) {
+    aktiverBereich = bereich;
+    localStorage.setItem("aktiver-bereich", bereich);
+    zeigeApp();
+    bereichAnwenden();
+    render();
+    renderNotizen();
+    renderKalender();
+    renderHeute();
+    renderOgsIdeen();
+    tabWechseln(bereich === "ogs" ? "aufgaben" : "heute");
+  };
 
   function dashboardNameAnzeigen() {
     const gespeichert = localStorage.getItem("dashboard-name");
@@ -121,7 +142,7 @@
     if (e.key === "Enter") anmelden();
   });
 
-  document.getElementById("btn-abmelden").addEventListener("click", async () => {
+  async function abmelden() {
     try {
       await api("logout");
     } catch (e) {
@@ -131,7 +152,10 @@
     token = "";
     document.getElementById("login-pass").value = "";
     zeigeLogin();
-  });
+  }
+
+  document.getElementById("btn-abmelden").addEventListener("click", abmelden);
+  document.getElementById("bereich-screen-abmelden").addEventListener("click", abmelden);
 
   async function anmelden() {
     const eingegebenesPass = document.getElementById("login-pass").value;
@@ -149,7 +173,7 @@
       token = daten.token;
       localStorage.setItem("aufgaben-token", token);
       await ladeDaten();
-      zeigeApp();
+      zeigeBereichAuswahl();
     } catch (e) {
       zeigeLogin("Verbindung fehlgeschlagen.");
     }
@@ -427,13 +451,26 @@
     if (token) {
       try {
         await ladeDaten();
-        zeigeApp();
 
-        // Falls wir gerade von Googles OAuth-Login zurückkommen
-        // (URL enthält ?code=...), den Code gegen ein Google-Token
-        // tauschen und die URL danach wieder säubern.
+        // Falls wir gerade von Googles OAuth-Login zurückkommen oder über
+        // eine App-Verknüpfung mit ?tab=... geöffnet wurden, macht die
+        // Bereichs-Auswahl keinen Sinn – direkt in die App (letzter Bereich).
         const urlParams = new URLSearchParams(location.search);
         const googleCode = urlParams.get("code");
+        const gewuenschterTab = urlParams.get("tab");
+
+        if (googleCode || gewuenschterTab) {
+          zeigeApp();
+          bereichAnwenden();
+          render();
+          renderNotizen();
+          renderKalender();
+          renderHeute();
+          renderOgsIdeen();
+        } else {
+          zeigeBereichAuswahl();
+        }
+
         if (googleCode) {
           try {
             await api("google_auth_callback", { code: googleCode });
@@ -445,9 +482,6 @@
           }
         }
 
-        // Falls über eine App-Verknüpfung mit ?tab=... geöffnet wurde
-        // (z.B. Android-Schnellzugriff "Neue Notiz"), direkt dorthin springen.
-        const gewuenschterTab = new URLSearchParams(location.search).get("tab");
         if (gewuenschterTab && document.getElementById("tab-" + gewuenschterTab)) {
           tabWechseln(gewuenschterTab);
         }
