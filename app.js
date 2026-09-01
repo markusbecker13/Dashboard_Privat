@@ -46,6 +46,8 @@
   const CSV_ZWECK_SPALTEN = ["Verwendungszweck", "Buchungstext"];
   const FIN_MONATE = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez"];
   const FIN_MONATSNAMEN_KURZ = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+  let ogsIdeen = [];
+  let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
   let wetterOrt = localStorage.getItem("wetter-ort") || "Erftstadt";
   let wetterDaten = null; // letzte erfolgreiche Antwort vom Server
   let wetterLetzterAbruf = 0; // Timestamp (ms), für einfaches Caching
@@ -192,6 +194,8 @@
     sonderausgaben = data.sonderausgaben || [];
     buchungen = data.buchungen || [];
     finanzEinstellungen = data.finanz_einstellungen || [];
+    ogsIdeen = data.ogs_ideen || [];
+    bereichAnwenden();
     render();
     renderKalender();
     renderHeute();
@@ -204,6 +208,7 @@
     renderVerlauf();
     renderPlanung();
     renderBlockzeiten();
+    renderOgsIdeen();
   }
 
   function badgeHtml(cls, text) {
@@ -302,8 +307,9 @@
     select.innerHTML = '<option value="">Ohne Projekt</option>' +
       projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
 
-    const offen = aufgaben.filter((a) => !a.erledigt).map(enrich);
-    const erledigt = aufgaben.filter((a) => a.erledigt);
+    const aufgabenBereich = aufgaben.filter((a) => bereichVon(a) === aktiverBereich);
+    const offen = aufgabenBereich.filter((a) => !a.erledigt).map(enrich);
+    const erledigt = aufgabenBereich.filter((a) => a.erledigt);
 
     const sortiere = (liste) => [...liste].sort((a, b) => {
       const ad = a.faellig_am || "9999-99-99";
@@ -360,7 +366,7 @@
     const ende_uhrzeit = document.getElementById("aufgabe-ende").value || null;
     const erinnere_alle_tage = document.getElementById("aufgabe-intervall").value || null;
 
-    await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am, uhrzeit, ende_uhrzeit, erinnere_alle_tage });
+    await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am, uhrzeit, ende_uhrzeit, erinnere_alle_tage, bereich: aktiverBereich });
     document.getElementById("neue-aufgabe").value = "";
     document.getElementById("aufgabe-faellig").value = "";
     document.getElementById("aufgabe-uhrzeit").value = "";
@@ -578,11 +584,45 @@
   }
 
   // ==========================================================
+  // Bereich (Privat / OGS Rapunzel)
+  // ==========================================================
+  // Aufgaben, Notizen und Termine tragen ein "bereich"-Feld (privat/ogs).
+  // Fehlt es (ältere Einträge), gilt Default "privat".
+  function bereichVon(objekt) {
+    return objekt.bereich || "privat";
+  }
+
+  function bereichAnwenden() {
+    document.querySelectorAll("[data-bereich]").forEach((el) => {
+      el.classList.toggle("active", el.dataset.bereich === aktiverBereich);
+    });
+    document.querySelectorAll("[data-nur]").forEach((el) => {
+      el.classList.toggle("hidden", el.dataset.nur !== aktiverBereich);
+    });
+  }
+
+  window.bereichWechseln = function(neu) {
+    if (neu === aktiverBereich) return;
+    aktiverBereich = neu;
+    localStorage.setItem("aktiver-bereich", neu);
+    bereichAnwenden();
+    render();
+    renderNotizen();
+    renderKalender();
+    renderHeute();
+    renderOgsIdeen();
+    tabWechseln(neu === "ogs" ? "aufgaben" : "heute");
+  };
+
+  document.getElementById("bereich-btn-privat").addEventListener("click", () => bereichWechseln("privat"));
+  document.getElementById("bereich-btn-ogs").addEventListener("click", () => bereichWechseln("ogs"));
+
+  // ==========================================================
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung", finanzen: "tab-finanzen" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung", finanzen: "view-finanzen" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung", finanzen: "tab-finanzen", ogsideen: "tab-ogs-ideen" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung", finanzen: "view-finanzen", ogsideen: "view-ogs-ideen" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -592,6 +632,7 @@
     if (aktiv === "planung") renderPlanung();
     if (aktiv === "frei") renderFrei();
     if (aktiv === "finanzen") renderFinanzen();
+    if (aktiv === "ogsideen") renderOgsIdeen();
     menuSchliessen();
   }
 
@@ -629,6 +670,7 @@
   document.getElementById("tab-verlauf").addEventListener("click", () => tabWechseln("verlauf"));
   document.getElementById("tab-planung").addEventListener("click", () => tabWechseln("planung"));
   document.getElementById("tab-finanzen").addEventListener("click", () => tabWechseln("finanzen"));
+  document.getElementById("tab-ogs-ideen").addEventListener("click", () => tabWechseln("ogsideen"));
 
   // ==========================================================
   // Wetter (Start-Tab)
@@ -719,14 +761,16 @@
   };
 
   function renderHeute() {
+    bereichAnwenden();
     const heuteIso = heuteISO();
-    const offenEnriched = aufgaben.filter((a) => !a.erledigt).map(enrich);
+    const aufgabenBereich = aufgaben.filter((a) => bereichVon(a) === aktiverBereich);
+    const offenEnriched = aufgabenBereich.filter((a) => !a.erledigt).map(enrich);
     const faelligHeute = offenEnriched.filter((a) => a.status === "ueberfaellig" || a.status === "heute");
     const erinnerungenHeute = offenEnriched.filter((a) => a.erinnerungFaellig);
     const termineGanztags = termine
-      .filter((t) => t.datum === heuteIso && !t.uhrzeit)
+      .filter((t) => t.datum === heuteIso && !t.uhrzeit && bereichVon(t) === aktiverBereich)
       .sort((a, b) => a.titel.localeCompare(b.titel));
-    const einkaufOffen = einkaufsliste.filter((e) => !e.erledigt);
+    const einkaufOffen = aktiverBereich === "privat" ? einkaufsliste.filter((e) => !e.erledigt) : [];
 
     const jetztDate = new Date();
     const jetztMinuten = jetztDate.getHours() * 60 + jetztDate.getMinutes();
@@ -776,27 +820,41 @@
 
     // ---- Kacheln ----
     const TYP_LABEL = { woche: "Woche", monat: "Monat", jahr: "Jahr" };
-    const aktuelleZiele = ["woche", "monat", "jahr"].flatMap((typ) => {
+    const aktuelleZiele = aktiverBereich === "privat" ? ["woche", "monat", "jahr"].flatMap((typ) => {
       const startIso = dateToISO(periodStart(typ, new Date()));
       return ziele.filter((z) => z.zeitraum_typ === typ && z.zeitraum_start === startIso);
-    });
+    }) : [];
 
     const aufgabenZahl = faelligHeute.length + erinnerungenHeute.length;
 
-    html += `<div class="start-kachel-grid">
-      <button class="start-kachel mod-aufgaben" onclick="tabWechseln('aufgaben')">
-        <span class="start-kachel-zahl">${aufgabenZahl}</span>
-        <span class="start-kachel-label">${aufgabenZahl === 1 ? "Aufgabe fällig" : "Aufgaben fällig"}</span>
-      </button>
-      <button class="start-kachel mod-planung" onclick="tabWechseln('planung')">
-        <span class="start-kachel-zahl">${aktuelleZiele.length}</span>
-        <span class="start-kachel-label">aktive Ziele</span>
-      </button>
-      <button class="start-kachel mod-einkauf" onclick="tabWechseln('einkauf')">
-        <span class="start-kachel-zahl">${einkaufOffen.length}</span>
-        <span class="start-kachel-label">${einkaufOffen.length === 1 ? "Artikel offen" : "Artikel offen"}</span>
-      </button>
-    </div>`;
+    if (aktiverBereich === "privat") {
+      html += `<div class="start-kachel-grid">
+        <button class="start-kachel mod-aufgaben" onclick="tabWechseln('aufgaben')">
+          <span class="start-kachel-zahl">${aufgabenZahl}</span>
+          <span class="start-kachel-label">${aufgabenZahl === 1 ? "Aufgabe fällig" : "Aufgaben fällig"}</span>
+        </button>
+        <button class="start-kachel mod-planung" onclick="tabWechseln('planung')">
+          <span class="start-kachel-zahl">${aktuelleZiele.length}</span>
+          <span class="start-kachel-label">aktive Ziele</span>
+        </button>
+        <button class="start-kachel mod-einkauf" onclick="tabWechseln('einkauf')">
+          <span class="start-kachel-zahl">${einkaufOffen.length}</span>
+          <span class="start-kachel-label">${einkaufOffen.length === 1 ? "Artikel offen" : "Artikel offen"}</span>
+        </button>
+      </div>`;
+    } else {
+      const ideenOffen = ogsIdeen.filter((i) => i.status === "offen" || i.status === "in_arbeit").length;
+      html += `<div class="start-kachel-grid">
+        <button class="start-kachel mod-aufgaben" onclick="tabWechseln('aufgaben')">
+          <span class="start-kachel-zahl">${aufgabenZahl}</span>
+          <span class="start-kachel-label">${aufgabenZahl === 1 ? "Aufgabe fällig" : "Aufgaben fällig"}</span>
+        </button>
+        <button class="start-kachel mod-planung" onclick="tabWechseln('ogsideen')">
+          <span class="start-kachel-zahl">${ideenOffen}</span>
+          <span class="start-kachel-label">${ideenOffen === 1 ? "offene Idee" : "offene Ideen"}</span>
+        </button>
+      </div>`;
+    }
 
     if (aktuelleZiele.length > 0) {
       html += `<div class="project-heading">Ziele</div><div class="ziel-kachel-grid">` +
@@ -831,7 +889,7 @@
   }
 
   function termineAmTag(isoDatum) {
-    return termine.filter((t) => t.datum === isoDatum).sort((a,b) => (a.uhrzeit||"99:99").localeCompare(b.uhrzeit||"99:99"));
+    return termine.filter((t) => t.datum === isoDatum && bereichVon(t) === aktiverBereich).sort((a,b) => (a.uhrzeit||"99:99").localeCompare(b.uhrzeit||"99:99"));
   }
 
   document.getElementById("cal-prev").addEventListener("click", () => {
@@ -878,7 +936,7 @@
   function renderUpcoming() {
     const heuteIso = dateToISO(new Date());
     const kommende = termine
-      .filter((t) => t.datum >= heuteIso)
+      .filter((t) => t.datum >= heuteIso && bereichVon(t) === aktiverBereich)
       .sort((a,b) => (a.datum + (a.uhrzeit||"99:99")).localeCompare(b.datum + (b.uhrzeit||"99:99")))
       .slice(0, 5);
 
@@ -975,7 +1033,7 @@
     const ende_uhrzeit = document.getElementById("termin-ende").value || null;
     const notiz = document.getElementById("termin-notiz").value.trim() || null;
 
-    await api("termin_hinzufuegen", { titel, datum: calAusgewaehlterTag, uhrzeit, ende_uhrzeit, notiz });
+    await api("termin_hinzufuegen", { titel, datum: calAusgewaehlterTag, uhrzeit, ende_uhrzeit, notiz, bereich: aktiverBereich });
     await ladeDaten();
     renderKalender();
   }
@@ -1511,10 +1569,10 @@
     const ende = document.getElementById("frei-ende").value || null;
 
     if (freiFormularTyp === "termin") {
-      await api("termin_hinzufuegen", { titel, datum: iso, uhrzeit: start, ende_uhrzeit: ende, notiz: null, kein_google_push: true });
+      await api("termin_hinzufuegen", { titel, datum: iso, uhrzeit: start, ende_uhrzeit: ende, notiz: null, kein_google_push: true, bereich: "privat" });
     } else {
       const projekt_id = document.getElementById("frei-projekt").value || null;
-      await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am: iso, uhrzeit: start, ende_uhrzeit: ende, erinnere_alle_tage: null });
+      await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am: iso, uhrzeit: start, ende_uhrzeit: ende, erinnere_alle_tage: null, bereich: "privat" });
     }
     freiFormularSchliessen();
     await ladeDaten();
@@ -1530,11 +1588,12 @@
       projekte.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
 
     const bereich = document.getElementById("notizen-bereich");
-    if (notizen.length === 0) {
+    const notizenBereich = notizen.filter((n) => bereichVon(n) === aktiverBereich);
+    if (notizenBereich.length === 0) {
       bereich.innerHTML = '<p class="empty-text">Noch keine Notizen.</p>';
       return;
     }
-    const html = notizen.map((n) => {
+    const html = notizenBereich.map((n) => {
       const projekt = projekte.find((p) => p.id === n.projekt_id);
       const datum = new Date(n.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
       return `
@@ -1558,13 +1617,72 @@
     const text = document.getElementById("neue-notiz").value.trim();
     if (!text) return;
     const projekt_id = document.getElementById("notiz-projekt").value || null;
-    await api("notiz_hinzufuegen", { text, projekt_id });
+    await api("notiz_hinzufuegen", { text, projekt_id, bereich: aktiverBereich });
     document.getElementById("neue-notiz").value = "";
     await ladeDaten();
   }
 
   window.notizLoeschen = async function(id) {
     await api("notiz_loeschen", { id });
+    await ladeDaten();
+  };
+
+  // ==========================================================
+  // OGS Rapunzel – Ideen-Sammlung
+  // ==========================================================
+  const OGS_IDEE_STATUS_LABEL = { offen: "Offen", in_arbeit: "In Arbeit", umgesetzt: "Umgesetzt", verworfen: "Verworfen" };
+
+  function renderOgsIdeen() {
+    const bereich = document.getElementById("ogs-ideen-bereich");
+    if (!bereich) return;
+    if (ogsIdeen.length === 0) {
+      bereich.innerHTML = '<p class="empty-text">Noch keine Ideen gesammelt.</p>';
+      return;
+    }
+    const html = ogsIdeen.map((i) => {
+      const datum = new Date(i.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+      const statusOptions = Object.entries(OGS_IDEE_STATUS_LABEL)
+        .map(([k, l]) => `<option value="${k}" ${k === i.status ? "selected" : ""}>${l}</option>`).join("");
+      return `
+        <div class="notiz-item">
+          <div style="flex:1;">
+            <span class="notiz-text">${escapeHtml(i.titel)}</span>
+            ${i.beschreibung ? `<div class="notiz-meta" style="margin-top:0.2rem;">${escapeHtml(i.beschreibung)}</div>` : ""}
+            <div class="notiz-meta" style="margin-top:0.4rem; display:flex; align-items:center; gap:0.4rem;">
+              <span>${datum}</span>
+              <select onchange="ogsIdeeStatusAendern('${i.id}', this.value)" style="padding:0.2rem 0.4rem; font-size:0.78rem;">${statusOptions}</select>
+            </div>
+          </div>
+          <button class="task-delete" onclick="ogsIdeeLoeschen('${i.id}')">×</button>
+        </div>`;
+    }).join("");
+    bereich.innerHTML = `<div class="notiz-list">${html}</div>`;
+  }
+
+  document.getElementById("btn-ogs-idee-hinzufuegen").addEventListener("click", ogsIdeeHinzufuegen);
+  document.getElementById("neue-ogs-idee").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") ogsIdeeHinzufuegen();
+  });
+
+  async function ogsIdeeHinzufuegen() {
+    const titel = document.getElementById("neue-ogs-idee").value.trim();
+    if (!titel) return;
+    const beschreibung = document.getElementById("neue-ogs-idee-beschreibung").value.trim() || null;
+    await api("ogs_idee_hinzufuegen", { titel, beschreibung });
+    document.getElementById("neue-ogs-idee").value = "";
+    document.getElementById("neue-ogs-idee-beschreibung").value = "";
+    await ladeDaten();
+  }
+
+  window.ogsIdeeStatusAendern = async function(id, status) {
+    const idee = ogsIdeen.find((i) => i.id === id);
+    if (!idee) return;
+    await api("ogs_idee_aktualisieren", { id, titel: idee.titel, beschreibung: idee.beschreibung, status });
+    await ladeDaten();
+  };
+
+  window.ogsIdeeLoeschen = async function(id) {
+    await api("ogs_idee_loeschen", { id });
     await ladeDaten();
   };
 
