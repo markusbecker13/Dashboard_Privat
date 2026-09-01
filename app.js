@@ -1511,7 +1511,7 @@
     const ende = document.getElementById("frei-ende").value || null;
 
     if (freiFormularTyp === "termin") {
-      await api("termin_hinzufuegen", { titel, datum: iso, uhrzeit: start, ende_uhrzeit: ende, notiz: null });
+      await api("termin_hinzufuegen", { titel, datum: iso, uhrzeit: start, ende_uhrzeit: ende, notiz: null, kein_google_push: true });
     } else {
       const projekt_id = document.getElementById("frei-projekt").value || null;
       await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am: iso, uhrzeit: start, ende_uhrzeit: ende, erinnere_alle_tage: null });
