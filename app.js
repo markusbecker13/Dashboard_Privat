@@ -49,6 +49,7 @@
   let ogsIdeen = [];
   let ogsInventar = [];
   let ogsProjekte = [];
+  let ogsProjektDateien = [];
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
   let wetterOrt = localStorage.getItem("wetter-ort") || "Erftstadt";
   let wetterDaten = null; // letzte erfolgreiche Antwort vom Server
@@ -224,6 +225,7 @@
     ogsIdeen = data.ogs_ideen || [];
     ogsInventar = data.ogs_inventar || [];
     ogsProjekte = data.ogs_projekte || [];
+    ogsProjektDateien = data.ogs_projekt_dateien || [];
     bereichAnwenden();
     render();
     renderKalender();
@@ -1908,6 +1910,7 @@
 
     const html = ogsProjekte.map((p) => {
       const datum = new Date(p.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+      const dateien = ogsProjektDateien.filter((d) => d.projekt_id === p.id);
       if (projBearbeitenId === p.id) {
         return `
           <div class="notiz-item">
@@ -1922,6 +1925,9 @@
             </div>
           </div>`;
       }
+      const dateiZeilen = dateien.map((d) => `
+              <div>📎 <span onclick="event.stopPropagation(); projDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
+                <span onclick="event.stopPropagation(); projDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen">×</span></div>`).join("");
       return `
         <div class="notiz-item">
           <div style="flex:1; cursor:pointer;" onclick="projBearbeitenStart('${p.id}')">
@@ -1929,9 +1935,10 @@
             ${p.beschreibung ? `<div class="notiz-meta" style="margin-top:0.2rem;">${escapeHtml(p.beschreibung)}</div>` : ""}
             <div class="notiz-meta" style="margin-top:0.3rem;">
               ${datum}${p.kategorie ? " · " + escapeHtml(p.kategorie) : ""}
-              ${p.datei_name
-                ? ` · <span onclick="event.stopPropagation(); projDateiOeffnen('${p.id}')" style="text-decoration:underline; cursor:pointer;">📎 ${escapeHtml(p.datei_name)}</span>`
-                : ` · <label style="text-decoration:underline; cursor:pointer;" onclick="event.stopPropagation();">📎 Datei anhängen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="projDateiNachreichen('${p.id}', this)"></label>`}
+            </div>
+            <div class="notiz-meta" style="margin-top:0.3rem;">
+              ${dateiZeilen}
+              <label style="text-decoration:underline; cursor:pointer;" onclick="event.stopPropagation();">📎 Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="projDateiHinzufuegen('${p.id}', this)"></label>
             </div>
           </div>
           <button class="task-delete" onclick="projLoeschen('${p.id}')">×</button>
@@ -1999,16 +2006,16 @@
     await ladeDaten();
   };
 
-  window.projDateiOeffnen = async function(id) {
+  window.projDateiOeffnen = async function(dateiId) {
     try {
-      const res = await api("ogs_projekt_datei_url", { id });
+      const res = await api("ogs_projekt_datei_url", { datei_id: dateiId });
       window.open(res.url, "_blank", "noopener");
     } catch (e) {
       alert("Datei konnte nicht geöffnet werden: " + e.message);
     }
   };
 
-  window.projDateiNachreichen = async function(id, input) {
+  window.projDateiHinzufuegen = async function(id, input) {
     const datei = input.files[0];
     if (!datei) return;
     if (!PROJ_ERLAUBTE_TYPEN.includes(datei.type)) {
@@ -2021,12 +2028,16 @@
       input.value = "";
       return;
     }
-    const projekt = ogsProjekte.find((p) => p.id === id);
-    if (!projekt) return;
     const datei_base64 = await dateiZuBase64(datei);
-    await api("ogs_projekt_datei_nachreichen", {
+    await api("ogs_projekt_datei_hinzufuegen", {
       id, datei_base64, datei_name: datei.name, datei_typ: datei.type,
     });
+    await ladeDaten();
+  };
+
+  window.projDateiLoeschen = async function(dateiId) {
+    if (!confirm("Diese Datei wirklich entfernen?")) return;
+    await api("ogs_projekt_datei_loeschen", { datei_id: dateiId });
     await ladeDaten();
   };
 
