@@ -106,9 +106,9 @@
 
   .bereich-switch { display: flex; gap: 0.3rem; margin-bottom: 1rem; }
   .bereich-btn {
-    flex: 1; text-align: center; padding: 0.5rem 0.4rem; border-radius: 8px;
+    flex: 1; text-align: center; padding: 0.5rem 0.2rem; border-radius: 8px;
     border: 1px solid var(--border); background: var(--panel); color: var(--ink-dim);
-    font-size: 0.82rem; cursor: pointer;
+    font-size: 0.78rem; cursor: pointer;
   }
   .bereich-btn.active { color: #fff; background: var(--accent); border-color: var(--accent); font-weight: 500; }
 
