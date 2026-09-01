@@ -49,29 +49,38 @@
       </div>
 
       <div class="tabs-menu" id="tabs-menu">
+        <div class="bereich-switch" id="bereich-switch">
+          <button class="bereich-btn active" id="bereich-btn-privat" data-bereich="privat">🏠 Privat</button>
+          <button class="bereich-btn" id="bereich-btn-ogs" data-bereich="ogs">🏫 OGS</button>
+        </div>
+
         <div class="tabs">
           <div class="tab-group">
             <span class="tab-group-label">Heute</span>
             <button class="tab-btn active" id="tab-heute">Start</button>
-            <button class="tab-btn" id="tab-frei">Frei</button>
+            <button class="tab-btn" id="tab-frei" data-nur="privat">Frei</button>
           </div>
           <div class="tab-group">
             <span class="tab-group-label">Planen</span>
             <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
             <button class="tab-btn" id="tab-kalender">Kalender</button>
-            <button class="tab-btn" id="tab-planung">Planung</button>
-            <button class="tab-btn" id="tab-finanzen">Finanzen</button>
+            <button class="tab-btn" id="tab-planung" data-nur="privat">Planung</button>
+            <button class="tab-btn" id="tab-finanzen" data-nur="privat">Finanzen</button>
           </div>
           <div class="tab-group">
             <span class="tab-group-label">Sammeln</span>
             <button class="tab-btn" id="tab-notizen">Notizen</button>
-            <button class="tab-btn" id="tab-links">Links</button>
-            <button class="tab-btn" id="tab-reflexion">Reflexion</button>
-            <button class="tab-btn" id="tab-einkauf">Einkauf</button>
+            <button class="tab-btn" id="tab-links" data-nur="privat">Links</button>
+            <button class="tab-btn" id="tab-reflexion" data-nur="privat">Reflexion</button>
+            <button class="tab-btn" id="tab-einkauf" data-nur="privat">Einkauf</button>
+          </div>
+          <div class="tab-group" data-nur="ogs">
+            <span class="tab-group-label">OGS Rapunzel</span>
+            <button class="tab-btn" id="tab-ogs-ideen">Ideen</button>
           </div>
           <div class="tab-group">
             <span class="tab-group-label">Verwalten</span>
-            <button class="tab-btn" id="tab-export">Export</button>
+            <button class="tab-btn" id="tab-export" data-nur="privat">Export</button>
             <button class="tab-btn" id="tab-verlauf">Verlauf</button>
           </div>
         </div>
@@ -85,6 +94,18 @@
       <div id="view-heute">
         <h1>Start</h1>
         <p class="hero-text">Was heute ansteht – Aufgaben und Termine kombiniert.</p>
+
+        <div class="bereich-tiles">
+          <button class="bereich-tile" data-bereich="privat" onclick="bereichWechseln('privat')">
+            <span class="bereich-tile-icon">🏠</span>
+            <span class="bereich-tile-label">Privat</span>
+          </button>
+          <button class="bereich-tile" data-bereich="ogs" onclick="bereichWechseln('ogs')">
+            <span class="bereich-tile-icon">🏫</span>
+            <span class="bereich-tile-label">OGS Rapunzel</span>
+          </button>
+        </div>
+
         <div id="wetter-bereich"></div>
         <div id="heute-bereich"></div>
       </div>
@@ -308,6 +329,19 @@
         <div id="fin-sonderausgaben-bereich" class="hidden"></div>
         <div id="fin-buchungen-bereich" class="hidden"></div>
         <div id="fin-uebersicht-bereich" class="hidden"></div>
+      </div>
+
+      <div id="view-ogs-ideen" class="hidden">
+        <h1>Ideen</h1>
+        <p class="hero-text">Ideen für Angebote und Projekte in der OGS Rapunzel – sammeln, Status pflegen, wiederfinden.</p>
+
+        <div class="row" style="align-items:flex-start;">
+          <input type="text" id="neue-ogs-idee" placeholder="Idee eintragen …">
+          <input type="text" id="neue-ogs-idee-beschreibung" placeholder="Kurze Beschreibung (optional)">
+          <button class="btn-primary" id="btn-ogs-idee-hinzufuegen">Speichern</button>
+        </div>
+
+        <div id="ogs-ideen-bereich"></div>
       </div>
     </main>
   </div>
