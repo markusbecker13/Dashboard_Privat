@@ -1,7 +1,7 @@
 {
   "name": "Dashboard",
   "short_name": "Dashboard",
-  "description": "Privates Dashboard mit Aufgaben, Kalender, Notizen, Links und Reflexion",
+  "description": "Persönliches Dashboard mit Aufgaben, Kalender (inkl. Google-Sync), Notizen, Finanzen, Frei-Zeit-Planung, Links, Reflexion und Einkaufsliste – plus eigene Bereiche für OGS Rapunzel und AWO OV Liblar mit Ideen, Inventar und Projekten inklusive Datei-Ablage",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#cfe6fb",
