@@ -108,7 +108,7 @@
     renderKalender();
     renderHeute();
     renderOgsIdeen();
-    tabWechseln(bereich === "ogs" ? "aufgaben" : "heute");
+    tabWechseln(bereich === "privat" ? "heute" : "aufgaben");
   };
 
   function dashboardNameAnzeigen() {
@@ -627,13 +627,24 @@
     return objekt.bereich || "privat";
   }
 
+  const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar" };
+
   function bereichAnwenden() {
     document.querySelectorAll("[data-bereich]").forEach((el) => {
       el.classList.toggle("active", el.dataset.bereich === aktiverBereich);
     });
     document.querySelectorAll("[data-nur]").forEach((el) => {
-      el.classList.toggle("hidden", el.dataset.nur !== aktiverBereich);
+      const erlaubt = el.dataset.nur.split(",");
+      el.classList.toggle("hidden", !erlaubt.includes(aktiverBereich));
     });
+    const arbeitLabel = document.getElementById("tab-group-arbeit-label");
+    if (arbeitLabel) arbeitLabel.textContent = BEREICH_NAME[aktiverBereich] || "";
+    const ideenTitel = document.getElementById("ogs-ideen-titel");
+    const ideenUntertitel = document.getElementById("ogs-ideen-untertitel");
+    if (ideenTitel) ideenTitel.textContent = "Ideen";
+    if (ideenUntertitel) {
+      ideenUntertitel.textContent = `Ideen für Angebote und Projekte${BEREICH_NAME[aktiverBereich] ? " – " + BEREICH_NAME[aktiverBereich] : ""} – sammeln, Status pflegen, wiederfinden.`;
+    }
   }
 
   window.bereichWechseln = function(neu) {
@@ -646,11 +657,12 @@
     renderKalender();
     renderHeute();
     renderOgsIdeen();
-    tabWechseln(neu === "ogs" ? "aufgaben" : "heute");
+    tabWechseln(neu === "privat" ? "heute" : "aufgaben");
   };
 
   document.getElementById("bereich-btn-privat").addEventListener("click", () => bereichWechseln("privat"));
   document.getElementById("bereich-btn-ogs").addEventListener("click", () => bereichWechseln("ogs"));
+  document.getElementById("bereich-btn-awo").addEventListener("click", () => bereichWechseln("awo"));
 
   // ==========================================================
   // Tabs
@@ -878,7 +890,7 @@
         </button>
       </div>`;
     } else {
-      const ideenOffen = ogsIdeen.filter((i) => i.status === "offen" || i.status === "in_arbeit").length;
+      const ideenOffen = ogsIdeen.filter((i) => bereichVon(i) === aktiverBereich && (i.status === "offen" || i.status === "in_arbeit")).length;
       html += `<div class="start-kachel-grid">
         <button class="start-kachel mod-aufgaben" onclick="tabWechseln('aufgaben')">
           <span class="start-kachel-zahl">${aufgabenZahl}</span>
@@ -1670,11 +1682,12 @@
   function renderOgsIdeen() {
     const bereich = document.getElementById("ogs-ideen-bereich");
     if (!bereich) return;
-    if (ogsIdeen.length === 0) {
+    const ideenBereich = ogsIdeen.filter((i) => bereichVon(i) === aktiverBereich);
+    if (ideenBereich.length === 0) {
       bereich.innerHTML = '<p class="empty-text">Noch keine Ideen gesammelt.</p>';
       return;
     }
-    const html = ogsIdeen.map((i) => {
+    const html = ideenBereich.map((i) => {
       const datum = new Date(i.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
       const statusOptions = Object.entries(OGS_IDEE_STATUS_LABEL)
         .map(([k, l]) => `<option value="${k}" ${k === i.status ? "selected" : ""}>${l}</option>`).join("");
@@ -1703,7 +1716,7 @@
     const titel = document.getElementById("neue-ogs-idee").value.trim();
     if (!titel) return;
     const beschreibung = document.getElementById("neue-ogs-idee-beschreibung").value.trim() || null;
-    await api("ogs_idee_hinzufuegen", { titel, beschreibung });
+    await api("ogs_idee_hinzufuegen", { titel, beschreibung, bereich: aktiverBereich });
     document.getElementById("neue-ogs-idee").value = "";
     document.getElementById("neue-ogs-idee-beschreibung").value = "";
     await ladeDaten();
