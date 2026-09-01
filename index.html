@@ -38,6 +38,37 @@
     <div id="login-error"></div>
   </div>
 
+  <div id="bereich-screen" class="hidden">
+    <svg class="login-logo" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logo">
+      <defs>
+        <linearGradient id="bereich-logo-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#232d3d"/>
+          <stop offset="100%" stop-color="#161d29"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="192" height="192" rx="42" fill="url(#bereich-logo-bg)"/>
+      <g fill="none" stroke="#f4f1ea" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 50 132 L 50 62 L 76 100 L 102 62 L 102 132"/>
+        <path d="M 102 62 L 120 62 C 136 62 136 92 120 92 L 102 92
+                 L 122 92 C 139 92 139 132 122 132 L 102 132"/>
+      </g>
+      <circle cx="102" cy="97" r="8" fill="#e8793f"/>
+    </svg>
+    <h1 style="font-size:1.5rem;">Willkommen zurück</h1>
+    <p class="hero-text">Welchen Bereich möchtest du öffnen?</p>
+    <div class="bereich-tiles">
+      <button class="bereich-tile" onclick="bereichAuswaehlen('privat')">
+        <span class="bereich-tile-icon">🏠</span>
+        <span class="bereich-tile-label">Privat</span>
+      </button>
+      <button class="bereich-tile" onclick="bereichAuswaehlen('ogs')">
+        <span class="bereich-tile-icon">🏫</span>
+        <span class="bereich-tile-label">OGS Rapunzel</span>
+      </button>
+    </div>
+    <button class="link-btn" id="bereich-screen-abmelden" style="margin-top:1.4rem;">Abmelden</button>
+  </div>
+
   <div id="app" class="hidden app-shell">
     <nav class="sidebar">
       <div class="topbar">
@@ -94,18 +125,6 @@
       <div id="view-heute">
         <h1>Start</h1>
         <p class="hero-text">Was heute ansteht – Aufgaben und Termine kombiniert.</p>
-
-        <div class="bereich-tiles">
-          <button class="bereich-tile" data-bereich="privat" onclick="bereichWechseln('privat')">
-            <span class="bereich-tile-icon">🏠</span>
-            <span class="bereich-tile-label">Privat</span>
-          </button>
-          <button class="bereich-tile" data-bereich="ogs" onclick="bereichWechseln('ogs')">
-            <span class="bereich-tile-icon">🏫</span>
-            <span class="bereich-tile-label">OGS Rapunzel</span>
-          </button>
-        </div>
-
         <div id="wetter-bereich"></div>
         <div id="heute-bereich"></div>
       </div>
