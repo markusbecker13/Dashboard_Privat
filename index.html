@@ -65,6 +65,10 @@
         <span class="bereich-tile-icon">🏫</span>
         <span class="bereich-tile-label">OGS Rapunzel</span>
       </button>
+      <button class="bereich-tile" onclick="bereichAuswaehlen('awo')">
+        <span class="bereich-tile-icon">🤝</span>
+        <span class="bereich-tile-label">AWO OV Liblar</span>
+      </button>
     </div>
     <button class="link-btn" id="bereich-screen-abmelden" style="margin-top:1.4rem;">Abmelden</button>
   </div>
@@ -83,6 +87,7 @@
         <div class="bereich-switch" id="bereich-switch">
           <button class="bereich-btn active" id="bereich-btn-privat" data-bereich="privat">🏠 Privat</button>
           <button class="bereich-btn" id="bereich-btn-ogs" data-bereich="ogs">🏫 OGS</button>
+          <button class="bereich-btn" id="bereich-btn-awo" data-bereich="awo">🤝 AWO</button>
         </div>
 
         <div class="tabs">
@@ -105,8 +110,8 @@
             <button class="tab-btn" id="tab-reflexion" data-nur="privat">Reflexion</button>
             <button class="tab-btn" id="tab-einkauf" data-nur="privat">Einkauf</button>
           </div>
-          <div class="tab-group" data-nur="ogs">
-            <span class="tab-group-label">OGS Rapunzel</span>
+          <div class="tab-group" data-nur="ogs,awo">
+            <span class="tab-group-label" id="tab-group-arbeit-label">OGS Rapunzel</span>
             <button class="tab-btn" id="tab-ogs-ideen">Ideen</button>
           </div>
           <div class="tab-group">
@@ -352,8 +357,8 @@
       </div>
 
       <div id="view-ogs-ideen" class="hidden">
-        <h1>Ideen</h1>
-        <p class="hero-text">Ideen für Angebote und Projekte in der OGS Rapunzel – sammeln, Status pflegen, wiederfinden.</p>
+        <h1 id="ogs-ideen-titel">Ideen</h1>
+        <p class="hero-text" id="ogs-ideen-untertitel">Ideen für Angebote und Projekte – sammeln, Status pflegen, wiederfinden.</p>
 
         <div class="row" style="align-items:flex-start;">
           <input type="text" id="neue-ogs-idee" placeholder="Idee eintragen …">
