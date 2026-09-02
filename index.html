@@ -120,6 +120,7 @@
             <span class="tab-group-label">Verwalten</span>
             <button class="tab-btn" id="tab-export" data-nur="privat">Export</button>
             <button class="tab-btn" id="tab-verlauf">Verlauf</button>
+            <button class="tab-btn" id="tab-anleitung">Anleitung</button>
           </div>
         </div>
 
@@ -315,6 +316,277 @@
         <p class="hero-text">Die letzten 50 Aktivitäten im Dashboard, neueste zuerst.</p>
 
         <div id="verlauf-bereich"></div>
+      </div>
+
+      <div id="view-anleitung" class="hidden">
+        <h1>Anleitung</h1>
+        <p class="hero-text">Die komplette Gesamtanleitung zum Dashboard – zum Aufklappen. Sichtbar in allen drei Bereichen und wird mit jeder neuen Funktion aktualisiert.</p>
+
+        <div class="anleitung-inhalt">
+
+          <details class="anleitung-abschnitt" open>
+            <summary>Wie alles zusammenhängt</summary>
+            <div class="anleitung-text">
+              <pre class="anleitung-diagramm">Dein Browser/Handy
+      │  einmalig: Passwort → Token
+      │  danach: Token + Aktion
+      ▼
+GitHub Pages (die App selbst: index.html, app.js, style.css)
+      │  ruft auf
+      ▼
+Supabase Edge Function "bright-endpoint"
+      │  (prüft Token/Passwort, hat als einzige den Datenbank-Schlüssel)
+      ▼
+Supabase-Datenbank (deine eigentlichen Daten)</pre>
+              <p>Die App selbst (auf GitHub Pages) ist öffentlich einsehbar – das ist nur Code, keine Daten. Deine echten Daten liegen ausschließlich in Supabase und sind ohne gültiges Login-Token nicht erreichbar.</p>
+              <p>Beim Anmelden schickst du dein Passwort einmalig; die Function prüft es und gibt dir dafür ein Token zurück. Dieses Token liegt danach in deinem Browser und wird bei jeder weiteren Aktion mitgeschickt – dein Passwort selbst verlässt dein Gerät nach dem Login nicht mehr. Das Token ist 90 Tage gültig, danach musst du dich erneut mit dem Passwort anmelden.</p>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Bereiche: Privat / OGS Rapunzel / AWO OV Liblar</summary>
+            <div class="anleitung-text">
+              <p>Das Dashboard trennt drei Lebensbereiche sauber voneinander: <strong>Privat</strong>, <strong>OGS Rapunzel</strong> (Beruf) und <strong>AWO OV Liblar</strong> (Ehrenamt).</p>
+              <ul>
+                <li><strong>Nach dem Login:</strong> ein Auswahlscreen mit drei Kacheln – Privat öffnet direkt den Start-Tab, OGS/AWO öffnen direkt den Aufgaben-Tab</li>
+                <li><strong>Jederzeit wechseln:</strong> kompakter Umschalter (🏠/🏫/🤝) fest oben in der Sidebar, ohne zurück zur Auswahl zu müssen</li>
+                <li><strong>„↔ Bereich wechseln":</strong> Link unten in der Sidebar, führt zurück zum Drei-Kacheln-Screen, ohne dich abzumelden</li>
+              </ul>
+              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen werden von OGS und AWO gemeinsam genutzt (aber getrennt gehalten), Inventar und Projekte gibt es nur im OGS-Bereich.</p>
+              <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS- und AWO-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Links/Reflexion/Einkauf/Export/Anleitung gibt es in allen bzw. – bis auf Anleitung – nur im Privat-Bereich.</p>
+              <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS oder AWO bleiben grundsätzlich rein lokal im Dashboard.</p>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Start</summary>
+            <div class="anleitung-text">
+              <p>Startansicht beim Öffnen der App.</p>
+              <ul>
+                <li><strong>Jetzt-Zeitleiste:</strong> zeigt den heutigen Zeitrahmen (siehe Frei) als Farbleiste – belegt/frei/erledigt als Segmente, ein oranger Marker zeigt die aktuelle Uhrzeit. Antippen springt in den Frei-Tab. Darunter steht der nächste offene Termin</li>
+                <li><strong>Drei Kacheln:</strong> fällige Aufgaben (inkl. fällige wiederkehrende Erinnerungen), aktive Ziele der laufenden Woche/Monat/Jahr, offene Artikel auf der Einkaufsliste – jede Kachel springt beim Antippen in den passenden Tab</li>
+                <li><strong>Ziel-Kacheln:</strong> darunter, falls für den aktuellen Zeitraum Ziele angelegt sind, mit Fortschritt</li>
+                <li>Ist nichts dringend, steht dort „Nichts Dringendes für heute — guter Tag."</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Aufgaben</summary>
+            <div class="anleitung-text">
+              <p>Deine zentrale Todo-Liste, nach Projekten gruppiert.</p>
+              <ul>
+                <li><strong>Neue Aufgabe:</strong> Titel eintippen, optional Projekt, Fälligkeitsdatum und/oder wiederkehrende Erinnerung („alle X Tage") setzen</li>
+                <li><strong>Erledigen:</strong> Kreis anklicken, Aufgabe wandert zu „Erledigt" (ausklappbar unten)</li>
+                <li><strong>Löschen:</strong> × klicken</li>
+                <li><strong>Projekt anlegen:</strong> „Neues Projekt anlegen" ausklappen, Namen eintragen</li>
+                <li><strong>Projekt umbenennen:</strong> ✎-Symbol neben dem Projektnamen</li>
+                <li><strong>Projekte sind bereichsspezifisch:</strong> ein in Privat angelegtes Projekt erscheint nicht in OGS oder AWO, auch nicht bei gleichem Namen</li>
+                <li><strong>Fälligkeit:</strong> überfällige Aufgaben werden rot markiert, heute fällige orange</li>
+                <li><strong>Wiederkehrende Erinnerung:</strong> zeigt einen Badge; ist sie fällig, erscheint ein ↻-Button, der sie um das Intervall nach vorne verschiebt, ohne die Aufgabe zu erledigen</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Kalender</summary>
+            <div class="anleitung-text">
+              <p>Monatsansicht für Termine.</p>
+              <ul>
+                <li>Mit ‹ › zwischen Monaten wechseln</li>
+                <li>Tag anklicken öffnet ein Panel mit den Terminen dieses Tages plus Formular zum Eintragen</li>
+                <li>Tage mit Terminen zeigen einen kleinen Punkt; oben die nächsten 5 anstehenden Termine</li>
+                <li><strong>Blockzeiten:</strong> feste Zeitfenster, wiederkehrend an bestimmten Wochentagen oder einmalig an einem festen Datum. Sie bilden den Rahmen, aus dem der Frei-Tab die freien Zeiten berechnet</li>
+              </ul>
+              <p><strong>Google-Kalender-Sync</strong> – Karte oben im Tab:</p>
+              <ul>
+                <li><strong>Nicht verbunden:</strong> Button startet den Google-Login, danach automatisch zurück im Kalender-Tab</li>
+                <li><strong>Verbunden:</strong> zeigt „Verbunden seit …" und „Letzter Abgleich: vor X Min./Std." Darunter „Jetzt synchronisieren" (sofortiger Abgleich statt auf den nächsten automatischen Lauf zu warten) und „Verbindung trennen" (mit Bestätigung, widerruft den Zugriff auch bei Google)</li>
+                <li><strong>Automatischer Abgleich:</strong> läuft serverseitig alle 15 Minuten von selbst, unabhängig davon ob die App offen ist</li>
+                <li>Der Abgleich ist beidseitig. Google-Geburtstags-Einträge sind eine Ausnahme – Google verweigert dort jede Änderung von außen, sie werden automatisch dauerhaft vom Rück-Push ausgeschlossen (kein Fehler, so vorgesehen)</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Frei</summary>
+            <div class="anleitung-text">
+              <p>Zeigt für einen wählbaren Tag, wo im festgelegten Zeitrahmen noch freie Zeit ist – berechnet aus Terminen, Aufgaben mit Uhrzeit und den Blockzeiten des jeweiligen Wochentags.</p>
+              <ul>
+                <li>Freie Lücken sind direkt anklickbar, um dort einen neuen Termin einzutragen</li>
+                <li>Belegte Abschnitte zeigen Titel und Zeitraum; direkt abhakbar, bearbeitbar (✎) oder entfernbar (×)</li>
+                <li>Ist für den Wochentag kein Zeitrahmen aktiv, erscheint ein Hinweis statt der Zeitleiste</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Planung <span class="anleitung-nur">(nur Privat)</span></summary>
+            <div class="anleitung-text">
+              <p>Ziele für Woche, Monat oder Jahr, mit Unterschritten.</p>
+              <ul>
+                <li>Über die drei Reiter oben zwischen Wochen-, Monats- und Jahresansicht wechseln, mit ‹ › durch die Zeiträume blättern</li>
+                <li><strong>Neues Ziel:</strong> Titel eintragen, optional ein übergeordnetes Ziel aus dem größeren Zeitraum zuordnen (z.B. Wochenziel einem Monatsziel unterordnen)</li>
+                <li>Innerhalb eines Ziels lassen sich Unterschritte anlegen und abhaken; Fortschritt erscheint auf der Zielkarte und der Start-Kachel</li>
+                <li>Unten im Tab: automatische Übersicht aller Termine und fälligen Aufgaben im gewählten Zeitraum, rein informativ</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Finanzen <span class="anleitung-nur">(nur Privat)</span></summary>
+            <div class="anleitung-text">
+              <p>Übersicht über Fixkosten, Sonderausgaben und einzelne Buchungen, über vier Reiter oben im Tab.</p>
+              <p><strong>Fixkosten</strong> – zwei Excel-artige 12-Monats-Tabellen (Ausgaben, Einnahmen). Zelle anklicken, um die ganze Zeile inline zu bearbeiten; Summenspalte/-zeile aktualisieren sich automatisch.</p>
+              <p><strong>Sonderausgaben</strong> – einmalige, größere Posten als Karten-Liste, ebenfalls inline bearbeitbar.</p>
+              <p><strong>Buchungen</strong> – laufende Kontobewegungen:</p>
+              <ul>
+                <li>Schnellerfassung mit Umschalter Ausgabe/Einnahme und Kategorie-Buttons, monatsweise Liste, inline bearbeitbar</li>
+                <li><strong>CSV-Import</strong> direkt im Browser: erkennt Buchungstag/Valuta, Betrag, Empfänger, Verwendungszweck automatisch, auch bei UTF-8- oder Windows-1252-Kodierung</li>
+                <li>Nach jedem Import läuft automatisch die <strong>Wiederkehrend-Erkennung</strong>: findet Buchungen mit gleichem Typ und ähnlichem Text über mindestens zwei Monate, zeigt sie als Kandidaten in einem Modal. Dort vor Übernahme bearbeitbar und wahlweise direkt als Fixkosten anlegbar (Einzelbuchungen werden dabei gelöscht, damit nichts doppelt auftaucht)</li>
+              </ul>
+              <p><strong>Übersicht</strong> – Jahresansicht:</p>
+              <ul>
+                <li>Startkapital einmalig eintragen; Monatstabelle mit Einnahmen, Ausgaben, Differenz, laufendem Kontostand</li>
+                <li>Drei Charts: Einnahmen vs. Ausgaben pro Monat, Kontostand-Verlauf, Ausgaben nach Kategorie</li>
+                <li>Rechnet <strong>ausschließlich</strong> aus den erfassten Buchungen – Fixkosten und Sonderausgaben fließen bewusst nicht mit ein, damit nichts doppelt gezählt wird</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Ideen <span class="anleitung-nur">(OGS Rapunzel &amp; AWO OV Liblar)</span></summary>
+            <div class="anleitung-text">
+              <p>Sammlung für Angebots- und Projektideen, getrennt nach Bereich.</p>
+              <ul>
+                <li>Titel eintragen, optional Beschreibung</li>
+                <li>Status direkt in der Liste per Dropdown ändern: Offen / In Arbeit / Umgesetzt / Verworfen</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Inventar <span class="anleitung-nur">(nur OGS Rapunzel)</span></summary>
+            <div class="anleitung-text">
+              <ul>
+                <li>Name, Kategorie (mit Autovervollständigung aus bestehenden Kategorien), Menge, optional Standort, Zustand (Gut / Eingeschränkt nutzbar / Defekt)</li>
+                <li>Liste automatisch nach Kategorie gruppiert, Filter-Dropdown zeigt die Anzahl je Kategorie</li>
+                <li>Klick auf einen Eintrag öffnet die Inline-Bearbeitung, Löschen mit Sicherheitsabfrage</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Projekte <span class="anleitung-nur">(nur OGS Rapunzel)</span></summary>
+            <div class="anleitung-text">
+              <p>Ausgearbeitete Konzepte und Projekte, optional mit hinterlegten Dateien.</p>
+              <ul>
+                <li><strong>Neues Projekt:</strong> Titel, Kategorie (mit Autovervollständigung), Kurzbeschreibung, optional gleich eine erste Datei</li>
+                <li><strong>Erlaubte Dateien:</strong> PDF und Word (.docx), maximal 5 MB pro Datei</li>
+                <li><strong>Mehrere Dateien pro Projekt:</strong> über „📎 Datei hinzufügen" lassen sich beliebig viele Dateien nacheinander anhängen. Jede Datei erscheint als eigene Zeile mit Dateiname (anklickbar zum Öffnen), Datum und einem × zum einzelnen Entfernen</li>
+                <li><strong>Datei öffnen:</strong> Klick auf den Dateinamen holt eine frische, 5 Minuten gültige Signatur-URL. Die Dateien liegen in einem privaten Supabase-Storage-Bucket, nicht öffentlich erreichbar</li>
+                <li><strong>CSV-Bulk-Import:</strong> Spalten <code>Titel</code> (Pflicht), <code>Beschreibung</code> und <code>Kategorie</code> (optional). Legt alle Zeilen als Projekte ohne Datei an – Dateien danach einzeln nachreichen</li>
+                <li>Klick auf Titel/Beschreibung öffnet die Inline-Bearbeitung, Löschen entfernt auch alle hinterlegten Dateien aus dem Storage</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Notizen</summary>
+            <div class="anleitung-text">
+              <p>Schneller Ablageort für spontane Gedanken.</p>
+              <ul>
+                <li>Text eintippen, optional einem Projekt zuordnen, Enter oder „Speichern"</li>
+                <li>Projekte sind bereichsspezifisch (siehe Aufgaben)</li>
+                <li>Keine Bearbeiten-Funktion, bewusst schlicht gehalten – lieber löschen und neu eintragen</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Links <span class="anleitung-nur">(nur Privat)</span></summary>
+            <div class="anleitung-text">
+              <ul>
+                <li>Titel + URL eintragen (fehlendes „https://" wird automatisch ergänzt), optional Notiz und Projekt</li>
+                <li>Nach Projekt gruppiert wie die Aufgaben</li>
+                <li>Titel ist klickbar, öffnet in neuem Tab</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Reflexion <span class="anleitung-nur">(nur Privat)</span></summary>
+            <div class="anleitung-text">
+              <p>Kurze, datierte Einträge – passend zu Einheiten, Ferienspiel-Tagen oder der Erlebnispädagogik-Weiterbildung.</p>
+              <ul>
+                <li>Datum (voreingestellt auf heute, änderbar) + freier Text</li>
+                <li>Liste zeigt neueste Einträge zuerst</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Einkaufsliste <span class="anleitung-nur">(nur Privat)</span></summary>
+            <div class="anleitung-text">
+              <ul>
+                <li>Artikel eintragen, Enter oder „Hinzufügen"</li>
+                <li>Abhaken statt löschen, wenn erledigt (wandert nach unten)</li>
+                <li>× zum endgültigen Entfernen</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Verlauf</summary>
+            <div class="anleitung-text">
+              <p>Zeigt die letzten 50 Aktivitäten aus allen Bereichen – was wurde wann hinzugefügt, erledigt oder gelöscht. Rein informativ, keine Aktionen möglich. Der automatische Google-Sync alle 15 Minuten wird hier bewusst nicht protokolliert.</p>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Export <span class="anleitung-nur">(nur Privat)</span></summary>
+            <div class="anleitung-text">
+              <p>Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen. Läuft komplett im Browser, ohne dass Daten an Dritte gehen. Bei „Alles" gibt es bei Excel ein Tabellenblatt pro Bereich, bei Word alle Tabellen untereinander in einem Dokument.</p>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Technische Bedienung</summary>
+            <div class="anleitung-text">
+              <p><strong>Abmelden:</strong> oben rechts in der Kopfzeile. Meldet die Session serverseitig ab und entfernt das gespeicherte Token auf diesem Gerät.</p>
+              <p><strong>Als App installieren (Android):</strong> Seite in Chrome öffnen → Drei-Punkte-Menü → „App installieren". Liegt danach als eigenes Icon auf dem Homescreen, öffnet ohne Browser-Leiste. Icon lange gedrückt halten → Schnellzugriff „Neue Notiz" springt direkt in den Notizen-Tab.</p>
+              <p><strong>Passwort ändern:</strong> Supabase-Dashboard → Edge Functions → Secrets → <code>APP_PASSWORD</code> löschen, neu anlegen. Kein Redeploy nötig. Ein zuvor ausgestelltes Token bleibt bis zum Ablauf (90 Tage) weiterhin gültig, unabhängig vom Passwort.</p>
+              <p><strong>Login-Schutz:</strong> Token statt Passwort im Browser, Rate-Limiting nach 5 Fehlversuchen in 15 Minuten, Zugriff nur von deiner GitHub-Pages-Adresse, strikte Inhalts-Regeln (CSP) gegen eingeschleuste Skripte.</p>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Bekannte Stolperfallen</summary>
+            <div class="anleitung-text">
+              <ul>
+                <li><strong>„Verify JWT" bei der Edge Function:</strong> muss ausgeschaltet sein, sonst „Passwort falsch" obwohl es stimmt. Springt nach jedem Deploy wieder auf „an" zurück – nach jedem Deploy prüfen</li>
+                <li><strong>Icons im GitHub-Repo:</strong> müssen im Unterordner <code>icons/</code> liegen, sonst funktioniert die App-Installation nicht</li>
+                <li><strong>Browser-Cache:</strong> nach dem Hochladen von index.html/app.js/style.css hilft ein privates/inkognito Fenster zuverlässiger als ein harter Reload; bei installierter PWA zusätzlich die App komplett schließen und neu öffnen</li>
+                <li><strong>Google-Sync und <code>google_kein_push</code>:</strong> mehrstufige Sync-Logik – jede Phase, die Termine zu Google schickt, muss den Filter einzeln berücksichtigen, sonst reicht eine vergessene Phase, um die Ausnahme wirkungslos zu machen</li>
+                <li><strong>Private Storage-Buckets:</strong> Dateien sind nie direkt über eine feste URL erreichbar, nur über kurz gültige (5 Min.) signierte URLs. Beim Löschen eines Datensatzes mit Datei-Anhang muss die Datei zusätzlich explizit aus dem Storage entfernt werden</li>
+                <li><strong>Finanzen-Jahresübersicht:</strong> rechnet nur aus der Tabelle <code>buchungen</code> – Fixkosten/Sonderausgaben dürfen dort nicht zusätzlich eingerechnet werden, sonst werden Beträge doppelt gezählt</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Datenschutz (DSGVO)</summary>
+            <div class="anleitung-text">
+              <ul>
+                <li>Supabase-Projekt läuft in der EU-Region (Frankfurt); Zugriff auf die Datenbank ausschließlich über die Edge Function mit Passwort-Schutz</li>
+                <li>Aktuell werden nur eigene Daten gespeichert (keine Daten Dritter) – das fällt unter die private Haushaltsausnahme der DSGVO</li>
+                <li><strong>OGS Rapunzel &amp; AWO OV Liblar:</strong> beide Bereiche enthalten ausschließlich organisatorische Inhalte, keine personenbezogenen Daten über Kinder, Familien oder Kolleg:innen. Sollten künftig doch personenbezogene Daten Dritter hinzukommen, braucht es eine erneute Prüfung</li>
+                <li><strong>Google-Kalender-Sync:</strong> Termindaten werden zwischen Supabase (EU) und Googles Servern übertragen, die auch außerhalb der EU liegen können. Rechtsgrundlage ist aktuell das EU-US Data Privacy Framework. Da es weiterhin nur um eigene Termine geht, ändert das nichts an der Haushaltsausnahme</li>
+              </ul>
+            </div>
+          </details>
+
+        </div>
       </div>
 
       <div id="view-planung" class="hidden">
