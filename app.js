@@ -1925,9 +1925,13 @@
             </div>
           </div>`;
       }
-      const dateiZeilen = dateien.map((d) => `
+      const dateiZeilen = dateien.map((d) => {
+        const hochgeladen = new Date(d.hochgeladen_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+        return `
               <div>📎 <span onclick="event.stopPropagation(); projDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
-                <span onclick="event.stopPropagation(); projDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen">×</span></div>`).join("");
+                <span style="opacity:0.65;">(${hochgeladen})</span>
+                <span onclick="event.stopPropagation(); projDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen">×</span></div>`;
+      }).join("");
       return `
         <div class="notiz-item">
           <div style="flex:1; cursor:pointer;" onclick="projBearbeitenStart('${p.id}')">
