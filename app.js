@@ -455,6 +455,63 @@
     await ladeDaten();
   }
 
+  // Hilfe-Icons ("?"): Tap öffnet ein kleines Popover direkt neben dem
+  // Icon mit dem Text aus data-hilfe. Funktioniert per Event-Delegation,
+  // also auch für Icons, die erst später (z.B. in gerenderten Listen)
+  // ins DOM kommen.
+  function initHilfeSystem() {
+    let offenesPopover = null;
+
+    function schliesseHilfePopover() {
+      if (offenesPopover) {
+        offenesPopover.remove();
+        offenesPopover = null;
+      }
+      document.querySelectorAll(".hilfe-icon.aktiv").forEach((b) => b.classList.remove("aktiv"));
+    }
+
+    document.addEventListener("click", function (e) {
+      const icon = e.target.closest(".hilfe-icon");
+      if (icon) {
+        e.preventDefault();
+        e.stopPropagation();
+        const warOffen = icon.classList.contains("aktiv");
+        schliesseHilfePopover();
+        if (warOffen) return;
+
+        const text = icon.getAttribute("data-hilfe") || "";
+        if (!text) return;
+
+        const pop = document.createElement("div");
+        pop.className = "hilfe-popover";
+        pop.textContent = text;
+        document.body.appendChild(pop);
+        icon.classList.add("aktiv");
+        offenesPopover = pop;
+
+        const rect = icon.getBoundingClientRect();
+        const pw = pop.offsetWidth;
+        const ph = pop.offsetHeight;
+        let left = rect.left + rect.width / 2 - pw / 2;
+        left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+        let top = rect.bottom + 8;
+        if (top + ph > window.innerHeight - 8) {
+          top = rect.top - ph - 8;
+        }
+        pop.style.left = left + "px";
+        pop.style.top = top + "px";
+        return;
+      }
+      if (offenesPopover && !e.target.closest(".hilfe-popover")) {
+        schliesseHilfePopover();
+      }
+    });
+
+    window.addEventListener("scroll", schliesseHilfePopover, true);
+    window.addEventListener("resize", schliesseHilfePopover);
+  }
+  initHilfeSystem();
+
   // Beim Start: automatisch anmelden, falls Token schon gespeichert
   (async function init() {
     if (token) {
