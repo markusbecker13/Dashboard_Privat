@@ -131,28 +131,32 @@
 
     <main>
       <div id="view-heute">
-        <h1>Start</h1>
+        <h1>Start <button class="hilfe-icon" data-hilfe="Zeigt heutige Termine und fällige/überfällige Aufgaben gemeinsam in einer Zeitleiste, plus das aktuelle Wetter oben. Reine Übersicht – bearbeitet wird in den Reitern Aufgaben bzw. Kalender.">?</button></h1>
         <p class="hero-text">Was heute ansteht – Aufgaben und Termine kombiniert.</p>
         <div id="wetter-bereich"></div>
         <div id="heute-bereich"></div>
       </div>
 
       <div id="view-aufgaben" class="hidden">
-      <h1>Aufgaben</h1>
+      <h1>Aufgaben <button class="hilfe-icon" data-hilfe="Alle Aufgaben, gruppiert nach Projekt. Fälligkeitsdatum, Uhrzeit und ein Wiederholungs-Intervall sind optional. Erledigte Aufgaben wandern nach unten in den Bereich 'Erledigt'.">?</button></h1>
       <p class="hero-text">Nach Projekten sortiert, mit Fälligkeit und wiederkehrender Erinnerung.</p>
 
       <div class="row">
         <input type="text" id="neue-aufgabe" placeholder="Neue Aufgabe eintragen …">
         <select id="aufgabe-projekt"><option value="">Ohne Projekt</option></select>
+        <button type="button" class="hilfe-icon" data-hilfe="Projekte sind je Bereich (Privat/OGS/AWO) getrennt – hier erscheinen nur Projekte des gerade aktiven Bereichs.">?</button>
         <input type="date" id="aufgabe-faellig" title="Fälligkeitsdatum (optional)">
         <input type="time" id="aufgabe-uhrzeit" style="width:8rem;" title="Beginn (optional)">
         <input type="time" id="aufgabe-ende" style="width:8rem;" title="Ende (optional)">
+        <button type="button" class="hilfe-icon" data-hilfe="Datum, Beginn und Ende sind optional. Mit Uhrzeit versehene Aufgaben werden im Reiter 'Frei' als Blockzeit berücksichtigt.">?</button>
         <input type="number" id="aufgabe-intervall" min="1" placeholder="alle X Tage" title="Wiederkehrende Erinnerung">
+        <button type="button" class="hilfe-icon" data-hilfe="Wiederkehrende Erinnerung: Zahl der Tage bis zur nächsten fälligen Wiederholung, z.B. 7 für wöchentlich. Nach dem Erledigen wird die Aufgabe automatisch um dieses Intervall verschoben statt abgehakt.">?</button>
         <button class="btn-primary" id="btn-hinzufuegen">Hinzufügen</button>
       </div>
 
       <div style="margin-bottom:1.8rem;">
         <button class="link-btn" id="toggle-projekt-form">▸ Neues Projekt anlegen</button>
+        <button type="button" class="hilfe-icon" data-hilfe="Ein neues Projekt gilt nur im gerade aktiven Bereich. Der gleiche Projektname kann in Privat, OGS und AWO unabhängig voneinander existieren.">?</button>
         <div class="row hidden" id="projekt-form" style="margin-top:0.5rem;">
           <input type="text" id="neues-projekt" placeholder="Projektname">
           <button class="btn-secondary" id="btn-projekt-anlegen">Anlegen</button>
@@ -165,7 +169,7 @@
       </div>
 
       <div id="view-kalender" class="hidden">
-        <h1>Kalender</h1>
+        <h1>Kalender <button class="hilfe-icon" data-hilfe="Termine im Monatsüberblick. Bei verbundenem Google-Kalender läuft der Abgleich automatisch alle 15 Minuten in beide Richtungen; neuere Änderung gewinnt bei Konflikten. Blockzeiten unten sind feste, wiederkehrende oder einmalige 'nicht stören'-Zeiten.">?</button></h1>
         <p class="hero-text">Termine eintragen und im Monatsüberblick behalten.</p>
 
         <div id="google-sync-karte" class="sync-karte"></div>
@@ -181,7 +185,7 @@
 
         <div id="cal-day-panel"></div>
 
-        <div class="project-heading" style="margin-top:2rem;">Blockzeiten</div>
+        <div class="project-heading" style="margin-top:2rem;">Blockzeiten <button type="button" class="hilfe-icon" data-hilfe="Wiederkehrend: an bestimmten Wochentagen jede Woche aktiv. Einmalig: nur an einem konkreten Datum. Blockzeiten werden im Reiter 'Frei' bei der Berechnung freier Zeiten mit ausgeschlossen.">?</button></div>
         <p class="hero-text" style="margin:0 0 0.8rem;">Feste "nicht stören"-Zeiten – wiederkehrend oder einmalig. Werden ab der nächsten Etappe bei der Lücken-Berechnung mitgezählt.</p>
         <div id="blockzeiten-liste"></div>
         <div style="margin:0.8rem 0 1.6rem;">
@@ -214,7 +218,7 @@
       </div>
 
       <div id="view-frei" class="hidden">
-        <h1>Frei</h1>
+        <h1>Frei <button class="hilfe-icon" data-hilfe="Berechnet automatisch, was an diesem Tag noch frei ist: Termine, Aufgaben mit Uhrzeit und Blockzeiten werden vom Zeitrahmen unten abgezogen. Reine Berechnung – Termine/Aufgaben selbst bearbeitest du in den jeweiligen Reitern.">?</button></h1>
         <p class="hero-text">Freie Zeiten an einem Tag – berechnet aus Terminen, Aufgaben mit Uhrzeit, Blockzeiten und deinem Zeitrahmen für diesen Wochentag.</p>
 
         <div class="cal-header">
@@ -224,7 +228,7 @@
         </div>
 
         <div class="cal-day-panel" style="margin-bottom:1.2rem;">
-          <div class="project-heading" style="margin:0 0 0.6rem;">Zeitrahmen für diesen Wochentag</div>
+          <div class="project-heading" style="margin:0 0 0.6rem;">Zeitrahmen für diesen Wochentag <button type="button" class="hilfe-icon" data-hilfe="Start/Ende gelten für diesen Wochentag (z.B. Mo–Fr anders als Sa/So). 'Aktiv' ausschalten markiert den ganzen Tag als nicht verfügbar, ohne den Zeitrahmen zu löschen.">?</button></div>
           <div class="row" style="align-items:center;">
             <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.88rem;">
               <input type="checkbox" id="frei-rahmen-aktiv" checked> aktiv
@@ -241,12 +245,13 @@
       </div>
 
       <div id="view-notizen" class="hidden">
-        <h1>Notizen</h1>
+        <h1>Notizen <button class="hilfe-icon" data-hilfe="Kurze, formlose Notizen – optional einem Projekt zugeordnet. Anders als bei Aufgaben gibt es kein Fälligkeitsdatum und keine Erledigt-Markierung.">?</button></h1>
         <p class="hero-text">Schnell rein, schnell wieder raus – für spontane Ideen und Gedanken.</p>
 
         <div class="row">
           <input type="text" id="neue-notiz" placeholder="Notiz eintragen …">
           <select id="notiz-projekt"><option value="">Ohne Projekt</option></select>
+          <button type="button" class="hilfe-icon" data-hilfe="Zeigt nur Projekte des aktiven Bereichs (Privat/OGS/AWO).">?</button>
           <button class="btn-primary" id="btn-notiz-hinzufuegen">Speichern</button>
         </div>
 
@@ -254,13 +259,14 @@
       </div>
 
       <div id="view-links" class="hidden">
-        <h1>Links</h1>
+        <h1>Links <button class="hilfe-icon" data-hilfe="Adressen und Materialien mit Titel, URL und optionaler Notiz – optional einem Projekt zugeordnet, damit du sie dort wiederfindest.">?</button></h1>
         <p class="hero-text">Wichtige Adressen und Materialien, schnell wiederfindbar.</p>
 
         <div class="row">
           <input type="text" id="neuer-link-titel" placeholder="Titel">
           <input type="text" id="neuer-link-url" placeholder="URL (z.B. beispiel.de/seite)">
           <select id="link-projekt"><option value="">Ohne Projekt</option></select>
+          <button type="button" class="hilfe-icon" data-hilfe="Zeigt nur Projekte des aktiven Bereichs (Privat/OGS/AWO).">?</button>
           <button class="btn-primary" id="btn-link-hinzufuegen">Speichern</button>
         </div>
         <div class="row" style="margin-top:-0.5rem;">
@@ -271,7 +277,7 @@
       </div>
 
       <div id="view-reflexion" class="hidden">
-        <h1>Reflexion</h1>
+        <h1>Reflexion <button class="hilfe-icon" data-hilfe="Persönliche, kurze Einträge mit Datum – z.B. Rückblick auf eine Einheit oder einen Tag. Rein privat gedacht, nicht für den Export oder zum Teilen.">?</button></h1>
         <p class="hero-text">Kurze Einträge nach Einheiten oder Tagen – zum Rückblättern, nicht zum Teilen.</p>
 
         <div class="reflex-form">
@@ -287,13 +293,13 @@
       </div>
 
       <div id="view-export" class="hidden">
-        <h1>Export</h1>
+        <h1>Export <button class="hilfe-icon" data-hilfe="Nur im Bereich Privat verfügbar. Exportiert deine Daten (z.B. Aufgaben, Finanzen, Notizen) als Excel- oder Word-Datei zum Herunterladen und Sichern – ändert nichts an den gespeicherten Daten selbst.">?</button></h1>
         <p class="hero-text">Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen.</p>
         <div id="export-liste"></div>
       </div>
 
       <div id="view-einkauf" class="hidden">
-        <h1>Einkaufsliste</h1>
+        <h1>Einkaufsliste <button class="hilfe-icon" data-hilfe="Einfache Merkliste zum Abhaken. Nur im Bereich Privat verfügbar.">?</button></h1>
         <p class="hero-text">Was besorgt werden muss – abhaken statt vergessen.</p>
 
         <div class="row">
@@ -305,20 +311,21 @@
       </div>
 
       <div id="view-verlauf" class="hidden">
-        <h1>Verlauf</h1>
+        <h1>Verlauf <button class="hilfe-icon" data-hilfe="Protokoll der letzten 50 Änderungen (angelegt, geändert, gelöscht) über alle Module hinweg. Der automatische Google-Kalender-Abgleich alle 15 Minuten wird hier bewusst nicht mitprotokolliert.">?</button></h1>
         <p class="hero-text">Die letzten 50 Aktivitäten im Dashboard, neueste zuerst.</p>
 
         <div id="verlauf-bereich"></div>
       </div>
 
       <div id="view-planung" class="hidden">
-        <h1>Planung</h1>
+        <h1>Planung <button class="hilfe-icon" data-hilfe="Ziele mit Unterschritten für Woche, Monat oder Jahr, plus eine Übersicht was im gewählten Zeitraum an Aufgaben und Terminen ansteht. Nur im Bereich Privat verfügbar.">?</button></h1>
         <p class="hero-text">Ziele mit Unterschritten, plus was in diesem Zeitraum ansteht.</p>
 
         <div class="plan-typ-tabs">
           <button class="plan-typ-btn active" id="plantyp-woche" data-typ="woche">Woche</button>
           <button class="plan-typ-btn" id="plantyp-monat" data-typ="monat">Monat</button>
           <button class="plan-typ-btn" id="plantyp-jahr" data-typ="jahr">Jahr</button>
+          <button type="button" class="hilfe-icon" data-hilfe="Wechselt die Zeit-Ebene für Ziele und Übersicht. Ziele einer kleineren Ebene können einem Ziel einer größeren Ebene untergeordnet werden (z.B. Wochenziel unter Monatsziel).">?</button>
         </div>
 
         <div class="cal-header">
@@ -332,6 +339,7 @@
           <div class="row hidden" id="ziel-form" style="margin-top:0.5rem;">
             <input type="text" id="neues-ziel" placeholder="Zieltitel">
             <select id="ziel-uebergeordnet"><option value="">Kein übergeordnetes Ziel</option></select>
+            <button type="button" class="hilfe-icon" data-hilfe="Optional: ordnet das neue Ziel als Unterschritt einem bestehenden, größeren Ziel zu (z.B. Wochenziel unter einem Monatsziel).">?</button>
             <button class="btn-primary" id="btn-ziel-anlegen">Anlegen</button>
           </div>
         </div>
@@ -342,7 +350,7 @@
       </div>
 
       <div id="view-finanzen" class="hidden">
-        <h1>Finanzen</h1>
+        <h1>Finanzen <button class="hilfe-icon" data-hilfe="Vier Bereiche: Fixkosten (wiederkehrend, geplant), Sonderausgaben (einmalig, geplant), Buchungen (tatsächliche Kontobewegungen, auch per CSV-Import) und Übersicht (Jahresauswertung – zählt bewusst nur Buchungen, damit geplante Fixkosten/Sonderausgaben nicht doppelt mitgerechnet werden).">?</button></h1>
         <p class="hero-text">Fixkosten, feste Einnahmen und Sonderausgaben.</p>
 
         <div class="plan-typ-tabs">
@@ -350,6 +358,7 @@
           <button class="plan-typ-btn" id="fintyp-sonderausgaben" data-fintyp="sonderausgaben">Sonderausgaben</button>
           <button class="plan-typ-btn" id="fintyp-buchungen" data-fintyp="buchungen">Buchungen</button>
           <button class="plan-typ-btn" id="fintyp-uebersicht" data-fintyp="uebersicht">Übersicht</button>
+          <button type="button" class="hilfe-icon" data-hilfe="Fixkosten/Sonderausgaben sind Planwerte (was fällig ist). Buchungen sind die echten Kontobewegungen, die du einzeln erfasst oder per CSV aus dem Online-Banking importierst. Die Übersicht wertet nur Buchungen aus, um Doppelzählung zu vermeiden.">?</button>
         </div>
 
         <div id="fin-fixkosten-bereich"></div>
@@ -359,7 +368,7 @@
       </div>
 
       <div id="view-ogs-ideen" class="hidden">
-        <h1 id="ogs-ideen-titel">Ideen</h1>
+        <h1 id="ogs-ideen-titel">Ideen <button class="hilfe-icon" data-hilfe="Sammelstelle für lose Ideen zu Angeboten/Projekten, mit Status (z.B. offen, in Arbeit, umgesetzt). Ausgearbeitete Konzepte mit Datei-Ablage gehören in den Reiter Projekte.">?</button></h1>
         <p class="hero-text" id="ogs-ideen-untertitel">Ideen für Angebote und Projekte – sammeln, Status pflegen, wiederfinden.</p>
 
         <div class="row" style="align-items:flex-start;">
@@ -372,7 +381,7 @@
       </div>
 
       <div id="view-ogs-inventar" class="hidden">
-        <h1>Inventar</h1>
+        <h1>Inventar <button class="hilfe-icon" data-hilfe="Material und Ausstattung, nach Kategorie sortiert und filterbar. Nur im Bereich OGS verfügbar.">?</button></h1>
         <p class="hero-text">Material und Ausstattung der OGS Rapunzel – nach Kategorie sortiert.</p>
 
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
@@ -386,6 +395,7 @@
             <option value="eingeschraenkt">Eingeschränkt nutzbar</option>
             <option value="defekt">Defekt</option>
           </select>
+          <button type="button" class="hilfe-icon" data-hilfe="Zustand wird als farbiges Label in der Liste angezeigt und lässt sich später filtern – z.B. um defekte oder eingeschränkt nutzbare Gegenstände schnell zu finden.">?</button>
           <button class="btn-primary" id="btn-inv-hinzufuegen">Speichern</button>
         </div>
 
@@ -394,7 +404,7 @@
       </div>
 
       <div id="view-ogs-projekte" class="hidden">
-        <h1>Projekte</h1>
+        <h1>Projekte <button class="hilfe-icon" data-hilfe="Ausgearbeitete Konzepte mit Datei-Ablage – im Unterschied zu Ideen können hier beliebig viele Dateien pro Projekt hinterlegt und einzeln nachgereicht oder gelöscht werden. Nur im Bereich OGS verfügbar.">?</button></h1>
         <p class="hero-text">Ausgearbeitete Konzepte und Projekte der OGS Rapunzel – mit Datei-Ablage.</p>
 
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
@@ -407,12 +417,13 @@
         </div>
         <div class="row" style="flex-wrap:wrap; align-items:center; margin-top:0.5rem;">
           <input type="file" id="neu-proj-datei" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+          <button type="button" class="hilfe-icon" data-hilfe="Optional beim Anlegen. Weitere Dateien kannst du dem Projekt jederzeit über '📎 Datei hinzufügen' in der Projektliste nachreichen – bestehende Dateien bleiben dabei erhalten.">?</button>
           <button class="btn-primary" id="btn-proj-hinzufuegen">Speichern</button>
         </div>
         <p class="empty-text" style="margin-top:0.3rem;">PDF oder Word (.docx), max. 5 MB. Datei ist optional.</p>
 
         <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-top:1.4rem;">
-          <h3 style="margin-top: 0; font-size:0.95rem;">Mehrere Projekte auf einmal importieren</h3>
+          <h3 style="margin-top: 0; font-size:0.95rem;">Mehrere Projekte auf einmal importieren <button type="button" class="hilfe-icon" data-hilfe="Legt für jede Zeile der CSV ein neues Projekt an, noch ohne Datei. Dateien reichst du danach einzeln pro Projekt über '📎 Datei hinzufügen' nach.">?</button></h3>
           <p class="empty-text">CSV-Datei mit Spalten <code>Titel</code>, <code>Beschreibung</code>, <code>Kategorie</code> (Beschreibung/Kategorie optional). Dateien pro Projekt können danach einzeln nachgereicht werden.</p>
           <div class="row" style="flex-wrap:wrap; align-items:center;">
             <input type="file" id="proj-csv-datei" accept=".csv">
