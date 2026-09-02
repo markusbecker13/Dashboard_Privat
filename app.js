@@ -737,8 +737,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", planung: "tab-planung", finanzen: "tab-finanzen", ogsideen: "tab-ogs-ideen", ogsinventar: "tab-ogs-inventar", ogsprojekte: "tab-ogs-projekte" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", planung: "view-planung", finanzen: "view-finanzen", ogsideen: "view-ogs-ideen", ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", anleitung: "tab-anleitung", planung: "tab-planung", finanzen: "tab-finanzen", ogsideen: "tab-ogs-ideen", ogsinventar: "tab-ogs-inventar", ogsprojekte: "tab-ogs-projekte" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", anleitung: "view-anleitung", planung: "view-planung", finanzen: "view-finanzen", ogsideen: "view-ogs-ideen", ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -786,6 +786,7 @@
   document.getElementById("tab-export").addEventListener("click", () => tabWechseln("export"));
   document.getElementById("tab-einkauf").addEventListener("click", () => tabWechseln("einkauf"));
   document.getElementById("tab-verlauf").addEventListener("click", () => tabWechseln("verlauf"));
+  document.getElementById("tab-anleitung").addEventListener("click", () => tabWechseln("anleitung"));
   document.getElementById("tab-planung").addEventListener("click", () => tabWechseln("planung"));
   document.getElementById("tab-finanzen").addEventListener("click", () => tabWechseln("finanzen"));
   document.getElementById("tab-ogs-ideen").addEventListener("click", () => tabWechseln("ogsideen"));
