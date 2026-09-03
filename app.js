@@ -1961,21 +1961,41 @@
       datalist.innerHTML = kategorien.map((k) => `<option value="${escapeAttr(k)}"></option>`).join("");
     }
 
+    // Nur echte Hauptprojekte (ohne eigenes hauptprojekt_id) stehen als
+    // Zuordnungs-Ziel zur Auswahl – so bleibt es bei einer Ebene.
+    const hauptprojekte = ogsProjekte.filter((p) => !p.hauptprojekt_id);
+    const hauptSelect = document.getElementById("neu-proj-hauptprojekt");
+    if (hauptSelect) {
+      const bisher = hauptSelect.value;
+      hauptSelect.innerHTML = '<option value="">– Eigenständiges Hauptprojekt –</option>' +
+        hauptprojekte.map((p) => `<option value="${p.id}">${escapeAttr(p.titel)}</option>`).join("");
+      if (hauptprojekte.some((p) => p.id === bisher)) hauptSelect.value = bisher;
+    }
+
     if (ogsProjekte.length === 0) {
       bereich.innerHTML = '<p class="empty-text">Noch keine Projekte hinterlegt.</p>';
       return;
     }
 
-    const html = ogsProjekte.map((p) => {
+    function projektHtml(p, istUnterprojekt) {
       const datum = new Date(p.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
       const dateien = ogsProjektDateien.filter((d) => d.projekt_id === p.id);
+      const itemKlasse = istUnterprojekt ? "proj-unter-item" : "notiz-item";
+
       if (projBearbeitenId === p.id) {
+        // Auswahl fürs Umhängen: alle Hauptprojekte außer sich selbst.
+        const hauptOptionen = hauptprojekte.filter((h) => h.id !== p.id)
+          .map((h) => `<option value="${h.id}" ${p.hauptprojekt_id === h.id ? "selected" : ""}>${escapeAttr(h.titel)}</option>`).join("");
         return `
-          <div class="notiz-item">
+          <div class="${itemKlasse}">
             <div style="flex:1; display:flex; flex-direction:column; gap:0.4rem;">
               <input type="text" id="proj-edit-titel-${p.id}" value="${escapeAttr(p.titel)}" placeholder="Titel">
               <input type="text" id="proj-edit-kategorie-${p.id}" value="${escapeAttr(p.kategorie || "")}" placeholder="Kategorie" list="proj-kategorie-liste">
               <textarea id="proj-edit-beschreibung-${p.id}" rows="2" placeholder="Kurzbeschreibung">${escapeHtml(p.beschreibung || "")}</textarea>
+              <select id="proj-edit-hauptprojekt-${p.id}">
+                <option value="">– Eigenständiges Hauptprojekt –</option>
+                ${hauptOptionen}
+              </select>
               <div>
                 <button class="btn-primary" onclick="projBearbeitenSpeichern('${p.id}')">Speichern</button>
                 <button class="link-btn" onclick="projBearbeitenAbbrechen()">Abbrechen</button>
@@ -1983,6 +2003,7 @@
             </div>
           </div>`;
       }
+
       const dateiZeilen = dateien.map((d) => {
         const hochgeladen = new Date(d.hochgeladen_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
         return `
@@ -1990,22 +2011,34 @@
                 <span style="opacity:0.65;">(${hochgeladen})</span>
                 <span onclick="event.stopPropagation(); projDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen">×</span></div>`;
       }).join("");
+
+      const unterprojekte = istUnterprojekt ? [] : ogsProjekte.filter((u) => u.hauptprojekt_id === p.id);
+      const unterprojekteHtml = unterprojekte.length > 0
+        ? `<div class="proj-unter-liste">${unterprojekte.map((u) => projektHtml(u, true)).join("")}</div>`
+        : "";
+
       return `
-        <div class="notiz-item">
-          <div style="flex:1; cursor:pointer;" onclick="projBearbeitenStart('${p.id}')">
-            <span class="notiz-text">${escapeHtml(p.titel)}</span>
-            ${p.beschreibung ? `<div class="notiz-meta" style="margin-top:0.2rem;">${escapeHtml(p.beschreibung)}</div>` : ""}
-            <div class="notiz-meta" style="margin-top:0.3rem;">
-              ${datum}${p.kategorie ? " · " + escapeHtml(p.kategorie) : ""}
+        <div class="${itemKlasse}">
+          <div style="flex:1;">
+            ${istUnterprojekt ? '<div class="proj-unter-label">Unterprojekt</div>' : ""}
+            <div style="cursor:pointer;" onclick="projBearbeitenStart('${p.id}')">
+              <span class="notiz-text">${escapeHtml(p.titel)}</span>
+              ${p.beschreibung ? `<div class="notiz-meta" style="margin-top:0.2rem;">${escapeHtml(p.beschreibung)}</div>` : ""}
+              <div class="notiz-meta" style="margin-top:0.3rem;">
+                ${datum}${p.kategorie ? " · " + escapeHtml(p.kategorie) : ""}
+              </div>
+              <div class="notiz-meta" style="margin-top:0.3rem;">
+                ${dateiZeilen}
+                <label style="text-decoration:underline; cursor:pointer;" onclick="event.stopPropagation();">📎 Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="projDateiHinzufuegen('${p.id}', this)"></label>
+              </div>
             </div>
-            <div class="notiz-meta" style="margin-top:0.3rem;">
-              ${dateiZeilen}
-              <label style="text-decoration:underline; cursor:pointer;" onclick="event.stopPropagation();">📎 Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="projDateiHinzufuegen('${p.id}', this)"></label>
-            </div>
+            ${unterprojekteHtml}
           </div>
           <button class="task-delete" onclick="projLoeschen('${p.id}')">×</button>
         </div>`;
-    }).join("");
+    }
+
+    const html = hauptprojekte.map((p) => projektHtml(p, false)).join("");
     bereich.innerHTML = `<div class="notiz-list">${html}</div>`;
   }
 
@@ -2016,10 +2049,11 @@
     if (!titel) return;
     const kategorie = document.getElementById("neu-proj-kategorie").value.trim() || null;
     const beschreibung = document.getElementById("neu-proj-beschreibung").value.trim() || null;
+    const hauptprojektId = document.getElementById("neu-proj-hauptprojekt").value || null;
     const dateiInput = document.getElementById("neu-proj-datei");
     const datei = dateiInput.files[0];
 
-    const payload = { titel, kategorie, beschreibung };
+    const payload = { titel, kategorie, beschreibung, hauptprojekt_id: hauptprojektId };
     if (datei) {
       if (!PROJ_ERLAUBTE_TYPEN.includes(datei.type)) {
         alert("Nur PDF- und Word-Dateien (.docx) sind erlaubt.");
@@ -2038,6 +2072,7 @@
     document.getElementById("neu-proj-titel").value = "";
     document.getElementById("neu-proj-kategorie").value = "";
     document.getElementById("neu-proj-beschreibung").value = "";
+    document.getElementById("neu-proj-hauptprojekt").value = "";
     dateiInput.value = "";
     await ladeDaten();
   }
@@ -2057,15 +2092,25 @@
     if (!titel) return;
     const kategorie = document.getElementById(`proj-edit-kategorie-${id}`).value.trim() || null;
     const beschreibung = document.getElementById(`proj-edit-beschreibung-${id}`).value.trim() || null;
-    await api("ogs_projekt_aktualisieren", { id, titel, kategorie, beschreibung });
-    projBearbeitenId = null;
-    await ladeDaten();
+    const hauptprojektSelect = document.getElementById(`proj-edit-hauptprojekt-${id}`);
+    const hauptprojekt_id = hauptprojektSelect ? (hauptprojektSelect.value || null) : undefined;
+    try {
+      await api("ogs_projekt_aktualisieren", { id, titel, kategorie, beschreibung, hauptprojekt_id });
+      projBearbeitenId = null;
+      await ladeDaten();
+    } catch (e) {
+      alert("Konnte nicht gespeichert werden: " + e.message);
+    }
   };
 
   window.projLoeschen = async function(id) {
-    if (!confirm("Dieses Projekt inklusive hinterlegter Datei wirklich löschen?")) return;
-    await api("ogs_projekt_loeschen", { id });
-    await ladeDaten();
+    if (!confirm("Dieses Projekt inklusive hinterlegter Dateien wirklich löschen?")) return;
+    try {
+      await api("ogs_projekt_loeschen", { id });
+      await ladeDaten();
+    } catch (e) {
+      alert("Konnte nicht gelöscht werden: " + e.message);
+    }
   };
 
   window.projDateiOeffnen = async function(dateiId) {
