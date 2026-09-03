@@ -225,6 +225,14 @@
   .notiz-text { flex: 1; font-size: 0.92rem; white-space: pre-wrap; }
   .notiz-meta { display: block; color: var(--ink-dim); font-size: 0.75rem; margin-top: 0.3rem; }
 
+  /* OGS-Projekte: Unterprojekte, eingerückt unter ihrem Hauptprojekt */
+  .proj-unter-liste { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.6rem; padding-left: 0.9rem; border-left: 2px solid var(--border); }
+  .proj-unter-item {
+    display: flex; align-items: flex-start; gap: 0.6rem; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 7px; padding: 0.55rem 0.7rem;
+  }
+  .proj-unter-label { font-size: 0.72rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 0.3rem; }
+
   .link-item {
     display: flex; align-items: flex-start; gap: 0.7rem; background: var(--panel);
     border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem;
