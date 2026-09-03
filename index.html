@@ -482,6 +482,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <p>Ausgearbeitete Konzepte und Projekte, optional mit hinterlegten Dateien.</p>
               <ul>
                 <li><strong>Neues Projekt:</strong> Titel, Kategorie (mit Autovervollständigung), Kurzbeschreibung, optional gleich eine erste Datei</li>
+                <li><strong>Unterprojekte:</strong> beim Anlegen oder in der Bearbeitung ein Hauptprojekt auswählen, dann läuft das Projekt als Unterprojekt darunter – nur eine Ebene tief, ein Unterprojekt kann nicht selbst wieder Hauptprojekt sein</li>
+                <li><strong>Löschschutz:</strong> ein Hauptprojekt mit noch vorhandenen Unterprojekten lässt sich nicht löschen – erst die Unterprojekte löschen oder einem anderen Hauptprojekt zuordnen</li>
                 <li><strong>Erlaubte Dateien:</strong> PDF und Word (.docx), maximal 5 MB pro Datei</li>
                 <li><strong>Mehrere Dateien pro Projekt:</strong> über „📎 Datei hinzufügen" lassen sich beliebig viele Dateien nacheinander anhängen. Jede Datei erscheint als eigene Zeile mit Dateiname (anklickbar zum Öffnen), Datum und einem × zum einzelnen Entfernen</li>
                 <li><strong>Datei öffnen:</strong> Klick auf den Dateinamen holt eine frische, 5 Minuten gültige Signatur-URL. Die Dateien liegen in einem privaten Supabase-Storage-Bucket, nicht öffentlich erreichbar</li>
@@ -676,13 +678,15 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-ogs-projekte" class="hidden">
-        <h1>Projekte <button class="hilfe-icon" data-hilfe="Ausgearbeitete Konzepte mit Datei-Ablage – im Unterschied zu Ideen können hier beliebig viele Dateien pro Projekt hinterlegt und einzeln nachgereicht oder gelöscht werden. Nur im Bereich OGS verfügbar.">?</button></h1>
-        <p class="hero-text">Ausgearbeitete Konzepte und Projekte der OGS Rapunzel – mit Datei-Ablage.</p>
+        <h1>Projekte <button class="hilfe-icon" data-hilfe="Ausgearbeitete Konzepte mit Datei-Ablage. Hauptprojekte können Unterprojekte enthalten – praktisch für ein größeres Thema mit mehreren kleineren Teilprojekten darin. Nur im Bereich OGS verfügbar.">?</button></h1>
+        <p class="hero-text">Ausgearbeitete Konzepte und Projekte der OGS Rapunzel – mit Datei-Ablage und Unterprojekten.</p>
 
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
           <input type="text" id="neu-proj-titel" placeholder="Titel">
           <input type="text" id="neu-proj-kategorie" placeholder="Kategorie (optional)" list="proj-kategorie-liste">
           <datalist id="proj-kategorie-liste"></datalist>
+          <select id="neu-proj-hauptprojekt"><option value="">– Eigenständiges Hauptprojekt –</option></select>
+          <button type="button" class="hilfe-icon" data-hilfe="Optional: ordnet das neue Projekt als Unterprojekt einem bestehenden Hauptprojekt zu. Nur eine Ebene möglich – ein Unterprojekt kann nicht selbst wieder Hauptprojekt für weitere Unterprojekte sein.">?</button>
         </div>
         <div class="row" style="flex-wrap:wrap; align-items:flex-start; margin-top:0.5rem;">
           <textarea id="neu-proj-beschreibung" placeholder="Kurzbeschreibung (optional)" rows="2" style="flex:1; min-width:200px;"></textarea>
@@ -695,7 +699,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <p class="empty-text" style="margin-top:0.3rem;">PDF oder Word (.docx), max. 5 MB. Datei ist optional.</p>
 
         <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-top:1.4rem;">
-          <h3 style="margin-top: 0; font-size:0.95rem;">Mehrere Projekte auf einmal importieren <button type="button" class="hilfe-icon" data-hilfe="Legt für jede Zeile der CSV ein neues Projekt an, noch ohne Datei. Dateien reichst du danach einzeln pro Projekt über '📎 Datei hinzufügen' nach.">?</button></h3>
+          <h3 style="margin-top: 0; font-size:0.95rem;">Mehrere Projekte auf einmal importieren <button type="button" class="hilfe-icon" data-hilfe="Legt für jede Zeile der CSV ein neues Hauptprojekt an, noch ohne Datei und ohne Unterprojekt-Zuordnung. Dateien und Unterprojekt-Zuordnung reichst du danach einzeln nach.">?</button></h3>
           <p class="empty-text">CSV-Datei mit Spalten <code>Titel</code>, <code>Beschreibung</code>, <code>Kategorie</code> (Beschreibung/Kategorie optional). Dateien pro Projekt können danach einzeln nachgereicht werden.</p>
           <div class="row" style="flex-wrap:wrap; align-items:center;">
             <input type="file" id="proj-csv-datei" accept=".csv">
