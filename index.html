@@ -108,6 +108,7 @@
             <button class="tab-btn" id="tab-notizen">Notizen</button>
             <button class="tab-btn" id="tab-links" data-nur="privat">Links</button>
             <button class="tab-btn" id="tab-reflexion" data-nur="privat">Reflexion</button>
+            <button class="tab-btn" id="tab-spiele" data-nur="privat">Spiele</button>
             <button class="tab-btn" id="tab-einkauf" data-nur="privat">Einkauf</button>
           </div>
           <div class="tab-group" data-nur="ogs,awo">
@@ -297,6 +298,35 @@
         <h1>Export <button class="hilfe-icon" data-hilfe="Nur im Bereich Privat verfügbar. Exportiert deine Daten (z.B. Aufgaben, Finanzen, Notizen) als Excel- oder Word-Datei zum Herunterladen und Sichern – ändert nichts an den gespeicherten Daten selbst.">?</button></h1>
         <p class="hero-text">Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen.</p>
         <div id="export-liste"></div>
+      </div>
+
+      <div id="view-spiele" class="hidden">
+        <h1>Spiele <button class="hilfe-icon" data-hilfe="Deine Spielekartei für die Jugendarbeit – griffbereit egal ob OGS, Jugendwerk oder unterwegs. Nach Kategorie sortiert und filterbar, Beschreibung direkt im Feld, optional zusätzlich eine Datei. Nur im Bereich Privat verfügbar, damit sie immer erreichbar ist.">?</button></h1>
+        <p class="hero-text">Spielbeschreibungen für die Jugendarbeit – nach Kategorie sortiert, jederzeit griffbereit.</p>
+
+        <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+          <input type="text" id="neu-spiel-titel" placeholder="Titel">
+          <input type="text" id="neu-spiel-kategorie" placeholder="Kategorie" list="spiel-kategorie-liste">
+          <datalist id="spiel-kategorie-liste"></datalist>
+        </div>
+        <div class="row" style="flex-wrap:wrap; align-items:flex-start; margin-top:0.5rem;">
+          <input type="text" id="neu-spiel-teilnehmerzahl" placeholder="Teilnehmerzahl (optional)" style="max-width:12rem;">
+          <input type="text" id="neu-spiel-altersgruppe" placeholder="Altersgruppe (optional)" style="max-width:12rem;">
+          <input type="text" id="neu-spiel-dauer" placeholder="Dauer (optional)" style="max-width:10rem;">
+          <input type="text" id="neu-spiel-material" placeholder="Material (optional)">
+        </div>
+        <div class="row" style="flex-wrap:wrap; align-items:flex-start; margin-top:0.5rem;">
+          <textarea id="neu-spiel-beschreibung" placeholder="Spielbeschreibung (optional)" rows="3" style="flex:1; min-width:200px;"></textarea>
+        </div>
+        <div class="row" style="flex-wrap:wrap; align-items:center; margin-top:0.5rem;">
+          <input type="file" id="neu-spiel-datei" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+          <button type="button" class="hilfe-icon" data-hilfe="Optional zusätzlich zur Beschreibung – z.B. wenn du schon eine ausformulierte Spielanleitung als PDF oder Word hast. Weitere Dateien lassen sich später über '📎 Datei hinzufügen' nachreichen.">?</button>
+          <button class="btn-primary" id="btn-spiel-hinzufuegen">Speichern</button>
+        </div>
+        <p class="empty-text" style="margin-top:0.3rem;">PDF oder Word (.docx), max. 5 MB. Datei ist optional.</p>
+
+        <div id="spiel-filter-bereich" style="margin-top:0.8rem;"></div>
+        <div id="spiel-liste-bereich"></div>
       </div>
 
       <div id="view-einkauf" class="hidden">
@@ -523,6 +553,19 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Datum (voreingestellt auf heute, änderbar) + freier Text</li>
                 <li>Liste zeigt neueste Einträge zuerst</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Spiele <span class="anleitung-nur">(nur Privat)</span></summary>
+            <div class="anleitung-text">
+              <p>Spielekartei für die Jugendarbeit – bewusst nur im Bereich Privat, damit sie unabhängig davon griffbereit ist, ob du gerade in der OGS, im Jugendwerk oder anderswo eine Spielidee brauchst.</p>
+              <ul>
+                <li><strong>Neues Spiel:</strong> Titel, Kategorie (mit Autovervollständigung), optional Teilnehmerzahl, Altersgruppe, Dauer und Material, optional eine Beschreibung direkt im Feld und/oder eine Datei</li>
+                <li><strong>Beschreibung im Feld vs. Datei:</strong> die Freitext-Beschreibung ist sofort lesbar und durchsuchbar; eine zusätzliche Datei eignet sich für bereits ausformulierte Anleitungen (PDF/Word, max. 5 MB)</li>
+                <li>Liste ist nach Kategorie gruppiert, Filter-Dropdown oben zeigt die Anzahl je Kategorie inklusive „Ohne Kategorie"</li>
+                <li>Klick auf ein Spiel öffnet die Inline-Bearbeitung aller Felder, Löschen mit Sicherheitsabfrage entfernt auch alle hinterlegten Dateien</li>
               </ul>
             </div>
           </details>
