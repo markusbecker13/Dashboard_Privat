@@ -50,6 +50,8 @@
   let ogsInventar = [];
   let ogsProjekte = [];
   let ogsProjektDateien = [];
+  let spiele = [];
+  let spieleDateien = [];
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
   let wetterOrt = localStorage.getItem("wetter-ort") || "Erftstadt";
   let wetterDaten = null; // letzte erfolgreiche Antwort vom Server
@@ -226,6 +228,8 @@
     ogsInventar = data.ogs_inventar || [];
     ogsProjekte = data.ogs_projekte || [];
     ogsProjektDateien = data.ogs_projekt_dateien || [];
+    spiele = data.spiele || [];
+    spieleDateien = data.spiele_dateien || [];
     bereichAnwenden();
     render();
     renderKalender();
@@ -242,6 +246,7 @@
     renderOgsIdeen();
     renderInventar();
     renderProjekte();
+    renderSpiele();
   }
 
   function badgeHtml(cls, text) {
@@ -737,8 +742,8 @@
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", anleitung: "tab-anleitung", planung: "tab-planung", finanzen: "tab-finanzen", ogsideen: "tab-ogs-ideen", ogsinventar: "tab-ogs-inventar", ogsprojekte: "tab-ogs-projekte" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", anleitung: "view-anleitung", planung: "view-planung", finanzen: "view-finanzen", ogsideen: "view-ogs-ideen", ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte" };
+    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", spiele: "tab-spiele", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", anleitung: "tab-anleitung", planung: "tab-planung", finanzen: "tab-finanzen", ogsideen: "tab-ogs-ideen", ogsinventar: "tab-ogs-inventar", ogsprojekte: "tab-ogs-projekte" };
+    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", spiele: "view-spiele", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", anleitung: "view-anleitung", planung: "view-planung", finanzen: "view-finanzen", ogsideen: "view-ogs-ideen", ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte" };
     for (const key in tabs) {
       document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
       document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
@@ -751,6 +756,7 @@
     if (aktiv === "ogsideen") renderOgsIdeen();
     if (aktiv === "ogsinventar") renderInventar();
     if (aktiv === "ogsprojekte") renderProjekte();
+    if (aktiv === "spiele") renderSpiele();
     menuSchliessen();
   }
 
@@ -787,6 +793,7 @@
   document.getElementById("tab-einkauf").addEventListener("click", () => tabWechseln("einkauf"));
   document.getElementById("tab-verlauf").addEventListener("click", () => tabWechseln("verlauf"));
   document.getElementById("tab-anleitung").addEventListener("click", () => tabWechseln("anleitung"));
+  document.getElementById("tab-spiele").addEventListener("click", () => tabWechseln("spiele"));
   document.getElementById("tab-planung").addEventListener("click", () => tabWechseln("planung"));
   document.getElementById("tab-finanzen").addEventListener("click", () => tabWechseln("finanzen"));
   document.getElementById("tab-ogs-ideen").addEventListener("click", () => tabWechseln("ogsideen"));
@@ -2213,6 +2220,232 @@
     input.value = "";
     await ladeDaten();
   }
+
+  // ==========================================================
+  // Spiele (Spielekartei für die Jugendarbeit, nur Privat)
+  // ==========================================================
+  let spielAktiveKategorie = "alle";
+  let spielBearbeitenId = null;
+  const SPIEL_OHNE_KATEGORIE = "__ohne__";
+
+  function spielMetaZeile(s) {
+    const teile = [];
+    if (s.teilnehmerzahl) teile.push(`👥 ${escapeHtml(s.teilnehmerzahl)}`);
+    if (s.altersgruppe) teile.push(`🎂 ${escapeHtml(s.altersgruppe)}`);
+    if (s.dauer) teile.push(`⏱ ${escapeHtml(s.dauer)}`);
+    if (s.material) teile.push(`🧰 ${escapeHtml(s.material)}`);
+    return teile.join(" · ");
+  }
+
+  function renderSpiele() {
+    const filterBereich = document.getElementById("spiel-filter-bereich");
+    const listeBereich = document.getElementById("spiel-liste-bereich");
+    if (!filterBereich || !listeBereich) return;
+
+    const kategorien = [...new Set(spiele.map((s) => s.kategorie).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const ohneKategorieAnzahl = spiele.filter((s) => !s.kategorie).length;
+
+    const datalist = document.getElementById("spiel-kategorie-liste");
+    if (datalist) datalist.innerHTML = kategorien.map((k) => `<option value="${escapeAttr(k)}"></option>`).join("");
+
+    const gueltigeWerte = ["alle", ...kategorien, ...(ohneKategorieAnzahl > 0 ? [SPIEL_OHNE_KATEGORIE] : [])];
+    if (!gueltigeWerte.includes(spielAktiveKategorie)) spielAktiveKategorie = "alle";
+
+    filterBereich.innerHTML = `
+      <select id="spiel-kategorie-filter" onchange="spielFilterAendern(this.value)">
+        <option value="alle" ${spielAktiveKategorie === "alle" ? "selected" : ""}>Alle Kategorien (${spiele.length})</option>
+        ${kategorien.map((k) => {
+          const anzahl = spiele.filter((s) => s.kategorie === k).length;
+          return `<option value="${escapeAttr(k)}" ${spielAktiveKategorie === k ? "selected" : ""}>${escapeHtml(k)} (${anzahl})</option>`;
+        }).join("")}
+        ${ohneKategorieAnzahl > 0 ? `<option value="${SPIEL_OHNE_KATEGORIE}" ${spielAktiveKategorie === SPIEL_OHNE_KATEGORIE ? "selected" : ""}>Ohne Kategorie (${ohneKategorieAnzahl})</option>` : ""}
+      </select>`;
+
+    let gefiltert = spiele;
+    if (spielAktiveKategorie === SPIEL_OHNE_KATEGORIE) gefiltert = spiele.filter((s) => !s.kategorie);
+    else if (spielAktiveKategorie !== "alle") gefiltert = spiele.filter((s) => s.kategorie === spielAktiveKategorie);
+
+    if (gefiltert.length === 0) {
+      listeBereich.innerHTML = '<p class="empty-text">Noch keine Spiele hinterlegt.</p>';
+      return;
+    }
+
+    const gruppen = {};
+    gefiltert.forEach((s) => {
+      const key = s.kategorie || SPIEL_OHNE_KATEGORIE;
+      (gruppen[key] = gruppen[key] || []).push(s);
+    });
+    const kategorienSortiert = Object.keys(gruppen).sort((a, b) => {
+      if (a === SPIEL_OHNE_KATEGORIE) return 1;
+      if (b === SPIEL_OHNE_KATEGORIE) return -1;
+      return a.localeCompare(b);
+    });
+
+    listeBereich.innerHTML = kategorienSortiert.map((kat) => {
+      const items = gruppen[kat].sort((a, b) => a.titel.localeCompare(b.titel));
+      const ueberschrift = kat === SPIEL_OHNE_KATEGORIE ? "Ohne Kategorie" : kat;
+      const zeilen = items.map((s) => {
+        const dateien = spieleDateien.filter((d) => d.spiel_id === s.id);
+
+        if (spielBearbeitenId === s.id) {
+          return `
+            <div class="notiz-item">
+              <div style="flex:1; display:flex; flex-direction:column; gap:0.4rem;">
+                <input type="text" id="spiel-edit-titel-${s.id}" value="${escapeAttr(s.titel)}" placeholder="Titel">
+                <input type="text" id="spiel-edit-kategorie-${s.id}" value="${escapeAttr(s.kategorie || "")}" placeholder="Kategorie" list="spiel-kategorie-liste">
+                <div class="row" style="flex-wrap:wrap;">
+                  <input type="text" id="spiel-edit-teilnehmerzahl-${s.id}" value="${escapeAttr(s.teilnehmerzahl || "")}" placeholder="Teilnehmerzahl" style="max-width:12rem;">
+                  <input type="text" id="spiel-edit-altersgruppe-${s.id}" value="${escapeAttr(s.altersgruppe || "")}" placeholder="Altersgruppe" style="max-width:12rem;">
+                  <input type="text" id="spiel-edit-dauer-${s.id}" value="${escapeAttr(s.dauer || "")}" placeholder="Dauer" style="max-width:10rem;">
+                  <input type="text" id="spiel-edit-material-${s.id}" value="${escapeAttr(s.material || "")}" placeholder="Material">
+                </div>
+                <textarea id="spiel-edit-beschreibung-${s.id}" rows="3" placeholder="Spielbeschreibung">${escapeHtml(s.beschreibung || "")}</textarea>
+                <div>
+                  <button class="btn-primary" onclick="spielBearbeitenSpeichern('${s.id}')">Speichern</button>
+                  <button class="link-btn" onclick="spielBearbeitenAbbrechen()">Abbrechen</button>
+                </div>
+              </div>
+            </div>`;
+        }
+
+        const dateiZeilen = dateien.map((d) => {
+          const hochgeladen = new Date(d.hochgeladen_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+          return `
+                <div>📎 <span onclick="event.stopPropagation(); spielDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
+                  <span style="opacity:0.65;">(${hochgeladen})</span>
+                  <span onclick="event.stopPropagation(); spielDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen">×</span></div>`;
+        }).join("");
+
+        const meta = spielMetaZeile(s);
+
+        return `
+          <div class="notiz-item">
+            <div style="flex:1; cursor:pointer;" onclick="spielBearbeitenStart('${s.id}')">
+              <span class="notiz-text">${escapeHtml(s.titel)}</span>
+              ${meta ? `<div class="notiz-meta" style="margin-top:0.2rem;">${meta}</div>` : ""}
+              ${s.beschreibung ? `<div class="notiz-meta" style="margin-top:0.3rem; white-space:pre-wrap;">${escapeHtml(s.beschreibung)}</div>` : ""}
+              <div class="notiz-meta" style="margin-top:0.3rem;">
+                ${dateiZeilen}
+                <label style="text-decoration:underline; cursor:pointer;" onclick="event.stopPropagation();">📎 Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="spielDateiHinzufuegen('${s.id}', this)"></label>
+              </div>
+            </div>
+            <button class="task-delete" onclick="spielLoeschen('${s.id}')">×</button>
+          </div>`;
+      }).join("");
+      return `<h3 style="margin-top:1.2rem; margin-bottom:0.4rem; font-size:0.95rem; color:var(--ink-dim);">${escapeHtml(ueberschrift)}</h3><div class="notiz-list">${zeilen}</div>`;
+    }).join("");
+  }
+
+  window.spielFilterAendern = function(wert) {
+    spielAktiveKategorie = wert;
+    renderSpiele();
+  };
+
+  document.getElementById("btn-spiel-hinzufuegen").addEventListener("click", spielHinzufuegen);
+
+  async function spielHinzufuegen() {
+    const titel = document.getElementById("neu-spiel-titel").value.trim();
+    if (!titel) return;
+    const kategorie = document.getElementById("neu-spiel-kategorie").value.trim() || null;
+    const beschreibung = document.getElementById("neu-spiel-beschreibung").value.trim() || null;
+    const teilnehmerzahl = document.getElementById("neu-spiel-teilnehmerzahl").value.trim() || null;
+    const altersgruppe = document.getElementById("neu-spiel-altersgruppe").value.trim() || null;
+    const dauer = document.getElementById("neu-spiel-dauer").value.trim() || null;
+    const material = document.getElementById("neu-spiel-material").value.trim() || null;
+    const dateiInput = document.getElementById("neu-spiel-datei");
+    const datei = dateiInput.files[0];
+
+    const payload = { titel, kategorie, beschreibung, teilnehmerzahl, altersgruppe, dauer, material };
+    if (datei) {
+      if (!PROJ_ERLAUBTE_TYPEN.includes(datei.type)) {
+        alert("Nur PDF- und Word-Dateien (.docx) sind erlaubt.");
+        return;
+      }
+      if (datei.size > PROJ_MAX_BYTES) {
+        alert("Die Datei ist größer als 5 MB.");
+        return;
+      }
+      payload.datei_base64 = await dateiZuBase64(datei);
+      payload.datei_name = datei.name;
+      payload.datei_typ = datei.type;
+    }
+
+    await api("spiel_hinzufuegen", payload);
+    document.getElementById("neu-spiel-titel").value = "";
+    document.getElementById("neu-spiel-kategorie").value = "";
+    document.getElementById("neu-spiel-beschreibung").value = "";
+    document.getElementById("neu-spiel-teilnehmerzahl").value = "";
+    document.getElementById("neu-spiel-altersgruppe").value = "";
+    document.getElementById("neu-spiel-dauer").value = "";
+    document.getElementById("neu-spiel-material").value = "";
+    dateiInput.value = "";
+    await ladeDaten();
+  }
+
+  window.spielBearbeitenStart = function(id) {
+    spielBearbeitenId = id;
+    renderSpiele();
+  };
+
+  window.spielBearbeitenAbbrechen = function() {
+    spielBearbeitenId = null;
+    renderSpiele();
+  };
+
+  window.spielBearbeitenSpeichern = async function(id) {
+    const titel = document.getElementById(`spiel-edit-titel-${id}`).value.trim();
+    if (!titel) return;
+    const kategorie = document.getElementById(`spiel-edit-kategorie-${id}`).value.trim() || null;
+    const beschreibung = document.getElementById(`spiel-edit-beschreibung-${id}`).value.trim() || null;
+    const teilnehmerzahl = document.getElementById(`spiel-edit-teilnehmerzahl-${id}`).value.trim() || null;
+    const altersgruppe = document.getElementById(`spiel-edit-altersgruppe-${id}`).value.trim() || null;
+    const dauer = document.getElementById(`spiel-edit-dauer-${id}`).value.trim() || null;
+    const material = document.getElementById(`spiel-edit-material-${id}`).value.trim() || null;
+    await api("spiel_aktualisieren", { id, titel, kategorie, beschreibung, teilnehmerzahl, altersgruppe, dauer, material });
+    spielBearbeitenId = null;
+    await ladeDaten();
+  };
+
+  window.spielLoeschen = async function(id) {
+    if (!confirm("Dieses Spiel inklusive hinterlegter Dateien wirklich löschen?")) return;
+    await api("spiel_loeschen", { id });
+    await ladeDaten();
+  };
+
+  window.spielDateiOeffnen = async function(dateiId) {
+    try {
+      const res = await api("spiel_datei_url", { datei_id: dateiId });
+      window.open(res.url, "_blank", "noopener");
+    } catch (e) {
+      alert("Datei konnte nicht geöffnet werden: " + e.message);
+    }
+  };
+
+  window.spielDateiHinzufuegen = async function(id, input) {
+    const datei = input.files[0];
+    if (!datei) return;
+    if (!PROJ_ERLAUBTE_TYPEN.includes(datei.type)) {
+      alert("Nur PDF- und Word-Dateien (.docx) sind erlaubt.");
+      input.value = "";
+      return;
+    }
+    if (datei.size > PROJ_MAX_BYTES) {
+      alert("Die Datei ist größer als 5 MB.");
+      input.value = "";
+      return;
+    }
+    const datei_base64 = await dateiZuBase64(datei);
+    await api("spiel_datei_hinzufuegen", {
+      id, datei_base64, datei_name: datei.name, datei_typ: datei.type,
+    });
+    await ladeDaten();
+  };
+
+  window.spielDateiLoeschen = async function(dateiId) {
+    if (!confirm("Diese Datei wirklich entfernen?")) return;
+    await api("spiel_datei_loeschen", { datei_id: dateiId });
+    await ladeDaten();
+  };
 
   // ==========================================================
   // Links
