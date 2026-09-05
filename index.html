@@ -353,7 +353,7 @@
       <div id="view-reiter-verwaltung" class="hidden">
         <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
-        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion und Einkaufsliste sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Finanzen, Planung/Frei und Export sind (Stand jetzt) noch nicht getrennt und zeigen überall dieselben Daten. Spiele bleibt bewusst eine gemeinsame Kartei. Inventar/Projekte gibt es bislang nur sinnvoll in OGS.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste und Finanzen sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Inventar/Projekte gibt es bislang nur sinnvoll in OGS.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -482,9 +482,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Finanzen <span class="anleitung-nur">(nur Privat)</span></summary>
+            <summary>Finanzen <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
-              <p>Übersicht über Fixkosten, Sonderausgaben und einzelne Buchungen, über vier Reiter oben im Tab.</p>
+              <p>Übersicht über Fixkosten, Sonderausgaben und einzelne Buchungen, über vier Reiter oben im Tab. Fixkosten, Sonderausgaben, Buchungen und Startkapital haben ein eigenes <code>bereich</code>-Feld – zusätzlich in OGS/AWO eingeblendet, sind das komplett eigene, getrennte Datensätze inkl. eigenem Startkapital pro Jahr.</p>
               <p><strong>Fixkosten</strong> – zwei Excel-artige 12-Monats-Tabellen (Ausgaben, Einnahmen). Zelle anklicken, um die ganze Zeile inline zu bearbeiten; Summenspalte/-zeile aktualisieren sich automatisch.</p>
               <p><strong>Sonderausgaben</strong> – einmalige, größere Posten als Karten-Liste, ebenfalls inline bearbeitbar.</p>
               <p><strong>Buchungen</strong> – laufende Kontobewegungen:</p>
@@ -499,6 +499,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li>Drei Charts: Einnahmen vs. Ausgaben pro Monat, Kontostand-Verlauf, Ausgaben nach Kategorie</li>
                 <li>Rechnet <strong>ausschließlich</strong> aus den erfassten Buchungen – Fixkosten und Sonderausgaben fließen bewusst nicht mit ein, damit nichts doppelt gezählt wird</li>
               </ul>
+              <p><strong>Massenlöschung</strong> (unten in der Übersicht) wirkt nur auf den aktuell aktiven Bereich – löscht in Privat keine OGS/AWO-Buchungen und umgekehrt.</p>
             </div>
           </details>
 
@@ -620,7 +621,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Ausblenden entfernt einen Reiter nur aus der Ansicht – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen</li>
                 <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
-                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion und Einkaufsliste haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Finanzen, Planung/Frei und Export</strong> haben (Stand jetzt) noch keine bereichseigene Trennung – zusätzlich sichtbar geschaltet, zeigen sie überall dieselben Daten. <strong>Spiele</strong> ist bewusst weiterhin eine einzige, gemeinsame Kartei. <strong>Inventar und Projekte</strong> haben noch kein <code>bereich</code>-Feld, sind also aktuell nur im OGS-Bereich sinnvoll nutzbar</li>
+                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste und Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital) haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten. <strong>Inventar und Projekte</strong> haben noch kein <code>bereich</code>-Feld, sind also aktuell nur im OGS-Bereich sinnvoll nutzbar (nächste Etappe)</li>
               </ul>
             </div>
           </details>
