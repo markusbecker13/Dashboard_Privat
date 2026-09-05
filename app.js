@@ -52,7 +52,68 @@
   let ogsProjektDateien = [];
   let spiele = [];
   let spieleDateien = [];
+  let tabEinstellungen = [];
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
+
+  // Zuordnung Tab-Schlüssel -> DOM-Element-IDs. Zentral an einer Stelle,
+  // damit tabWechseln(), bereichAnwenden() und die Reiter-Verwaltung
+  // dieselbe Quelle nutzen.
+  const TAB_ELEMENTE = {
+    heute: "tab-heute", frei: "tab-frei", aufgaben: "tab-aufgaben", kalender: "tab-kalender",
+    planung: "tab-planung", finanzen: "tab-finanzen", notizen: "tab-notizen", links: "tab-links",
+    reflexion: "tab-reflexion", spiele: "tab-spiele", einkauf: "tab-einkauf", export: "tab-export",
+    verlauf: "tab-verlauf", anleitung: "tab-anleitung", ogsideen: "tab-ogs-ideen",
+    ogsinventar: "tab-ogs-inventar", ogsprojekte: "tab-ogs-projekte",
+    reiterverwaltung: "tab-reiter-verwaltung",
+  };
+  const VIEW_ELEMENTE = {
+    heute: "view-heute", frei: "view-frei", aufgaben: "view-aufgaben", kalender: "view-kalender",
+    planung: "view-planung", finanzen: "view-finanzen", notizen: "view-notizen", links: "view-links",
+    reflexion: "view-reflexion", spiele: "view-spiele", einkauf: "view-einkauf", export: "view-export",
+    verlauf: "view-verlauf", anleitung: "view-anleitung", ogsideen: "view-ogs-ideen",
+    ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte",
+    reiterverwaltung: "view-reiter-verwaltung",
+  };
+
+  // Welche Reiter in welchem Bereich grundsätzlich zur Auswahl stehen
+  // (unabhängig von data-nur – das steuert nur die technische Verfügbarkeit,
+  // dies hier ist die vom Nutzer änderbare Sichtbarkeit).
+  const BEREICH_TABS = {
+    privat: [
+      ["heute", "Start"], ["frei", "Frei"], ["aufgaben", "Aufgaben"], ["kalender", "Kalender"],
+      ["planung", "Planung"], ["finanzen", "Finanzen"], ["notizen", "Notizen"], ["links", "Links"],
+      ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["einkauf", "Einkauf"], ["export", "Export"],
+      ["verlauf", "Verlauf"], ["anleitung", "Anleitung"],
+    ],
+    ogs: [
+      ["heute", "Start"], ["aufgaben", "Aufgaben"], ["kalender", "Kalender"], ["notizen", "Notizen"],
+      ["ogsideen", "Ideen"], ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"],
+      ["verlauf", "Verlauf"], ["anleitung", "Anleitung"],
+    ],
+    awo: [
+      ["heute", "Start"], ["aufgaben", "Aufgaben"], ["kalender", "Kalender"], ["notizen", "Notizen"],
+      ["ogsideen", "Ideen"], ["verlauf", "Verlauf"], ["anleitung", "Anleitung"],
+    ],
+  };
+  const BEREICH_TITEL_VERWALTUNG = { privat: "🏠 Privat", ogs: "🏫 OGS Rapunzel", awo: "🤝 AWO OV Liblar" };
+
+  function reiterIstSichtbar(bereich, schluessel) {
+    const eintrag = tabEinstellungen.find((e) => e.bereich === bereich && e.tab_id === schluessel);
+    return eintrag ? eintrag.sichtbar !== false : true;
+  }
+
+  function ersteSichtbareTabSchluessel(bevorzugt) {
+    if (bevorzugt && istTabSichtbar(bevorzugt)) return bevorzugt;
+    for (const schluessel in TAB_ELEMENTE) {
+      if (istTabSichtbar(schluessel)) return schluessel;
+    }
+    return bevorzugt || "heute";
+  }
+
+  function istTabSichtbar(schluessel) {
+    const el = document.getElementById(TAB_ELEMENTE[schluessel]);
+    return !!el && el.offsetParent !== null;
+  }
   let wetterOrt = localStorage.getItem("wetter-ort") || "Erftstadt";
   let wetterDaten = null; // letzte erfolgreiche Antwort vom Server
   let wetterLetzterAbruf = 0; // Timestamp (ms), für einfaches Caching
@@ -113,7 +174,9 @@
     renderKalender();
     renderHeute();
     renderOgsIdeen();
-    tabWechseln(bereich === "privat" ? "heute" : "aufgaben");
+    renderReiterVerwaltung();
+    const standard = bereich === "privat" ? "heute" : bereich === "verwaltung" ? "reiterverwaltung" : "aufgaben";
+    tabWechseln(ersteSichtbareTabSchluessel(standard));
   };
 
   function dashboardNameAnzeigen() {
@@ -230,7 +293,9 @@
     ogsProjektDateien = data.ogs_projekt_dateien || [];
     spiele = data.spiele || [];
     spieleDateien = data.spiele_dateien || [];
+    tabEinstellungen = data.tab_einstellungen || [];
     bereichAnwenden();
+    renderReiterVerwaltung();
     render();
     renderKalender();
     renderHeute();
@@ -711,6 +776,15 @@
       const erlaubt = el.dataset.nur.split(",");
       el.classList.toggle("hidden", !erlaubt.includes(aktiverBereich));
     });
+    // Nutzer-Einstellung aus der Reiter-Verwaltung: blendet einzelne Reiter
+    // zusätzlich aus, aber nur innerhalb dessen, was data-nur ohnehin erlaubt.
+    if (BEREICH_TABS[aktiverBereich]) {
+      BEREICH_TABS[aktiverBereich].forEach(([schluessel]) => {
+        const el = document.getElementById(TAB_ELEMENTE[schluessel]);
+        if (!el || el.classList.contains("hidden")) return;
+        if (!reiterIstSichtbar(aktiverBereich, schluessel)) el.classList.add("hidden");
+      });
+    }
     const arbeitLabel = document.getElementById("tab-group-arbeit-label");
     if (arbeitLabel) arbeitLabel.textContent = BEREICH_NAME[aktiverBereich] || "";
     const ideenTitel = document.getElementById("ogs-ideen-titel");
@@ -731,22 +805,23 @@
     renderKalender();
     renderHeute();
     renderOgsIdeen();
-    tabWechseln(neu === "privat" ? "heute" : "aufgaben");
+    renderReiterVerwaltung();
+    const standard = neu === "privat" ? "heute" : neu === "verwaltung" ? "reiterverwaltung" : "aufgaben";
+    tabWechseln(ersteSichtbareTabSchluessel(standard));
   };
 
   document.getElementById("bereich-btn-privat").addEventListener("click", () => bereichWechseln("privat"));
   document.getElementById("bereich-btn-ogs").addEventListener("click", () => bereichWechseln("ogs"));
   document.getElementById("bereich-btn-awo").addEventListener("click", () => bereichWechseln("awo"));
+  document.getElementById("bereich-btn-verwaltung").addEventListener("click", () => bereichWechseln("verwaltung"));
 
   // ==========================================================
   // Tabs
   // ==========================================================
   function tabWechseln(aktiv) {
-    const tabs = { heute: "tab-heute", aufgaben: "tab-aufgaben", kalender: "tab-kalender", frei: "tab-frei", notizen: "tab-notizen", links: "tab-links", reflexion: "tab-reflexion", spiele: "tab-spiele", export: "tab-export", einkauf: "tab-einkauf", verlauf: "tab-verlauf", anleitung: "tab-anleitung", planung: "tab-planung", finanzen: "tab-finanzen", ogsideen: "tab-ogs-ideen", ogsinventar: "tab-ogs-inventar", ogsprojekte: "tab-ogs-projekte" };
-    const views = { heute: "view-heute", aufgaben: "view-aufgaben", kalender: "view-kalender", frei: "view-frei", notizen: "view-notizen", links: "view-links", reflexion: "view-reflexion", spiele: "view-spiele", export: "view-export", einkauf: "view-einkauf", verlauf: "view-verlauf", anleitung: "view-anleitung", planung: "view-planung", finanzen: "view-finanzen", ogsideen: "view-ogs-ideen", ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte" };
-    for (const key in tabs) {
-      document.getElementById(tabs[key]).classList.toggle("active", key === aktiv);
-      document.getElementById(views[key]).classList.toggle("hidden", key !== aktiv);
+    for (const key in TAB_ELEMENTE) {
+      document.getElementById(TAB_ELEMENTE[key]).classList.toggle("active", key === aktiv);
+      document.getElementById(VIEW_ELEMENTE[key]).classList.toggle("hidden", key !== aktiv);
     }
     if (aktiv === "kalender") { renderKalender(); ladeGoogleSyncStatus(); }
     if (aktiv === "heute") renderHeute();
@@ -757,6 +832,7 @@
     if (aktiv === "ogsinventar") renderInventar();
     if (aktiv === "ogsprojekte") renderProjekte();
     if (aktiv === "spiele") renderSpiele();
+    if (aktiv === "reiterverwaltung") renderReiterVerwaltung();
     menuSchliessen();
   }
 
@@ -799,6 +875,37 @@
   document.getElementById("tab-ogs-ideen").addEventListener("click", () => tabWechseln("ogsideen"));
   document.getElementById("tab-ogs-inventar").addEventListener("click", () => tabWechseln("ogsinventar"));
   document.getElementById("tab-ogs-projekte").addEventListener("click", () => tabWechseln("ogsprojekte"));
+  document.getElementById("tab-reiter-verwaltung").addEventListener("click", () => tabWechseln("reiterverwaltung"));
+
+  // ==========================================================
+  // Reiter-Verwaltung (Bereich "Verwaltung")
+  // ==========================================================
+  function renderReiterVerwaltung() {
+    const container = document.getElementById("reiter-verwaltung-liste");
+    if (!container) return;
+    container.innerHTML = Object.entries(BEREICH_TABS).map(([bereich, tabsListe]) => `
+      <div class="reiter-verwaltung-block">
+        <h3>${BEREICH_TITEL_VERWALTUNG[bereich]}</h3>
+        <div class="reiter-verwaltung-grid">
+          ${tabsListe.map(([schluessel, label]) => `
+            <label class="reiter-verwaltung-item">
+              <input type="checkbox" ${reiterIstSichtbar(bereich, schluessel) ? "checked" : ""}
+                onchange="reiterUmschalten('${bereich}','${schluessel}', this.checked)">
+              ${escapeHtml(label)}
+            </label>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  window.reiterUmschalten = async function(bereich, schluessel, sichtbar) {
+    const idx = tabEinstellungen.findIndex((e) => e.bereich === bereich && e.tab_id === schluessel);
+    if (idx >= 0) tabEinstellungen[idx].sichtbar = sichtbar;
+    else tabEinstellungen.push({ bereich, tab_id: schluessel, sichtbar });
+    await api("tab_einstellungen_speichern", { bereich, tab_id: schluessel, sichtbar });
+    bereichAnwenden();
+  };
 
   // ==========================================================
   // Wetter (Start-Tab)
