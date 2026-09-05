@@ -75,31 +75,34 @@
     reiterverwaltung: "view-reiter-verwaltung",
   };
 
-  // Welche Reiter in welchem Bereich grundsätzlich zur Auswahl stehen
-  // (unabhängig von data-nur – das steuert nur die technische Verfügbarkeit,
-  // dies hier ist die vom Nutzer änderbare Sichtbarkeit).
-  const BEREICH_TABS = {
-    privat: [
-      ["heute", "Start"], ["frei", "Frei"], ["aufgaben", "Aufgaben"], ["kalender", "Kalender"],
-      ["planung", "Planung"], ["finanzen", "Finanzen"], ["notizen", "Notizen"], ["links", "Links"],
-      ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["einkauf", "Einkauf"], ["export", "Export"],
-      ["verlauf", "Verlauf"], ["anleitung", "Anleitung"],
-    ],
-    ogs: [
-      ["heute", "Start"], ["aufgaben", "Aufgaben"], ["kalender", "Kalender"], ["notizen", "Notizen"],
-      ["ogsideen", "Ideen"], ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"],
-      ["verlauf", "Verlauf"], ["anleitung", "Anleitung"],
-    ],
-    awo: [
-      ["heute", "Start"], ["aufgaben", "Aufgaben"], ["kalender", "Kalender"], ["notizen", "Notizen"],
-      ["ogsideen", "Ideen"], ["verlauf", "Verlauf"], ["anleitung", "Anleitung"],
-    ],
-  };
+  // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
+  // gleich, die tatsächliche Sichtbarkeit steuert allein tab_einstellungen
+  // (mit STANDARD_SICHTBAR als Vorbelegung, siehe unten).
+  const ALLE_REITER = [
+    ["heute", "Start"], ["frei", "Frei"], ["aufgaben", "Aufgaben"], ["kalender", "Kalender"],
+    ["planung", "Planung"], ["finanzen", "Finanzen"], ["notizen", "Notizen"], ["links", "Links"],
+    ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["einkauf", "Einkauf"], ["export", "Export"],
+    ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
+    ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"],
+  ];
+  const BEREICH_TABS = { privat: ALLE_REITER, ogs: ALLE_REITER, awo: ALLE_REITER };
   const BEREICH_TITEL_VERWALTUNG = { privat: "🏠 Privat", ogs: "🏫 OGS Rapunzel", awo: "🤝 AWO OV Liblar" };
+
+  // Vorbelegung, solange in tab_einstellungen noch kein expliziter Eintrag
+  // existiert – entspricht dem bisherigen Verhalten (data-nur), damit sich
+  // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
+  const STANDARD_SICHTBAR = {
+    privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
+      "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung"],
+    ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
+      "ogsideen", "ogsinventar", "ogsprojekte"],
+    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen"],
+  };
 
   function reiterIstSichtbar(bereich, schluessel) {
     const eintrag = tabEinstellungen.find((e) => e.bereich === bereich && e.tab_id === schluessel);
-    return eintrag ? eintrag.sichtbar !== false : true;
+    if (eintrag) return eintrag.sichtbar !== false;
+    return (STANDARD_SICHTBAR[bereich] || []).includes(schluessel);
   }
 
   function ersteSichtbareTabSchluessel(bevorzugt) {
@@ -776,17 +779,18 @@
       const erlaubt = el.dataset.nur.split(",");
       el.classList.toggle("hidden", !erlaubt.includes(aktiverBereich));
     });
-    // Nutzer-Einstellung aus der Reiter-Verwaltung: blendet einzelne Reiter
-    // zusätzlich aus, aber nur innerhalb dessen, was data-nur ohnehin erlaubt.
+    // Nutzer-Einstellung aus der Reiter-Verwaltung: entscheidet je Bereich
+    // final, welche Reiter sichtbar sind (überschreibt data-nur, das hier
+    // nur noch den Verwaltungs-Bereich selbst freihält).
     if (BEREICH_TABS[aktiverBereich]) {
       BEREICH_TABS[aktiverBereich].forEach(([schluessel]) => {
         const el = document.getElementById(TAB_ELEMENTE[schluessel]);
-        if (!el || el.classList.contains("hidden")) return;
-        if (!reiterIstSichtbar(aktiverBereich, schluessel)) el.classList.add("hidden");
+        if (!el) return;
+        el.classList.toggle("hidden", !reiterIstSichtbar(aktiverBereich, schluessel));
       });
     }
     const arbeitLabel = document.getElementById("tab-group-arbeit-label");
-    if (arbeitLabel) arbeitLabel.textContent = BEREICH_NAME[aktiverBereich] || "";
+    if (arbeitLabel) arbeitLabel.textContent = BEREICH_NAME[aktiverBereich] || "Weitere";
     const ideenTitel = document.getElementById("ogs-ideen-titel");
     const ideenUntertitel = document.getElementById("ogs-ideen-untertitel");
     if (ideenTitel) ideenTitel.textContent = "Ideen";
