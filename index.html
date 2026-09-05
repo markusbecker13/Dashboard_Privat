@@ -353,7 +353,7 @@
       <div id="view-reiter-verwaltung" class="hidden">
         <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
-        <p class="empty-text" style="margin-top:-0.3rem;">Achtung bei Reitern ohne eigene Bereichs-Trennung (Finanzen, Planung, Frei, Links, Reflexion, Einkauf, Spiele, Export, Ideen, Inventar, Projekte): schaltest du sie zusätzlich in einem anderen Bereich sichtbar, zeigen sie dort dieselben Datensätze – keine separate Kopie pro Bereich.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion und Einkaufsliste sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Finanzen, Planung/Frei und Export sind (Stand jetzt) noch nicht getrennt und zeigen überall dieselben Daten. Spiele bleibt bewusst eine gemeinsame Kartei. Inventar/Projekte gibt es bislang nur sinnvoll in OGS.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -503,7 +503,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Ideen <span class="anleitung-nur">(OGS Rapunzel &amp; AWO OV Liblar)</span></summary>
+            <summary>Ideen <span class="anleitung-nur">(OGS Rapunzel &amp; AWO OV Liblar, per Reiter-Verwaltung auch Privat)</span></summary>
             <div class="anleitung-text">
               <p>Sammlung für Angebots- und Projektideen, getrennt nach Bereich.</p>
               <ul>
@@ -554,7 +554,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Links <span class="anleitung-nur">(nur Privat)</span></summary>
+            <summary>Links <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <ul>
                 <li>Titel + URL eintragen (fehlendes „https://" wird automatisch ergänzt), optional Notiz und Projekt</li>
@@ -565,7 +565,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Reflexion <span class="anleitung-nur">(nur Privat)</span></summary>
+            <summary>Reflexion <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <p>Kurze, datierte Einträge – passend zu Einheiten, Ferienspiel-Tagen oder der Erlebnispädagogik-Weiterbildung.</p>
               <ul>
@@ -589,7 +589,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Einkaufsliste <span class="anleitung-nur">(nur Privat)</span></summary>
+            <summary>Einkaufsliste <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <ul>
                 <li>Artikel eintragen, Enter oder „Hinzufügen"</li>
@@ -620,7 +620,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Ausblenden entfernt einen Reiter nur aus der Ansicht – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen</li>
                 <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
-                <li><strong>Wichtige Einschränkung:</strong> Nur Aufgaben, Notizen, Termine/Kalender und Ideen haben ein eigenes <code>bereich</code>-Feld in der Datenbank. Alle anderen Reiter (Finanzen, Planung, Frei, Links, Reflexion, Einkauf, Spiele, Export, Inventar, Projekte) greifen auf einen einzigen, nicht nach Bereich getrennten Datensatz zu – zusätzlich in einem anderen Bereich sichtbar geschaltet, zeigen sie dort exakt dieselben Daten, keine getrennte Kopie</li>
+                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion und Einkaufsliste haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Finanzen, Planung/Frei und Export</strong> haben (Stand jetzt) noch keine bereichseigene Trennung – zusätzlich sichtbar geschaltet, zeigen sie überall dieselben Daten. <strong>Spiele</strong> ist bewusst weiterhin eine einzige, gemeinsame Kartei. <strong>Inventar und Projekte</strong> haben noch kein <code>bereich</code>-Feld, sind also aktuell nur im OGS-Bereich sinnvoll nutzbar</li>
               </ul>
             </div>
           </details>
