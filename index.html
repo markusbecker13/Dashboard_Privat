@@ -69,6 +69,10 @@
         <span class="bereich-tile-icon">🤝</span>
         <span class="bereich-tile-label">AWO OV Liblar</span>
       </button>
+      <button class="bereich-tile" onclick="bereichAuswaehlen('verwaltung')">
+        <span class="bereich-tile-icon">⚙️</span>
+        <span class="bereich-tile-label">Verwaltung</span>
+      </button>
     </div>
     <button class="link-btn" id="bereich-screen-abmelden" style="margin-top:1.4rem;">Abmelden</button>
   </div>
@@ -88,22 +92,23 @@
           <button class="bereich-btn active" id="bereich-btn-privat" data-bereich="privat">🏠 Privat</button>
           <button class="bereich-btn" id="bereich-btn-ogs" data-bereich="ogs">🏫 OGS</button>
           <button class="bereich-btn" id="bereich-btn-awo" data-bereich="awo">🤝 AWO</button>
+          <button class="bereich-btn" id="bereich-btn-verwaltung" data-bereich="verwaltung">⚙️ Verwaltung</button>
         </div>
 
         <div class="tabs">
-          <div class="tab-group">
+          <div class="tab-group" data-nur="privat,ogs,awo">
             <span class="tab-group-label">Heute</span>
             <button class="tab-btn active" id="tab-heute">Start</button>
             <button class="tab-btn" id="tab-frei" data-nur="privat">Frei</button>
           </div>
-          <div class="tab-group">
+          <div class="tab-group" data-nur="privat,ogs,awo">
             <span class="tab-group-label">Planen</span>
             <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
             <button class="tab-btn" id="tab-kalender">Kalender</button>
             <button class="tab-btn" id="tab-planung" data-nur="privat">Planung</button>
             <button class="tab-btn" id="tab-finanzen" data-nur="privat">Finanzen</button>
           </div>
-          <div class="tab-group">
+          <div class="tab-group" data-nur="privat,ogs,awo">
             <span class="tab-group-label">Sammeln</span>
             <button class="tab-btn" id="tab-notizen">Notizen</button>
             <button class="tab-btn" id="tab-links" data-nur="privat">Links</button>
@@ -117,11 +122,15 @@
             <button class="tab-btn" id="tab-ogs-inventar" data-nur="ogs">Inventar</button>
             <button class="tab-btn" id="tab-ogs-projekte" data-nur="ogs">Projekte</button>
           </div>
-          <div class="tab-group">
+          <div class="tab-group" data-nur="privat,ogs,awo">
             <span class="tab-group-label">Verwalten</span>
             <button class="tab-btn" id="tab-export" data-nur="privat">Export</button>
             <button class="tab-btn" id="tab-verlauf">Verlauf</button>
             <button class="tab-btn" id="tab-anleitung">Anleitung</button>
+          </div>
+          <div class="tab-group" data-nur="verwaltung">
+            <span class="tab-group-label">Verwaltung</span>
+            <button class="tab-btn" id="tab-reiter-verwaltung">Reiter</button>
           </div>
         </div>
 
@@ -341,6 +350,13 @@
         <div id="einkauf-bereich"></div>
       </div>
 
+      <div id="view-reiter-verwaltung" class="hidden">
+        <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
+        <p class="hero-text">Reiter je Bereich ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
+
+        <div id="reiter-verwaltung-liste"></div>
+      </div>
+
       <div id="view-verlauf" class="hidden">
         <h1>Verlauf <button class="hilfe-icon" data-hilfe="Protokoll der letzten 50 Änderungen (angelegt, geändert, gelöscht) über alle Module hinweg. Der automatische Google-Kalender-Abgleich alle 15 Minuten wird hier bewusst nicht mitprotokolliert.">?</button></h1>
         <p class="hero-text">Die letzten 50 Aktivitäten im Dashboard, neueste zuerst.</p>
@@ -374,17 +390,18 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Bereiche: Privat / OGS Rapunzel / AWO OV Liblar</summary>
+            <summary>Bereiche: Privat / OGS Rapunzel / AWO OV Liblar / Verwaltung</summary>
             <div class="anleitung-text">
-              <p>Das Dashboard trennt drei Lebensbereiche sauber voneinander: <strong>Privat</strong>, <strong>OGS Rapunzel</strong> (Beruf) und <strong>AWO OV Liblar</strong> (Ehrenamt).</p>
+              <p>Das Dashboard trennt drei Lebensbereiche sauber voneinander: <strong>Privat</strong>, <strong>OGS Rapunzel</strong> (Beruf) und <strong>AWO OV Liblar</strong> (Ehrenamt). Ein vierter Bereich <strong>Verwaltung</strong> (⚙️) hat keine eigenen Daten, sondern enthält nur die Reiter-Verwaltung.</p>
               <ul>
-                <li><strong>Nach dem Login:</strong> ein Auswahlscreen mit drei Kacheln – Privat öffnet direkt den Start-Tab, OGS/AWO öffnen direkt den Aufgaben-Tab</li>
-                <li><strong>Jederzeit wechseln:</strong> kompakter Umschalter (🏠/🏫/🤝) fest oben in der Sidebar, ohne zurück zur Auswahl zu müssen</li>
-                <li><strong>„↔ Bereich wechseln":</strong> Link unten in der Sidebar, führt zurück zum Drei-Kacheln-Screen, ohne dich abzumelden</li>
+                <li><strong>Nach dem Login:</strong> ein Auswahlscreen mit vier Kacheln – Privat öffnet direkt den Start-Tab, OGS/AWO öffnen direkt den Aufgaben-Tab, Verwaltung öffnet direkt die Reiter-Verwaltung</li>
+                <li><strong>Jederzeit wechseln:</strong> kompakter Umschalter (🏠/🏫/🤝/⚙️) fest oben in der Sidebar, ohne zurück zur Auswahl zu müssen</li>
+                <li><strong>„↔ Bereich wechseln":</strong> Link unten in der Sidebar, führt zurück zum Kacheln-Screen, ohne dich abzumelden</li>
               </ul>
               <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen werden von OGS und AWO gemeinsam genutzt (aber getrennt gehalten), Inventar und Projekte gibt es nur im OGS-Bereich.</p>
-              <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS- und AWO-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Links/Reflexion/Einkauf/Export/Anleitung gibt es in allen bzw. – bis auf Anleitung – nur im Privat-Bereich.</p>
+              <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS- und AWO-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Links/Reflexion/Einkauf/Export gibt es nur im Privat-Bereich.</p>
               <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS oder AWO bleiben grundsätzlich rein lokal im Dashboard.</p>
+              <p><strong>Welche Reiter tatsächlich sichtbar sind</strong>, lässt sich zusätzlich pro Bereich ein-/ausschalten – siehe Reiter unten. Das hier Beschriebene ist die technische Obergrenze, nicht zwingend das, was gerade angezeigt wird.</p>
             </div>
           </details>
 
@@ -592,6 +609,18 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <summary>Export <span class="anleitung-nur">(nur Privat)</span></summary>
             <div class="anleitung-text">
               <p>Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen. Läuft komplett im Browser, ohne dass Daten an Dritte gehen. Bei „Alles" gibt es bei Excel ein Tabellenblatt pro Bereich, bei Word alle Tabellen untereinander in einem Dokument.</p>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Reiter <span class="anleitung-nur">(nur Verwaltung)</span></summary>
+            <div class="anleitung-text">
+              <p>Checkboxen-Übersicht, gruppiert nach Privat/OGS/AWO: legt für jeden Bereich einzeln fest, welche Reiter in der Sidebar sichtbar sein sollen.</p>
+              <ul>
+                <li>Ausblenden entfernt einen Reiter nur aus der Ansicht – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen</li>
+                <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
+                <li>Reiter, die aus technischen Gründen nur in bestimmten Bereichen existieren (z.B. Finanzen nur in Privat, Inventar nur in OGS), tauchen in der Liste konsequent auch nur beim passenden Bereich auf</li>
+              </ul>
             </div>
           </details>
 
