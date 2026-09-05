@@ -781,6 +781,14 @@
     return buchungen.filter((b) => bereichVon(b) === aktiverBereich);
   }
 
+  function ogsInventarAktuell() {
+    return ogsInventar.filter((i) => bereichVon(i) === aktiverBereich);
+  }
+
+  function ogsProjekteAktuell() {
+    return ogsProjekte.filter((p) => bereichVon(p) === aktiverBereich);
+  }
+
   const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar" };
 
   function bereichAnwenden() {
@@ -1950,7 +1958,8 @@
     const listeBereich = document.getElementById("inv-liste-bereich");
     if (!filterBereich || !listeBereich) return;
 
-    const kategorien = [...new Set(ogsInventar.map((i) => i.kategorie))].sort((a, b) => a.localeCompare(b));
+    const inventarAktuell = ogsInventarAktuell();
+    const kategorien = [...new Set(inventarAktuell.map((i) => i.kategorie))].sort((a, b) => a.localeCompare(b));
 
     const datalist = document.getElementById("inv-kategorie-liste");
     if (datalist) datalist.innerHTML = kategorien.map((k) => `<option value="${escapeAttr(k)}"></option>`).join("");
@@ -1959,14 +1968,14 @@
 
     filterBereich.innerHTML = `
       <select id="inv-kategorie-filter" onchange="invFilterAendern(this.value)">
-        <option value="alle" ${invAktiveKategorie === "alle" ? "selected" : ""}>Alle Kategorien (${ogsInventar.length})</option>
+        <option value="alle" ${invAktiveKategorie === "alle" ? "selected" : ""}>Alle Kategorien (${inventarAktuell.length})</option>
         ${kategorien.map((k) => {
-          const anzahl = ogsInventar.filter((i) => i.kategorie === k).length;
+          const anzahl = inventarAktuell.filter((i) => i.kategorie === k).length;
           return `<option value="${escapeAttr(k)}" ${invAktiveKategorie === k ? "selected" : ""}>${escapeHtml(k)} (${anzahl})</option>`;
         }).join("")}
       </select>`;
 
-    const gefiltert = invAktiveKategorie === "alle" ? ogsInventar : ogsInventar.filter((i) => i.kategorie === invAktiveKategorie);
+    const gefiltert = invAktiveKategorie === "alle" ? inventarAktuell : inventarAktuell.filter((i) => i.kategorie === invAktiveKategorie);
 
     if (gefiltert.length === 0) {
       listeBereich.innerHTML = '<p class="empty-text">Noch nichts im Inventar.</p>';
@@ -2025,7 +2034,7 @@
     const menge = document.getElementById("neu-inv-menge").value || 1;
     const standort = document.getElementById("neu-inv-standort").value.trim() || null;
     const zustand = document.getElementById("neu-inv-zustand").value;
-    await api("ogs_inventar_hinzufuegen", { name, kategorie, menge, standort, zustand });
+    await api("ogs_inventar_hinzufuegen", { name, kategorie, menge, standort, zustand, bereich: aktiverBereich });
     document.getElementById("neu-inv-name").value = "";
     document.getElementById("neu-inv-kategorie").value = "";
     document.getElementById("neu-inv-menge").value = "1";
@@ -2085,15 +2094,17 @@
     const bereich = document.getElementById("proj-liste-bereich");
     if (!bereich) return;
 
+    const projekteAktuellOgs = ogsProjekteAktuell();
+
     const datalist = document.getElementById("proj-kategorie-liste");
     if (datalist) {
-      const kategorien = [...new Set(ogsProjekte.map((p) => p.kategorie).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const kategorien = [...new Set(projekteAktuellOgs.map((p) => p.kategorie).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       datalist.innerHTML = kategorien.map((k) => `<option value="${escapeAttr(k)}"></option>`).join("");
     }
 
     // Nur echte Hauptprojekte (ohne eigenes hauptprojekt_id) stehen als
     // Zuordnungs-Ziel zur Auswahl – so bleibt es bei einer Ebene.
-    const hauptprojekte = ogsProjekte.filter((p) => !p.hauptprojekt_id);
+    const hauptprojekte = projekteAktuellOgs.filter((p) => !p.hauptprojekt_id);
     const hauptSelect = document.getElementById("neu-proj-hauptprojekt");
     if (hauptSelect) {
       const bisher = hauptSelect.value;
@@ -2102,7 +2113,7 @@
       if (hauptprojekte.some((p) => p.id === bisher)) hauptSelect.value = bisher;
     }
 
-    if (ogsProjekte.length === 0) {
+    if (projekteAktuellOgs.length === 0) {
       bereich.innerHTML = '<p class="empty-text">Noch keine Projekte hinterlegt.</p>';
       return;
     }
@@ -2142,7 +2153,7 @@
                 <span onclick="event.stopPropagation(); projDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen">×</span></div>`;
       }).join("");
 
-      const unterprojekte = istUnterprojekt ? [] : ogsProjekte.filter((u) => u.hauptprojekt_id === p.id);
+      const unterprojekte = istUnterprojekt ? [] : projekteAktuellOgs.filter((u) => u.hauptprojekt_id === p.id);
       const unterprojekteHtml = unterprojekte.length > 0
         ? `<div class="proj-unter-liste">${unterprojekte.map((u) => projektHtml(u, true)).join("")}</div>`
         : "";
@@ -2183,7 +2194,7 @@
     const dateiInput = document.getElementById("neu-proj-datei");
     const datei = dateiInput.files[0];
 
-    const payload = { titel, kategorie, beschreibung, hauptprojekt_id: hauptprojektId };
+    const payload = { titel, kategorie, beschreibung, hauptprojekt_id: hauptprojektId, bereich: aktiverBereich };
     if (datei) {
       if (!PROJ_ERLAUBTE_TYPEN.includes(datei.type)) {
         alert("Nur PDF- und Word-Dateien (.docx) sind erlaubt.");
@@ -2338,7 +2349,7 @@
       return;
     }
 
-    const res = await api("ogs_projekte_csv_import", { zeilen: importZeilen });
+    const res = await api("ogs_projekte_csv_import", { zeilen: importZeilen, bereich: aktiverBereich });
     status.textContent = `${res.anzahl} Projekte importiert.`;
     input.value = "";
     await ladeDaten();
