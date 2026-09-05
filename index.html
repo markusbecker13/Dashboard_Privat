@@ -353,7 +353,7 @@
       <div id="view-reiter-verwaltung" class="hidden">
         <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
-        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste und Finanzen sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Inventar/Projekte gibt es bislang nur sinnvoll in OGS.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar und -Projekte sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -399,7 +399,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Jederzeit wechseln:</strong> kompakter Umschalter (🏠/🏫/🤝/⚙️) fest oben in der Sidebar, ohne zurück zur Auswahl zu müssen</li>
                 <li><strong>„↔ Bereich wechseln":</strong> Link unten in der Sidebar, führt zurück zum Kacheln-Screen, ohne dich abzumelden</li>
               </ul>
-              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen werden von OGS und AWO gemeinsam genutzt (aber getrennt gehalten), Inventar und Projekte gibt es nur im OGS-Bereich.</p>
+              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar und -Projekte haben ebenfalls ein eigenes bereich-Feld.</p>
               <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS- und AWO-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Links/Reflexion/Einkauf/Export gibt es nur im Privat-Bereich.</p>
               <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS oder AWO bleiben grundsätzlich rein lokal im Dashboard.</p>
               <p><strong>Welche Reiter tatsächlich sichtbar sind</strong>, lässt sich zusätzlich pro Bereich ein-/ausschalten – siehe Reiter unten. Das hier Beschriebene ist die technische Obergrenze, nicht zwingend das, was gerade angezeigt wird.</p>
@@ -515,7 +515,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Inventar <span class="anleitung-nur">(nur OGS Rapunzel)</span></summary>
+            <summary>Inventar <span class="anleitung-nur">(Standard: nur OGS Rapunzel, per Reiter-Verwaltung auch Privat/AWO – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <ul>
                 <li>Name, Kategorie (mit Autovervollständigung aus bestehenden Kategorien), Menge, optional Standort, Zustand (Gut / Eingeschränkt nutzbar / Defekt)</li>
@@ -526,12 +526,12 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Projekte <span class="anleitung-nur">(nur OGS Rapunzel)</span></summary>
+            <summary>Projekte <span class="anleitung-nur">(Standard: nur OGS Rapunzel, per Reiter-Verwaltung auch Privat/AWO – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <p>Ausgearbeitete Konzepte und Projekte, optional mit hinterlegten Dateien.</p>
               <ul>
                 <li><strong>Neues Projekt:</strong> Titel, Kategorie (mit Autovervollständigung), Kurzbeschreibung, optional gleich eine erste Datei</li>
-                <li><strong>Unterprojekte:</strong> beim Anlegen oder in der Bearbeitung ein Hauptprojekt auswählen, dann läuft das Projekt als Unterprojekt darunter – nur eine Ebene tief, ein Unterprojekt kann nicht selbst wieder Hauptprojekt sein</li>
+                <li><strong>Unterprojekte:</strong> beim Anlegen oder in der Bearbeitung ein Hauptprojekt auswählen, dann läuft das Projekt als Unterprojekt darunter – nur eine Ebene tief, ein Unterprojekt kann nicht selbst wieder Hauptprojekt sein. Ein Hauptprojekt muss im selben Bereich liegen wie das Unterprojekt</li>
                 <li><strong>Löschschutz:</strong> ein Hauptprojekt mit noch vorhandenen Unterprojekten lässt sich nicht löschen – erst die Unterprojekte löschen oder einem anderen Hauptprojekt zuordnen</li>
                 <li><strong>Erlaubte Dateien:</strong> PDF und Word (.docx), maximal 5 MB pro Datei</li>
                 <li><strong>Mehrere Dateien pro Projekt:</strong> über „📎 Datei hinzufügen" lassen sich beliebig viele Dateien nacheinander anhängen. Jede Datei erscheint als eigene Zeile mit Dateiname (anklickbar zum Öffnen), Datum und einem × zum einzelnen Entfernen</li>
@@ -621,7 +621,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Ausblenden entfernt einen Reiter nur aus der Ansicht – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen</li>
                 <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
-                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste und Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital) haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten. <strong>Inventar und Projekte</strong> haben noch kein <code>bereich</code>-Feld, sind also aktuell nur im OGS-Bereich sinnvoll nutzbar (nächste Etappe)</li>
+                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital) sowie OGS-Inventar und -Projekte haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten.</li>
               </ul>
             </div>
           </details>
