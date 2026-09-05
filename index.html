@@ -99,32 +99,32 @@
           <div class="tab-group" data-nur="privat,ogs,awo">
             <span class="tab-group-label">Heute</span>
             <button class="tab-btn active" id="tab-heute">Start</button>
-            <button class="tab-btn" id="tab-frei" data-nur="privat">Frei</button>
+            <button class="tab-btn" id="tab-frei">Frei</button>
           </div>
           <div class="tab-group" data-nur="privat,ogs,awo">
             <span class="tab-group-label">Planen</span>
             <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
             <button class="tab-btn" id="tab-kalender">Kalender</button>
-            <button class="tab-btn" id="tab-planung" data-nur="privat">Planung</button>
-            <button class="tab-btn" id="tab-finanzen" data-nur="privat">Finanzen</button>
+            <button class="tab-btn" id="tab-planung">Planung</button>
+            <button class="tab-btn" id="tab-finanzen">Finanzen</button>
           </div>
           <div class="tab-group" data-nur="privat,ogs,awo">
             <span class="tab-group-label">Sammeln</span>
             <button class="tab-btn" id="tab-notizen">Notizen</button>
-            <button class="tab-btn" id="tab-links" data-nur="privat">Links</button>
-            <button class="tab-btn" id="tab-reflexion" data-nur="privat">Reflexion</button>
-            <button class="tab-btn" id="tab-spiele" data-nur="privat">Spiele</button>
-            <button class="tab-btn" id="tab-einkauf" data-nur="privat">Einkauf</button>
+            <button class="tab-btn" id="tab-links">Links</button>
+            <button class="tab-btn" id="tab-reflexion">Reflexion</button>
+            <button class="tab-btn" id="tab-spiele">Spiele</button>
+            <button class="tab-btn" id="tab-einkauf">Einkauf</button>
           </div>
-          <div class="tab-group" data-nur="ogs,awo">
+          <div class="tab-group" data-nur="privat,ogs,awo">
             <span class="tab-group-label" id="tab-group-arbeit-label">OGS Rapunzel</span>
             <button class="tab-btn" id="tab-ogs-ideen">Ideen</button>
-            <button class="tab-btn" id="tab-ogs-inventar" data-nur="ogs">Inventar</button>
-            <button class="tab-btn" id="tab-ogs-projekte" data-nur="ogs">Projekte</button>
+            <button class="tab-btn" id="tab-ogs-inventar">Inventar</button>
+            <button class="tab-btn" id="tab-ogs-projekte">Projekte</button>
           </div>
           <div class="tab-group" data-nur="privat,ogs,awo">
             <span class="tab-group-label">Verwalten</span>
-            <button class="tab-btn" id="tab-export" data-nur="privat">Export</button>
+            <button class="tab-btn" id="tab-export">Export</button>
             <button class="tab-btn" id="tab-verlauf">Verlauf</button>
             <button class="tab-btn" id="tab-anleitung">Anleitung</button>
           </div>
@@ -351,8 +351,9 @@
       </div>
 
       <div id="view-reiter-verwaltung" class="hidden">
-        <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
-        <p class="hero-text">Reiter je Bereich ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
+        <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
+        <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Achtung bei Reitern ohne eigene Bereichs-Trennung (Finanzen, Planung, Frei, Links, Reflexion, Einkauf, Spiele, Export, Ideen, Inventar, Projekte): schaltest du sie zusätzlich in einem anderen Bereich sichtbar, zeigen sie dort dieselben Datensätze – keine separate Kopie pro Bereich.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -615,11 +616,11 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Reiter <span class="anleitung-nur">(nur Verwaltung)</span></summary>
             <div class="anleitung-text">
-              <p>Checkboxen-Übersicht, gruppiert nach Privat/OGS/AWO: legt für jeden Bereich einzeln fest, welche Reiter in der Sidebar sichtbar sein sollen.</p>
+              <p>Checkboxen-Übersicht, gruppiert nach Privat/OGS/AWO: legt für jeden Bereich einzeln und frei fest, welche Reiter in der Sidebar sichtbar sein sollen – auch außerhalb der ursprünglichen Zuordnung (z.B. Finanzen auch in OGS einblenden).</p>
               <ul>
                 <li>Ausblenden entfernt einen Reiter nur aus der Ansicht – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen</li>
                 <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
-                <li>Reiter, die aus technischen Gründen nur in bestimmten Bereichen existieren (z.B. Finanzen nur in Privat, Inventar nur in OGS), tauchen in der Liste konsequent auch nur beim passenden Bereich auf</li>
+                <li><strong>Wichtige Einschränkung:</strong> Nur Aufgaben, Notizen, Termine/Kalender und Ideen haben ein eigenes <code>bereich</code>-Feld in der Datenbank. Alle anderen Reiter (Finanzen, Planung, Frei, Links, Reflexion, Einkauf, Spiele, Export, Inventar, Projekte) greifen auf einen einzigen, nicht nach Bereich getrennten Datensatz zu – zusätzlich in einem anderen Bereich sichtbar geschaltet, zeigen sie dort exakt dieselben Daten, keine getrennte Kopie</li>
               </ul>
             </div>
           </details>
