@@ -2582,9 +2582,10 @@
     select.innerHTML = '<option value="">Ohne Projekt</option>' +
       projekteAktuell().map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
 
-    const ohneProjekt = links.filter((l) => !l.projekt_id);
+    const linksBereich = links.filter((l) => bereichVon(l) === aktiverBereich);
+    const ohneProjekt = linksBereich.filter((l) => !l.projekt_id);
     const gruppen = projekteAktuell()
-      .map((p) => ({ projekt: p, liste: links.filter((l) => l.projekt_id === p.id) }))
+      .map((p) => ({ projekt: p, liste: linksBereich.filter((l) => l.projekt_id === p.id) }))
       .filter((g) => g.liste.length > 0);
 
     let html = "";
@@ -2594,7 +2595,7 @@
     for (const g of gruppen) {
       html += `<div class="project-heading">${escapeHtml(g.projekt.name)}</div><div class="task-list">${g.liste.map(linkHtml).join("")}</div>`;
     }
-    if (links.length === 0) {
+    if (linksBereich.length === 0) {
       html = '<p class="empty-text">Noch keine Links gespeichert.</p>';
     }
     document.getElementById("links-bereich").innerHTML = html;
@@ -2615,7 +2616,7 @@
     const notiz = document.getElementById("neuer-link-notiz").value.trim() || null;
     const projekt_id = document.getElementById("link-projekt").value || null;
 
-    await api("link_hinzufuegen", { titel, url, notiz, projekt_id });
+    await api("link_hinzufuegen", { titel, url, notiz, projekt_id, bereich: aktiverBereich });
     document.getElementById("neuer-link-titel").value = "";
     document.getElementById("neuer-link-url").value = "";
     document.getElementById("neuer-link-notiz").value = "";
@@ -2641,11 +2642,12 @@
 
   function renderReflexionen() {
     const bereich = document.getElementById("reflexion-bereich");
-    if (reflexionen.length === 0) {
+    const reflexionenBereich = reflexionen.filter((r) => bereichVon(r) === aktiverBereich);
+    if (reflexionenBereich.length === 0) {
       bereich.innerHTML = '<p class="empty-text">Noch keine Einträge.</p>';
       return;
     }
-    bereich.innerHTML = reflexionen.map((r) => `
+    bereich.innerHTML = reflexionenBereich.map((r) => `
       <div class="reflex-item">
         <div class="reflex-datum">
           <span>${formatDatumLang(r.datum)}</span>
@@ -2688,7 +2690,7 @@
     if (reflexBearbeiteterId) {
       await api("reflexion_aktualisieren", { id: reflexBearbeiteterId, text, datum });
     } else {
-      await api("reflexion_hinzufuegen", { text, datum });
+      await api("reflexion_hinzufuegen", { text, datum, bereich: aktiverBereich });
     }
     reflexFormZuruecksetzen();
     await ladeDaten();
@@ -2885,8 +2887,9 @@
   // Einkaufsliste
   // ==========================================================
   function renderEinkauf() {
-    const offen = einkaufsliste.filter((e) => !e.erledigt);
-    const erledigt = einkaufsliste.filter((e) => e.erledigt);
+    const einkaufBereich = einkaufsliste.filter((e) => bereichVon(e) === aktiverBereich);
+    const offen = einkaufBereich.filter((e) => !e.erledigt);
+    const erledigt = einkaufBereich.filter((e) => e.erledigt);
 
     let html = "";
     if (offen.length === 0 && erledigt.length === 0) {
@@ -2920,7 +2923,7 @@
   async function einkaufHinzufuegen() {
     const text = document.getElementById("neuer-einkauf").value.trim();
     if (!text) return;
-    await api("einkauf_hinzufuegen", { text });
+    await api("einkauf_hinzufuegen", { text, bereich: aktiverBereich });
     document.getElementById("neuer-einkauf").value = "";
     await ladeDaten();
   }
