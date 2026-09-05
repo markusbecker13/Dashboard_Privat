@@ -769,6 +769,18 @@
     return projekte.filter((p) => bereichVon(p) === aktiverBereich);
   }
 
+  function fixkostenAktuell() {
+    return fixkosten.filter((f) => bereichVon(f) === aktiverBereich);
+  }
+
+  function sonderausgabenAktuell() {
+    return sonderausgaben.filter((s) => bereichVon(s) === aktiverBereich);
+  }
+
+  function buchungenAktuell() {
+    return buchungen.filter((b) => bereichVon(b) === aktiverBereich);
+  }
+
   const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar" };
 
   function bereichAnwenden() {
@@ -3246,7 +3258,7 @@
   }
 
   function fixkostenTabelleHtml(typ, titel) {
-    const zeilen = fixkosten.filter((f) => f.typ === typ);
+    const zeilen = fixkostenAktuell().filter((f) => f.typ === typ);
     const summenProMonat = FIN_MONATE.map((m) => zeilen.reduce((s, f) => s + finZahl(f[m]), 0));
     const summeGesamt = summenProMonat.reduce((s, x) => s + x, 0);
     return `
@@ -3305,7 +3317,7 @@
     const betrag = document.getElementById("neue-fk-betrag").value;
     const zahlung = {};
     FIN_MONATE.forEach((m) => { zahlung[m] = betrag; });
-    await api("fixkosten_hinzufuegen", { bezeichnung, typ, ...zahlung });
+    await api("fixkosten_hinzufuegen", { bezeichnung, typ, ...zahlung, bereich: aktiverBereich });
     await ladeDaten();
     renderFinanzen();
   }
@@ -3369,7 +3381,7 @@
   function renderFinSonderausgaben() {
     const el = document.getElementById("fin-sonderausgaben-bereich");
     const jahr = new Date().getFullYear();
-    const zeilen = sonderausgaben.filter((s) => Number(s.jahr) === jahr);
+    const zeilen = sonderausgabenAktuell().filter((s) => Number(s.jahr) === jahr);
     const summe = zeilen.reduce((s, x) => s + finZahl(x.betrag), 0);
     el.innerHTML = `
       <div class="fin-summary-row">
@@ -3404,7 +3416,7 @@
     const betrag = document.getElementById("neue-sa-betrag").value;
     const monat = document.getElementById("neue-sa-monat").value;
     const notiz = document.getElementById("neue-sa-notiz").value.trim();
-    await api("sonderausgabe_hinzufuegen", { bezeichnung, betrag, monat, notiz, jahr: new Date().getFullYear() });
+    await api("sonderausgabe_hinzufuegen", { bezeichnung, betrag, monat, notiz, jahr: new Date().getFullYear(), bereich: aktiverBereich });
     await ladeDaten();
     renderFinanzen();
   }
@@ -3464,7 +3476,7 @@
     const el = document.getElementById("fin-buchungen-bereich");
     const istAktuellerMonat = finBuchMonat === new Date().getMonth() + 1 && finBuchJahr === new Date().getFullYear();
 
-    const buchungenMonat = buchungen
+    const buchungenMonat = buchungenAktuell()
       .filter((b) => {
         const [j, m] = (b.datum || "").split("-");
         return Number(j) === finBuchJahr && Number(m) === finBuchMonat;
@@ -3595,6 +3607,7 @@
       datum, betrag, notiz,
       typ: buchungTypAusgewaehlt,
       kategorie: buchungKategorieAusgewaehlt,
+      bereich: aktiverBereich,
     });
     await ladeDaten();
     renderFinanzen();
@@ -3722,7 +3735,7 @@
       return;
     }
 
-    const ergebnis = await api("buchungen_batch_import", { zeilen });
+    const ergebnis = await api("buchungen_batch_import", { zeilen, bereich: aktiverBereich });
 
     let meldung = "Import abgeschlossen\n\n" +
       `Neue Ausgaben: ${ergebnis.importiert_ausgaben}\n` +
@@ -3740,7 +3753,7 @@
 
     await ladeDaten();
 
-    const kandidaten = erkennKandidatenFin(buchungen);
+    const kandidaten = erkennKandidatenFin(buchungenAktuell());
     if (kandidaten.length) {
       zeigeErkennungsModal(kandidaten);
     } else {
@@ -3911,7 +3924,7 @@
 
       const zahlung = { bezeichnung, typ };
       FIN_MONATE.forEach((m) => { zahlung[m] = betrag; });
-      await api("fixkosten_hinzufuegen", zahlung);
+      await api("fixkosten_hinzufuegen", { ...zahlung, bereich: aktiverBereich });
       angelegt++;
 
       if (buchungenLoeschen) {
@@ -3940,12 +3953,12 @@
     const el = document.getElementById("fin-uebersicht-bereich");
     el.innerHTML = `<p class="empty-text">Lade Jahresübersicht …</p>`;
 
-    const einstellung = finanzEinstellungen.find((e) => Number(e.jahr) === finUebJahr);
+    const einstellung = finanzEinstellungen.find((e) => Number(e.jahr) === finUebJahr && bereichVon(e) === aktiverBereich);
     const startkapital = einstellung ? finZahl(einstellung.start_kontostand) : 0;
 
     let daten;
     try {
-      daten = await api("finanzen_jahresuebersicht", { jahr: finUebJahr });
+      daten = await api("finanzen_jahresuebersicht", { jahr: finUebJahr, bereich: aktiverBereich });
     } catch (err) {
       el.innerHTML = `<p class="empty-text">Übersicht konnte nicht geladen werden.</p>`;
       return;
@@ -4034,7 +4047,7 @@
 
     document.getElementById("fin-startkapital-speichern").addEventListener("click", async () => {
       const wert = document.getElementById("fin-startkapital-input").value;
-      await api("startkapital_speichern", { jahr: finUebJahr, start_kontostand: wert });
+      await api("startkapital_speichern", { jahr: finUebJahr, start_kontostand: wert, bereich: aktiverBereich });
       await ladeDaten();
       renderFinUebersicht();
     });
@@ -4109,6 +4122,7 @@
       bis: document.getElementById("fin-ml-bis").value || null,
       typ: document.getElementById("fin-ml-typ").value || null,
       kategorie: document.getElementById("fin-ml-kategorie").value || null,
+      bereich: aktiverBereich,
     };
   }
 
@@ -4224,7 +4238,7 @@
 
   function finChartKategorien(jahr) {
     const summenProKategorie = {};
-    buchungen
+    buchungenAktuell()
       .filter((b) => b.typ !== "einnahme" && (b.datum || "").slice(0, 4) === String(jahr))
       .forEach((b) => {
         const kat = b.kategorie || "Sonstiges";
