@@ -533,3 +533,19 @@
     padding: 0.8rem 1rem; font-size: 0.78rem; line-height: 1.5; overflow-x: auto;
     margin: 0 0 0.9rem; white-space: pre;
   }
+
+  /* Reiter-Verwaltung (Bereich "Verwaltung") */
+  .reiter-verwaltung-block {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.9rem 1rem; margin-bottom: 0.9rem;
+  }
+  .reiter-verwaltung-block h3 { margin: 0 0 0.6rem; font-size: 0.95rem; }
+  .reiter-verwaltung-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 0.5rem 0.8rem;
+  }
+  .reiter-verwaltung-item {
+    display: flex; align-items: center; gap: 0.45rem; font-size: 0.88rem;
+    color: var(--ink); cursor: pointer;
+  }
+  .reiter-verwaltung-item input[type="checkbox"] { width: 1.05rem; height: 1.05rem; flex-shrink: 0; }
