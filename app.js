@@ -53,6 +53,7 @@
   let spiele = [];
   let spieleDateien = [];
   let tabEinstellungen = [];
+  let verleih = [];
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
 
   // Zuordnung Tab-Schlüssel -> DOM-Element-IDs. Zentral an einer Stelle,
@@ -63,7 +64,7 @@
     planung: "tab-planung", finanzen: "tab-finanzen", notizen: "tab-notizen", links: "tab-links",
     reflexion: "tab-reflexion", spiele: "tab-spiele", einkauf: "tab-einkauf", export: "tab-export",
     verlauf: "tab-verlauf", anleitung: "tab-anleitung", ogsideen: "tab-ogs-ideen",
-    ogsinventar: "tab-ogs-inventar", ogsprojekte: "tab-ogs-projekte",
+    ogsinventar: "tab-ogs-inventar", ogsprojekte: "tab-ogs-projekte", verleih: "tab-verleih",
     reiterverwaltung: "tab-reiter-verwaltung",
   };
   const VIEW_ELEMENTE = {
@@ -71,7 +72,7 @@
     planung: "view-planung", finanzen: "view-finanzen", notizen: "view-notizen", links: "view-links",
     reflexion: "view-reflexion", spiele: "view-spiele", einkauf: "view-einkauf", export: "view-export",
     verlauf: "view-verlauf", anleitung: "view-anleitung", ogsideen: "view-ogs-ideen",
-    ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte",
+    ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
     reiterverwaltung: "view-reiter-verwaltung",
   };
 
@@ -83,7 +84,7 @@
     ["planung", "Planung"], ["finanzen", "Finanzen"], ["notizen", "Notizen"], ["links", "Links"],
     ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["einkauf", "Einkauf"], ["export", "Export"],
     ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
-    ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"],
+    ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
   ];
   const BEREICH_TABS = { privat: ALLE_REITER, ogs: ALLE_REITER, awo: ALLE_REITER };
   const BEREICH_TITEL_VERWALTUNG = { privat: "🏠 Privat", ogs: "🏫 OGS Rapunzel", awo: "🤝 AWO OV Liblar" };
@@ -95,7 +96,7 @@
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
       "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
-      "ogsideen", "ogsinventar", "ogsprojekte"],
+      "ogsideen", "ogsinventar", "ogsprojekte", "verleih"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen"],
   };
 
@@ -297,6 +298,7 @@
     spiele = data.spiele || [];
     spieleDateien = data.spiele_dateien || [];
     tabEinstellungen = data.tab_einstellungen || [];
+    verleih = data.verleih || [];
     bereichAnwenden();
     renderReiterVerwaltung();
     render();
@@ -789,6 +791,10 @@
     return ogsProjekte.filter((p) => bereichVon(p) === aktiverBereich);
   }
 
+  function verleihAktuell() {
+    return verleih.filter((v) => bereichVon(v) === aktiverBereich);
+  }
+
   const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar" };
 
   function bereichAnwenden() {
@@ -856,6 +862,7 @@
     if (aktiv === "ogsinventar") renderInventar();
     if (aktiv === "ogsprojekte") renderProjekte();
     if (aktiv === "spiele") renderSpiele();
+    if (aktiv === "verleih") renderVerleih();
     if (aktiv === "reiterverwaltung") renderReiterVerwaltung();
     menuSchliessen();
   }
@@ -899,6 +906,7 @@
   document.getElementById("tab-ogs-ideen").addEventListener("click", () => tabWechseln("ogsideen"));
   document.getElementById("tab-ogs-inventar").addEventListener("click", () => tabWechseln("ogsinventar"));
   document.getElementById("tab-ogs-projekte").addEventListener("click", () => tabWechseln("ogsprojekte"));
+  document.getElementById("tab-verleih").addEventListener("click", () => tabWechseln("verleih"));
   document.getElementById("tab-reiter-verwaltung").addEventListener("click", () => tabWechseln("reiterverwaltung"));
 
   // ==========================================================
@@ -2007,11 +2015,16 @@
               </div>
             </div>`;
         }
+        const offeneAusleihen = verleihAktuell().filter((v) => v.inventar_id === i.id && !v.rueckgabe_am);
+        const ausleiheHinweis = offeneAusleihen.length > 0
+          ? `<span class="notiz-meta" style="display:block; color:var(--accent);">→ ${offeneAusleihen.reduce((s, v) => s + v.menge, 0)}× verliehen an ${offeneAusleihen.map((v) => escapeHtml(v.ausgeliehen_an)).join(", ")}</span>`
+          : "";
         return `
           <div class="notiz-item">
             <div style="flex:1; cursor:pointer;" onclick="invBearbeitenStart('${i.id}')">
               <span class="notiz-text">${escapeHtml(i.name)}</span>
               <span class="notiz-meta">${i.menge}× ${i.standort ? "· " + escapeHtml(i.standort) + " " : ""}· ${INV_ZUSTAND_LABEL[i.zustand] || i.zustand}</span>
+              ${ausleiheHinweis}
             </div>
             <button class="task-delete" onclick="invLoeschen('${i.id}')">×</button>
           </div>`;
@@ -2080,6 +2093,7 @@
   ];
   const PROJ_MAX_BYTES = 5 * 1024 * 1024;
   let projBearbeitenId = null;
+  let verleihBearbeitenId = null;
 
   function dateiZuBase64(datei) {
     return new Promise((resolve, reject) => {
@@ -2354,6 +2368,135 @@
     input.value = "";
     await ladeDaten();
   }
+
+  // ==========================================================
+  // Verleih (Verleih-Historie für Inventar-Gegenstände)
+  // ==========================================================
+  function verleihDatumDe(iso) {
+    if (!iso) return "";
+    const [j, m, t] = [iso.slice(0, 4), iso.slice(5, 7), iso.slice(8, 10)];
+    return `${t}.${m}.${j}`;
+  }
+
+  function renderVerleih() {
+    const bereichEl = document.getElementById("verleih-liste-bereich");
+    if (!bereichEl) return;
+
+    const inventarAktuell = ogsInventarAktuell().slice().sort((a, b) => a.name.localeCompare(b.name));
+    const select = document.getElementById("verleih-inventar");
+    if (select) {
+      const bisher = select.value;
+      select.innerHTML = inventarAktuell.length
+        ? inventarAktuell.map((i) => `<option value="${i.id}">${escapeAttr(i.name)}${i.kategorie ? " · " + escapeAttr(i.kategorie) : ""}</option>`).join("")
+        : '<option value="">Kein Inventar vorhanden</option>';
+      if (inventarAktuell.some((i) => i.id === bisher)) select.value = bisher;
+    }
+
+    const eintraegeAktuell = verleihAktuell();
+    const inventarById = Object.fromEntries(ogsInventar.map((i) => [i.id, i]));
+
+    function gegenstandName(v) {
+      return inventarById[v.inventar_id]?.name || "(gelöschter Gegenstand)";
+    }
+
+    function eintragHtml(v) {
+      if (verleihBearbeitenId === v.id) {
+        return `
+          <div class="notiz-item">
+            <div style="flex:1; display:flex; flex-wrap:wrap; gap:0.4rem;">
+              <input type="text" id="verleih-edit-an-${v.id}" value="${escapeAttr(v.ausgeliehen_an)}" placeholder="An wen">
+              <input type="number" id="verleih-edit-menge-${v.id}" value="${v.menge}" min="1" style="width:5rem;">
+              <label class="empty-text" style="display:flex; align-items:center; gap:0.3rem;">Ausgeliehen: <input type="date" id="verleih-edit-am-${v.id}" value="${v.ausgeliehen_am}"></label>
+              <label class="empty-text" style="display:flex; align-items:center; gap:0.3rem;">Zurück: <input type="date" id="verleih-edit-rueck-${v.id}" value="${v.rueckgabe_am || ""}"></label>
+              <input type="text" id="verleih-edit-notiz-${v.id}" value="${escapeAttr(v.notiz || "")}" placeholder="Notiz (optional)" style="flex:1; min-width:150px;">
+              <button class="btn-primary" onclick="verleihBearbeitenSpeichern('${v.id}')">Speichern</button>
+              <button class="link-btn" onclick="verleihBearbeitenAbbrechen()">Abbrechen</button>
+            </div>
+          </div>`;
+      }
+      const offen = !v.rueckgabe_am;
+      return `
+        <div class="notiz-item">
+          <div style="flex:1; cursor:pointer;" onclick="verleihBearbeitenStart('${v.id}')">
+            <span class="notiz-text">${v.menge}× ${escapeHtml(gegenstandName(v))} → ${escapeHtml(v.ausgeliehen_an)}</span>
+            <span class="notiz-meta">
+              seit ${verleihDatumDe(v.ausgeliehen_am)}${offen ? "" : " · zurück am " + verleihDatumDe(v.rueckgabe_am)}
+              ${v.notiz ? " · " + escapeHtml(v.notiz) : ""}
+            </span>
+          </div>
+          ${offen ? `<button class="btn-primary" style="white-space:nowrap;" onclick="event.stopPropagation(); verleihRueckgabe('${v.id}')">Zurück (heute)</button>` : ""}
+          <button class="task-delete" onclick="event.stopPropagation(); verleihLoeschen('${v.id}')">×</button>
+        </div>`;
+    }
+
+    const offeneEintraege = eintraegeAktuell.filter((v) => !v.rueckgabe_am)
+      .sort((a, b) => a.ausgeliehen_am.localeCompare(b.ausgeliehen_am));
+    const zurueckEintraege = eintraegeAktuell.filter((v) => v.rueckgabe_am)
+      .sort((a, b) => b.rueckgabe_am.localeCompare(a.rueckgabe_am));
+
+    let html = `<h3 style="margin-top:1.2rem; margin-bottom:0.4rem; font-size:0.95rem; color:var(--ink-dim);">Aktuell ausgeliehen (${offeneEintraege.length})</h3>`;
+    html += offeneEintraege.length
+      ? `<div class="notiz-list">${offeneEintraege.map(eintragHtml).join("")}</div>`
+      : '<p class="empty-text">Gerade ist nichts verliehen.</p>';
+
+    html += `<h3 style="margin-top:1.6rem; margin-bottom:0.4rem; font-size:0.95rem; color:var(--ink-dim);">Zurückgegeben (${zurueckEintraege.length})</h3>`;
+    html += zurueckEintraege.length
+      ? `<div class="notiz-list">${zurueckEintraege.map(eintragHtml).join("")}</div>`
+      : '<p class="empty-text">Noch keine Rückgaben erfasst.</p>';
+
+    bereichEl.innerHTML = html;
+  }
+
+  document.getElementById("btn-verleih-hinzufuegen").addEventListener("click", verleihHinzufuegen);
+
+  async function verleihHinzufuegen() {
+    const inventar_id = document.getElementById("verleih-inventar").value;
+    const ausgeliehen_an = document.getElementById("verleih-an").value.trim();
+    if (!inventar_id || !ausgeliehen_an) return;
+    const menge = document.getElementById("verleih-menge").value || 1;
+    const ausgeliehen_am = document.getElementById("verleih-am").value || heuteISO();
+    const notiz = document.getElementById("verleih-notiz").value.trim() || null;
+
+    await api("verleih_hinzufuegen", { inventar_id, ausgeliehen_an, menge, ausgeliehen_am, notiz, bereich: aktiverBereich });
+    document.getElementById("verleih-an").value = "";
+    document.getElementById("verleih-menge").value = "1";
+    document.getElementById("verleih-am").value = "";
+    document.getElementById("verleih-notiz").value = "";
+    await ladeDaten();
+  }
+
+  window.verleihRueckgabe = async function(id) {
+    await api("verleih_rueckgabe", { id });
+    await ladeDaten();
+  };
+
+  window.verleihLoeschen = async function(id) {
+    if (!confirm("Diesen Verleih-Eintrag endgültig löschen?")) return;
+    await api("verleih_loeschen", { id });
+    await ladeDaten();
+  };
+
+  window.verleihBearbeitenStart = function(id) {
+    verleihBearbeitenId = id;
+    renderVerleih();
+  };
+
+  window.verleihBearbeitenAbbrechen = function() {
+    verleihBearbeitenId = null;
+    renderVerleih();
+  };
+
+  window.verleihBearbeitenSpeichern = async function(id) {
+    const ausgeliehen_an = document.getElementById(`verleih-edit-an-${id}`).value.trim();
+    if (!ausgeliehen_an) return;
+    const menge = document.getElementById(`verleih-edit-menge-${id}`).value || 1;
+    const ausgeliehen_am = document.getElementById(`verleih-edit-am-${id}`).value;
+    const rueckgabe_am = document.getElementById(`verleih-edit-rueck-${id}`).value || null;
+    const notiz = document.getElementById(`verleih-edit-notiz-${id}`).value.trim() || null;
+    await api("verleih_aktualisieren", { id, ausgeliehen_an, menge, ausgeliehen_am, rueckgabe_am, notiz });
+    verleihBearbeitenId = null;
+    await ladeDaten();
+  };
 
   // ==========================================================
   // Spiele (Spielekartei für die Jugendarbeit, nur Privat)
