@@ -121,6 +121,7 @@
             <button class="tab-btn" id="tab-ogs-ideen">Ideen</button>
             <button class="tab-btn" id="tab-ogs-inventar">Inventar</button>
             <button class="tab-btn" id="tab-ogs-projekte">Projekte</button>
+            <button class="tab-btn" id="tab-verleih">Verleih</button>
           </div>
           <div class="tab-group" data-nur="privat,ogs,awo">
             <span class="tab-group-label">Verwalten</span>
@@ -353,7 +354,7 @@
       <div id="view-reiter-verwaltung" class="hidden">
         <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
-        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar und -Projekte sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -399,7 +400,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Jederzeit wechseln:</strong> kompakter Umschalter (🏠/🏫/🤝/⚙️) fest oben in der Sidebar, ohne zurück zur Auswahl zu müssen</li>
                 <li><strong>„↔ Bereich wechseln":</strong> Link unten in der Sidebar, führt zurück zum Kacheln-Screen, ohne dich abzumelden</li>
               </ul>
-              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar und -Projekte haben ebenfalls ein eigenes bereich-Feld.</p>
+              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar, -Projekte und -Verleih haben ebenfalls ein eigenes bereich-Feld.</p>
               <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS- und AWO-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Links/Reflexion/Einkauf/Export gibt es nur im Privat-Bereich.</p>
               <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS oder AWO bleiben grundsätzlich rein lokal im Dashboard.</p>
               <p><strong>Welche Reiter tatsächlich sichtbar sind</strong>, lässt sich zusätzlich pro Bereich ein-/ausschalten – siehe Reiter unten. Das hier Beschriebene ist die technische Obergrenze, nicht zwingend das, was gerade angezeigt wird.</p>
@@ -543,6 +544,21 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
+            <summary>Verleih <span class="anleitung-nur">(Standard: nur OGS Rapunzel, per Reiter-Verwaltung auch Privat/AWO – bereichsgetrennt, an das jeweilige Inventar gekoppelt)</span></summary>
+            <div class="anleitung-text">
+              <p>Verleih-Historie für Inventar-Gegenstände: wer hat was wann bekommen, und ist es schon zurück?</p>
+              <ul>
+                <li><strong>Neuer Verleih:</strong> Gegenstand aus dem Inventar auswählen (nur Gegenstände des aktuellen Bereichs stehen zur Auswahl), An wen, Menge, Datum (leer = heute), optional Notiz</li>
+                <li><strong>Zwei Listen:</strong> „Aktuell ausgeliehen" und „Zurückgegeben" – getrennt sortiert</li>
+                <li><strong>Zurückgeben:</strong> Button „Zurück (heute)" bei jedem offenen Eintrag trägt sofort das heutige Datum ein</li>
+                <li><strong>Nachträglich korrigieren:</strong> auf einen Eintrag tippen öffnet die Inline-Bearbeitung – dort auch ein abweichendes Rückgabedatum eintragbar oder ein Eintrag durch Leeren des Rückgabe-Feldes wieder auf „offen" setzbar</li>
+                <li><strong>Im Inventar-Reiter</strong> zeigen Gegenstände mit offenen Ausleihen direkt einen Hinweis, an wen wie viel gerade verliehen ist</li>
+                <li>Löschen entfernt nur den Verleih-Eintrag, nicht den Inventar-Gegenstand selbst</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
             <summary>Notizen</summary>
             <div class="anleitung-text">
               <p>Schneller Ablageort für spontane Gedanken.</p>
@@ -621,7 +637,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Ausblenden entfernt einen Reiter nur aus der Ansicht – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen</li>
                 <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
-                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital) sowie OGS-Inventar und -Projekte haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten.</li>
+                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital) sowie OGS-Inventar, -Projekte und -Verleih haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten.</li>
               </ul>
             </div>
           </details>
@@ -783,6 +799,23 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         </div>
 
         <div id="proj-liste-bereich" style="margin-top:1.2rem;"></div>
+      </div>
+
+      <div id="view-verleih" class="hidden">
+        <h1>Verleih <button class="hilfe-icon" data-hilfe="Verleih-Historie für Inventar-Gegenstände: wer hat was wann bekommen, und ist es schon zurück? Zeigt getrennt an, was gerade ausgeliehen ist und was bereits zurückgegeben wurde. Zum Bearbeiten (auch für ein nachträgliches Rückgabedatum) auf einen Eintrag tippen.">?</button></h1>
+        <p class="hero-text">Wer hat gerade welchen Inventar-Gegenstand – und wann kam er zurück?</p>
+
+        <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+          <select id="verleih-inventar"></select>
+          <input type="text" id="verleih-an" placeholder="An wen (Name)">
+          <input type="number" id="verleih-menge" placeholder="Menge" min="1" value="1" style="width:5rem;">
+          <input type="date" id="verleih-am" title="Ausgeliehen am (leer = heute)">
+          <input type="text" id="verleih-notiz" placeholder="Notiz (optional)">
+          <button class="btn-primary" id="btn-verleih-hinzufuegen">Verleihen</button>
+        </div>
+        <p class="empty-text" style="margin-top:0.3rem;">Neue Gegenstände zuerst im Inventar-Reiter anlegen – hier nur auswählen und verleihen.</p>
+
+        <div id="verleih-liste-bereich"></div>
       </div>
     </main>
   </div>
