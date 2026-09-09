@@ -2005,6 +2005,7 @@
                 <input type="text" id="inv-edit-kategorie-${i.id}" value="${escapeAttr(i.kategorie)}" placeholder="Kategorie" list="inv-kategorie-liste">
                 <input type="number" id="inv-edit-menge-${i.id}" value="${i.menge}" min="1" style="width:5rem;">
                 <input type="text" id="inv-edit-standort-${i.id}" value="${escapeAttr(i.standort || "")}" placeholder="Standort">
+                <input type="text" id="inv-edit-beschreibung-${i.id}" value="${escapeAttr(i.beschreibung || "")}" placeholder="Beschreibung" style="min-width:14rem; flex:1;">
                 <select id="inv-edit-zustand-${i.id}">
                   <option value="gut" ${i.zustand === "gut" ? "selected" : ""}>Gut</option>
                   <option value="eingeschraenkt" ${i.zustand === "eingeschraenkt" ? "selected" : ""}>Eingeschränkt nutzbar</option>
@@ -2024,6 +2025,7 @@
             <div style="flex:1; cursor:pointer;" onclick="invBearbeitenStart('${i.id}')">
               <span class="notiz-text">${escapeHtml(i.name)}</span>
               <span class="notiz-meta">${i.menge}× ${i.standort ? "· " + escapeHtml(i.standort) + " " : ""}· ${INV_ZUSTAND_LABEL[i.zustand] || i.zustand}</span>
+              ${i.beschreibung ? `<span class="notiz-meta" style="display:block;">${escapeHtml(i.beschreibung)}</span>` : ""}
               ${ausleiheHinweis}
             </div>
             <button class="task-delete" onclick="invLoeschen('${i.id}')">×</button>
@@ -2046,12 +2048,14 @@
     if (!name || !kategorie) return;
     const menge = document.getElementById("neu-inv-menge").value || 1;
     const standort = document.getElementById("neu-inv-standort").value.trim() || null;
+    const beschreibung = document.getElementById("neu-inv-beschreibung").value.trim() || null;
     const zustand = document.getElementById("neu-inv-zustand").value;
-    await api("ogs_inventar_hinzufuegen", { name, kategorie, menge, standort, zustand, bereich: aktiverBereich });
+    await api("ogs_inventar_hinzufuegen", { name, kategorie, menge, standort, beschreibung, zustand, bereich: aktiverBereich });
     document.getElementById("neu-inv-name").value = "";
     document.getElementById("neu-inv-kategorie").value = "";
     document.getElementById("neu-inv-menge").value = "1";
     document.getElementById("neu-inv-standort").value = "";
+    document.getElementById("neu-inv-beschreibung").value = "";
     document.getElementById("neu-inv-zustand").value = "gut";
     await ladeDaten();
   }
@@ -2072,8 +2076,9 @@
     if (!name || !kategorie) return;
     const menge = document.getElementById(`inv-edit-menge-${id}`).value || 1;
     const standort = document.getElementById(`inv-edit-standort-${id}`).value.trim() || null;
+    const beschreibung = document.getElementById(`inv-edit-beschreibung-${id}`).value.trim() || null;
     const zustand = document.getElementById(`inv-edit-zustand-${id}`).value;
-    await api("ogs_inventar_aktualisieren", { id, name, kategorie, menge, standort, zustand });
+    await api("ogs_inventar_aktualisieren", { id, name, kategorie, menge, standort, beschreibung, zustand });
     invBearbeitenId = null;
     await ladeDaten();
   };
