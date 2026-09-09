@@ -2446,8 +2446,10 @@
           aufsteigend ? a[datumsfeld].localeCompare(b[datumsfeld]) : b[datumsfeld].localeCompare(a[datumsfeld]));
         const anzahl = eintraege.reduce((s, v) => s + v.menge, 0);
         return `
-          <h4 style="margin-top:1rem; margin-bottom:0.3rem; font-size:0.9rem;">${escapeHtml(person)} <span class="empty-text">(${anzahl} Gegenstand${anzahl === 1 ? "" : "e"})</span></h4>
-          <div class="notiz-list">${eintraege.map(eintragHtml).join("")}</div>`;
+          <details class="verleih-person" open>
+            <summary>${escapeHtml(person)} <span class="empty-text">(${anzahl} Gegenstand${anzahl === 1 ? "" : "e"})</span></summary>
+            <div class="notiz-list">${eintraege.map(eintragHtml).join("")}</div>
+          </details>`;
       }).join("");
     }
 
