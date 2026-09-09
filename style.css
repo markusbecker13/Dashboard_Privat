@@ -528,6 +528,16 @@
     background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
     padding: 0.05rem 0.35rem; font-size: 0.82em;
   }
+
+  /* Verleih: aufklappbare Personen-Gruppen */
+  .verleih-person { margin-top: 1rem; }
+  .verleih-person summary {
+    cursor: pointer; font-size: 0.9rem; font-weight: 600; list-style: none; user-select: none;
+    padding: 0.2rem 0;
+  }
+  .verleih-person summary::-webkit-details-marker { display: none; }
+  .verleih-person summary::before { content: "▸ "; color: var(--accent); }
+  .verleih-person[open] summary::before { content: "▾ "; }
   .anleitung-diagramm {
     background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
     padding: 0.8rem 1rem; font-size: 0.78rem; line-height: 1.5; overflow-x: auto;
