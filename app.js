@@ -2423,7 +2423,7 @@
       return `
         <div class="notiz-item">
           <div style="flex:1; cursor:pointer;" onclick="verleihBearbeitenStart('${v.id}')">
-            <span class="notiz-text">${v.menge}× ${escapeHtml(gegenstandName(v))} → ${escapeHtml(v.ausgeliehen_an)}</span>
+            <span class="notiz-text">${v.menge}× ${escapeHtml(gegenstandName(v))}</span>
             <span class="notiz-meta">
               seit ${verleihDatumDe(v.ausgeliehen_am)}${offen ? "" : " · zurück am " + verleihDatumDe(v.rueckgabe_am)}
               ${v.notiz ? " · " + escapeHtml(v.notiz) : ""}
@@ -2434,19 +2434,31 @@
         </div>`;
     }
 
-    const offeneEintraege = eintraegeAktuell.filter((v) => !v.rueckgabe_am)
-      .sort((a, b) => a.ausgeliehen_am.localeCompare(b.ausgeliehen_am));
-    const zurueckEintraege = eintraegeAktuell.filter((v) => v.rueckgabe_am)
-      .sort((a, b) => b.rueckgabe_am.localeCompare(a.rueckgabe_am));
+    const offeneEintraege = eintraegeAktuell.filter((v) => !v.rueckgabe_am);
+    const zurueckEintraege = eintraegeAktuell.filter((v) => v.rueckgabe_am);
+
+    function nachPersonGruppiert(liste, datumsfeld, aufsteigend) {
+      const gruppen = {};
+      liste.forEach((v) => { (gruppen[v.ausgeliehen_an] = gruppen[v.ausgeliehen_an] || []).push(v); });
+      const personenSortiert = Object.keys(gruppen).sort((a, b) => a.localeCompare(b));
+      return personenSortiert.map((person) => {
+        const eintraege = gruppen[person].sort((a, b) =>
+          aufsteigend ? a[datumsfeld].localeCompare(b[datumsfeld]) : b[datumsfeld].localeCompare(a[datumsfeld]));
+        const anzahl = eintraege.reduce((s, v) => s + v.menge, 0);
+        return `
+          <h4 style="margin-top:1rem; margin-bottom:0.3rem; font-size:0.9rem;">${escapeHtml(person)} <span class="empty-text">(${anzahl} Gegenstand${anzahl === 1 ? "" : "e"})</span></h4>
+          <div class="notiz-list">${eintraege.map(eintragHtml).join("")}</div>`;
+      }).join("");
+    }
 
     let html = `<h3 style="margin-top:1.2rem; margin-bottom:0.4rem; font-size:0.95rem; color:var(--ink-dim);">Aktuell ausgeliehen (${offeneEintraege.length})</h3>`;
     html += offeneEintraege.length
-      ? `<div class="notiz-list">${offeneEintraege.map(eintragHtml).join("")}</div>`
+      ? nachPersonGruppiert(offeneEintraege, "ausgeliehen_am", true)
       : '<p class="empty-text">Gerade ist nichts verliehen.</p>';
 
     html += `<h3 style="margin-top:1.6rem; margin-bottom:0.4rem; font-size:0.95rem; color:var(--ink-dim);">Zurückgegeben (${zurueckEintraege.length})</h3>`;
     html += zurueckEintraege.length
-      ? `<div class="notiz-list">${zurueckEintraege.map(eintragHtml).join("")}</div>`
+      ? nachPersonGruppiert(zurueckEintraege, "rueckgabe_am", false)
       : '<p class="empty-text">Noch keine Rückgaben erfasst.</p>';
 
     bereichEl.innerHTML = html;
