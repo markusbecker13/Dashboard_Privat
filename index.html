@@ -519,7 +519,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <summary>Inventar <span class="anleitung-nur">(Standard: nur OGS Rapunzel, per Reiter-Verwaltung auch Privat/AWO – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <ul>
-                <li>Name, Kategorie (mit Autovervollständigung aus bestehenden Kategorien), Menge, optional Standort, Zustand (Gut / Eingeschränkt nutzbar / Defekt)</li>
+                <li>Name, Kategorie (mit Autovervollständigung aus bestehenden Kategorien), Menge, optional Standort, optional Beschreibung, Zustand (Gut / Eingeschränkt nutzbar / Defekt)</li>
                 <li>Liste automatisch nach Kategorie gruppiert, Filter-Dropdown zeigt die Anzahl je Kategorie</li>
                 <li>Klick auf einen Eintrag öffnet die Inline-Bearbeitung, Löschen mit Sicherheitsabfrage</li>
               </ul>
@@ -754,6 +754,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <datalist id="inv-kategorie-liste"></datalist>
           <input type="number" id="neu-inv-menge" placeholder="Menge" min="1" value="1" style="width:5rem;">
           <input type="text" id="neu-inv-standort" placeholder="Standort (optional)">
+          <input type="text" id="neu-inv-beschreibung" placeholder="Beschreibung (optional)" style="min-width:14rem; flex:1;">
           <select id="neu-inv-zustand">
             <option value="gut">Gut</option>
             <option value="eingeschraenkt">Eingeschränkt nutzbar</option>
