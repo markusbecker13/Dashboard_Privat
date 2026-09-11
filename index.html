@@ -77,69 +77,38 @@
     <button class="link-btn" id="bereich-screen-abmelden" style="margin-top:1.4rem;">Abmelden</button>
   </div>
 
+  <div id="kategorie-screen" class="hidden">
+    <div class="kachel-screen-top">
+      <button class="link-btn" id="kategorie-zurueck-btn">↔ Bereich wechseln</button>
+    </div>
+    <h1 style="font-size:1.4rem;" id="kategorie-screen-bereichsname">Bereich</h1>
+    <p class="hero-text">Was möchtest du tun?</p>
+    <div class="bereich-tiles" id="kategorie-tiles"></div>
+  </div>
+
+  <div id="unterkategorie-screen" class="hidden">
+    <div class="kachel-screen-top">
+      <button class="link-btn" id="unterkategorie-zurueck-btn">← Zurück</button>
+    </div>
+    <h1 style="font-size:1.4rem;" id="unterkategorie-screen-titel">Kategorie</h1>
+    <p class="hero-text">Welcher Reiter?</p>
+    <div class="bereich-tiles" id="unterkategorie-tiles"></div>
+  </div>
+
   <div id="app" class="hidden app-shell">
-    <nav class="sidebar">
-      <div class="topbar">
-        <span class="brand" id="brand-name">Dashboard</span>
-        <button class="project-edit-btn" onclick="dashboardNameBearbeiten()" title="Name ändern">✎</button>
-        <span class="brand-sub" id="brand-sub">Aufgaben</span>
-        <button class="project-edit-btn" onclick="untertitelBearbeiten()" title="Untertitel ändern">✎</button>
-        <button class="menu-toggle" id="menu-toggle" aria-label="Menü öffnen" aria-expanded="false">☰</button>
-      </div>
-
-      <div class="tabs-menu" id="tabs-menu">
-        <div class="bereich-switch" id="bereich-switch">
-          <button class="bereich-btn active" id="bereich-btn-privat" data-bereich="privat">🏠 Privat</button>
-          <button class="bereich-btn" id="bereich-btn-ogs" data-bereich="ogs">🏫 OGS</button>
-          <button class="bereich-btn" id="bereich-btn-awo" data-bereich="awo">🤝 AWO</button>
-          <button class="bereich-btn" id="bereich-btn-verwaltung" data-bereich="verwaltung">⚙️ Verwaltung</button>
-        </div>
-
-        <div class="tabs">
-          <div class="tab-group" data-nur="privat,ogs,awo">
-            <span class="tab-group-label">Heute</span>
-            <button class="tab-btn active" id="tab-heute">Start</button>
-            <button class="tab-btn" id="tab-frei">Frei</button>
-          </div>
-          <div class="tab-group" data-nur="privat,ogs,awo">
-            <span class="tab-group-label">Planen</span>
-            <button class="tab-btn" id="tab-aufgaben">Aufgaben</button>
-            <button class="tab-btn" id="tab-kalender">Kalender</button>
-            <button class="tab-btn" id="tab-planung">Planung</button>
-            <button class="tab-btn" id="tab-finanzen">Finanzen</button>
-          </div>
-          <div class="tab-group" data-nur="privat,ogs,awo">
-            <span class="tab-group-label">Sammeln</span>
-            <button class="tab-btn" id="tab-notizen">Notizen</button>
-            <button class="tab-btn" id="tab-links">Links</button>
-            <button class="tab-btn" id="tab-reflexion">Reflexion</button>
-            <button class="tab-btn" id="tab-spiele">Spiele</button>
-            <button class="tab-btn" id="tab-einkauf">Einkauf</button>
-          </div>
-          <div class="tab-group" data-nur="privat,ogs,awo">
-            <span class="tab-group-label" id="tab-group-arbeit-label">OGS Rapunzel</span>
-            <button class="tab-btn" id="tab-ogs-ideen">Ideen</button>
-            <button class="tab-btn" id="tab-ogs-inventar">Inventar</button>
-            <button class="tab-btn" id="tab-ogs-projekte">Projekte</button>
-            <button class="tab-btn" id="tab-verleih">Verleih</button>
-          </div>
-          <div class="tab-group" data-nur="privat,ogs,awo">
-            <span class="tab-group-label">Verwalten</span>
-            <button class="tab-btn" id="tab-export">Export</button>
-            <button class="tab-btn" id="tab-verlauf">Verlauf</button>
-            <button class="tab-btn" id="tab-anleitung">Anleitung</button>
-          </div>
-          <div class="tab-group" data-nur="verwaltung">
-            <span class="tab-group-label">Verwaltung</span>
-            <button class="tab-btn" id="tab-reiter-verwaltung">Reiter</button>
-          </div>
-        </div>
-
-        <button id="btn-abmelden" class="link-btn sidebar-abmelden">Abmelden</button>
-        <button id="btn-bereich-wechseln" class="link-btn">↔ Bereich wechseln</button>
-      </div>
-    </nav>
-    <div class="menu-backdrop" id="menu-backdrop"></div>
+    <header class="content-topbar">
+      <button class="content-topbar-btn" id="content-back-btn" title="Zurück" aria-label="Zurück">←</button>
+      <button class="content-topbar-btn" id="content-home-btn" title="Kategorien" aria-label="Kategorien">🏠</button>
+      <span class="brand" id="brand-name">Dashboard</span>
+      <span class="brand-sub" id="brand-sub">Aufgaben</span>
+      <button class="content-topbar-btn content-menu-btn" id="menu-toggle" aria-label="Menü öffnen" aria-expanded="false">⋮</button>
+    </header>
+    <div class="account-menu hidden" id="account-menu">
+      <button class="link-btn" onclick="dashboardNameBearbeiten()">✎ Name ändern</button>
+      <button class="link-btn" onclick="untertitelBearbeiten()">✎ Untertitel ändern</button>
+      <button class="link-btn" id="btn-bereich-wechseln">↔ Bereich wechseln</button>
+      <button class="link-btn" id="btn-abmelden">Abmelden</button>
+    </div>
 
     <main>
       <div id="view-heute">
@@ -396,9 +365,10 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Das Dashboard trennt drei Lebensbereiche sauber voneinander: <strong>Privat</strong>, <strong>OGS Rapunzel</strong> (Beruf) und <strong>AWO OV Liblar</strong> (Ehrenamt). Ein vierter Bereich <strong>Verwaltung</strong> (⚙️) hat keine eigenen Daten, sondern enthält nur die Reiter-Verwaltung.</p>
               <ul>
-                <li><strong>Nach dem Login:</strong> ein Auswahlscreen mit vier Kacheln – Privat öffnet direkt den Start-Tab, OGS/AWO öffnen direkt den Aufgaben-Tab, Verwaltung öffnet direkt die Reiter-Verwaltung</li>
-                <li><strong>Jederzeit wechseln:</strong> kompakter Umschalter (🏠/🏫/🤝/⚙️) fest oben in der Sidebar, ohne zurück zur Auswahl zu müssen</li>
-                <li><strong>„↔ Bereich wechseln":</strong> Link unten in der Sidebar, führt zurück zum Kacheln-Screen, ohne dich abzumelden</li>
+                <li><strong>Nach dem Login:</strong> ein Auswahlscreen mit vier Kacheln (Bereich wählen). Verwaltung öffnet direkt die Reiter-Verwaltung; Privat/OGS/AWO öffnen eine zweite Kachel-Ebene mit Themen: Heute, Planen, Sammeln, dem bereichsspezifischen Themenblock (z.B. „OGS Rapunzel" mit Ideen/Inventar/Projekte/Verleih) und Verwalten</li>
+                <li><strong>Dritte Ebene – Reiter:</strong> jede Themen-Kachel öffnet die einzelnen Reiter als eigene Kacheln. Enthält ein Thema gerade nur einen sichtbaren Reiter, springt die App direkt hinein und überspringt diese Zwischenseite</li>
+                <li><strong>Zurück &amp; Home:</strong> in jeder Ansicht oben ein ← (eine Ebene zurück zu den Reiter- bzw. Themen-Kacheln) und ein 🏠 (direkt zu den Themen-Kacheln des aktuellen Bereichs)</li>
+                <li><strong>„↔ Bereich wechseln":</strong> im ⋮-Menü oben rechts, führt zurück zum Bereichs-Kacheln-Screen, ohne dich abzumelden</li>
               </ul>
               <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar, -Projekte und -Verleih haben ebenfalls ein eigenes bereich-Feld.</p>
               <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS- und AWO-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Links/Reflexion/Einkauf/Export gibt es nur im Privat-Bereich.</p>
@@ -633,9 +603,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Reiter <span class="anleitung-nur">(nur Verwaltung)</span></summary>
             <div class="anleitung-text">
-              <p>Checkboxen-Übersicht, gruppiert nach Privat/OGS/AWO: legt für jeden Bereich einzeln und frei fest, welche Reiter in der Sidebar sichtbar sein sollen – auch außerhalb der ursprünglichen Zuordnung (z.B. Finanzen auch in OGS einblenden).</p>
+              <p>Checkboxen-Übersicht, gruppiert nach Privat/OGS/AWO: legt für jeden Bereich einzeln und frei fest, welche Reiter als Kachel sichtbar sein sollen – auch außerhalb der ursprünglichen Zuordnung (z.B. Finanzen auch in OGS einblenden).</p>
               <ul>
-                <li>Ausblenden entfernt einen Reiter nur aus der Ansicht – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen</li>
+                <li>Ausblenden entfernt einen Reiter nur aus der Kachel-Ansicht – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen. Eine Themen-Kachel (z.B. „Sammeln") erscheint nur, solange mindestens ein Reiter darin sichtbar ist</li>
                 <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
                 <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital) sowie OGS-Inventar, -Projekte und -Verleih haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten.</li>
               </ul>
@@ -645,7 +615,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Technische Bedienung</summary>
             <div class="anleitung-text">
-              <p><strong>Abmelden:</strong> oben rechts in der Kopfzeile. Meldet die Session serverseitig ab und entfernt das gespeicherte Token auf diesem Gerät.</p>
+              <p><strong>Abmelden:</strong> im ⋮-Menü oben rechts in der Kopfzeile. Meldet die Session serverseitig ab und entfernt das gespeicherte Token auf diesem Gerät.</p>
               <p><strong>Als App installieren (Android):</strong> Seite in Chrome öffnen → Drei-Punkte-Menü → „App installieren". Liegt danach als eigenes Icon auf dem Homescreen, öffnet ohne Browser-Leiste. Icon lange gedrückt halten → Schnellzugriff „Neue Notiz" springt direkt in den Notizen-Tab.</p>
               <p><strong>Passwort ändern:</strong> Supabase-Dashboard → Edge Functions → Secrets → <code>APP_PASSWORD</code> löschen, neu anlegen. Kein Redeploy nötig. Ein zuvor ausgestelltes Token bleibt bis zum Ablauf (90 Tage) weiterhin gültig, unabhängig vom Passwort.</p>
               <p><strong>Login-Schutz:</strong> Token statt Passwort im Browser, Rate-Limiting nach 5 Fehlversuchen in 15 Minuten, Zugriff nur von deiner GitHub-Pages-Adresse, strikte Inhalts-Regeln (CSP) gegen eingeschleuste Skripte.</p>
