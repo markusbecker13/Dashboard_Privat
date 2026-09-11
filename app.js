@@ -55,18 +55,9 @@
   let tabEinstellungen = [];
   let verleih = [];
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
+  let aktiveKategorie = null; // Schlüssel der gerade offenen Themen-Kachel-Gruppe, oder null
+  let aktiverTab = null; // Schlüssel des gerade angezeigten Reiters (view-*), für den Zurück-Button
 
-  // Zuordnung Tab-Schlüssel -> DOM-Element-IDs. Zentral an einer Stelle,
-  // damit tabWechseln(), bereichAnwenden() und die Reiter-Verwaltung
-  // dieselbe Quelle nutzen.
-  const TAB_ELEMENTE = {
-    heute: "tab-heute", frei: "tab-frei", aufgaben: "tab-aufgaben", kalender: "tab-kalender",
-    planung: "tab-planung", finanzen: "tab-finanzen", notizen: "tab-notizen", links: "tab-links",
-    reflexion: "tab-reflexion", spiele: "tab-spiele", einkauf: "tab-einkauf", export: "tab-export",
-    verlauf: "tab-verlauf", anleitung: "tab-anleitung", ogsideen: "tab-ogs-ideen",
-    ogsinventar: "tab-ogs-inventar", ogsprojekte: "tab-ogs-projekte", verleih: "tab-verleih",
-    reiterverwaltung: "tab-reiter-verwaltung",
-  };
   const VIEW_ELEMENTE = {
     heute: "view-heute", frei: "view-frei", aufgaben: "view-aufgaben", kalender: "view-kalender",
     planung: "view-planung", finanzen: "view-finanzen", notizen: "view-notizen", links: "view-links",
@@ -90,7 +81,7 @@
   const BEREICH_TITEL_VERWALTUNG = { privat: "🏠 Privat", ogs: "🏫 OGS Rapunzel", awo: "🤝 AWO OV Liblar" };
 
   // Vorbelegung, solange in tab_einstellungen noch kein expliziter Eintrag
-  // existiert – entspricht dem bisherigen Verhalten (data-nur), damit sich
+  // existiert – entspricht dem bisherigen Standardverhalten, damit sich
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
@@ -106,18 +97,31 @@
     return (STANDARD_SICHTBAR[bereich] || []).includes(schluessel);
   }
 
-  function ersteSichtbareTabSchluessel(bevorzugt) {
-    if (bevorzugt && istTabSichtbar(bevorzugt)) return bevorzugt;
-    for (const schluessel in TAB_ELEMENTE) {
-      if (istTabSichtbar(schluessel)) return schluessel;
-    }
-    return bevorzugt || "heute";
+  // Themen-Kacheln (Hauptkategorien) je Bereich. Fasst dieselben Reiter
+  // zusammen, die vorher als Sidebar-Gruppen (Heute/Planen/Sammeln/...)
+  // dargestellt wurden – jetzt als zweite Kachel-Ebene nach der
+  // Bereichsauswahl. "arbeit" trägt bewusst Label/Icon des aktiven
+  // Bereichs (analog zur früheren "tab-group-arbeit-label").
+  const BEREICH_ARBEIT_ICON = { ogs: "🏫", awo: "🤝" };
+
+  function hauptkategorien() {
+    return [
+      { schluessel: "heute", label: "Heute", icon: "☀️", tabs: ["heute", "frei"] },
+      { schluessel: "planen", label: "Planen", icon: "🗓️", tabs: ["aufgaben", "kalender", "planung", "finanzen"] },
+      { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf"] },
+      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", icon: BEREICH_ARBEIT_ICON[aktiverBereich] || "📌", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih"] },
+      { schluessel: "verwalten", label: "Verwalten", icon: "🛠️", tabs: ["export", "verlauf", "anleitung"] },
+    ];
   }
 
-  function istTabSichtbar(schluessel) {
-    const el = document.getElementById(TAB_ELEMENTE[schluessel]);
-    return !!el && el.offsetParent !== null;
+  function sichtbareTabsInGruppe(gruppe) {
+    return gruppe.tabs.filter((schluessel) => reiterIstSichtbar(aktiverBereich, schluessel));
   }
+
+  function gruppeVonTab(schluessel) {
+    return hauptkategorien().find((g) => g.tabs.includes(schluessel));
+  }
+
   let wetterOrt = localStorage.getItem("wetter-ort") || "Erftstadt";
   let wetterDaten = null; // letzte erfolgreiche Antwort vom Server
   let wetterLetzterAbruf = 0; // Timestamp (ms), für einfaches Caching
@@ -150,6 +154,8 @@
   function zeigeLogin(fehler) {
     document.getElementById("app").classList.add("hidden");
     document.getElementById("bereich-screen").classList.add("hidden");
+    document.getElementById("kategorie-screen").classList.add("hidden");
+    document.getElementById("unterkategorie-screen").classList.add("hidden");
     document.getElementById("login-screen").classList.remove("hidden");
     document.getElementById("login-error").textContent = fehler || "";
   }
@@ -157,21 +163,90 @@
   function zeigeBereichAuswahl() {
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("app").classList.add("hidden");
+    document.getElementById("kategorie-screen").classList.add("hidden");
+    document.getElementById("unterkategorie-screen").classList.add("hidden");
     document.getElementById("bereich-screen").classList.remove("hidden");
   }
 
   function zeigeApp() {
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("bereich-screen").classList.add("hidden");
+    document.getElementById("kategorie-screen").classList.add("hidden");
+    document.getElementById("unterkategorie-screen").classList.add("hidden");
     document.getElementById("app").classList.remove("hidden");
     dashboardNameAnzeigen();
     untertitelAnzeigen();
   }
 
+  // ==========================================================
+  // Kachel-Navigation: Bereich -> Hauptkategorie (Thema) -> Reiter
+  // ==========================================================
+  function zeigeKategorien() {
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("bereich-screen").classList.add("hidden");
+    document.getElementById("app").classList.add("hidden");
+    document.getElementById("unterkategorie-screen").classList.add("hidden");
+    document.getElementById("kategorie-screen").classList.remove("hidden");
+    aktiveKategorie = null;
+    renderKategorieTiles();
+  }
+
+  function renderKategorieTiles() {
+    const titel = document.getElementById("kategorie-screen-bereichsname");
+    if (titel) titel.textContent = BEREICH_TITEL_VERWALTUNG[aktiverBereich] || "";
+    const container = document.getElementById("kategorie-tiles");
+    if (!container) return;
+    container.innerHTML = hauptkategorien()
+      .filter((g) => sichtbareTabsInGruppe(g).length > 0)
+      .map((g) => `
+        <button class="bereich-tile" onclick="kategorieAuswaehlen('${g.schluessel}')">
+          <span class="bereich-tile-icon">${g.icon}</span>
+          <span class="bereich-tile-label">${escapeHtml(g.label)}</span>
+        </button>
+      `).join("");
+  }
+
+  window.kategorieAuswaehlen = function(schluessel) {
+    const gruppe = hauptkategorien().find((g) => g.schluessel === schluessel);
+    const sichtbar = gruppe ? sichtbareTabsInGruppe(gruppe) : [];
+    // Nur ein sichtbarer Reiter im Thema? Dann direkt hinein, statt eine
+    // Zwischenseite mit nur einer Kachel zu zeigen.
+    if (sichtbar.length <= 1) {
+      tabWechseln(sichtbar[0] || "heute");
+      return;
+    }
+    zeigeUnterkategorien(schluessel);
+  };
+
+  function zeigeUnterkategorien(schluessel) {
+    document.getElementById("kategorie-screen").classList.add("hidden");
+    document.getElementById("app").classList.add("hidden");
+    document.getElementById("unterkategorie-screen").classList.remove("hidden");
+    aktiveKategorie = schluessel;
+    renderUnterkategorieTiles();
+  }
+
+  function renderUnterkategorieTiles() {
+    const gruppe = hauptkategorien().find((g) => g.schluessel === aktiveKategorie);
+    if (!gruppe) return;
+    const titel = document.getElementById("unterkategorie-screen-titel");
+    if (titel) titel.textContent = gruppe.label;
+    const container = document.getElementById("unterkategorie-tiles");
+    if (!container) return;
+    container.innerHTML = sichtbareTabsInGruppe(gruppe).map((schluessel) => {
+      const eintrag = ALLE_REITER.find(([s]) => s === schluessel);
+      const label = eintrag ? eintrag[1] : schluessel;
+      return `
+        <button class="bereich-tile" onclick="tabWechseln('${schluessel}')">
+          <span class="bereich-tile-label">${escapeHtml(label)}</span>
+        </button>
+      `;
+    }).join("");
+  }
+
   window.bereichAuswaehlen = function(bereich) {
     aktiverBereich = bereich;
     localStorage.setItem("aktiver-bereich", bereich);
-    zeigeApp();
     bereichAnwenden();
     render();
     renderNotizen();
@@ -179,8 +254,11 @@
     renderHeute();
     renderOgsIdeen();
     renderReiterVerwaltung();
-    const standard = bereich === "privat" ? "heute" : bereich === "verwaltung" ? "reiterverwaltung" : "aufgaben";
-    tabWechseln(ersteSichtbareTabSchluessel(standard));
+    if (bereich === "verwaltung") {
+      tabWechseln("reiterverwaltung");
+    } else {
+      zeigeKategorien();
+    }
   };
 
   function dashboardNameAnzeigen() {
@@ -623,7 +701,7 @@
           }
         }
 
-        if (gewuenschterTab && document.getElementById("tab-" + gewuenschterTab)) {
+        if (gewuenschterTab && VIEW_ELEMENTE[gewuenschterTab]) {
           tabWechseln(gewuenschterTab);
         }
         return;
@@ -798,25 +876,6 @@
   const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar" };
 
   function bereichAnwenden() {
-    document.querySelectorAll("[data-bereich]").forEach((el) => {
-      el.classList.toggle("active", el.dataset.bereich === aktiverBereich);
-    });
-    document.querySelectorAll("[data-nur]").forEach((el) => {
-      const erlaubt = el.dataset.nur.split(",");
-      el.classList.toggle("hidden", !erlaubt.includes(aktiverBereich));
-    });
-    // Nutzer-Einstellung aus der Reiter-Verwaltung: entscheidet je Bereich
-    // final, welche Reiter sichtbar sind (überschreibt data-nur, das hier
-    // nur noch den Verwaltungs-Bereich selbst freihält).
-    if (BEREICH_TABS[aktiverBereich]) {
-      BEREICH_TABS[aktiverBereich].forEach(([schluessel]) => {
-        const el = document.getElementById(TAB_ELEMENTE[schluessel]);
-        if (!el) return;
-        el.classList.toggle("hidden", !reiterIstSichtbar(aktiverBereich, schluessel));
-      });
-    }
-    const arbeitLabel = document.getElementById("tab-group-arbeit-label");
-    if (arbeitLabel) arbeitLabel.textContent = BEREICH_NAME[aktiverBereich] || "Weitere";
     const ideenTitel = document.getElementById("ogs-ideen-titel");
     const ideenUntertitel = document.getElementById("ogs-ideen-untertitel");
     if (ideenTitel) ideenTitel.textContent = "Ideen";
@@ -825,34 +884,19 @@
     }
   }
 
-  window.bereichWechseln = function(neu) {
-    if (neu === aktiverBereich) return;
-    aktiverBereich = neu;
-    localStorage.setItem("aktiver-bereich", neu);
-    bereichAnwenden();
-    render();
-    renderNotizen();
-    renderKalender();
-    renderHeute();
-    renderOgsIdeen();
-    renderReiterVerwaltung();
-    const standard = neu === "privat" ? "heute" : neu === "verwaltung" ? "reiterverwaltung" : "aufgaben";
-    tabWechseln(ersteSichtbareTabSchluessel(standard));
-  };
-
-  document.getElementById("bereich-btn-privat").addEventListener("click", () => bereichWechseln("privat"));
-  document.getElementById("bereich-btn-ogs").addEventListener("click", () => bereichWechseln("ogs"));
-  document.getElementById("bereich-btn-awo").addEventListener("click", () => bereichWechseln("awo"));
-  document.getElementById("bereich-btn-verwaltung").addEventListener("click", () => bereichWechseln("verwaltung"));
-
   // ==========================================================
-  // Tabs
+  // Tabs / Inhalt anzeigen
   // ==========================================================
   function tabWechseln(aktiv) {
-    for (const key in TAB_ELEMENTE) {
-      document.getElementById(TAB_ELEMENTE[key]).classList.toggle("active", key === aktiv);
+    for (const key in VIEW_ELEMENTE) {
       document.getElementById(VIEW_ELEMENTE[key]).classList.toggle("hidden", key !== aktiv);
     }
+    aktiverTab = aktiv;
+    document.getElementById("kategorie-screen").classList.add("hidden");
+    document.getElementById("unterkategorie-screen").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    dashboardNameAnzeigen();
+    untertitelAnzeigen();
     if (aktiv === "kalender") { renderKalender(); ladeGoogleSyncStatus(); }
     if (aktiv === "heute") renderHeute();
     if (aktiv === "planung") renderPlanung();
@@ -864,51 +908,54 @@
     if (aktiv === "spiele") renderSpiele();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "reiterverwaltung") renderReiterVerwaltung();
-    menuSchliessen();
+    kontoMenuSchliessen();
   }
+  window.tabWechseln = tabWechseln;
 
-  // Mobiles Menü: Tabs stecken hinter dem Hamburger-Button und öffnen
-  // sich als Drawer. Auf breiten Bildschirmen (Desktop) bleibt der
-  // Drawer per CSS immer sichtbar, die open/close-Klassen wirken sich
-  // dort nicht sichtbar aus.
+  // Zurück-Button: eine Ebene zurück zu den Reiter-Kacheln des aktuellen
+  // Themas (oder direkt zu den Themen-Kacheln, wenn das Thema nur einen
+  // sichtbaren Reiter hatte und deshalb übersprungen wurde). Im Bereich
+  // "Verwaltung" gibt es keine Kachel-Ebenen – dort geht's zurück zur
+  // Bereichsauswahl.
+  document.getElementById("content-back-btn").addEventListener("click", () => {
+    if (aktiverBereich === "verwaltung") { zeigeBereichAuswahl(); return; }
+    const gruppe = gruppeVonTab(aktiverTab);
+    if (gruppe && sichtbareTabsInGruppe(gruppe).length > 1) {
+      zeigeUnterkategorien(gruppe.schluessel);
+    } else {
+      zeigeKategorien();
+    }
+  });
+  // Home-Button: direkt zu den Themen-Kacheln des aktuellen Bereichs.
+  document.getElementById("content-home-btn").addEventListener("click", () => {
+    if (aktiverBereich === "verwaltung") { zeigeBereichAuswahl(); return; }
+    zeigeKategorien();
+  });
+  document.getElementById("kategorie-zurueck-btn").addEventListener("click", zeigeBereichAuswahl);
+  document.getElementById("unterkategorie-zurueck-btn").addEventListener("click", zeigeKategorien);
+
+  // Konto-/Einstellungs-Menü (⋮ oben rechts): Name/Untertitel ändern,
+  // Bereich wechseln, Abmelden – ersetzt die frühere Sidebar-Ecke.
   const menuToggleBtn = document.getElementById("menu-toggle");
-  const tabsMenuEl = document.getElementById("tabs-menu");
-  const menuBackdropEl = document.getElementById("menu-backdrop");
+  const accountMenuEl = document.getElementById("account-menu");
 
-  function menuOeffnen() {
-    tabsMenuEl.classList.add("open");
-    menuBackdropEl.classList.add("open");
+  function kontoMenuOeffnen() {
+    accountMenuEl.classList.remove("hidden");
     menuToggleBtn.setAttribute("aria-expanded", "true");
   }
-  function menuSchliessen() {
-    tabsMenuEl.classList.remove("open");
-    menuBackdropEl.classList.remove("open");
+  function kontoMenuSchliessen() {
+    accountMenuEl.classList.add("hidden");
     menuToggleBtn.setAttribute("aria-expanded", "false");
   }
-  menuToggleBtn.addEventListener("click", () => {
-    if (tabsMenuEl.classList.contains("open")) menuSchliessen(); else menuOeffnen();
+  menuToggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (accountMenuEl.classList.contains("hidden")) kontoMenuOeffnen(); else kontoMenuSchliessen();
   });
-  menuBackdropEl.addEventListener("click", menuSchliessen);
-  document.getElementById("tab-heute").addEventListener("click", () => tabWechseln("heute"));
-  document.getElementById("tab-aufgaben").addEventListener("click", () => tabWechseln("aufgaben"));
-  document.getElementById("tab-kalender").addEventListener("click", () => tabWechseln("kalender"));
-  document.getElementById("tab-frei").addEventListener("click", () => tabWechseln("frei"));
-  document.getElementById("tab-notizen").addEventListener("click", () => tabWechseln("notizen"));
-  document.getElementById("tab-links").addEventListener("click", () => tabWechseln("links"));
-  document.getElementById("tab-reflexion").addEventListener("click", () => tabWechseln("reflexion"));
-  document.getElementById("tab-export").addEventListener("click", () => tabWechseln("export"));
-  document.getElementById("tab-einkauf").addEventListener("click", () => tabWechseln("einkauf"));
-  document.getElementById("tab-verlauf").addEventListener("click", () => tabWechseln("verlauf"));
-  document.getElementById("tab-anleitung").addEventListener("click", () => tabWechseln("anleitung"));
-  document.getElementById("tab-spiele").addEventListener("click", () => tabWechseln("spiele"));
-  document.getElementById("tab-planung").addEventListener("click", () => tabWechseln("planung"));
-  document.getElementById("tab-finanzen").addEventListener("click", () => tabWechseln("finanzen"));
-  document.getElementById("tab-ogs-ideen").addEventListener("click", () => tabWechseln("ogsideen"));
-  document.getElementById("tab-ogs-inventar").addEventListener("click", () => tabWechseln("ogsinventar"));
-  document.getElementById("tab-ogs-projekte").addEventListener("click", () => tabWechseln("ogsprojekte"));
-  document.getElementById("tab-verleih").addEventListener("click", () => tabWechseln("verleih"));
-  document.getElementById("tab-reiter-verwaltung").addEventListener("click", () => tabWechseln("reiterverwaltung"));
-
+  document.addEventListener("click", (e) => {
+    if (!accountMenuEl.classList.contains("hidden") && !accountMenuEl.contains(e.target) && e.target !== menuToggleBtn) {
+      kontoMenuSchliessen();
+    }
+  });
   // ==========================================================
   // Reiter-Verwaltung (Bereich "Verwaltung")
   // ==========================================================
