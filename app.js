@@ -106,8 +106,8 @@
 
   function hauptkategorien() {
     return [
-      { schluessel: "heute", label: "Heute", icon: "☀️", tabs: ["heute", "frei"] },
-      { schluessel: "planen", label: "Planen", icon: "🗓️", tabs: ["aufgaben", "kalender", "planung", "finanzen"] },
+      { schluessel: "heute", label: "Heute", icon: "☀️", tabs: ["heute"] },
+      { schluessel: "planen", label: "Planen", icon: "🗓️", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
       { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf"] },
       { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", icon: BEREICH_ARBEIT_ICON[aktiverBereich] || "📌", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih"] },
       { schluessel: "verwalten", label: "Verwalten", icon: "🛠️", tabs: ["export", "verlauf", "anleitung"] },
