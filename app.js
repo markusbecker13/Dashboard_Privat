@@ -2596,6 +2596,7 @@
   let trainingFilterOrt = "";
   let trainingFilterVon = "";
   let trainingFilterBis = "";
+  let trainingSession = null; // aktive "Plan starten"-Session: { planId, planName, sportart, ort, index, uebungen }
 
   // Montag der Woche, in der "iso" liegt (lokale Zeit, ISO-Datum rein/raus).
   function wochenstartISO(iso) {
@@ -2765,6 +2766,7 @@
         ${laengsteStreak >= 1 ? `<div class="empty-text" style="margin-top:0.2rem;">🔥 Längste Serie: ${laengsteStreak} Woche${laengsteStreak === 1 ? "" : "n"} in Folge Ziel erreicht</div>` : ""}`;
     }
 
+    renderTrainingSession();
     renderTrainingSportartZiele(eintraegeAktuell, wocheStart);
 
     // Sportart/Ort-Vorschläge aus bisherigen Einträgen (Autovervollständigung)
@@ -3070,6 +3072,7 @@
             <span class="notiz-text">${escapeHtml(p.name)}</span>
             ${uebungenAnzeige(uebungen)}
           </div>
+          <button class="link-btn" onclick="event.stopPropagation(); planStarten('${p.id}')" ${uebungen.length ? "" : "disabled"}>▶ Starten</button>
           <button class="task-delete" onclick="event.stopPropagation(); planLoeschen('${p.id}')">×</button>
         </div>`;
     }
@@ -3264,6 +3267,118 @@
       trainingFilterBis = "";
       renderTraining();
     });
+  }
+
+  // ------------------------------------------------------------
+  // "Plan starten": geführtes Durchklicken der Übungen eines Plans,
+  // speichert am Ende als neuen, mit dem Plan verlinkten Trainingseintrag.
+  // ------------------------------------------------------------
+
+  window.planStarten = function(planId) {
+    const plan = trainingsplaene.find((p) => p.id === planId);
+    if (!plan) return;
+    const uebungen = planUebungenFuer(planId)
+      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "" }));
+    if (!uebungen.length) return;
+    trainingSession = { planId, planName: plan.name, sportart: plan.name, ort: "", index: 0, uebungen };
+    renderTraining();
+    const bereichEl = document.getElementById("training-session-bereich");
+    if (bereichEl) bereichEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  function trainingSessionAusDomUebernehmen() {
+    if (!trainingSession) return;
+    const sportartEl = document.getElementById("session-sportart");
+    const ortEl = document.getElementById("session-ort");
+    if (sportartEl) trainingSession.sportart = sportartEl.value.trim();
+    if (ortEl) trainingSession.ort = ortEl.value.trim();
+    const u = trainingSession.uebungen[trainingSession.index];
+    const nameEl = document.getElementById("session-ueb-name");
+    if (nameEl) u.name = nameEl.value.trim();
+    const saetzeEl = document.getElementById("session-ueb-saetze");
+    if (saetzeEl) u.saetze = saetzeEl.value;
+    const wdhEl = document.getElementById("session-ueb-wdh");
+    if (wdhEl) u.wiederholungen = wdhEl.value;
+    const gewichtEl = document.getElementById("session-ueb-gewicht");
+    if (gewichtEl) u.gewicht_kg = gewichtEl.value;
+  }
+
+  window.trainingSessionWeiter = function() {
+    trainingSessionAusDomUebernehmen();
+    trainingSession.index = Math.min(trainingSession.index + 1, trainingSession.uebungen.length - 1);
+    renderTraining();
+  };
+
+  window.trainingSessionZurueck = function() {
+    trainingSessionAusDomUebernehmen();
+    trainingSession.index = Math.max(trainingSession.index - 1, 0);
+    renderTraining();
+  };
+
+  window.trainingSessionAbbrechen = function() {
+    if (!confirm("Trainings-Session abbrechen? Bisher eingegebene Werte gehen verloren.")) return;
+    trainingSession = null;
+    renderTraining();
+  };
+
+  window.trainingSessionAbschliessen = async function() {
+    trainingSessionAusDomUebernehmen();
+    const sportart = (trainingSession.sportart || "").trim();
+    if (!sportart) { alert("Bitte eine Sportart angeben."); return; }
+    const uebungen = trainingSession.uebungen.filter((u) => (u.name || "").trim());
+    const planId = trainingSession.planId;
+    const ort = trainingSession.ort;
+
+    await api("training_hinzufuegen", {
+      bereich: aktiverBereich,
+      datum: heuteISO(),
+      sportart,
+      ort,
+      dauer_minuten: "",
+      notiz: "",
+      uebungen,
+      plan_id: planId,
+    });
+    trainingSession = null;
+    await ladeDaten();
+    renderTraining();
+  };
+
+  function renderTrainingSession() {
+    const el = document.getElementById("training-session-bereich");
+    if (!el) return;
+    if (!trainingSession) { el.innerHTML = ""; return; }
+
+    const gesamt = trainingSession.uebungen.length;
+    const i = trainingSession.index;
+    const u = trainingSession.uebungen[i];
+    const istLetzte = i === gesamt - 1;
+
+    el.innerHTML = `
+      <div class="notiz-item" style="flex-direction:column; align-items:stretch; border:1px solid var(--accent); margin-bottom:1.2rem;">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <strong>${escapeHtml(trainingSession.planName)} · Übung ${i + 1} von ${gesamt}</strong>
+          <button class="link-btn" onclick="trainingSessionAbbrechen()">Abbrechen</button>
+        </div>
+        <div class="row" style="flex-wrap:wrap; margin-top:0.6rem; gap:0.4rem;">
+          <input type="text" id="session-sportart" placeholder="Sportart" value="${escapeAttr(trainingSession.sportart)}" list="training-sportart-liste" style="flex:1; min-width:120px;">
+          <input type="text" id="session-ort" placeholder="Ort (optional)" value="${escapeAttr(trainingSession.ort)}" list="training-ort-liste" style="flex:1; min-width:120px;">
+        </div>
+        <div class="row" style="flex-wrap:wrap; margin-top:0.8rem;">
+          <input type="text" id="session-ueb-name" value="${escapeAttr(u.name)}" placeholder="Übung" list="training-uebung-namen-liste" style="flex:1; min-width:150px; font-weight:600;">
+        </div>
+        <div class="row" style="flex-wrap:wrap; margin-top:0.4rem; gap:0.4rem;">
+          <input type="number" id="session-ueb-saetze" value="${escapeAttr(u.saetze)}" placeholder="Sätze" min="0" style="width:5.5rem;">
+          <input type="number" id="session-ueb-wdh" value="${escapeAttr(u.wiederholungen)}" placeholder="Wdh" min="0" style="width:5.5rem;">
+          <input type="number" id="session-ueb-gewicht" value="${escapeAttr(u.gewicht_kg)}" placeholder="Gewicht (kg)" min="0" step="0.5" style="width:8rem;">
+        </div>
+        <div class="row" style="margin-top:0.9rem; justify-content:space-between;">
+          <button class="link-btn" onclick="trainingSessionZurueck()" ${i === 0 ? "disabled" : ""}>← Zurück</button>
+          ${istLetzte
+            ? `<button class="btn-primary" onclick="trainingSessionAbschliessen()">Training speichern</button>`
+            : `<button class="btn-primary" onclick="trainingSessionWeiter()">Weiter →</button>`}
+        </div>
+      </div>`;
   }
 
   // ------------------------------------------------------------
