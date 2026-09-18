@@ -3073,6 +3073,7 @@
             ${uebungenAnzeige(uebungen)}
           </div>
           <button class="link-btn" onclick="event.stopPropagation(); planStarten('${p.id}')" ${uebungen.length ? "" : "disabled"}>▶ Starten</button>
+          <button class="link-btn" onclick="event.stopPropagation(); planExportieren('${p.id}')">⇩ Export</button>
           <button class="task-delete" onclick="event.stopPropagation(); planLoeschen('${p.id}')">×</button>
         </div>`;
     }
@@ -3132,6 +3133,121 @@
     await ladeDaten();
     renderTraining();
   };
+
+  // ------------------------------------------------------------
+  // Trainingspläne: Import & Export (JSON-Dateien, bereichslos –
+  // Bereich wird beim Import immer aus dem aktiven Bereich gesetzt)
+  // ------------------------------------------------------------
+
+  function planZuExportObjekt(p) {
+    return {
+      name: p.name,
+      uebungen: planUebungenFuer(p.id).map((u) => ({
+        name: u.name,
+        saetze: u.saetze ?? null,
+        wiederholungen: u.wiederholungen ?? null,
+        gewicht_kg: u.gewicht_kg ?? null,
+      })),
+    };
+  }
+
+  function planDateinameSlug(text) {
+    const ersatz = { ä: "ae", ö: "oe", ü: "ue", ß: "ss" };
+    const slug = (text || "plan")
+      .toLowerCase()
+      .replace(/[äöüß]/g, (c) => ersatz[c] || c)
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return slug || "plan";
+  }
+
+  window.planExportieren = function(planId) {
+    const p = trainingsplaene.find((pl) => pl.id === planId);
+    if (!p) return;
+    const exportObj = { typ: "trainingsplan_export", version: 1, plaene: [planZuExportObjekt(p)] };
+    downloadDatei(`trainingsplan-${planDateinameSlug(p.name)}.json`, JSON.stringify(exportObj, null, 2), "application/json");
+  };
+
+  function plaeneAlleExportieren() {
+    const plaene = trainingsplaeneAktuell();
+    if (!plaene.length) { alert("Keine Trainingspläne zum Exportieren vorhanden."); return; }
+    const exportObj = { typ: "trainingsplan_export", version: 1, plaene: plaene.map(planZuExportObjekt) };
+    downloadDatei(`trainingsplaene-${aktiverBereich}-${heuteISO()}.json`, JSON.stringify(exportObj, null, 2), "application/json");
+  }
+
+  async function plaeneImportieren(file) {
+    const text = await file.text();
+    let daten;
+    try {
+      daten = JSON.parse(text);
+    } catch {
+      throw new Error("Datei ist kein gültiges JSON.");
+    }
+
+    const eingehendePlaene = Array.isArray(daten?.plaene) ? daten.plaene : Array.isArray(daten) ? daten : null;
+    if (!eingehendePlaene || !eingehendePlaene.length) {
+      throw new Error("Keine Trainingspläne in der Datei gefunden.");
+    }
+
+    const gueltig = eingehendePlaene
+      .filter((p) => p && typeof p.name === "string" && p.name.trim())
+      .map((p) => ({
+        name: p.name.trim(),
+        uebungen: Array.isArray(p.uebungen)
+          ? p.uebungen
+              .filter((u) => u && typeof u.name === "string" && u.name.trim())
+              .map((u) => ({
+                name: u.name.trim(),
+                saetze: u.saetze ?? null,
+                wiederholungen: u.wiederholungen ?? null,
+                gewicht_kg: u.gewicht_kg ?? null,
+              }))
+          : [],
+      }));
+    if (!gueltig.length) throw new Error("Keine gültigen Trainingspläne in der Datei gefunden.");
+
+    const bestehendeNamen = new Set(trainingsplaeneAktuell().map((p) => p.name));
+    const duplikate = gueltig.filter((p) => bestehendeNamen.has(p.name)).map((p) => p.name);
+    if (duplikate.length) {
+      const weiter = confirm(
+        `Diese Pläne existieren im Bereich „${aktiverBereich}" bereits: ${duplikate.join(", ")}.\n\n` +
+        `Trotzdem importieren? Es entstehen zusätzliche Pläne mit gleichem Namen.`
+      );
+      if (!weiter) return;
+    }
+
+    for (const p of gueltig) {
+      await api("plan_hinzufuegen", { bereich: aktiverBereich, name: p.name, uebungen: p.uebungen });
+    }
+    await ladeDaten();
+    renderTraining();
+    alert(`${gueltig.length} Trainingsplan/-pläne importiert.`);
+  }
+
+  const btnPlaeneExportAlle = document.getElementById("btn-plaene-export-alle");
+  if (btnPlaeneExportAlle) btnPlaeneExportAlle.addEventListener("click", plaeneAlleExportieren);
+
+  const btnPlaeneImport = document.getElementById("btn-plaene-import");
+  const plaeneImportInput = document.getElementById("plaene-import-input");
+  if (btnPlaeneImport && plaeneImportInput) {
+    btnPlaeneImport.addEventListener("click", () => plaeneImportInput.click());
+    plaeneImportInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      btnPlaeneImport.textContent = "Importiere …";
+      btnPlaeneImport.disabled = true;
+      try {
+        await plaeneImportieren(file);
+      } catch (err) {
+        console.error(err);
+        alert("Import fehlgeschlagen: " + (err.message || err));
+      } finally {
+        btnPlaeneImport.textContent = "⇪ Pläne importieren";
+        btnPlaeneImport.disabled = false;
+      }
+    });
+  }
 
   // ------------------------------------------------------------
   // Sportarten- & Übungen-Stammdaten (Vorschläge für die
