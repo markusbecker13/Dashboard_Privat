@@ -583,8 +583,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Neuer Eintrag:</strong> Datum (leer = heute), Sportart und Ort als Freitext mit Autovervollständigung aus bisherigen Einträgen, Dauer in Minuten, optional Notiz</li>
                 <li><strong>Übungen (optional):</strong> „+ Übung hinzufügen" fügt beliebig viele Zeilen mit Name, Sätzen, Wiederholungen und Gewicht hinzu – sinnvoll für Kraft-Training wie das Rücken-Training, bei anderen Sportarten einfach weglassen</li>
                 <li><strong>Plan starten:</strong> bei einem Trainingsplan auf „▶ Starten" klicken – öffnet einen Vollbild-Fokus-Modus (deckt den ganzen Bildschirm ab, kein Scrollen nötig), dann Übung für Übung mit „Weiter"/"← Zurück" durchklicken, Werte bei Bedarf anpassen. „×" oben rechts bricht die Session ab (mit Rückfrage). Am Ende („Training speichern") wird automatisch ein neuer, mit dem Plan verlinkter Trainingseintrag mit heutigem Datum angelegt und der Fokus-Modus schließt sich</li>
-                <li><strong>Trainingspläne:</strong> unter „Trainingspläne verwalten" lassen sich benannte Vorlagen (z. B. „Rücken A", „Rücken B") mit eigenen Übungslisten anlegen. Im Formular oben füllt die Auswahl „Kein Plan"/Plan-Name die Übungen automatisch vor – danach frei editierbar. Der genutzte Plan wird beim Eintrag mit angezeigt ("· Plan: …") und lässt sich beim Bearbeiten auch nachträglich ändern oder entfernen. Über „⇩ Export" bei einem Plan bzw. „⇩ Alle exportieren" lässt sich eine Datei herunterladen; über „⇪ Pläne importieren (CSV/JSON)" lässt sich eine solche Datei (auch mit mehreren Plänen) wieder einlesen – bei Namensgleichheit mit vorhandenen Plänen kommt vorher eine Sicherheitsabfrage. Am einfachsten zum Selberausfüllen (z. B. in Excel/LibreOffice Calc) ist eine CSV-Datei mit den Spalten Plan, Übung, Sätze, Wiederholungen, Gewicht (kg) – eine Zeile je Übung, mehrere Zeilen mit gleichem Plan-Namen ergeben zusammen einen Plan. „⇩ CSV-Vorlage" liefert eine ausgefüllte Beispieldatei zum Anpassen. Beim Import werden alle enthaltenen Übungsnamen automatisch auch in „Sportarten & Übungen verwalten" ergänzt (bereits vorhandene Namen werden übersprungen)</li>
+                <li><strong>Trainingspläne:</strong> unter „Trainingspläne verwalten" lassen sich benannte Vorlagen (z. B. „Rücken A", „Rücken B") mit eigenen Übungslisten anlegen. Im Formular oben füllt die Auswahl „Kein Plan"/Plan-Name die Übungen automatisch vor – danach frei editierbar. Der genutzte Plan wird beim Eintrag mit angezeigt ("· Plan: …") und lässt sich beim Bearbeiten auch nachträglich ändern oder entfernen. Über „⇩ Export" bei einem Plan bzw. „⇩ Alle exportieren" lässt sich eine Datei herunterladen; über „⇪ Pläne importieren (CSV/JSON)" lässt sich eine solche Datei (auch mit mehreren Plänen) wieder einlesen – bei Namensgleichheit mit vorhandenen Plänen kommt vorher eine Sicherheitsabfrage. Am einfachsten zum Selberausfüllen (z. B. in Excel/LibreOffice Calc) ist eine CSV-Datei mit den Spalten Plan, Übung, Sätze, Wiederholungen, Gewicht (kg) – eine Zeile je Übung, mehrere Zeilen mit gleichem Plan-Namen ergeben zusammen einen Plan. „⇩ CSV-Vorlage" liefert eine ausgefüllte Beispieldatei zum Anpassen. Beim Import werden alle enthaltenen Übungsnamen automatisch auch in „Sportarten & Übungen verwalten" ergänzt (bereits vorhandene Namen werden übersprungen). Jeder Plan-Eintrag ist aufklappbar (Klick auf den Namen zeigt/verbirgt die Übungen); Bearbeiten läuft über „✎"</li>
                 <li><strong>Sportarten & Übungen – Beschreibung & Bild:</strong> Einträge stehen untereinander in einer Liste. Über „✎" lässt sich zu jedem Eintrag jederzeit eine Beschreibung sowie ein Bild (JPG/PNG/WebP/GIF, max. 5 MB) hinterlegen, ändern oder entfernen. Hinterlegte Bilder erscheinen als kleines Vorschaubild überall dort, wo die Übung als Chip angezeigt wird (Trainingseinträge, Trainingspläne, „Plan starten")</li>
+                <li><strong>Intervall-Timer:</strong> unter „Intervall-Timer verwalten" lassen sich benannte Vorlagen mit Arbeitszeit, Pause, Anzahl Runden und optionaler Vorbereitungszeit anlegen – unabhängig von Trainingsplänen. „▶ Starten" öffnet denselben Vollbild-Fokus-Modus wie „Plan starten": der Countdown läuft automatisch durch Vorbereitung → Arbeit → Pause → nächste Runde, bei jedem Phasenwechsel Signalton + Vibration (sofern vom Gerät unterstützt), das Display bleibt währenddessen an. „⏸ Pause"/"▶ Weiter" hält den Timer an, „×"/"Beenden" bricht ab (mit Rückfrage, solange nicht fertig)</li>
                 <li><strong>Übungsverlauf:</strong> Auswahl einer Übung zeigt ihr Gewicht über die Zeit als Diagramm – braucht mindestens zwei Einträge mit Gewichtsangabe für dieselbe Übung, um eine Linie zeichnen zu können</li>
                 <li><strong>Sportarten & Übungen verwalten:</strong> eigene Liste mit Vorschlägen für Sportart- und Übungsnamen, unabhängig davon ob sie schon mal genutzt wurden. Freitext bleibt überall möglich – die Liste erscheint nur als Vorschlag bei der Autovervollständigung, zusammen mit bereits genutzten Werten</li>
                 <li><strong>Wochenziel:</strong> oben "X von Y diese Woche" mit einem ✓ sobald erreicht. Ziel über „Ziel ändern" jederzeit anpassbar (Woche zählt Montag bis Sonntag). Darunter die längste je erreichte Serie von Wochen in Folge mit erreichtem Ziel</li>
@@ -897,6 +898,37 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             </div>
 
             <div id="trainingsplan-liste" style="margin-top:1.2rem;"></div>
+          </div>
+        </details>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
+          <summary>Intervall-Timer verwalten</summary>
+          <div class="anleitung-text">
+            <p class="empty-text" style="margin-top:0;">Als Vorlage speichern, dann jederzeit im Vollbild-Fokus-Modus starten – unabhängig von Trainingsplänen.</p>
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start; gap:0.5rem;">
+              <input type="text" id="timer-neu-name" placeholder="Name (z.B. Tabata)" style="flex:1; min-width:150px;">
+            </div>
+            <div class="row" style="flex-wrap:wrap; margin-top:0.6rem; gap:0.5rem;">
+              <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                <label style="font-size:0.78rem; color:var(--ink-dim);">Arbeit (Sek.)</label>
+                <input type="number" id="timer-neu-arbeit" min="1" value="30" style="width:6.5rem;">
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                <label style="font-size:0.78rem; color:var(--ink-dim);">Pause (Sek.)</label>
+                <input type="number" id="timer-neu-pause" min="0" value="15" style="width:6.5rem;">
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                <label style="font-size:0.78rem; color:var(--ink-dim);">Runden</label>
+                <input type="number" id="timer-neu-runden" min="1" value="8" style="width:6.5rem;">
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                <label style="font-size:0.78rem; color:var(--ink-dim);">Vorbereitung (Sek.)</label>
+                <input type="number" id="timer-neu-vorbereitung" min="0" value="10" style="width:6.5rem;">
+              </div>
+            </div>
+            <button class="btn-primary" id="btn-timer-hinzufuegen" style="margin-top:0.8rem;">Timer speichern</button>
+
+            <div id="timer-liste" style="margin-top:1.2rem;"></div>
           </div>
         </details>
       </div>
