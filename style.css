@@ -141,6 +141,30 @@
   .session-fokus-btn-sek { background: var(--panel); color: var(--ink); border: 1px solid var(--border); }
   .session-fokus-btn-sek:disabled { opacity: 0.4; cursor: default; }
   .session-fokus-btn-primaer { background: var(--accent); color: #fff; font-weight: 600; }
+
+  /* Trainingspläne: aufklappbare Einträge (native <details>) */
+  .plan-item {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.7rem 0.8rem;
+  }
+  .plan-item summary {
+    cursor: pointer; list-style: none; display: flex; align-items: center;
+    justify-content: space-between; gap: 0.6rem;
+  }
+  .plan-item summary::-webkit-details-marker { display: none; }
+  .plan-item summary::marker { content: ""; }
+  .plan-item .chevron { display: inline-block; margin-right: 0.4rem; color: var(--ink-dim); transition: transform 0.15s; }
+  .plan-item[open] .chevron { transform: rotate(90deg); }
+  .plan-item .chip-liste { margin-top: 0.6rem; }
+  .plan-item-aktionen { margin-top: 0.7rem; }
+
+  /* Intervall-Timer: Fokus-Modus-Inhalt (nutzt .session-fokus-* Rahmen) */
+  .timer-fokus-mitte { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 0.8rem; flex: 1; }
+  .timer-phase-label { font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); }
+  .timer-countdown { font-size: 5rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+  .timer-phase-arbeit .timer-phase-label { color: var(--overdue-text); }
+  .timer-phase-pause .timer-phase-label { color: var(--mod-termine); }
+  .timer-phase-fertig .timer-phase-label { color: var(--accent); font-size: 1.8rem; }
   .empty-text { color: var(--ink-dim); }
   #login-screen, #bereich-screen, #kategorie-screen, #unterkategorie-screen { max-width: 340px; margin: 3rem auto; padding: 0 1.4rem; text-align: center; }
   .kachel-screen-top { display: flex; justify-content: flex-start; margin-bottom: 1rem; }
