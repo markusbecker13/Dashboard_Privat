@@ -2592,6 +2592,10 @@
   let planBearbeitenId = null;
   let planFormUebungen = []; // Übungs-Zeilen im "Neuer Plan"-Formular
   let planBearbeitenUebungen = []; // Übungs-Zeilen im gerade offenen Plan-Bearbeiten-Formular
+  let trainingFilterSportart = "";
+  let trainingFilterOrt = "";
+  let trainingFilterVon = "";
+  let trainingFilterBis = "";
 
   // Montag der Woche, in der "iso" liegt (lokale Zeit, ISO-Datum rein/raus).
   function wochenstartISO(iso) {
@@ -2602,9 +2606,18 @@
     return d.toISOString().slice(0, 10);
   }
 
-  function trainingWochenziel() {
-    const eintrag = trainingEinstellungen.find((e) => e.bereich === aktiverBereich);
-    return eintrag ? eintrag.wochenziel : 2;
+  function trainingWochenziel(sportart) {
+    const key = (sportart || "").trim();
+    const eintrag = trainingEinstellungen.find((e) => e.bereich === aktiverBereich && (e.sportart || "") === key);
+    if (eintrag) return eintrag.wochenziel;
+    return key ? null : 2;
+  }
+
+  function trainingSportartZieleAktuell() {
+    return trainingEinstellungen
+      .filter((e) => e.bereich === aktiverBereich && (e.sportart || "").trim())
+      .slice()
+      .sort((a, b) => a.sportart.localeCompare(b.sportart));
   }
 
   // Längste je erreichte Serie von Wochen in Folge mit erreichtem Wochenziel
@@ -2702,12 +2715,42 @@
       (uebungenByTraining[u.training_id] = uebungenByTraining[u.training_id] || []).push(u);
     });
 
+    // Filter (Sportart/Ort/Zeitraum, kombinierbar) – wirkt auf Liste
+    // UND auf die Wochenziel-/Serien-Anzeige oben.
+    const eintraegeGefiltert = eintraegeAktuell.filter((t) => {
+      if (trainingFilterSportart && t.sportart !== trainingFilterSportart) return false;
+      if (trainingFilterOrt && t.ort !== trainingFilterOrt) return false;
+      if (trainingFilterVon && t.datum < trainingFilterVon) return false;
+      if (trainingFilterBis && t.datum > trainingFilterBis) return false;
+      return true;
+    });
+
+    const filterSportartEl = document.getElementById("training-filter-sportart");
+    if (filterSportartEl) {
+      const sportarten = [...new Set(eintraegeAktuell.map((t) => t.sportart))].filter(Boolean).sort((a, b) => a.localeCompare(b));
+      filterSportartEl.innerHTML = '<option value="">Alle Sportarten</option>'
+        + sportarten.map((s) => `<option value="${escapeAttr(s)}" ${s === trainingFilterSportart ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
+    }
+    const filterOrtEl = document.getElementById("training-filter-ort");
+    if (filterOrtEl) {
+      const orte = [...new Set(eintraegeAktuell.map((t) => t.ort))].filter(Boolean).sort((a, b) => a.localeCompare(b));
+      filterOrtEl.innerHTML = '<option value="">Alle Orte</option>'
+        + orte.map((o) => `<option value="${escapeAttr(o)}" ${o === trainingFilterOrt ? "selected" : ""}>${escapeHtml(o)}</option>`).join("");
+    }
+    const filterVonEl = document.getElementById("training-filter-von");
+    if (filterVonEl) filterVonEl.value = trainingFilterVon;
+    const filterBisEl = document.getElementById("training-filter-bis");
+    if (filterBisEl) filterBisEl.value = trainingFilterBis;
+
     // Wochenziel-Fortschritt der aktuellen Woche + längste je erreichte Streak
+    // (bezogen auf die gefilterte Auswahl; bei aktivem Sportart-Filter zählt
+    // deren eigenes Ziel, falls eines hinterlegt ist, sonst das Gesamtziel)
     const wocheStart = wochenstartISO(heuteISO());
-    const zielWoche = trainingWochenziel();
-    const anzahlDieseWoche = eintraegeAktuell.filter((t) => t.datum >= wocheStart).length;
+    const zielSportartSpezifisch = trainingFilterSportart ? trainingWochenziel(trainingFilterSportart) : null;
+    const zielWoche = zielSportartSpezifisch !== null ? zielSportartSpezifisch : trainingWochenziel("");
+    const anzahlDieseWoche = eintraegeGefiltert.filter((t) => t.datum >= wocheStart).length;
     const gruppenFuerStreak = {};
-    eintraegeAktuell.forEach((t) => {
+    eintraegeGefiltert.forEach((t) => {
       const start = wochenstartISO(t.datum);
       (gruppenFuerStreak[start] = gruppenFuerStreak[start] || []).push(t);
     });
@@ -2715,11 +2758,14 @@
     const zielEl = document.getElementById("training-wochenziel-anzeige");
     if (zielEl) {
       const erreicht = anzahlDieseWoche >= zielWoche;
+      const zielLabel = trainingFilterSportart ? ` – ${escapeHtml(trainingFilterSportart)}` : "";
       zielEl.innerHTML = `
-        <span style="font-weight:600;">${anzahlDieseWoche} von ${zielWoche}</span> diese Woche${erreicht ? " ✓" : ""}
+        <span style="font-weight:600;">${anzahlDieseWoche} von ${zielWoche}</span> diese Woche${zielLabel}${erreicht ? " ✓" : ""}
         <button class="link-btn" style="margin-left:0.6rem;" onclick="trainingZielBearbeiten()">Ziel ändern</button>
         ${laengsteStreak >= 1 ? `<div class="empty-text" style="margin-top:0.2rem;">🔥 Längste Serie: ${laengsteStreak} Woche${laengsteStreak === 1 ? "" : "n"} in Folge Ziel erreicht</div>` : ""}`;
     }
+
+    renderTrainingSportartZiele(eintraegeAktuell, wocheStart);
 
     // Sportart/Ort-Vorschläge aus bisherigen Einträgen (Autovervollständigung)
     const orteBisher = [...new Set(training.map((t) => t.ort).filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -2849,7 +2895,7 @@
     }
 
     const gruppen = {};
-    eintraegeAktuell.forEach((t) => {
+    eintraegeGefiltert.forEach((t) => {
       const start = wochenstartISO(t.datum);
       (gruppen[start] = gruppen[start] || []).push(t);
     });
@@ -2857,7 +2903,8 @@
 
     let html;
     if (!wochenSortiert.length) {
-      html = '<p class="empty-text">Noch kein Training erfasst.</p>';
+      const filterAktiv = trainingFilterSportart || trainingFilterOrt || trainingFilterVon || trainingFilterBis;
+      html = `<p class="empty-text">${filterAktiv ? "Keine Einträge für diesen Filter." : "Noch kein Training erfasst."}</p>`;
     } else {
       html = wochenSortiert.map((start) => {
         const eintraege = gruppen[start];
@@ -2939,12 +2986,14 @@
   };
 
   window.trainingZielBearbeiten = async function() {
-    const aktuell = trainingWochenziel();
-    const neu = prompt("Trainings-Wochenziel (Anzahl Einheiten pro Woche):", aktuell);
+    const sportart = trainingFilterSportart || "";
+    const aktuell = sportart ? (trainingWochenziel(sportart) ?? trainingWochenziel("")) : trainingWochenziel("");
+    const label = sportart ? `Wochenziel für „${sportart}" (Anzahl Einheiten pro Woche):` : "Gesamt-Wochenziel (Anzahl Einheiten pro Woche):";
+    const neu = prompt(label, aktuell);
     if (neu === null) return;
     const wert = parseInt(neu, 10);
     if (!Number.isFinite(wert) || wert < 0) return;
-    await api("training_ziel_speichern", { bereich: aktiverBereich, wochenziel: wert });
+    await api("training_ziel_speichern", { bereich: aktiverBereich, sportart, wochenziel: wert });
     await ladeDaten();
     renderTraining();
   };
@@ -3146,6 +3195,76 @@
     await ladeDaten();
     renderTraining();
   };
+
+  // ------------------------------------------------------------
+  // Wochenziel je Sportart (zusätzlich zum Gesamtziel) + Filter
+  // ------------------------------------------------------------
+
+  function renderTrainingSportartZiele(eintraegeAktuell, wocheStart) {
+    const listEl = document.getElementById("training-sportart-ziele-liste");
+    const auswahlEl = document.getElementById("training-sportart-ziel-auswahl");
+    if (!listEl) return;
+
+    const ziele = trainingSportartZieleAktuell();
+    listEl.innerHTML = ziele.length
+      ? ziele.map((z) => {
+          const anzahl = eintraegeAktuell.filter((t) => t.sportart === z.sportart && t.datum >= wocheStart).length;
+          const erreicht = anzahl >= z.wochenziel;
+          return `
+            <div class="notiz-item">
+              <span style="flex:1;">${escapeHtml(z.sportart)}: <strong>${anzahl} von ${z.wochenziel}</strong> diese Woche${erreicht ? " ✓" : ""}</span>
+              <button class="task-delete" onclick="trainingSportartZielLoeschen('${escapeAttr(z.sportart)}')">×</button>
+            </div>`;
+        }).join("")
+      : "";
+
+    if (auswahlEl) {
+      const sportarten = [...new Set([
+        ...trainingStammdatenAktuell("sportart").map((s) => s.name),
+        ...eintraegeAktuell.map((t) => t.sportart),
+      ])].filter(Boolean).sort((a, b) => a.localeCompare(b));
+      auswahlEl.innerHTML = sportarten.map((s) => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join("");
+    }
+  }
+
+  window.trainingSportartZielLoeschen = async function(sportart) {
+    await api("training_ziel_loeschen", { bereich: aktiverBereich, sportart });
+    await ladeDaten();
+    renderTraining();
+  };
+
+  const btnSportartZielSpeichern = document.getElementById("btn-training-sportart-ziel-speichern");
+  if (btnSportartZielSpeichern) {
+    btnSportartZielSpeichern.addEventListener("click", async () => {
+      const sportart = document.getElementById("training-sportart-ziel-auswahl").value;
+      const wertEl = document.getElementById("training-sportart-ziel-wert");
+      const wert = parseInt(wertEl.value, 10);
+      if (!sportart || !Number.isFinite(wert) || wert < 0) return;
+      await api("training_ziel_speichern", { bereich: aktiverBereich, sportart, wochenziel: wert });
+      wertEl.value = "";
+      await ladeDaten();
+      renderTraining();
+    });
+  }
+
+  const filterSportartAuswahlEl = document.getElementById("training-filter-sportart");
+  if (filterSportartAuswahlEl) filterSportartAuswahlEl.addEventListener("change", () => { trainingFilterSportart = filterSportartAuswahlEl.value; renderTraining(); });
+  const filterOrtAuswahlEl = document.getElementById("training-filter-ort");
+  if (filterOrtAuswahlEl) filterOrtAuswahlEl.addEventListener("change", () => { trainingFilterOrt = filterOrtAuswahlEl.value; renderTraining(); });
+  const filterVonAuswahlEl = document.getElementById("training-filter-von");
+  if (filterVonAuswahlEl) filterVonAuswahlEl.addEventListener("change", () => { trainingFilterVon = filterVonAuswahlEl.value; renderTraining(); });
+  const filterBisAuswahlEl = document.getElementById("training-filter-bis");
+  if (filterBisAuswahlEl) filterBisAuswahlEl.addEventListener("change", () => { trainingFilterBis = filterBisAuswahlEl.value; renderTraining(); });
+  const btnTrainingFilterReset = document.getElementById("btn-training-filter-zuruecksetzen");
+  if (btnTrainingFilterReset) {
+    btnTrainingFilterReset.addEventListener("click", () => {
+      trainingFilterSportart = "";
+      trainingFilterOrt = "";
+      trainingFilterVon = "";
+      trainingFilterBis = "";
+      renderTraining();
+    });
+  }
 
   // ------------------------------------------------------------
   // Übungsverlauf (Langzeit-Diagramm: Gewicht je Übung über die Zeit)
