@@ -60,6 +60,8 @@
   let trainingsplaene = [];
   let trainingsplanUebungen = [];
   let trainingStammdaten = [];
+  let stammdatenBearbeitenId = null;
+  let trainingBildUrls = {}; // stammdaten-id -> { url, ablauf }
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
   let aktiveKategorie = null; // Schlüssel der gerade offenen Themen-Kachel-Gruppe, oder null
   let aktiverTab = null; // Schlüssel des gerade angezeigten Reiters (view-*), für den Zurück-Button
@@ -2851,7 +2853,7 @@
           if (t) werte += trendSymbol(u.gewicht_kg, vorherigesGewicht(t, u));
         }
         const bestleistung = t && istBestleistung(t, u);
-        return `<span class="chip" style="cursor:default; padding-right:0.7rem;" ${bestleistung ? 'title="Neue Bestleistung"' : ""}>${bestleistung ? "🏆 " : ""}${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
+        return `<span class="chip" style="cursor:default; padding-right:0.7rem;" ${bestleistung ? 'title="Neue Bestleistung"' : ""}>${chipBildHtml("uebung", u.name)}${bestleistung ? "🏆 " : ""}${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
       });
       return `<div class="chip-liste" style="margin-top:0.4rem;">${chips.join("")}</div>`;
     }
@@ -3048,7 +3050,7 @@
         let werte = "";
         if (u.saetze || u.wiederholungen) werte += `${u.saetze || "?"}×${u.wiederholungen || "?"}`;
         if (u.gewicht_kg) werte += `${werte ? " · " : ""}${u.gewicht_kg} kg`;
-        return `<span class="chip" style="cursor:default; padding-right:0.7rem;">${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
+        return `<span class="chip" style="cursor:default; padding-right:0.7rem;">${chipBildHtml("uebung", u.name)}${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
       });
       return `<div class="chip-liste" style="margin-top:0.4rem;">${chips.join("")}</div>`;
     }
@@ -3348,20 +3350,86 @@
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  // Bild-URLs werden lazy geladen (nur wenn ein bild_pfad hinterlegt
+  // ist) und pro Stammdaten-Eintrag 60 Minuten lang wiederverwendet
+  // – so reicht ein Abruf für alle Vorkommen (Stammdaten-Liste,
+  // Trainingseinträge, Trainingspläne, "Plan starten").
+  async function trainingBilderLaden() {
+    const brauchtLaden = trainingStammdaten.filter(
+      (s) => s.bild_pfad && (!trainingBildUrls[s.id] || trainingBildUrls[s.id].ablauf < Date.now())
+    );
+    if (!brauchtLaden.length) return;
+    for (const s of brauchtLaden) {
+      try {
+        const res = await api("stammdaten_bild_url", { id: s.id });
+        trainingBildUrls[s.id] = { url: res.url, ablauf: Date.now() + 55 * 60 * 1000 };
+      } catch (e) {
+        console.error("Bild konnte nicht geladen werden:", e);
+      }
+    }
+    renderTraining();
+  }
+
+  // Sucht (bereichsgetrennt) den Stammdaten-Eintrag zu einem Namen
+  // und liefert dessen bereits geladene Bild-URL, falls vorhanden.
+  function stammdatenBildUrlFuerName(typ, name) {
+    if (!name) return null;
+    const eintrag = trainingStammdaten.find(
+      (s) => bereichVon(s) === aktiverBereich && s.typ === typ && s.name.trim().toLowerCase() === name.trim().toLowerCase()
+    );
+    if (!eintrag || !eintrag.bild_pfad) return null;
+    return trainingBildUrls[eintrag.id]?.url || null;
+  }
+
+  function chipBildHtml(typ, name) {
+    const url = stammdatenBildUrlFuerName(typ, name);
+    return url ? `<img src="${escapeAttr(url)}" class="chip-bild" alt="">` : "";
+  }
+
   function renderTrainingsstammdaten() {
     const sportarten = trainingStammdatenAktuell("sportart");
     const uebungen = trainingStammdatenAktuell("uebung");
 
-    function chipListeHtml(liste) {
+    function eintragHtml(s) {
+      if (stammdatenBearbeitenId === s.id) {
+        const bildUrl = trainingBildUrls[s.id]?.url;
+        return `
+          <div class="notiz-item" style="flex-direction:column; align-items:stretch;">
+            <strong>${escapeHtml(s.name)}</strong>
+            <textarea id="stammdaten-edit-beschreibung-${s.id}" placeholder="Beschreibung (optional)" rows="2" style="margin-top:0.5rem; width:100%;">${escapeHtml(s.beschreibung || "")}</textarea>
+            <div class="row" style="align-items:center; margin-top:0.5rem; gap:0.6rem; flex-wrap:wrap;">
+              ${s.bild_pfad ? `<img src="${bildUrl ? escapeAttr(bildUrl) : ""}" class="stammdaten-bild" alt="">` : ""}
+              <input type="file" id="stammdaten-edit-bild-${s.id}" accept="image/jpeg,image/png,image/webp,image/gif">
+              ${s.bild_pfad ? `<label style="font-size:0.8rem; display:flex; align-items:center; gap:0.3rem;"><input type="checkbox" id="stammdaten-edit-bild-entfernen-${s.id}"> Bild entfernen</label>` : ""}
+            </div>
+            <div class="row" style="margin-top:0.6rem;">
+              <button class="btn-primary" onclick="stammdatenBearbeitenSpeichern('${s.id}')">Speichern</button>
+              <button class="link-btn" onclick="stammdatenBearbeitenAbbrechen()">Abbrechen</button>
+            </div>
+          </div>`;
+      }
+      const bildUrl = trainingBildUrls[s.id]?.url;
+      return `
+        <div class="notiz-item">
+          ${s.bild_pfad && bildUrl ? `<img src="${escapeAttr(bildUrl)}" class="stammdaten-bild" alt="">` : ""}
+          <div style="flex:1;">
+            <span class="notiz-text">${escapeHtml(s.name)}</span>
+            ${s.beschreibung ? `<span class="notiz-meta" style="white-space:pre-wrap;">${escapeHtml(s.beschreibung)}</span>` : ""}
+          </div>
+          <button class="task-edit-btn" onclick="stammdatenBearbeitenStart('${s.id}')" title="Bearbeiten">✎</button>
+          <button class="task-delete" onclick="stammdatenLoeschen('${s.id}')">×</button>
+        </div>`;
+    }
+
+    function listeHtml(liste) {
       if (!liste.length) return '<p class="empty-text">Noch keine hinterlegt.</p>';
-      return `<div class="chip-liste">${liste.map((s) => `
-        <span class="chip">${escapeHtml(s.name)}<button type="button" onclick="stammdatenLoeschen('${s.id}')">×</button></span>`).join("")}</div>`;
+      return `<div class="notiz-list">${liste.map(eintragHtml).join("")}</div>`;
     }
 
     const sportartenListEl = document.getElementById("stammdaten-sportarten-liste");
-    if (sportartenListEl) sportartenListEl.innerHTML = chipListeHtml(sportarten);
+    if (sportartenListEl) sportartenListEl.innerHTML = listeHtml(sportarten);
     const uebungenListEl = document.getElementById("stammdaten-uebungen-liste");
-    if (uebungenListEl) uebungenListEl.innerHTML = chipListeHtml(uebungen);
+    if (uebungenListEl) uebungenListEl.innerHTML = listeHtml(uebungen);
 
     // Vorschläge für die Autovervollständigung: verwaltete Liste +
     // bisher tatsächlich genutzte Werte zusammengeführt.
@@ -3379,6 +3447,8 @@
     ])].filter(Boolean).sort((a, b) => a.localeCompare(b));
     const uebungList = document.getElementById("training-uebung-namen-liste");
     if (uebungList) uebungList.innerHTML = uebungsnamenVorschlaege.map((n) => `<option value="${escapeAttr(n)}">`).join("");
+
+    trainingBilderLaden();
   }
 
   const btnStammSportart = document.getElementById("btn-stammdaten-sportart-hinzufuegen");
@@ -3399,6 +3469,47 @@
 
   window.stammdatenLoeschen = async function(id) {
     await api("stammdaten_loeschen", { id });
+    await ladeDaten();
+    renderTraining();
+  };
+
+  window.stammdatenBearbeitenStart = function(id) {
+    stammdatenBearbeitenId = id;
+    renderTraining();
+  };
+
+  window.stammdatenBearbeitenAbbrechen = function() {
+    stammdatenBearbeitenId = null;
+    renderTraining();
+  };
+
+  window.stammdatenBearbeitenSpeichern = async function(id) {
+    const beschreibungEl = document.getElementById(`stammdaten-edit-beschreibung-${id}`);
+    const dateiEl = document.getElementById(`stammdaten-edit-bild-${id}`);
+    const entfernenEl = document.getElementById(`stammdaten-edit-bild-entfernen-${id}`);
+
+    const payload = { id, beschreibung: beschreibungEl ? beschreibungEl.value.trim() : "" };
+
+    const datei = dateiEl && dateiEl.files[0];
+    if (datei) {
+      const erlaubteTypen = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+      if (!erlaubteTypen.includes(datei.type)) {
+        alert("Nur JPG-, PNG-, WebP- oder GIF-Bilder sind erlaubt.");
+        return;
+      }
+      if (datei.size > 5 * 1024 * 1024) {
+        alert("Bild ist größer als 5 MB.");
+        return;
+      }
+      payload.bild_base64 = await dateiZuBase64(datei);
+      payload.bild_typ = datei.type;
+      payload.bild_name = datei.name;
+    } else if (entfernenEl && entfernenEl.checked) {
+      payload.bild_entfernen = true;
+    }
+
+    await api("stammdaten_aktualisieren", payload);
+    stammdatenBearbeitenId = null;
     await ladeDaten();
     renderTraining();
   };
@@ -3568,7 +3679,8 @@
           <input type="text" id="session-sportart" placeholder="Sportart" value="${escapeAttr(trainingSession.sportart)}" list="training-sportart-liste" style="flex:1; min-width:120px;">
           <input type="text" id="session-ort" placeholder="Ort (optional)" value="${escapeAttr(trainingSession.ort)}" list="training-ort-liste" style="flex:1; min-width:120px;">
         </div>
-        <div class="row" style="flex-wrap:wrap; margin-top:0.8rem;">
+        <div class="row" style="flex-wrap:wrap; align-items:center; margin-top:0.8rem; gap:0.5rem;">
+          ${stammdatenBildUrlFuerName("uebung", u.name) ? `<img src="${escapeAttr(stammdatenBildUrlFuerName("uebung", u.name))}" class="stammdaten-bild" alt="">` : ""}
           <input type="text" id="session-ueb-name" value="${escapeAttr(u.name)}" placeholder="Übung" list="training-uebung-namen-liste" style="flex:1; min-width:150px; font-weight:600;">
         </div>
         <div class="row" style="flex-wrap:wrap; margin-top:0.4rem; gap:0.4rem;">
