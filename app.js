@@ -3175,18 +3175,83 @@
     downloadDatei(`trainingsplaene-${aktiverBereich}-${heuteISO()}.json`, JSON.stringify(exportObj, null, 2), "application/json");
   }
 
-  async function plaeneImportieren(file) {
-    const text = await file.text();
-    let daten;
-    try {
-      daten = JSON.parse(text);
-    } catch {
-      throw new Error("Datei ist kein gültiges JSON.");
+  // Einfaches CSV-Format für Laien (z.B. in Excel/LibreOffice Calc
+  // auszufüllen): eine Zeile je Übung, mehrere Zeilen mit gleichem
+  // Plan-Namen bilden gemeinsam einen Plan. Trennzeichen (; oder ,)
+  // und deutsches Dezimalkomma werden automatisch erkannt (nutzt
+  // dieselbe Logik wie der CSV-Import bei den Finanzen).
+  function csvZuTrainingsplaenen(text) {
+    const { header, rows } = parseCsvText(text);
+    const kopf = header.map((h) => h.toLowerCase());
+    const idxPlan = findeSpalte(kopf, ["plan", "plan-name", "planname", "trainingsplan"]);
+    const idxUebung = findeSpalte(kopf, ["übung", "uebung", "übungsname", "uebungsname", "name"]);
+    const idxSaetze = findeSpalte(kopf, ["sätze", "saetze", "sets"]);
+    const idxWdh = findeSpalte(kopf, ["wiederholungen", "wdh", "reps"]);
+    const idxGewicht = findeSpalte(kopf, ["gewicht (kg)", "gewicht_kg", "gewicht", "kg"]);
+
+    if (idxPlan === -1 || idxUebung === -1) {
+      throw new Error(
+        'Spalte "Plan" oder "Übung" wurde nicht gefunden. Erwartete Kopfzeile z.B.: ' +
+        "Plan;Übung;Sätze;Wiederholungen;Gewicht (kg)"
+      );
     }
 
-    const eingehendePlaene = Array.isArray(daten?.plaene) ? daten.plaene : Array.isArray(daten) ? daten : null;
-    if (!eingehendePlaene || !eingehendePlaene.length) {
-      throw new Error("Keine Trainingspläne in der Datei gefunden.");
+    const reihenfolge = [];
+    const nachPlan = new Map();
+    for (const felder of rows) {
+      const planName = (felder[idxPlan] || "").trim();
+      const uebungName = (felder[idxUebung] || "").trim();
+      if (!planName || !uebungName) continue;
+      if (!nachPlan.has(planName)) { nachPlan.set(planName, []); reihenfolge.push(planName); }
+      nachPlan.get(planName).push({
+        name: uebungName,
+        saetze: idxSaetze > -1 ? csvGanzzahlOderNull(felder[idxSaetze]) : null,
+        wiederholungen: idxWdh > -1 ? csvGanzzahlOderNull(felder[idxWdh]) : null,
+        gewicht_kg: idxGewicht > -1 ? parseCsvBetrag(felder[idxGewicht]) : null,
+      });
+    }
+    return reihenfolge.map((name) => ({ name, uebungen: nachPlan.get(name) }));
+  }
+
+  function csvGanzzahlOderNull(raw) {
+    const s = (raw || "").trim();
+    if (!s) return null;
+    const n = parseInt(s, 10);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  window.planVorlageHerunterladen = function() {
+    const vorlage =
+      "Plan;Übung;Sätze;Wiederholungen;Gewicht (kg)\n" +
+      "Rücken A;Latzug;3;12;40\n" +
+      "Rücken A;Rudern;3;10;35\n" +
+      "Rücken A;Klimmzug;3;8;\n" +
+      "Rücken B;Kreuzheben;4;6;60\n" +
+      "Rücken B;T-Bar-Rudern;3;10;30\n";
+    downloadDatei("trainingsplaene-vorlage.csv", vorlage, "text/csv");
+  };
+
+  async function plaeneImportieren(file) {
+    const text = await file.text();
+    const istJson = file.name.toLowerCase().endsWith(".json");
+
+    let eingehendePlaene;
+    if (istJson) {
+      let daten;
+      try {
+        daten = JSON.parse(text);
+      } catch {
+        throw new Error("Datei ist kein gültiges JSON.");
+      }
+      eingehendePlaene = Array.isArray(daten?.plaene) ? daten.plaene : Array.isArray(daten) ? daten : null;
+      if (!eingehendePlaene || !eingehendePlaene.length) {
+        throw new Error("Keine Trainingspläne in der Datei gefunden.");
+      }
+    } else {
+      eingehendePlaene = csvZuTrainingsplaenen(text);
+      if (!eingehendePlaene.length) {
+        throw new Error("Keine gültigen Zeilen gefunden (Plan- oder Übungsname fehlt überall).");
+      }
     }
 
     const gueltig = eingehendePlaene
@@ -3227,6 +3292,9 @@
   const btnPlaeneExportAlle = document.getElementById("btn-plaene-export-alle");
   if (btnPlaeneExportAlle) btnPlaeneExportAlle.addEventListener("click", plaeneAlleExportieren);
 
+  const btnPlaeneVorlage = document.getElementById("btn-plaene-vorlage");
+  if (btnPlaeneVorlage) btnPlaeneVorlage.addEventListener("click", planVorlageHerunterladen);
+
   const btnPlaeneImport = document.getElementById("btn-plaene-import");
   const plaeneImportInput = document.getElementById("plaene-import-input");
   if (btnPlaeneImport && plaeneImportInput) {
@@ -3243,7 +3311,7 @@
         console.error(err);
         alert("Import fehlgeschlagen: " + (err.message || err));
       } finally {
-        btnPlaeneImport.textContent = "⇪ Pläne importieren";
+        btnPlaeneImport.textContent = "⇪ Pläne importieren (CSV/JSON)";
         btnPlaeneImport.disabled = false;
       }
     });
