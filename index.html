@@ -576,6 +576,20 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
+            <summary>Training <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
+            <div class="anleitung-text">
+              <p>Trainingsverlauf und -erfolg – bewusst offen für beliebige Sportarten und Orte, weil sich beides über die Zeit ändern soll.</p>
+              <ul>
+                <li><strong>Neuer Eintrag:</strong> Datum (leer = heute), Sportart und Ort als Freitext mit Autovervollständigung aus bisherigen Einträgen, Dauer in Minuten, optional Notiz</li>
+                <li><strong>Übungen (optional):</strong> „+ Übung hinzufügen" fügt beliebig viele Zeilen mit Name, Sätzen, Wiederholungen und Gewicht hinzu – sinnvoll für Kraft-Training wie das Rücken-Training, bei anderen Sportarten einfach weglassen</li>
+                <li><strong>Wochenziel:</strong> oben "X von Y diese Woche" mit einem ✓ sobald erreicht. Ziel über „Ziel ändern" jederzeit anpassbar (Woche zählt Montag bis Sonntag)</li>
+                <li><strong>Liste:</strong> nach Woche gruppiert, aktuelle Woche standardmäßig aufgeklappt, jede Wochen-Überschrift zeigt Anzahl und ob das Wochenziel erreicht wurde</li>
+                <li>Klick auf einen Eintrag öffnet die Inline-Bearbeitung inklusive der hinterlegten Übungen</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
             <summary>Einkaufsliste <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <ul>
@@ -787,6 +801,29 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <p class="empty-text" style="margin-top:0.3rem;">Neue Gegenstände zuerst im Inventar-Reiter anlegen – hier nur auswählen und verleihen.</p>
 
         <div id="verleih-liste-bereich"></div>
+      </div>
+
+      <div id="view-training" class="hidden">
+        <h1>Training <button class="hilfe-icon" data-hilfe="Trainingsverlauf: Datum, Sportart, Ort, Dauer und optional einzelne Übungen mit Sätzen/Wiederholungen/Gewicht (v.a. für Kraft-Training). Oben der Wochenziel-Vergleich, darunter die Liste gruppiert nach Woche. Zum Bearbeiten auf einen Eintrag tippen.">?</button></h1>
+        <p class="hero-text">Trainingsverlauf und Fortschritt – offen für beliebige Sportarten und Orte, die Häufigkeit darf sich jederzeit ändern.</p>
+
+        <p id="training-wochenziel-anzeige" style="margin-bottom:1.2rem;"></p>
+
+        <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+          <input type="date" id="training-datum" title="Datum (leer = heute)">
+          <input type="text" id="training-sportart" placeholder="Sportart (z.B. Rücken)" list="training-sportart-liste">
+          <datalist id="training-sportart-liste"></datalist>
+          <input type="text" id="training-ort" placeholder="Ort (z.B. Zuhause)" list="training-ort-liste">
+          <datalist id="training-ort-liste"></datalist>
+          <input type="number" id="training-dauer" placeholder="Minuten" min="0" style="width:6rem;">
+          <input type="text" id="training-notiz" placeholder="Notiz (optional)" style="flex:1; min-width:150px;">
+        </div>
+        <div style="margin:0.6rem 0 1rem;">
+          <div id="training-neu-uebungen"></div>
+        </div>
+        <button class="btn-primary" id="btn-training-hinzufuegen">Training speichern</button>
+
+        <div id="training-liste-bereich" style="margin-top:1.6rem;"></div>
       </div>
     </main>
   </div>
