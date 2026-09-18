@@ -3585,8 +3585,10 @@
   }
 
   // ------------------------------------------------------------
-  // "Plan starten": geführtes Durchklicken der Übungen eines Plans,
-  // speichert am Ende als neuen, mit dem Plan verlinkten Trainingseintrag.
+  // "Plan starten": geführtes Durchklicken der Übungen eines Plans
+  // in einem Vollbild-Fokus-Modus (eigenes Overlay über der ganzen
+  // App, kein Scrollen/Ablenkung nötig), speichert am Ende als
+  // neuen, mit dem Plan verlinkten Trainingseintrag.
   // ------------------------------------------------------------
 
   window.planStarten = function(planId) {
@@ -3596,10 +3598,29 @@
       .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "" }));
     if (!uebungen.length) return;
     trainingSession = { planId, planName: plan.name, sportart: plan.name, ort: "", index: 0, uebungen };
-    renderTraining();
-    const bereichEl = document.getElementById("training-session-bereich");
-    if (bereichEl) bereichEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    sessionFokusOeffnen();
   };
+
+  function sessionFokusOeffnen() {
+    if (document.getElementById("session-fokus-overlay")) { renderTrainingSession(); return; }
+    const overlay = document.createElement("div");
+    overlay.className = "session-fokus-overlay";
+    overlay.id = "session-fokus-overlay";
+    document.body.appendChild(overlay);
+    renderTrainingSession();
+    // Echtes Vollbild, wo unterstützt (Android/Desktop); auf iOS
+    // Safari nicht verfügbar – die Overlay-Ansicht deckt den
+    // Bildschirm dann trotzdem vollständig ab.
+    try { document.documentElement.requestFullscreen?.().catch(() => {}); } catch {}
+  }
+
+  function sessionFokusSchliessen() {
+    const overlay = document.getElementById("session-fokus-overlay");
+    if (overlay) overlay.remove();
+    if (document.fullscreenElement) {
+      try { document.exitFullscreen?.().catch(() => {}); } catch {}
+    }
+  }
 
   function trainingSessionAusDomUebernehmen() {
     if (!trainingSession) return;
@@ -3621,18 +3642,19 @@
   window.trainingSessionWeiter = function() {
     trainingSessionAusDomUebernehmen();
     trainingSession.index = Math.min(trainingSession.index + 1, trainingSession.uebungen.length - 1);
-    renderTraining();
+    renderTrainingSession();
   };
 
   window.trainingSessionZurueck = function() {
     trainingSessionAusDomUebernehmen();
     trainingSession.index = Math.max(trainingSession.index - 1, 0);
-    renderTraining();
+    renderTrainingSession();
   };
 
   window.trainingSessionAbbrechen = function() {
     if (!confirm("Trainings-Session abbrechen? Bisher eingegebene Werte gehen verloren.")) return;
     trainingSession = null;
+    sessionFokusSchliessen();
     renderTraining();
   };
 
@@ -3655,45 +3677,45 @@
       plan_id: planId,
     });
     trainingSession = null;
+    sessionFokusSchliessen();
     await ladeDaten();
     renderTraining();
   };
 
   function renderTrainingSession() {
-    const el = document.getElementById("training-session-bereich");
-    if (!el) return;
-    if (!trainingSession) { el.innerHTML = ""; return; }
+    const overlay = document.getElementById("session-fokus-overlay");
+    if (!overlay) return;
+    if (!trainingSession) { overlay.remove(); return; }
 
     const gesamt = trainingSession.uebungen.length;
     const i = trainingSession.index;
     const u = trainingSession.uebungen[i];
     const istLetzte = i === gesamt - 1;
+    const bildUrl = stammdatenBildUrlFuerName("uebung", u.name);
 
-    el.innerHTML = `
-      <div class="notiz-item" style="flex-direction:column; align-items:stretch; border:1px solid var(--accent); margin-bottom:1.2rem;">
-        <div class="row" style="justify-content:space-between; align-items:center;">
-          <strong>${escapeHtml(trainingSession.planName)} · Übung ${i + 1} von ${gesamt}</strong>
-          <button class="link-btn" onclick="trainingSessionAbbrechen()">Abbrechen</button>
-        </div>
-        <div class="row" style="flex-wrap:wrap; margin-top:0.6rem; gap:0.4rem;">
+    overlay.innerHTML = `
+      <div class="session-fokus-kopf">
+        <span class="session-fokus-titel">${escapeHtml(trainingSession.planName)} · Übung ${i + 1} von ${gesamt}</span>
+        <button class="session-fokus-schliessen" onclick="trainingSessionAbbrechen()" aria-label="Schließen">×</button>
+      </div>
+      <div class="session-fokus-inhalt">
+        <div class="row" style="flex-wrap:wrap; gap:0.5rem;">
           <input type="text" id="session-sportart" placeholder="Sportart" value="${escapeAttr(trainingSession.sportart)}" list="training-sportart-liste" style="flex:1; min-width:120px;">
           <input type="text" id="session-ort" placeholder="Ort (optional)" value="${escapeAttr(trainingSession.ort)}" list="training-ort-liste" style="flex:1; min-width:120px;">
         </div>
-        <div class="row" style="flex-wrap:wrap; align-items:center; margin-top:0.8rem; gap:0.5rem;">
-          ${stammdatenBildUrlFuerName("uebung", u.name) ? `<img src="${escapeAttr(stammdatenBildUrlFuerName("uebung", u.name))}" class="stammdaten-bild" alt="">` : ""}
-          <input type="text" id="session-ueb-name" value="${escapeAttr(u.name)}" placeholder="Übung" list="training-uebung-namen-liste" style="flex:1; min-width:150px; font-weight:600;">
+        ${bildUrl ? `<img src="${escapeAttr(bildUrl)}" class="session-fokus-bild" alt="">` : ""}
+        <input type="text" id="session-ueb-name" class="session-fokus-uebung-name" value="${escapeAttr(u.name)}" placeholder="Übung" list="training-uebung-namen-liste">
+        <div class="session-fokus-werte">
+          <div><label>Sätze</label><input type="number" id="session-ueb-saetze" value="${escapeAttr(u.saetze)}" min="0"></div>
+          <div><label>Wdh</label><input type="number" id="session-ueb-wdh" value="${escapeAttr(u.wiederholungen)}" min="0"></div>
+          <div><label>Gewicht (kg)</label><input type="number" id="session-ueb-gewicht" value="${escapeAttr(u.gewicht_kg)}" min="0" step="0.5"></div>
         </div>
-        <div class="row" style="flex-wrap:wrap; margin-top:0.4rem; gap:0.4rem;">
-          <input type="number" id="session-ueb-saetze" value="${escapeAttr(u.saetze)}" placeholder="Sätze" min="0" style="width:5.5rem;">
-          <input type="number" id="session-ueb-wdh" value="${escapeAttr(u.wiederholungen)}" placeholder="Wdh" min="0" style="width:5.5rem;">
-          <input type="number" id="session-ueb-gewicht" value="${escapeAttr(u.gewicht_kg)}" placeholder="Gewicht (kg)" min="0" step="0.5" style="width:8rem;">
-        </div>
-        <div class="row" style="margin-top:0.9rem; justify-content:space-between;">
-          <button class="link-btn" onclick="trainingSessionZurueck()" ${i === 0 ? "disabled" : ""}>← Zurück</button>
-          ${istLetzte
-            ? `<button class="btn-primary" onclick="trainingSessionAbschliessen()">Training speichern</button>`
-            : `<button class="btn-primary" onclick="trainingSessionWeiter()">Weiter →</button>`}
-        </div>
+      </div>
+      <div class="session-fokus-fuss">
+        <button class="session-fokus-btn-sek" onclick="trainingSessionZurueck()" ${i === 0 ? "disabled" : ""}>← Zurück</button>
+        ${istLetzte
+          ? `<button class="session-fokus-btn-primaer" onclick="trainingSessionAbschliessen()">Training speichern</button>`
+          : `<button class="session-fokus-btn-primaer" onclick="trainingSessionWeiter()">Weiter →</button>`}
       </div>`;
   }
 
