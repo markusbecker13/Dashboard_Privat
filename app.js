@@ -2607,6 +2607,32 @@
     return eintrag ? eintrag.wochenziel : 2;
   }
 
+  // Längste je erreichte Serie von Wochen in Folge mit erreichtem Wochenziel
+  // (Lücken ohne Eintrag zählen als 0 und brechen die Serie). Bezieht sich
+  // auf das aktuell eingestellte Wochenziel, unabhängig davon, ob es früher
+  // ein anderes war.
+  function trainingLaengsteStreak(gruppen, zielWoche) {
+    const keys = Object.keys(gruppen);
+    if (!keys.length) return 0;
+    const erste = keys.slice().sort()[0];
+    const letzte = wochenstartISO(heuteISO());
+    const cursor = new Date(erste + "T00:00:00");
+    const ende = new Date(letzte + "T00:00:00");
+    let laengste = 0, aktuell = 0;
+    while (cursor <= ende) {
+      const iso = cursor.toISOString().slice(0, 10);
+      const anzahl = (gruppen[iso] || []).length;
+      if (anzahl >= zielWoche) {
+        aktuell++;
+        if (aktuell > laengste) laengste = aktuell;
+      } else {
+        aktuell = 0;
+      }
+      cursor.setDate(cursor.getDate() + 7);
+    }
+    return laengste;
+  }
+
   function trainingUebungZeileHtml(u, i, praefix) {
     return `
       <div class="row" style="gap:0.4rem; margin-bottom:0.3rem; flex-wrap:wrap;">
@@ -2676,16 +2702,23 @@
       (uebungenByTraining[u.training_id] = uebungenByTraining[u.training_id] || []).push(u);
     });
 
-    // Wochenziel-Fortschritt der aktuellen Woche
+    // Wochenziel-Fortschritt der aktuellen Woche + längste je erreichte Streak
     const wocheStart = wochenstartISO(heuteISO());
     const zielWoche = trainingWochenziel();
     const anzahlDieseWoche = eintraegeAktuell.filter((t) => t.datum >= wocheStart).length;
+    const gruppenFuerStreak = {};
+    eintraegeAktuell.forEach((t) => {
+      const start = wochenstartISO(t.datum);
+      (gruppenFuerStreak[start] = gruppenFuerStreak[start] || []).push(t);
+    });
+    const laengsteStreak = trainingLaengsteStreak(gruppenFuerStreak, zielWoche);
     const zielEl = document.getElementById("training-wochenziel-anzeige");
     if (zielEl) {
       const erreicht = anzahlDieseWoche >= zielWoche;
       zielEl.innerHTML = `
         <span style="font-weight:600;">${anzahlDieseWoche} von ${zielWoche}</span> diese Woche${erreicht ? " ✓" : ""}
-        <button class="link-btn" style="margin-left:0.6rem;" onclick="trainingZielBearbeiten()">Ziel ändern</button>`;
+        <button class="link-btn" style="margin-left:0.6rem;" onclick="trainingZielBearbeiten()">Ziel ändern</button>
+        ${laengsteStreak >= 1 ? `<div class="empty-text" style="margin-top:0.2rem;">🔥 Längste Serie: ${laengsteStreak} Woche${laengsteStreak === 1 ? "" : "n"} in Folge Ziel erreicht</div>` : ""}`;
     }
 
     // Sportart/Ort-Vorschläge aus bisherigen Einträgen (Autovervollständigung)
@@ -2721,6 +2754,36 @@
       return bestes ? bestes.gewicht_kg : null;
     }
 
+    // Bestleistung: neues Maximum bei Gewicht ODER Wiederholungen für diese
+    // Übung (gleicher Bereich), verglichen mit allen vorherigen Einträgen.
+    // Ohne vorherigen Eintrag zu dieser Übung gilt es noch nicht als "neu".
+    function istBestleistung(t, u) {
+      const hatGewicht = u.gewicht_kg !== null && u.gewicht_kg !== undefined && u.gewicht_kg !== "";
+      const hatWdh = u.wiederholungen !== null && u.wiederholungen !== undefined && u.wiederholungen !== "";
+      if (!hatGewicht && !hatWdh) return false;
+      const name = (u.name || "").trim().toLowerCase();
+      if (!name) return false;
+      let maxGewicht = null, maxWdh = null;
+      trainingUebungen.forEach((other) => {
+        if (other.training_id === t.id) return;
+        if ((other.name || "").trim().toLowerCase() !== name) return;
+        const ot = trainingByIdAktuell[other.training_id];
+        if (!ot || ot.datum > t.datum) return;
+        if (other.gewicht_kg !== null && other.gewicht_kg !== undefined && other.gewicht_kg !== "") {
+          const w = Number(other.gewicht_kg);
+          if (maxGewicht === null || w > maxGewicht) maxGewicht = w;
+        }
+        if (other.wiederholungen !== null && other.wiederholungen !== undefined && other.wiederholungen !== "") {
+          const r = Number(other.wiederholungen);
+          if (maxWdh === null || r > maxWdh) maxWdh = r;
+        }
+      });
+      if (maxGewicht === null && maxWdh === null) return false; // erster Eintrag: kein Vergleich möglich
+      const gewichtNeu = hatGewicht && (maxGewicht === null || Number(u.gewicht_kg) > maxGewicht);
+      const wdhNeu = hatWdh && (maxWdh === null || Number(u.wiederholungen) > maxWdh);
+      return gewichtNeu || wdhNeu;
+    }
+
     function trendSymbol(aktuell, vorher) {
       if (vorher === null || vorher === undefined) return "";
       const diff = Number(aktuell) - Number(vorher);
@@ -2739,7 +2802,8 @@
           werte += `${u.gewicht_kg} kg`;
           if (t) werte += trendSymbol(u.gewicht_kg, vorherigesGewicht(t, u));
         }
-        return `<span class="chip" style="cursor:default; padding-right:0.7rem;">${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
+        const bestleistung = t && istBestleistung(t, u);
+        return `<span class="chip" style="cursor:default; padding-right:0.7rem;" ${bestleistung ? 'title="Neue Bestleistung"' : ""}>${bestleistung ? "🏆 " : ""}${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
       });
       return `<div class="chip-liste" style="margin-top:0.4rem;">${chips.join("")}</div>`;
     }
