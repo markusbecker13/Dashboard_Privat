@@ -95,6 +95,14 @@
   .task-edit-felder { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.7rem; }
   .task-edit-felder input, .task-edit-felder select { flex: 1 1 140px; }
   .task-delete { background: none; border: none; color: var(--ink-dim); font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.5rem; flex-shrink: 0; }
+  .chip-liste { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    font-size: 0.8rem; padding: 0.25rem 0.3rem 0.25rem 0.7rem; border-radius: 999px;
+    background: var(--bg); color: var(--ink); border: 1px solid var(--border);
+  }
+  .chip button { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 0.3rem; }
+  .chip button:hover { color: var(--accent); }
   .empty-text { color: var(--ink-dim); }
   #login-screen, #bereich-screen, #kategorie-screen, #unterkategorie-screen { max-width: 340px; margin: 3rem auto; padding: 0 1.4rem; text-align: center; }
   .kachel-screen-top { display: flex; justify-content: flex-start; margin-bottom: 1rem; }
