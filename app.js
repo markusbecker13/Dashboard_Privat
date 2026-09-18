@@ -2698,6 +2698,7 @@
 
     renderTrainingsplaene();
     renderTrainingsstammdaten();
+    renderTrainingsverlauf();
 
     // Fortschritts-Trend: letztes bekanntes Gewicht je Übungsname (gleicher
     // Bereich, chronologisch davor) zum Vergleich mit dem aktuellen Wert.
@@ -3081,6 +3082,101 @@
     await ladeDaten();
     renderTraining();
   };
+
+  // ------------------------------------------------------------
+  // Übungsverlauf (Langzeit-Diagramm: Gewicht je Übung über die Zeit)
+  // ------------------------------------------------------------
+
+  let verlaufAusgewaehlteUebung = null;
+
+  function trainingUebungsnamenAktuell() {
+    const idsAktuell = new Set(training.filter((t) => bereichVon(t) === aktiverBereich).map((t) => t.id));
+    const namen = new Set();
+    trainingUebungen.forEach((u) => {
+      if (idsAktuell.has(u.training_id) && (u.name || "").trim()) namen.add(u.name.trim());
+    });
+    return [...namen].sort((a, b) => a.localeCompare(b));
+  }
+
+  function trainingVerlaufFuerUebung(name) {
+    const key = (name || "").trim().toLowerCase();
+    if (!key) return [];
+    const trainingMap = {};
+    training.forEach((t) => { if (bereichVon(t) === aktiverBereich) trainingMap[t.id] = t; });
+    const punkte = [];
+    trainingUebungen.forEach((u) => {
+      if ((u.name || "").trim().toLowerCase() !== key) return;
+      if (u.gewicht_kg === null || u.gewicht_kg === undefined || u.gewicht_kg === "") return;
+      const t = trainingMap[u.training_id];
+      if (!t) return;
+      punkte.push({ datum: t.datum, gewicht_kg: Number(u.gewicht_kg) });
+    });
+    punkte.sort((a, b) => a.datum.localeCompare(b.datum));
+    return punkte;
+  }
+
+  function trainingVerlaufChartSvg(punkte) {
+    const breite = 700, hoehe = 200, unten = 24, oben = 20, linksrand = 10, rechtsrand = 10;
+    const werte = punkte.map((p) => p.gewicht_kg);
+    const minWert = Math.min(...werte);
+    const maxWert = Math.max(...werte);
+    const spanne = (maxWert - minWert) || 1;
+    const schrittX = (breite - linksrand - rechtsrand) / Math.max(1, punkte.length - 1);
+    const yVon = (w) => oben + (hoehe - oben - unten) * (1 - (w - minWert) / spanne);
+
+    const punkteStr = punkte.map((p, i) => `${linksrand + i * schrittX},${yVon(p.gewicht_kg).toFixed(1)}`).join(" ");
+
+    let labelSvg = "";
+    punkte.forEach((p, i) => {
+      if (i === 0 || i === punkte.length - 1 || punkte.length <= 6) {
+        const kurz = `${p.datum.slice(8, 10)}.${p.datum.slice(5, 7)}.`;
+        labelSvg += `<text x="${linksrand + i * schrittX}" y="${hoehe - 6}" font-size="9" fill="var(--ink-dim)" text-anchor="middle">${kurz}</text>`;
+      }
+    });
+
+    return `<svg viewBox="0 0 ${breite} ${hoehe}" style="width:100%; height:auto; display:block;">
+      <text x="${linksrand}" y="12" font-size="9" fill="var(--ink-dim)">${maxWert} kg</text>
+      <text x="${linksrand}" y="${hoehe - unten - 4}" font-size="9" fill="var(--ink-dim)">${minWert} kg</text>
+      <polyline points="${punkteStr}" fill="none" stroke="var(--accent)" stroke-width="2"></polyline>
+      ${punkte.map((p, i) => `<circle cx="${linksrand + i * schrittX}" cy="${yVon(p.gewicht_kg).toFixed(1)}" r="2.6" fill="var(--accent)"></circle>`).join("")}
+      ${labelSvg}
+    </svg>`;
+  }
+
+  function renderTrainingsverlauf() {
+    const auswahlEl = document.getElementById("verlauf-uebung-auswahl");
+    const chartEl = document.getElementById("verlauf-chart-bereich");
+    if (!auswahlEl || !chartEl) return;
+
+    const namen = trainingUebungsnamenAktuell();
+    if (!namen.length) {
+      auswahlEl.innerHTML = "";
+      auswahlEl.style.display = "none";
+      chartEl.innerHTML = '<p class="empty-text">Noch keine Übungen mit Gewichtsangabe erfasst.</p>';
+      return;
+    }
+    auswahlEl.style.display = "";
+    if (!verlaufAusgewaehlteUebung || !namen.includes(verlaufAusgewaehlteUebung)) verlaufAusgewaehlteUebung = namen[0];
+    auswahlEl.innerHTML = namen.map((n) => `<option value="${escapeAttr(n)}" ${n === verlaufAusgewaehlteUebung ? "selected" : ""}>${escapeHtml(n)}</option>`).join("");
+
+    const punkte = trainingVerlaufFuerUebung(verlaufAusgewaehlteUebung);
+    if (punkte.length < 2) {
+      chartEl.innerHTML = '<p class="empty-text">Für diese Übung noch zu wenige Gewichtsangaben (mind. 2 nötig) für ein Diagramm.</p>';
+      return;
+    }
+    const erster = punkte[0].gewicht_kg, letzter = punkte[punkte.length - 1].gewicht_kg;
+    const diff = letzter - erster;
+    const diffText = diff > 0 ? `+${diff} kg seit dem ersten Eintrag` : diff < 0 ? `${diff} kg seit dem ersten Eintrag` : "unverändert seit dem ersten Eintrag";
+    chartEl.innerHTML = `${trainingVerlaufChartSvg(punkte)}<p class="empty-text" style="margin-top:0.4rem;">${punkte.length} Einträge · ${diffText}</p>`;
+  }
+
+  const verlaufAuswahlEl = document.getElementById("verlauf-uebung-auswahl");
+  if (verlaufAuswahlEl) {
+    verlaufAuswahlEl.addEventListener("change", () => {
+      verlaufAusgewaehlteUebung = verlaufAuswahlEl.value;
+      renderTrainingsverlauf();
+    });
+  }
 
   // ==========================================================
   // Spiele (Spielekartei für die Jugendarbeit, nur Privat)
