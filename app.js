@@ -62,6 +62,9 @@
   let trainingStammdaten = [];
   let stammdatenBearbeitenId = null;
   let trainingBildUrls = {}; // stammdaten-id -> { url, ablauf }
+  let intervallTimer = [];
+  let timerBearbeitenId = null;
+  let timerSession = null; // laufender Timer im Fokus-Modus
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
   let aktiveKategorie = null; // Schlüssel der gerade offenen Themen-Kachel-Gruppe, oder null
   let aktiverTab = null; // Schlüssel des gerade angezeigten Reiters (view-*), für den Zurück-Button
@@ -392,6 +395,7 @@
     trainingsplaene = data.trainingsplaene || [];
     trainingsplanUebungen = data.trainingsplan_uebungen || [];
     trainingStammdaten = data.training_stammdaten || [];
+    intervallTimer = data.intervall_timer || [];
     bereichAnwenden();
     renderReiterVerwaltung();
     render();
@@ -2781,6 +2785,7 @@
 
     renderTrainingsplaene();
     renderTrainingsstammdaten();
+    renderTimerVerwaltung();
     renderTrainingsverlauf();
 
     // Fortschritts-Trend: letztes bekanntes Gewicht je Übungsname (gleicher
@@ -3069,19 +3074,23 @@
           </div>`;
       }
       return `
-        <div class="notiz-item" style="cursor:pointer;" onclick="planBearbeitenStart('${p.id}')">
-          <div style="flex:1;">
-            <span class="notiz-text">${escapeHtml(p.name)}</span>
-            ${uebungenAnzeige(uebungen)}
+        <details class="plan-item">
+          <summary>
+            <span><span class="chevron">▸</span><span class="notiz-text">${escapeHtml(p.name)}</span></span>
+            <span class="notiz-meta">${uebungen.length} Übung${uebungen.length === 1 ? "" : "en"}</span>
+          </summary>
+          ${uebungenAnzeige(uebungen)}
+          <div class="row plan-item-aktionen" style="flex-wrap:wrap;">
+            <button class="link-btn" onclick="planStarten('${p.id}')" ${uebungen.length ? "" : "disabled"}>▶ Starten</button>
+            <button class="link-btn" onclick="planExportieren('${p.id}')">⇩ Export</button>
+            <button class="task-edit-btn" onclick="planBearbeitenStart('${p.id}')" title="Bearbeiten">✎</button>
+            <button class="task-delete" onclick="planLoeschen('${p.id}')">×</button>
           </div>
-          <button class="link-btn" onclick="event.stopPropagation(); planStarten('${p.id}')" ${uebungen.length ? "" : "disabled"}>▶ Starten</button>
-          <button class="link-btn" onclick="event.stopPropagation(); planExportieren('${p.id}')">⇩ Export</button>
-          <button class="task-delete" onclick="event.stopPropagation(); planLoeschen('${p.id}')">×</button>
-        </div>`;
+        </details>`;
     }
 
     listEl.innerHTML = plaene.length
-      ? plaene.map(planHtml).join("")
+      ? `<div class="notiz-list">${plaene.map(planHtml).join("")}</div>`
       : '<p class="empty-text">Noch keine Trainingspläne angelegt.</p>';
 
     const neuFormEl = document.getElementById("plan-neu-uebungen");
@@ -3611,7 +3620,7 @@
     // Echtes Vollbild, wo unterstützt (Android/Desktop); auf iOS
     // Safari nicht verfügbar – die Overlay-Ansicht deckt den
     // Bildschirm dann trotzdem vollständig ab.
-    try { document.documentElement.requestFullscreen?.().catch(() => {}); } catch {}
+    try { document.documentElement.requestFullscreen?.()?.catch(() => {}); } catch {}
   }
 
   function sessionFokusSchliessen() {
@@ -3716,6 +3725,281 @@
         ${istLetzte
           ? `<button class="session-fokus-btn-primaer" onclick="trainingSessionAbschliessen()">Training speichern</button>`
           : `<button class="session-fokus-btn-primaer" onclick="trainingSessionWeiter()">Weiter →</button>`}
+      </div>`;
+  }
+
+  // ------------------------------------------------------------
+  // Intervall-Timer: benannte Vorlagen (Verwaltung) + Vollbild-
+  // Fokus-Modus mit automatisch laufendem Countdown (Signalton +
+  // Vibration bei jedem Phasenwechsel, Screen-Wake-Lock während
+  // der Timer läuft, damit das Display nicht einschläft).
+  // ------------------------------------------------------------
+
+  function renderTimerVerwaltung() {
+    const listEl = document.getElementById("timer-liste");
+    if (!listEl) return;
+    const liste = intervallTimer
+      .filter((t) => bereichVon(t) === aktiverBereich)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    function timerHtml(t) {
+      if (timerBearbeitenId === t.id) {
+        return `
+          <div class="notiz-item" style="flex-direction:column; align-items:stretch;">
+            <input type="text" id="timer-edit-name-${t.id}" value="${escapeAttr(t.name)}" placeholder="Name">
+            <div class="row" style="flex-wrap:wrap; margin-top:0.6rem; gap:0.5rem;">
+              <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                <label style="font-size:0.78rem; color:var(--ink-dim);">Arbeit (Sek.)</label>
+                <input type="number" id="timer-edit-arbeit-${t.id}" min="1" value="${t.arbeit_sekunden}" style="width:6.5rem;">
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                <label style="font-size:0.78rem; color:var(--ink-dim);">Pause (Sek.)</label>
+                <input type="number" id="timer-edit-pause-${t.id}" min="0" value="${t.pause_sekunden}" style="width:6.5rem;">
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                <label style="font-size:0.78rem; color:var(--ink-dim);">Runden</label>
+                <input type="number" id="timer-edit-runden-${t.id}" min="1" value="${t.runden}" style="width:6.5rem;">
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                <label style="font-size:0.78rem; color:var(--ink-dim);">Vorbereitung (Sek.)</label>
+                <input type="number" id="timer-edit-vorbereitung-${t.id}" min="0" value="${t.vorbereitung_sekunden}" style="width:6.5rem;">
+              </div>
+            </div>
+            <div class="row" style="margin-top:0.6rem;">
+              <button class="btn-primary" onclick="timerBearbeitenSpeichern('${t.id}')">Speichern</button>
+              <button class="link-btn" onclick="timerBearbeitenAbbrechen()">Abbrechen</button>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="notiz-item">
+          <div style="flex:1;">
+            <span class="notiz-text">${escapeHtml(t.name)}</span>
+            <span class="notiz-meta">${t.arbeit_sekunden}s Arbeit${t.pause_sekunden ? ` / ${t.pause_sekunden}s Pause` : ""} × ${t.runden} Runde${t.runden === 1 ? "" : "n"}${t.vorbereitung_sekunden ? ` · ${t.vorbereitung_sekunden}s Vorbereitung` : ""}</span>
+          </div>
+          <button class="link-btn" onclick="timerStarten('${t.id}')">▶ Starten</button>
+          <button class="task-edit-btn" onclick="timerBearbeitenStart('${t.id}')" title="Bearbeiten">✎</button>
+          <button class="task-delete" onclick="timerLoeschen('${t.id}')">×</button>
+        </div>`;
+    }
+
+    listEl.innerHTML = liste.length
+      ? `<div class="notiz-list">${liste.map(timerHtml).join("")}</div>`
+      : '<p class="empty-text">Noch keine Timer angelegt.</p>';
+  }
+
+  const btnTimerHinzufuegen = document.getElementById("btn-timer-hinzufuegen");
+  if (btnTimerHinzufuegen) btnTimerHinzufuegen.addEventListener("click", timerHinzufuegen);
+
+  async function timerHinzufuegen() {
+    const nameEl = document.getElementById("timer-neu-name");
+    const name = nameEl.value.trim();
+    if (!name) return;
+    await api("timer_hinzufuegen", {
+      bereich: aktiverBereich,
+      name,
+      arbeit_sekunden: document.getElementById("timer-neu-arbeit").value,
+      pause_sekunden: document.getElementById("timer-neu-pause").value,
+      runden: document.getElementById("timer-neu-runden").value,
+      vorbereitung_sekunden: document.getElementById("timer-neu-vorbereitung").value,
+    });
+    nameEl.value = "";
+    await ladeDaten();
+    renderTraining();
+  }
+
+  window.timerBearbeitenStart = function(id) {
+    timerBearbeitenId = id;
+    renderTraining();
+  };
+
+  window.timerBearbeitenAbbrechen = function() {
+    timerBearbeitenId = null;
+    renderTraining();
+  };
+
+  window.timerBearbeitenSpeichern = async function(id) {
+    const name = document.getElementById(`timer-edit-name-${id}`).value.trim();
+    if (!name) return;
+    await api("timer_aktualisieren", {
+      id,
+      name,
+      arbeit_sekunden: document.getElementById(`timer-edit-arbeit-${id}`).value,
+      pause_sekunden: document.getElementById(`timer-edit-pause-${id}`).value,
+      runden: document.getElementById(`timer-edit-runden-${id}`).value,
+      vorbereitung_sekunden: document.getElementById(`timer-edit-vorbereitung-${id}`).value,
+    });
+    timerBearbeitenId = null;
+    await ladeDaten();
+    renderTraining();
+  };
+
+  window.timerLoeschen = async function(id) {
+    if (!confirm("Diesen Timer endgültig löschen?")) return;
+    await api("timer_loeschen", { id });
+    await ladeDaten();
+    renderTraining();
+  };
+
+  let timerIntervalHandle = null;
+
+  window.timerStarten = function(id) {
+    const t = intervallTimer.find((x) => x.id === id);
+    if (!t) return;
+    const startPhase = t.vorbereitung_sekunden > 0 ? "vorbereitung" : "arbeit";
+    timerSession = {
+      name: t.name,
+      arbeit: t.arbeit_sekunden,
+      pause: t.pause_sekunden,
+      runden: t.runden,
+      vorbereitung: t.vorbereitung_sekunden,
+      phase: startPhase,
+      rundeAktuell: 1,
+      sekundenVerbleibend: startPhase === "vorbereitung" ? t.vorbereitung_sekunden : t.arbeit_sekunden,
+      laeuft: true,
+      wakeLock: null,
+    };
+    timerFokusOeffnen();
+    timerSignal(timerSession.phase);
+  };
+
+  function timerFokusOeffnen() {
+    if (!document.getElementById("timer-fokus-overlay")) {
+      const overlay = document.createElement("div");
+      overlay.className = "session-fokus-overlay";
+      overlay.id = "timer-fokus-overlay";
+      document.body.appendChild(overlay);
+    }
+    renderTimerSession();
+    try { document.documentElement.requestFullscreen?.()?.catch(() => {}); } catch {}
+    if ("wakeLock" in navigator) {
+      navigator.wakeLock.request("screen")
+        .then((lock) => { if (timerSession) timerSession.wakeLock = lock; })
+        .catch(() => {});
+    }
+    clearInterval(timerIntervalHandle);
+    timerIntervalHandle = setInterval(timerTick, 1000);
+  }
+
+  function timerFokusSchliessen() {
+    clearInterval(timerIntervalHandle);
+    timerIntervalHandle = null;
+    const overlay = document.getElementById("timer-fokus-overlay");
+    if (overlay) overlay.remove();
+    if (document.fullscreenElement) {
+      try { document.exitFullscreen?.().catch(() => {}); } catch {}
+    }
+  }
+
+  function timerTick() {
+    if (!timerSession || !timerSession.laeuft) return;
+    timerSession.sekundenVerbleibend--;
+    if (timerSession.sekundenVerbleibend <= 0) {
+      timerPhaseWeiter();
+    } else {
+      renderTimerSession();
+    }
+  }
+
+  function timerPhaseWeiter() {
+    const t = timerSession;
+    if (t.phase === "vorbereitung") {
+      t.phase = "arbeit";
+      t.sekundenVerbleibend = t.arbeit;
+    } else if (t.phase === "arbeit") {
+      if (t.rundeAktuell >= t.runden) {
+        t.phase = "fertig";
+        t.laeuft = false;
+        clearInterval(timerIntervalHandle);
+        timerIntervalHandle = null;
+        timerSignal("fertig");
+        renderTimerSession();
+        return;
+      }
+      if (t.pause > 0) {
+        t.phase = "pause";
+        t.sekundenVerbleibend = t.pause;
+      } else {
+        t.rundeAktuell++;
+        t.phase = "arbeit";
+        t.sekundenVerbleibend = t.arbeit;
+      }
+    } else if (t.phase === "pause") {
+      t.rundeAktuell++;
+      t.phase = "arbeit";
+      t.sekundenVerbleibend = t.arbeit;
+    }
+    timerSignal(t.phase);
+    renderTimerSession();
+  }
+
+  function timerSignal(phase) {
+    try {
+      if (navigator.vibrate) {
+        navigator.vibrate(phase === "fertig" ? [200, 100, 200, 100, 400] : 200);
+      }
+    } catch {}
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const beep = (freq, start, dauer) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime + start);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + dauer);
+      };
+      if (phase === "fertig") {
+        beep(880, 0, 0.15); beep(1046, 0.18, 0.15); beep(1318, 0.36, 0.3);
+      } else if (phase === "arbeit") {
+        beep(880, 0, 0.2);
+      } else if (phase === "pause") {
+        beep(523, 0, 0.2);
+      } else {
+        beep(660, 0, 0.15);
+      }
+    } catch {}
+  }
+
+  window.timerPausieren = function() {
+    if (!timerSession) return;
+    timerSession.laeuft = !timerSession.laeuft;
+    renderTimerSession();
+  };
+
+  window.timerAbbrechen = function() {
+    if (!timerSession) return;
+    if (timerSession.phase !== "fertig" && !confirm("Timer beenden?")) return;
+    if (timerSession.wakeLock) { try { timerSession.wakeLock.release(); } catch {} }
+    timerSession = null;
+    timerFokusSchliessen();
+  };
+
+  function renderTimerSession() {
+    const overlay = document.getElementById("timer-fokus-overlay");
+    if (!overlay || !timerSession) return;
+    const t = timerSession;
+    const phaseLabel = { vorbereitung: "Vorbereitung", arbeit: "Arbeit", pause: "Pause", fertig: "Fertig! 🎉" }[t.phase];
+    const mm = String(Math.floor(t.sekundenVerbleibend / 60)).padStart(2, "0");
+    const ss = String(t.sekundenVerbleibend % 60).padStart(2, "0");
+
+    overlay.innerHTML = `
+      <div class="session-fokus-kopf">
+        <span class="session-fokus-titel">${escapeHtml(t.name)} · Runde ${Math.min(t.rundeAktuell, t.runden)} von ${t.runden}</span>
+        <button class="session-fokus-schliessen" onclick="timerAbbrechen()" aria-label="Schließen">×</button>
+      </div>
+      <div class="session-fokus-inhalt timer-fokus-mitte timer-phase-${t.phase}">
+        <div class="timer-phase-label">${phaseLabel}</div>
+        ${t.phase !== "fertig" ? `<div class="timer-countdown">${mm}:${ss}</div>` : ""}
+      </div>
+      <div class="session-fokus-fuss">
+        ${t.phase !== "fertig" ? `<button class="session-fokus-btn-sek" onclick="timerPausieren()">${t.laeuft ? "⏸ Pause" : "▶ Weiter"}</button>` : ""}
+        <button class="session-fokus-btn-primaer" onclick="timerAbbrechen()">${t.phase === "fertig" ? "Fertig" : "Beenden"}</button>
       </div>`;
   }
 
