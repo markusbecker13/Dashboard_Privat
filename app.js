@@ -3284,9 +3284,29 @@
     for (const p of gueltig) {
       await api("plan_hinzufuegen", { bereich: aktiverBereich, name: p.name, uebungen: p.uebungen });
     }
+
+    // Übungsnamen aus den importierten Plänen zusätzlich in die
+    // Stammdaten übernehmen (Tab "Sportarten & Übungen verwalten"),
+    // damit sie dort direkt gelistet sind und bei der Autovervoll-
+    // ständigung erscheinen. Bereits vorhandene Namen werden dabei
+    // übersprungen (stammdaten_hinzufuegen würde sie ohnehin ignorieren).
+    const bekannteUebungsnamen = new Set(trainingStammdatenAktuell("uebung").map((s) => s.name));
+    const neueUebungsnamen = new Set();
+    for (const p of gueltig) {
+      for (const u of p.uebungen) {
+        if (!bekannteUebungsnamen.has(u.name)) neueUebungsnamen.add(u.name);
+      }
+    }
+    for (const name of neueUebungsnamen) {
+      await api("stammdaten_hinzufuegen", { bereich: aktiverBereich, typ: "uebung", name });
+    }
+
     await ladeDaten();
     renderTraining();
-    alert(`${gueltig.length} Trainingsplan/-pläne importiert.`);
+    alert(
+      `${gueltig.length} Trainingsplan/-pläne importiert.` +
+      (neueUebungsnamen.size ? `\n${neueUebungsnamen.size} neue Übung(en) in den Stammdaten ergänzt.` : "")
+    );
   }
 
   const btnPlaeneExportAlle = document.getElementById("btn-plaene-export-alle");
