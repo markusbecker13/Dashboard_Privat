@@ -59,6 +59,7 @@
   let trainingEinstellungen = [];
   let trainingsplaene = [];
   let trainingsplanUebungen = [];
+  let trainingStammdaten = [];
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
   let aktiveKategorie = null; // Schlüssel der gerade offenen Themen-Kachel-Gruppe, oder null
   let aktiverTab = null; // Schlüssel des gerade angezeigten Reiters (view-*), für den Zurück-Button
@@ -388,6 +389,7 @@
     trainingEinstellungen = data.training_einstellungen || [];
     trainingsplaene = data.trainingsplaene || [];
     trainingsplanUebungen = data.trainingsplan_uebungen || [];
+    trainingStammdaten = data.training_stammdaten || [];
     bereichAnwenden();
     renderReiterVerwaltung();
     render();
@@ -2608,7 +2610,7 @@
   function trainingUebungZeileHtml(u, i, praefix) {
     return `
       <div class="row" style="gap:0.4rem; margin-bottom:0.3rem; flex-wrap:wrap;">
-        <input type="text" id="${praefix}-ueb-name-${i}" value="${escapeAttr(u.name || "")}" placeholder="Übung (z.B. Rudern)" style="flex:1; min-width:120px;">
+        <input type="text" id="${praefix}-ueb-name-${i}" value="${escapeAttr(u.name || "")}" placeholder="Übung (z.B. Rudern)" list="training-uebung-namen-liste" style="flex:1; min-width:120px;">
         <input type="number" id="${praefix}-ueb-saetze-${i}" value="${u.saetze ?? ""}" placeholder="Sätze" min="0" style="width:4.3rem;">
         <input type="number" id="${praefix}-ueb-wdh-${i}" value="${u.wiederholungen ?? ""}" placeholder="Wdh" min="0" style="width:4.3rem;">
         <input type="number" id="${praefix}-ueb-gewicht-${i}" value="${u.gewicht_kg ?? ""}" placeholder="kg" min="0" step="0.5" style="width:4.3rem;">
@@ -2687,10 +2689,7 @@
     }
 
     // Sportart/Ort-Vorschläge aus bisherigen Einträgen (Autovervollständigung)
-    const sportartenBisher = [...new Set(training.map((t) => t.sportart).filter(Boolean))].sort((a, b) => a.localeCompare(b));
     const orteBisher = [...new Set(training.map((t) => t.ort).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-    const sportartList = document.getElementById("training-sportart-liste");
-    if (sportartList) sportartList.innerHTML = sportartenBisher.map((s) => `<option value="${escapeAttr(s)}">`).join("");
     const ortList = document.getElementById("training-ort-liste");
     if (ortList) ortList.innerHTML = orteBisher.map((o) => `<option value="${escapeAttr(o)}">`).join("");
 
@@ -2698,6 +2697,7 @@
     if (uebungenFormEl) uebungenFormEl.innerHTML = trainingUebungenBlockHtml(trainingFormUebungen, "neu");
 
     renderTrainingsplaene();
+    renderTrainingsstammdaten();
 
     function uebungenAnzeige(uebungenListe) {
       if (!uebungenListe.length) return "";
@@ -2979,6 +2979,72 @@
   window.planLoeschen = async function(id) {
     if (!confirm("Diesen Trainingsplan endgültig löschen? Bereits erfasste Trainings bleiben erhalten, verlieren aber die Verknüpfung.")) return;
     await api("plan_loeschen", { id });
+    await ladeDaten();
+    renderTraining();
+  };
+
+  // ------------------------------------------------------------
+  // Sportarten- & Übungen-Stammdaten (Vorschläge für die
+  // Autovervollständigung; Freitext bleibt weiterhin möglich)
+  // ------------------------------------------------------------
+
+  function trainingStammdatenAktuell(typ) {
+    return trainingStammdaten
+      .filter((s) => bereichVon(s) === aktiverBereich && s.typ === typ)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function renderTrainingsstammdaten() {
+    const sportarten = trainingStammdatenAktuell("sportart");
+    const uebungen = trainingStammdatenAktuell("uebung");
+
+    function chipListeHtml(liste) {
+      if (!liste.length) return '<p class="empty-text">Noch keine hinterlegt.</p>';
+      return `<div class="chip-liste">${liste.map((s) => `
+        <span class="chip">${escapeHtml(s.name)}<button type="button" onclick="stammdatenLoeschen('${s.id}')">×</button></span>`).join("")}</div>`;
+    }
+
+    const sportartenListEl = document.getElementById("stammdaten-sportarten-liste");
+    if (sportartenListEl) sportartenListEl.innerHTML = chipListeHtml(sportarten);
+    const uebungenListEl = document.getElementById("stammdaten-uebungen-liste");
+    if (uebungenListEl) uebungenListEl.innerHTML = chipListeHtml(uebungen);
+
+    // Vorschläge für die Autovervollständigung: verwaltete Liste +
+    // bisher tatsächlich genutzte Werte zusammengeführt.
+    const sportartenVorschlaege = [...new Set([
+      ...sportarten.map((s) => s.name),
+      ...training.map((t) => t.sportart),
+    ])].filter(Boolean).sort((a, b) => a.localeCompare(b));
+    const sportartList = document.getElementById("training-sportart-liste");
+    if (sportartList) sportartList.innerHTML = sportartenVorschlaege.map((s) => `<option value="${escapeAttr(s)}">`).join("");
+
+    const uebungsnamenVorschlaege = [...new Set([
+      ...uebungen.map((u) => u.name),
+      ...trainingUebungen.map((u) => u.name),
+      ...trainingsplanUebungen.map((u) => u.name),
+    ])].filter(Boolean).sort((a, b) => a.localeCompare(b));
+    const uebungList = document.getElementById("training-uebung-namen-liste");
+    if (uebungList) uebungList.innerHTML = uebungsnamenVorschlaege.map((n) => `<option value="${escapeAttr(n)}">`).join("");
+  }
+
+  const btnStammSportart = document.getElementById("btn-stammdaten-sportart-hinzufuegen");
+  if (btnStammSportart) btnStammSportart.addEventListener("click", () => stammdatenHinzufuegen("sportart"));
+  const btnStammUebung = document.getElementById("btn-stammdaten-uebung-hinzufuegen");
+  if (btnStammUebung) btnStammUebung.addEventListener("click", () => stammdatenHinzufuegen("uebung"));
+
+  async function stammdatenHinzufuegen(typ) {
+    const inputId = typ === "sportart" ? "stammdaten-sportart-neu" : "stammdaten-uebung-neu";
+    const el = document.getElementById(inputId);
+    const name = el.value.trim();
+    if (!name) return;
+    await api("stammdaten_hinzufuegen", { bereich: aktiverBereich, typ, name });
+    el.value = "";
+    await ladeDaten();
+    renderTraining();
+  }
+
+  window.stammdatenLoeschen = async function(id) {
+    await api("stammdaten_loeschen", { id });
     await ladeDaten();
     renderTraining();
   };
