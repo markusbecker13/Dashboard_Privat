@@ -583,6 +583,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Neuer Eintrag:</strong> Datum (leer = heute), Sportart und Ort als Freitext mit Autovervollständigung aus bisherigen Einträgen, Dauer in Minuten, optional Notiz</li>
                 <li><strong>Übungen (optional):</strong> „+ Übung hinzufügen" fügt beliebig viele Zeilen mit Name, Sätzen, Wiederholungen und Gewicht hinzu – sinnvoll für Kraft-Training wie das Rücken-Training, bei anderen Sportarten einfach weglassen</li>
                 <li><strong>Trainingspläne:</strong> unter „Trainingspläne verwalten" lassen sich benannte Vorlagen (z. B. „Rücken A", „Rücken B") mit eigenen Übungslisten anlegen. Im Formular oben füllt die Auswahl „Kein Plan"/Plan-Name die Übungen automatisch vor – danach frei editierbar. Der genutzte Plan wird beim Eintrag mit angezeigt ("· Plan: …") und lässt sich beim Bearbeiten auch nachträglich ändern oder entfernen</li>
+                <li><strong>Sportarten & Übungen verwalten:</strong> eigene Liste mit Vorschlägen für Sportart- und Übungsnamen, unabhängig davon ob sie schon mal genutzt wurden. Freitext bleibt überall möglich – die Liste erscheint nur als Vorschlag bei der Autovervollständigung, zusammen mit bereits genutzten Werten</li>
                 <li><strong>Wochenziel:</strong> oben "X von Y diese Woche" mit einem ✓ sobald erreicht. Ziel über „Ziel ändern" jederzeit anpassbar (Woche zählt Montag bis Sonntag)</li>
                 <li><strong>Liste:</strong> nach Woche gruppiert, aktuelle Woche standardmäßig aufgeklappt, jede Wochen-Überschrift zeigt Anzahl und ob das Wochenziel erreicht wurde</li>
                 <li>Klick auf einen Eintrag öffnet die Inline-Bearbeitung inklusive der hinterlegten Übungen. Löschen eines Plans entfernt nur die Vorlage – bereits erfasste Trainings bleiben erhalten und verlieren lediglich die Verknüpfung</li>
@@ -816,6 +817,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <datalist id="training-sportart-liste"></datalist>
           <input type="text" id="training-ort" placeholder="Ort (z.B. Zuhause)" list="training-ort-liste">
           <datalist id="training-ort-liste"></datalist>
+          <datalist id="training-uebung-namen-liste"></datalist>
           <input type="number" id="training-dauer" placeholder="Minuten" min="0" style="width:6rem;">
           <input type="text" id="training-notiz" placeholder="Notiz (optional)" style="flex:1; min-width:150px;">
           <select id="training-plan-auswahl" title="Plan anwenden (füllt Übungen unten aus)" onchange="planAufTrainingAnwenden(this.value)">
@@ -829,7 +831,25 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
 
         <div id="training-liste-bereich" style="margin-top:1.6rem;"></div>
 
-        <details class="anleitung-abschnitt" style="margin-top:1.6rem;">
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
+          <summary>Sportarten & Übungen verwalten</summary>
+          <div class="anleitung-text">
+            <p class="empty-text" style="margin-top:0;">Freitext bleibt überall möglich – diese Liste liefert nur die Vorschläge bei der Autovervollständigung.</p>
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+              <input type="text" id="stammdaten-sportart-neu" placeholder="Neue Sportart">
+              <button class="btn-primary" id="btn-stammdaten-sportart-hinzufuegen">+ Sportart</button>
+            </div>
+            <div id="stammdaten-sportarten-liste" style="margin:0.6rem 0 1.2rem;"></div>
+
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+              <input type="text" id="stammdaten-uebung-neu" placeholder="Neue Übung">
+              <button class="btn-primary" id="btn-stammdaten-uebung-hinzufuegen">+ Übung</button>
+            </div>
+            <div id="stammdaten-uebungen-liste" style="margin-top:0.6rem;"></div>
+          </div>
+        </details>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
           <summary>Trainingspläne verwalten</summary>
           <div class="anleitung-text">
             <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
