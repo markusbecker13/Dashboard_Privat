@@ -54,6 +54,9 @@
   let spieleDateien = [];
   let tabEinstellungen = [];
   let verleih = [];
+  let training = [];
+  let trainingUebungen = [];
+  let trainingEinstellungen = [];
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
   let aktiveKategorie = null; // Schlüssel der gerade offenen Themen-Kachel-Gruppe, oder null
   let aktiverTab = null; // Schlüssel des gerade angezeigten Reiters (view-*), für den Zurück-Button
@@ -64,7 +67,7 @@
     reflexion: "view-reflexion", spiele: "view-spiele", einkauf: "view-einkauf", export: "view-export",
     verlauf: "view-verlauf", anleitung: "view-anleitung", ogsideen: "view-ogs-ideen",
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
-    reiterverwaltung: "view-reiter-verwaltung",
+    reiterverwaltung: "view-reiter-verwaltung", training: "view-training",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -76,6 +79,7 @@
     ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["einkauf", "Einkauf"], ["export", "Export"],
     ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
+    ["training", "Training"],
   ];
   const BEREICH_TABS = { privat: ALLE_REITER, ogs: ALLE_REITER, awo: ALLE_REITER };
   const BEREICH_TITEL_VERWALTUNG = { privat: "🏠 Privat", ogs: "🏫 OGS Rapunzel", awo: "🤝 AWO OV Liblar" };
@@ -85,7 +89,7 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung"],
+      "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung", "training"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen"],
@@ -108,7 +112,7 @@
     return [
       { schluessel: "heute", label: "Heute", icon: "☀️", tabs: ["heute"] },
       { schluessel: "planen", label: "Planen", icon: "🗓️", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
-      { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf"] },
+      { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf", "training"] },
       { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", icon: BEREICH_ARBEIT_ICON[aktiverBereich] || "📌", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih"] },
       { schluessel: "verwalten", label: "Verwalten", icon: "🛠️", tabs: ["export", "verlauf", "anleitung"] },
     ];
@@ -377,6 +381,9 @@
     spieleDateien = data.spiele_dateien || [];
     tabEinstellungen = data.tab_einstellungen || [];
     verleih = data.verleih || [];
+    training = data.training || [];
+    trainingUebungen = data.training_uebungen || [];
+    trainingEinstellungen = data.training_einstellungen || [];
     bereichAnwenden();
     renderReiterVerwaltung();
     render();
@@ -873,6 +880,10 @@
     return verleih.filter((v) => bereichVon(v) === aktiverBereich);
   }
 
+  function trainingAktuell() {
+    return training.filter((t) => bereichVon(t) === aktiverBereich);
+  }
+
   const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar" };
 
   function bereichAnwenden() {
@@ -907,6 +918,7 @@
     if (aktiv === "ogsprojekte") renderProjekte();
     if (aktiv === "spiele") renderSpiele();
     if (aktiv === "verleih") renderVerleih();
+    if (aktiv === "training") renderTraining();
     if (aktiv === "reiterverwaltung") renderReiterVerwaltung();
     kontoMenuSchliessen();
   }
@@ -2424,7 +2436,7 @@
   // ==========================================================
   // Verleih (Verleih-Historie für Inventar-Gegenstände)
   // ==========================================================
-  function verleihDatumDe(iso) {
+  function datumDe(iso) {
     if (!iso) return "";
     const [j, m, t] = [iso.slice(0, 4), iso.slice(5, 7), iso.slice(8, 10)];
     return `${t}.${m}.${j}`;
@@ -2472,7 +2484,7 @@
           <div style="flex:1; cursor:pointer;" onclick="verleihBearbeitenStart('${v.id}')">
             <span class="notiz-text">${v.menge}× ${escapeHtml(gegenstandName(v))}</span>
             <span class="notiz-meta">
-              seit ${verleihDatumDe(v.ausgeliehen_am)}${offen ? "" : " · zurück am " + verleihDatumDe(v.rueckgabe_am)}
+              seit ${datumDe(v.ausgeliehen_am)}${offen ? "" : " · zurück am " + datumDe(v.rueckgabe_am)}
               ${v.notiz ? " · " + escapeHtml(v.notiz) : ""}
             </span>
           </div>
@@ -2562,6 +2574,261 @@
     await api("verleih_aktualisieren", { id, ausgeliehen_an, menge, ausgeliehen_am, rueckgabe_am, notiz });
     verleihBearbeitenId = null;
     await ladeDaten();
+  };
+
+  // ==========================================================
+  // Training (Trainingsverlauf, Standard: nur Privat)
+  // ==========================================================
+  let trainingBearbeitenId = null;
+  let trainingFormUebungen = []; // Übungs-Zeilen im "Neu"-Formular
+  let trainingBearbeitenUebungen = []; // Übungs-Zeilen im gerade offenen Bearbeiten-Formular
+
+  // Montag der Woche, in der "iso" liegt (lokale Zeit, ISO-Datum rein/raus).
+  function wochenstartISO(iso) {
+    const d = new Date(iso + "T00:00:00");
+    const tag = d.getDay(); // 0 = So, 1 = Mo, ...
+    const diffZuMontag = tag === 0 ? -6 : 1 - tag;
+    d.setDate(d.getDate() + diffZuMontag);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function trainingWochenziel() {
+    const eintrag = trainingEinstellungen.find((e) => e.bereich === aktiverBereich);
+    return eintrag ? eintrag.wochenziel : 2;
+  }
+
+  function trainingUebungZeileHtml(u, i, praefix) {
+    return `
+      <div class="row" style="gap:0.4rem; margin-bottom:0.3rem; flex-wrap:wrap;">
+        <input type="text" id="${praefix}-ueb-name-${i}" value="${escapeAttr(u.name || "")}" placeholder="Übung (z.B. Rudern)" style="flex:1; min-width:120px;">
+        <input type="number" id="${praefix}-ueb-saetze-${i}" value="${u.saetze ?? ""}" placeholder="Sätze" min="0" style="width:4.3rem;">
+        <input type="number" id="${praefix}-ueb-wdh-${i}" value="${u.wiederholungen ?? ""}" placeholder="Wdh" min="0" style="width:4.3rem;">
+        <input type="number" id="${praefix}-ueb-gewicht-${i}" value="${u.gewicht_kg ?? ""}" placeholder="kg" min="0" step="0.5" style="width:4.3rem;">
+        <button class="task-delete" type="button" onclick="trainingUebungZeileEntfernen('${praefix}', ${i})">×</button>
+      </div>`;
+  }
+
+  function trainingUebungenBlockHtml(arr, praefix) {
+    return `
+      <div id="${praefix}-uebungen-liste">${arr.map((u, i) => trainingUebungZeileHtml(u, i, praefix)).join("")}</div>
+      <button class="link-btn" type="button" onclick="trainingUebungZeileHinzufuegen('${praefix}')">+ Übung hinzufügen</button>`;
+  }
+
+  // Liest die aktuell im DOM stehenden Werte einer Übungs-Zeilenliste aus
+  // (nötig, weil Zeile-hinzufügen/-entfernen die Liste neu rendert und
+  // dabei sonst schon eingetippte Werte in den übrigen Zeilen verlieren
+  // würde).
+  function trainingUebungenAusDom(praefix, anzahl) {
+    const arr = [];
+    for (let i = 0; i < anzahl; i++) {
+      arr.push({
+        name: document.getElementById(`${praefix}-ueb-name-${i}`)?.value.trim() || "",
+        saetze: document.getElementById(`${praefix}-ueb-saetze-${i}`)?.value || "",
+        wiederholungen: document.getElementById(`${praefix}-ueb-wdh-${i}`)?.value || "",
+        gewicht_kg: document.getElementById(`${praefix}-ueb-gewicht-${i}`)?.value || "",
+      });
+    }
+    return arr;
+  }
+
+  function trainingUebungenArray(praefix) {
+    return praefix === "neu" ? trainingFormUebungen : trainingBearbeitenUebungen;
+  }
+
+  window.trainingUebungZeileHinzufuegen = function(praefix) {
+    const arr = trainingUebungenArray(praefix);
+    const aktuell = trainingUebungenAusDom(praefix, arr.length);
+    aktuell.push({ name: "", saetze: "", wiederholungen: "", gewicht_kg: "" });
+    arr.length = 0;
+    arr.push(...aktuell);
+    renderTraining();
+  };
+
+  window.trainingUebungZeileEntfernen = function(praefix, index) {
+    const arr = trainingUebungenArray(praefix);
+    const aktuell = trainingUebungenAusDom(praefix, arr.length);
+    aktuell.splice(index, 1);
+    arr.length = 0;
+    arr.push(...aktuell);
+    renderTraining();
+  };
+
+  function renderTraining() {
+    const bereichEl = document.getElementById("training-liste-bereich");
+    if (!bereichEl) return;
+
+    const eintraegeAktuell = trainingAktuell().slice().sort((a, b) => b.datum.localeCompare(a.datum));
+    const uebungenByTraining = {};
+    trainingUebungen.forEach((u) => {
+      (uebungenByTraining[u.training_id] = uebungenByTraining[u.training_id] || []).push(u);
+    });
+
+    // Wochenziel-Fortschritt der aktuellen Woche
+    const wocheStart = wochenstartISO(heuteISO());
+    const zielWoche = trainingWochenziel();
+    const anzahlDieseWoche = eintraegeAktuell.filter((t) => t.datum >= wocheStart).length;
+    const zielEl = document.getElementById("training-wochenziel-anzeige");
+    if (zielEl) {
+      const erreicht = anzahlDieseWoche >= zielWoche;
+      zielEl.innerHTML = `
+        <span style="font-weight:600;">${anzahlDieseWoche} von ${zielWoche}</span> diese Woche${erreicht ? " ✓" : ""}
+        <button class="link-btn" style="margin-left:0.6rem;" onclick="trainingZielBearbeiten()">Ziel ändern</button>`;
+    }
+
+    // Sportart/Ort-Vorschläge aus bisherigen Einträgen (Autovervollständigung)
+    const sportartenBisher = [...new Set(training.map((t) => t.sportart).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const orteBisher = [...new Set(training.map((t) => t.ort).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const sportartList = document.getElementById("training-sportart-liste");
+    if (sportartList) sportartList.innerHTML = sportartenBisher.map((s) => `<option value="${escapeAttr(s)}">`).join("");
+    const ortList = document.getElementById("training-ort-liste");
+    if (ortList) ortList.innerHTML = orteBisher.map((o) => `<option value="${escapeAttr(o)}">`).join("");
+
+    const uebungenFormEl = document.getElementById("training-neu-uebungen");
+    if (uebungenFormEl) uebungenFormEl.innerHTML = trainingUebungenBlockHtml(trainingFormUebungen, "neu");
+
+    function uebungenAnzeige(uebungenListe) {
+      if (!uebungenListe.length) return "";
+      const teile = uebungenListe.map((u) => {
+        let t = escapeHtml(u.name);
+        if (u.saetze || u.wiederholungen) t += ` (${u.saetze || "?"}×${u.wiederholungen || "?"})`;
+        if (u.gewicht_kg) t += ` · ${u.gewicht_kg} kg`;
+        return t;
+      });
+      return `<div class="empty-text" style="margin-top:0.2rem;">${teile.join(" · ")}</div>`;
+    }
+
+    function eintragHtml(t) {
+      const uebungenListe = (uebungenByTraining[t.id] || []).slice().sort((a, b) => a.reihenfolge - b.reihenfolge);
+      if (trainingBearbeitenId === t.id) {
+        return `
+          <div class="notiz-item" style="flex-direction:column; align-items:stretch;">
+            <div class="row" style="flex-wrap:wrap;">
+              <input type="date" id="training-edit-datum-${t.id}" value="${t.datum}">
+              <input type="text" id="training-edit-sportart-${t.id}" value="${escapeAttr(t.sportart)}" placeholder="Sportart">
+              <input type="text" id="training-edit-ort-${t.id}" value="${escapeAttr(t.ort || "")}" placeholder="Ort">
+              <input type="number" id="training-edit-dauer-${t.id}" value="${t.dauer_minuten ?? ""}" placeholder="Minuten" min="0" style="width:6rem;">
+              <input type="text" id="training-edit-notiz-${t.id}" value="${escapeAttr(t.notiz || "")}" placeholder="Notiz" style="flex:1; min-width:150px;">
+            </div>
+            <div style="margin-top:0.5rem;">
+              ${trainingUebungenBlockHtml(trainingBearbeitenUebungen, `edit-${t.id}`)}
+            </div>
+            <div class="row" style="margin-top:0.5rem;">
+              <button class="btn-primary" onclick="trainingBearbeitenSpeichern('${t.id}')">Speichern</button>
+              <button class="link-btn" onclick="trainingBearbeitenAbbrechen()">Abbrechen</button>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="notiz-item" style="cursor:pointer;" onclick="trainingBearbeitenStart('${t.id}')">
+          <div style="flex:1;">
+            <span class="notiz-text">${escapeHtml(t.sportart)}${t.ort ? " · " + escapeHtml(t.ort) : ""}</span>
+            <span class="notiz-meta">
+              ${datumDe(t.datum)}${t.dauer_minuten ? " · " + t.dauer_minuten + " Min." : ""}
+              ${t.notiz ? " · " + escapeHtml(t.notiz) : ""}
+            </span>
+            ${uebungenAnzeige(uebungenListe)}
+          </div>
+          <button class="task-delete" onclick="event.stopPropagation(); trainingLoeschen('${t.id}')">×</button>
+        </div>`;
+    }
+
+    const gruppen = {};
+    eintraegeAktuell.forEach((t) => {
+      const start = wochenstartISO(t.datum);
+      (gruppen[start] = gruppen[start] || []).push(t);
+    });
+    const wochenSortiert = Object.keys(gruppen).sort((a, b) => b.localeCompare(a));
+
+    let html;
+    if (!wochenSortiert.length) {
+      html = '<p class="empty-text">Noch kein Training erfasst.</p>';
+    } else {
+      html = wochenSortiert.map((start) => {
+        const eintraege = gruppen[start];
+        const anzahl = eintraege.length;
+        const istAktuelleWoche = start === wocheStart;
+        const erreicht = anzahl >= zielWoche;
+        const label = istAktuelleWoche ? "Diese Woche" : `Woche ab ${datumDe(start)}`;
+        return `
+          <details class="verleih-person" ${istAktuelleWoche ? "open" : ""}>
+            <summary>${label} <span class="empty-text">(${anzahl} Training${anzahl === 1 ? "" : "s"}${erreicht ? " ✓" : ""})</span></summary>
+            <div class="notiz-list">${eintraege.map(eintragHtml).join("")}</div>
+          </details>`;
+      }).join("");
+    }
+    bereichEl.innerHTML = html;
+  }
+
+  document.getElementById("btn-training-hinzufuegen").addEventListener("click", trainingHinzufuegen);
+
+  async function trainingHinzufuegen() {
+    const sportart = document.getElementById("training-sportart").value.trim();
+    if (!sportart) return;
+    const datum = document.getElementById("training-datum").value || heuteISO();
+    const ort = document.getElementById("training-ort").value.trim() || null;
+    const dauer_minuten = document.getElementById("training-dauer").value || null;
+    const notiz = document.getElementById("training-notiz").value.trim() || null;
+    const uebungen = trainingUebungenAusDom("neu", trainingFormUebungen.length);
+
+    await api("training_hinzufuegen", { bereich: aktiverBereich, datum, sportart, ort, dauer_minuten, notiz, uebungen });
+
+    document.getElementById("training-sportart").value = "";
+    document.getElementById("training-ort").value = "";
+    document.getElementById("training-dauer").value = "";
+    document.getElementById("training-notiz").value = "";
+    document.getElementById("training-datum").value = "";
+    trainingFormUebungen = [];
+    await ladeDaten();
+    renderTraining();
+  }
+
+  window.trainingLoeschen = async function(id) {
+    if (!confirm("Dieses Training endgültig löschen?")) return;
+    await api("training_loeschen", { id });
+    await ladeDaten();
+    renderTraining();
+  };
+
+  window.trainingBearbeitenStart = function(id) {
+    trainingBearbeitenId = id;
+    trainingBearbeitenUebungen = trainingUebungen
+      .filter((u) => u.training_id === id)
+      .sort((a, b) => a.reihenfolge - b.reihenfolge)
+      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "" }));
+    renderTraining();
+  };
+
+  window.trainingBearbeitenAbbrechen = function() {
+    trainingBearbeitenId = null;
+    trainingBearbeitenUebungen = [];
+    renderTraining();
+  };
+
+  window.trainingBearbeitenSpeichern = async function(id) {
+    const sportart = document.getElementById(`training-edit-sportart-${id}`).value.trim();
+    if (!sportart) return;
+    const datum = document.getElementById(`training-edit-datum-${id}`).value;
+    const ort = document.getElementById(`training-edit-ort-${id}`).value.trim() || null;
+    const dauer_minuten = document.getElementById(`training-edit-dauer-${id}`).value || null;
+    const notiz = document.getElementById(`training-edit-notiz-${id}`).value.trim() || null;
+    const uebungen = trainingUebungenAusDom(`edit-${id}`, trainingBearbeitenUebungen.length);
+
+    await api("training_aktualisieren", { id, datum, sportart, ort, dauer_minuten, notiz, uebungen });
+    trainingBearbeitenId = null;
+    trainingBearbeitenUebungen = [];
+    await ladeDaten();
+    renderTraining();
+  };
+
+  window.trainingZielBearbeiten = async function() {
+    const aktuell = trainingWochenziel();
+    const neu = prompt("Trainings-Wochenziel (Anzahl Einheiten pro Woche):", aktuell);
+    if (neu === null) return;
+    const wert = parseInt(neu, 10);
+    if (!Number.isFinite(wert) || wert < 0) return;
+    await api("training_ziel_speichern", { bereich: aktiverBereich, wochenziel: wert });
+    await ladeDaten();
+    renderTraining();
   };
 
   // ==========================================================
