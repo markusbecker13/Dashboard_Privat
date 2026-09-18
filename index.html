@@ -586,6 +586,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Übungsverlauf:</strong> Auswahl einer Übung zeigt ihr Gewicht über die Zeit als Diagramm – braucht mindestens zwei Einträge mit Gewichtsangabe für dieselbe Übung, um eine Linie zeichnen zu können</li>
                 <li><strong>Sportarten & Übungen verwalten:</strong> eigene Liste mit Vorschlägen für Sportart- und Übungsnamen, unabhängig davon ob sie schon mal genutzt wurden. Freitext bleibt überall möglich – die Liste erscheint nur als Vorschlag bei der Autovervollständigung, zusammen mit bereits genutzten Werten</li>
                 <li><strong>Wochenziel:</strong> oben "X von Y diese Woche" mit einem ✓ sobald erreicht. Ziel über „Ziel ändern" jederzeit anpassbar (Woche zählt Montag bis Sonntag). Darunter die längste je erreichte Serie von Wochen in Folge mit erreichtem Ziel</li>
+                <li><strong>Sportart-Ziele:</strong> zusätzlich zum Gesamtziel lässt sich pro Sportart ein eigenes Wochenziel festlegen (Auswahl + Zahl + „+ Sportart-Ziel"). Ist ein Sportart-Filter aktiv, bezieht sich die Wochenziel-/Serien-Anzeige oben auf diese Sportart und ihr eigenes Ziel (falls eines hinterlegt ist, sonst das Gesamtziel)</li>
+                <li><strong>Filter:</strong> Sportart, Ort und Zeitraum sind kombinierbar und wirken auf die Liste darunter sowie auf die Wochenziel-/Serien-Anzeige oben. „Filter zurücksetzen" hebt alle wieder auf</li>
                 <li><strong>Bestleistung:</strong> eine Übung bekommt bei neuer Bestmarke bei Gewicht oder Wiederholungen ein 🏆-Symbol (erst ab dem zweiten Eintrag dieser Übung möglich)</li>
                 <li><strong>Liste:</strong> nach Woche gruppiert, aktuelle Woche standardmäßig aufgeklappt, jede Wochen-Überschrift zeigt Anzahl und ob das Wochenziel erreicht wurde</li>
                 <li>Klick auf einen Eintrag öffnet die Inline-Bearbeitung inklusive der hinterlegten Übungen. Löschen eines Plans entfernt nur die Vorlage – bereits erfasste Trainings bleiben erhalten und verlieren lediglich die Verknüpfung</li>
@@ -808,10 +810,25 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-training" class="hidden">
-        <h1>Training <button class="hilfe-icon" data-hilfe="Trainingsverlauf: Datum, Sportart, Ort, Dauer und optional einzelne Übungen mit Sätzen/Wiederholungen/Gewicht (v.a. für Kraft-Training). Oben der Wochenziel-Vergleich, darunter die Liste gruppiert nach Woche. Trainingspläne (benannte Übungs-Vorlagen) unten verwalten und beim Eintragen per Auswahl anwenden. Zum Bearbeiten auf einen Eintrag tippen.">?</button></h1>
+        <h1>Training <button class="hilfe-icon" data-hilfe="Trainingsverlauf: Datum, Sportart, Ort, Dauer und optional einzelne Übungen mit Sätzen/Wiederholungen/Gewicht (v.a. für Kraft-Training). Oben der Wochenziel-Vergleich (Gesamt + je Sportart), Filter nach Sportart/Ort/Zeitraum, darunter die Liste gruppiert nach Woche. Trainingspläne (benannte Übungs-Vorlagen) unten verwalten und beim Eintragen per Auswahl anwenden. Zum Bearbeiten auf einen Eintrag tippen.">?</button></h1>
         <p class="hero-text">Trainingsverlauf und Fortschritt – offen für beliebige Sportarten und Orte, die Häufigkeit darf sich jederzeit ändern.</p>
 
-        <p id="training-wochenziel-anzeige" style="margin-bottom:1.2rem;"></p>
+        <p id="training-wochenziel-anzeige" style="margin-bottom:0.6rem;"></p>
+
+        <div id="training-sportart-ziele-liste" style="margin-bottom:0.6rem;"></div>
+        <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-bottom:1.2rem;">
+          <select id="training-sportart-ziel-auswahl" style="min-width:140px;"></select>
+          <input type="number" id="training-sportart-ziel-wert" placeholder="Ziel/Woche" min="0" style="width:8rem;">
+          <button class="link-btn" id="btn-training-sportart-ziel-speichern">+ Sportart-Ziel</button>
+        </div>
+
+        <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-bottom:0.6rem;">
+          <select id="training-filter-sportart"><option value="">Alle Sportarten</option></select>
+          <select id="training-filter-ort"><option value="">Alle Orte</option></select>
+          <input type="date" id="training-filter-von" title="Zeitraum von">
+          <input type="date" id="training-filter-bis" title="Zeitraum bis">
+          <button class="link-btn" id="btn-training-filter-zuruecksetzen">Filter zurücksetzen</button>
+        </div>
 
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
           <input type="date" id="training-datum" title="Datum (leer = heute)">
