@@ -583,7 +583,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Neuer Eintrag:</strong> Datum (leer = heute), Sportart und Ort als Freitext mit Autovervollständigung aus bisherigen Einträgen, Dauer in Minuten, optional Notiz</li>
                 <li><strong>Übungen (optional):</strong> „+ Übung hinzufügen" fügt beliebig viele Zeilen mit Name, Sätzen, Wiederholungen und Gewicht hinzu – sinnvoll für Kraft-Training wie das Rücken-Training, bei anderen Sportarten einfach weglassen</li>
                 <li><strong>Plan starten:</strong> bei einem Trainingsplan auf „▶ Starten" klicken, dann Übung für Übung mit „Weiter"/"← Zurück" durchklicken, Werte bei Bedarf anpassen. Am Ende („Training speichern") wird automatisch ein neuer, mit dem Plan verlinkter Trainingseintrag mit heutigem Datum angelegt</li>
-                <li><strong>Trainingspläne:</strong> unter „Trainingspläne verwalten" lassen sich benannte Vorlagen (z. B. „Rücken A", „Rücken B") mit eigenen Übungslisten anlegen. Im Formular oben füllt die Auswahl „Kein Plan"/Plan-Name die Übungen automatisch vor – danach frei editierbar. Der genutzte Plan wird beim Eintrag mit angezeigt ("· Plan: …") und lässt sich beim Bearbeiten auch nachträglich ändern oder entfernen</li>
+                <li><strong>Trainingspläne:</strong> unter „Trainingspläne verwalten" lassen sich benannte Vorlagen (z. B. „Rücken A", „Rücken B") mit eigenen Übungslisten anlegen. Im Formular oben füllt die Auswahl „Kein Plan"/Plan-Name die Übungen automatisch vor – danach frei editierbar. Der genutzte Plan wird beim Eintrag mit angezeigt ("· Plan: …") und lässt sich beim Bearbeiten auch nachträglich ändern oder entfernen. Über „⇩ Export" bei einem Plan bzw. „⇩ Alle exportieren" lässt sich eine JSON-Datei herunterladen; über „⇪ Pläne importieren" lässt sich eine solche Datei (auch mit mehreren Plänen) wieder einlesen – bei Namensgleichheit mit vorhandenen Plänen kommt vorher eine Sicherheitsabfrage</li>
                 <li><strong>Übungsverlauf:</strong> Auswahl einer Übung zeigt ihr Gewicht über die Zeit als Diagramm – braucht mindestens zwei Einträge mit Gewichtsangabe für dieselbe Übung, um eine Linie zeichnen zu können</li>
                 <li><strong>Sportarten & Übungen verwalten:</strong> eigene Liste mit Vorschlägen für Sportart- und Übungsnamen, unabhängig davon ob sie schon mal genutzt wurden. Freitext bleibt überall möglich – die Liste erscheint nur als Vorschlag bei der Autovervollständigung, zusammen mit bereits genutzten Werten</li>
                 <li><strong>Wochenziel:</strong> oben "X von Y diese Woche" mit einem ✓ sobald erreicht. Ziel über „Ziel ändern" jederzeit anpassbar (Woche zählt Montag bis Sonntag). Darunter die längste je erreichte Serie von Wochen in Folge mit erreichtem Ziel</li>
@@ -889,6 +889,12 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <div id="plan-neu-uebungen"></div>
             </div>
             <button class="btn-primary" id="btn-plan-hinzufuegen">Plan speichern</button>
+
+            <div class="row" style="flex-wrap:wrap; margin-top:1rem; gap:0.5rem;">
+              <button class="link-btn" id="btn-plaene-export-alle">⇩ Alle exportieren</button>
+              <button class="link-btn" id="btn-plaene-import">⇪ Pläne importieren</button>
+              <input type="file" id="plaene-import-input" accept=".json" class="hidden">
+            </div>
 
             <div id="trainingsplan-liste" style="margin-top:1.2rem;"></div>
           </div>
