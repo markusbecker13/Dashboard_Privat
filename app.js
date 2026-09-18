@@ -57,6 +57,8 @@
   let training = [];
   let trainingUebungen = [];
   let trainingEinstellungen = [];
+  let trainingsplaene = [];
+  let trainingsplanUebungen = [];
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
   let aktiveKategorie = null; // Schlüssel der gerade offenen Themen-Kachel-Gruppe, oder null
   let aktiverTab = null; // Schlüssel des gerade angezeigten Reiters (view-*), für den Zurück-Button
@@ -384,6 +386,8 @@
     training = data.training || [];
     trainingUebungen = data.training_uebungen || [];
     trainingEinstellungen = data.training_einstellungen || [];
+    trainingsplaene = data.trainingsplaene || [];
+    trainingsplanUebungen = data.trainingsplan_uebungen || [];
     bereichAnwenden();
     renderReiterVerwaltung();
     render();
@@ -2582,6 +2586,10 @@
   let trainingBearbeitenId = null;
   let trainingFormUebungen = []; // Übungs-Zeilen im "Neu"-Formular
   let trainingBearbeitenUebungen = []; // Übungs-Zeilen im gerade offenen Bearbeiten-Formular
+  let trainingFormPlanId = null; // im "Neu"-Formular ausgewählter Plan (Verlinkung)
+  let planBearbeitenId = null;
+  let planFormUebungen = []; // Übungs-Zeilen im "Neuer Plan"-Formular
+  let planBearbeitenUebungen = []; // Übungs-Zeilen im gerade offenen Plan-Bearbeiten-Formular
 
   // Montag der Woche, in der "iso" liegt (lokale Zeit, ISO-Datum rein/raus).
   function wochenstartISO(iso) {
@@ -2632,7 +2640,10 @@
   }
 
   function trainingUebungenArray(praefix) {
-    return praefix === "neu" ? trainingFormUebungen : trainingBearbeitenUebungen;
+    if (praefix === "neu") return trainingFormUebungen;
+    if (praefix === "plan-neu") return planFormUebungen;
+    if (praefix.startsWith("plan-edit-")) return planBearbeitenUebungen;
+    return trainingBearbeitenUebungen;
   }
 
   window.trainingUebungZeileHinzufuegen = function(praefix) {
@@ -2686,6 +2697,8 @@
     const uebungenFormEl = document.getElementById("training-neu-uebungen");
     if (uebungenFormEl) uebungenFormEl.innerHTML = trainingUebungenBlockHtml(trainingFormUebungen, "neu");
 
+    renderTrainingsplaene();
+
     function uebungenAnzeige(uebungenListe) {
       if (!uebungenListe.length) return "";
       const teile = uebungenListe.map((u) => {
@@ -2708,6 +2721,10 @@
               <input type="text" id="training-edit-ort-${t.id}" value="${escapeAttr(t.ort || "")}" placeholder="Ort">
               <input type="number" id="training-edit-dauer-${t.id}" value="${t.dauer_minuten ?? ""}" placeholder="Minuten" min="0" style="width:6rem;">
               <input type="text" id="training-edit-notiz-${t.id}" value="${escapeAttr(t.notiz || "")}" placeholder="Notiz" style="flex:1; min-width:150px;">
+              <select id="training-edit-plan-${t.id}" title="Verknüpfter Trainingsplan">
+                <option value="">Kein Plan</option>
+                ${trainingsplaeneAktuell().map((p) => `<option value="${p.id}" ${p.id === t.plan_id ? "selected" : ""}>${escapeAttr(p.name)}</option>`).join("")}
+              </select>
             </div>
             <div style="margin-top:0.5rem;">
               ${trainingUebungenBlockHtml(trainingBearbeitenUebungen, `edit-${t.id}`)}
@@ -2725,6 +2742,7 @@
             <span class="notiz-meta">
               ${datumDe(t.datum)}${t.dauer_minuten ? " · " + t.dauer_minuten + " Min." : ""}
               ${t.notiz ? " · " + escapeHtml(t.notiz) : ""}
+              ${t.plan_id ? " · Plan: " + escapeHtml(planName(t.plan_id) || "?") : ""}
             </span>
             ${uebungenAnzeige(uebungenListe)}
           </div>
@@ -2770,7 +2788,7 @@
     const notiz = document.getElementById("training-notiz").value.trim() || null;
     const uebungen = trainingUebungenAusDom("neu", trainingFormUebungen.length);
 
-    await api("training_hinzufuegen", { bereich: aktiverBereich, datum, sportart, ort, dauer_minuten, notiz, uebungen });
+    await api("training_hinzufuegen", { bereich: aktiverBereich, datum, sportart, ort, dauer_minuten, notiz, uebungen, plan_id: trainingFormPlanId });
 
     document.getElementById("training-sportart").value = "";
     document.getElementById("training-ort").value = "";
@@ -2778,6 +2796,7 @@
     document.getElementById("training-notiz").value = "";
     document.getElementById("training-datum").value = "";
     trainingFormUebungen = [];
+    trainingFormPlanId = null;
     await ladeDaten();
     renderTraining();
   }
@@ -2811,9 +2830,10 @@
     const ort = document.getElementById(`training-edit-ort-${id}`).value.trim() || null;
     const dauer_minuten = document.getElementById(`training-edit-dauer-${id}`).value || null;
     const notiz = document.getElementById(`training-edit-notiz-${id}`).value.trim() || null;
+    const plan_id = document.getElementById(`training-edit-plan-${id}`).value || null;
     const uebungen = trainingUebungenAusDom(`edit-${id}`, trainingBearbeitenUebungen.length);
 
-    await api("training_aktualisieren", { id, datum, sportart, ort, dauer_minuten, notiz, uebungen });
+    await api("training_aktualisieren", { id, datum, sportart, ort, dauer_minuten, notiz, plan_id, uebungen });
     trainingBearbeitenId = null;
     trainingBearbeitenUebungen = [];
     await ladeDaten();
@@ -2827,6 +2847,138 @@
     const wert = parseInt(neu, 10);
     if (!Number.isFinite(wert) || wert < 0) return;
     await api("training_ziel_speichern", { bereich: aktiverBereich, wochenziel: wert });
+    await ladeDaten();
+    renderTraining();
+  };
+
+  // ------------------------------------------------------------
+  // Trainingspläne (benannte Übungs-Vorlagen, verlinkbar mit
+  // einzelnen Trainingseinträgen)
+  // ------------------------------------------------------------
+
+  function trainingsplaeneAktuell() {
+    return trainingsplaene.filter((p) => bereichVon(p) === aktiverBereich);
+  }
+
+  function planUebungenFuer(planId) {
+    return trainingsplanUebungen.filter((u) => u.plan_id === planId).sort((a, b) => a.reihenfolge - b.reihenfolge);
+  }
+
+  function planName(planId) {
+    const p = trainingsplaene.find((pl) => pl.id === planId);
+    return p ? p.name : null;
+  }
+
+  // Übernimmt die Übungen eines gewählten Plans in das "Neu"-Formular
+  // für einen Trainingseintrag; bleibt danach frei editierbar.
+  window.planAufTrainingAnwenden = function(planId) {
+    trainingFormPlanId = planId || null;
+    if (planId) {
+      trainingFormUebungen = planUebungenFuer(planId)
+        .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "" }));
+    }
+    renderTraining();
+  };
+
+  function renderTrainingsplaene() {
+    const listEl = document.getElementById("trainingsplan-liste");
+    if (!listEl) return;
+    const plaene = trainingsplaeneAktuell().slice().sort((a, b) => a.name.localeCompare(b.name));
+
+    // Auswahl-Dropdown im "Neu"-Formular für Trainingseinträge
+    const auswahlEl = document.getElementById("training-plan-auswahl");
+    if (auswahlEl) {
+      auswahlEl.innerHTML = '<option value="">Kein Plan</option>'
+        + plaene.map((p) => `<option value="${p.id}">${escapeAttr(p.name)}</option>`).join("");
+      auswahlEl.value = plaene.some((p) => p.id === trainingFormPlanId) ? trainingFormPlanId : "";
+    }
+
+    function uebungenAnzeige(liste) {
+      if (!liste.length) return "";
+      const teile = liste.map((u) => {
+        let t = escapeHtml(u.name);
+        if (u.saetze || u.wiederholungen) t += ` (${u.saetze || "?"}×${u.wiederholungen || "?"})`;
+        if (u.gewicht_kg) t += ` · ${u.gewicht_kg} kg`;
+        return t;
+      });
+      return `<div class="empty-text" style="margin-top:0.2rem;">${teile.join(" · ")}</div>`;
+    }
+
+    function planHtml(p) {
+      const uebungen = planUebungenFuer(p.id);
+      if (planBearbeitenId === p.id) {
+        return `
+          <div class="notiz-item" style="flex-direction:column; align-items:stretch;">
+            <input type="text" id="plan-edit-name-${p.id}" value="${escapeAttr(p.name)}" placeholder="Name (z.B. Rücken A)">
+            <div style="margin-top:0.5rem;">${trainingUebungenBlockHtml(planBearbeitenUebungen, `plan-edit-${p.id}`)}</div>
+            <div class="row" style="margin-top:0.5rem;">
+              <button class="btn-primary" onclick="planBearbeitenSpeichern('${p.id}')">Speichern</button>
+              <button class="link-btn" onclick="planBearbeitenAbbrechen()">Abbrechen</button>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="notiz-item" style="cursor:pointer;" onclick="planBearbeitenStart('${p.id}')">
+          <div style="flex:1;">
+            <span class="notiz-text">${escapeHtml(p.name)}</span>
+            ${uebungenAnzeige(uebungen)}
+          </div>
+          <button class="task-delete" onclick="event.stopPropagation(); planLoeschen('${p.id}')">×</button>
+        </div>`;
+    }
+
+    listEl.innerHTML = plaene.length
+      ? plaene.map(planHtml).join("")
+      : '<p class="empty-text">Noch keine Trainingspläne angelegt.</p>';
+
+    const neuFormEl = document.getElementById("plan-neu-uebungen");
+    if (neuFormEl) neuFormEl.innerHTML = trainingUebungenBlockHtml(planFormUebungen, "plan-neu");
+  }
+
+  const btnPlanHinzufuegen = document.getElementById("btn-plan-hinzufuegen");
+  if (btnPlanHinzufuegen) btnPlanHinzufuegen.addEventListener("click", planHinzufuegen);
+
+  async function planHinzufuegen() {
+    const nameEl = document.getElementById("plan-neu-name");
+    const name = nameEl.value.trim();
+    if (!name) return;
+    const uebungen = trainingUebungenAusDom("plan-neu", planFormUebungen.length);
+
+    await api("plan_hinzufuegen", { bereich: aktiverBereich, name, uebungen });
+    nameEl.value = "";
+    planFormUebungen = [];
+    await ladeDaten();
+    renderTraining();
+  }
+
+  window.planBearbeitenStart = function(id) {
+    planBearbeitenId = id;
+    planBearbeitenUebungen = planUebungenFuer(id)
+      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "" }));
+    renderTraining();
+  };
+
+  window.planBearbeitenAbbrechen = function() {
+    planBearbeitenId = null;
+    planBearbeitenUebungen = [];
+    renderTraining();
+  };
+
+  window.planBearbeitenSpeichern = async function(id) {
+    const name = document.getElementById(`plan-edit-name-${id}`).value.trim();
+    if (!name) return;
+    const uebungen = trainingUebungenAusDom(`plan-edit-${id}`, planBearbeitenUebungen.length);
+
+    await api("plan_aktualisieren", { id, name, uebungen });
+    planBearbeitenId = null;
+    planBearbeitenUebungen = [];
+    await ladeDaten();
+    renderTraining();
+  };
+
+  window.planLoeschen = async function(id) {
+    if (!confirm("Diesen Trainingsplan endgültig löschen? Bereits erfasste Trainings bleiben erhalten, verlieren aber die Verknüpfung.")) return;
+    await api("plan_loeschen", { id });
     await ladeDaten();
     renderTraining();
   };
