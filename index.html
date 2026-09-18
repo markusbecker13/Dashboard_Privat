@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://juxoxltaeugsmtvirfcm.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'none';">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Dashboard</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1c2430">
@@ -582,7 +582,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li><strong>Neuer Eintrag:</strong> Datum (leer = heute), Sportart und Ort als Freitext mit Autovervollständigung aus bisherigen Einträgen, Dauer in Minuten, optional Notiz</li>
                 <li><strong>Übungen (optional):</strong> „+ Übung hinzufügen" fügt beliebig viele Zeilen mit Name, Sätzen, Wiederholungen und Gewicht hinzu – sinnvoll für Kraft-Training wie das Rücken-Training, bei anderen Sportarten einfach weglassen</li>
-                <li><strong>Plan starten:</strong> bei einem Trainingsplan auf „▶ Starten" klicken, dann Übung für Übung mit „Weiter"/"← Zurück" durchklicken, Werte bei Bedarf anpassen. Am Ende („Training speichern") wird automatisch ein neuer, mit dem Plan verlinkter Trainingseintrag mit heutigem Datum angelegt</li>
+                <li><strong>Plan starten:</strong> bei einem Trainingsplan auf „▶ Starten" klicken – öffnet einen Vollbild-Fokus-Modus (deckt den ganzen Bildschirm ab, kein Scrollen nötig), dann Übung für Übung mit „Weiter"/"← Zurück" durchklicken, Werte bei Bedarf anpassen. „×" oben rechts bricht die Session ab (mit Rückfrage). Am Ende („Training speichern") wird automatisch ein neuer, mit dem Plan verlinkter Trainingseintrag mit heutigem Datum angelegt und der Fokus-Modus schließt sich</li>
                 <li><strong>Trainingspläne:</strong> unter „Trainingspläne verwalten" lassen sich benannte Vorlagen (z. B. „Rücken A", „Rücken B") mit eigenen Übungslisten anlegen. Im Formular oben füllt die Auswahl „Kein Plan"/Plan-Name die Übungen automatisch vor – danach frei editierbar. Der genutzte Plan wird beim Eintrag mit angezeigt ("· Plan: …") und lässt sich beim Bearbeiten auch nachträglich ändern oder entfernen. Über „⇩ Export" bei einem Plan bzw. „⇩ Alle exportieren" lässt sich eine Datei herunterladen; über „⇪ Pläne importieren (CSV/JSON)" lässt sich eine solche Datei (auch mit mehreren Plänen) wieder einlesen – bei Namensgleichheit mit vorhandenen Plänen kommt vorher eine Sicherheitsabfrage. Am einfachsten zum Selberausfüllen (z. B. in Excel/LibreOffice Calc) ist eine CSV-Datei mit den Spalten Plan, Übung, Sätze, Wiederholungen, Gewicht (kg) – eine Zeile je Übung, mehrere Zeilen mit gleichem Plan-Namen ergeben zusammen einen Plan. „⇩ CSV-Vorlage" liefert eine ausgefüllte Beispieldatei zum Anpassen. Beim Import werden alle enthaltenen Übungsnamen automatisch auch in „Sportarten & Übungen verwalten" ergänzt (bereits vorhandene Namen werden übersprungen)</li>
                 <li><strong>Sportarten & Übungen – Beschreibung & Bild:</strong> Einträge stehen untereinander in einer Liste. Über „✎" lässt sich zu jedem Eintrag jederzeit eine Beschreibung sowie ein Bild (JPG/PNG/WebP/GIF, max. 5 MB) hinterlegen, ändern oder entfernen. Hinterlegte Bilder erscheinen als kleines Vorschaubild überall dort, wo die Übung als Chip angezeigt wird (Trainingseinträge, Trainingspläne, „Plan starten")</li>
                 <li><strong>Übungsverlauf:</strong> Auswahl einer Übung zeigt ihr Gewicht über die Zeit als Diagramm – braucht mindestens zwei Einträge mit Gewichtsangabe für dieselbe Übung, um eine Linie zeichnen zu können</li>
@@ -816,8 +816,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <p class="hero-text">Trainingsverlauf und Fortschritt – offen für beliebige Sportarten und Orte, die Häufigkeit darf sich jederzeit ändern.</p>
 
         <p id="training-wochenziel-anzeige" style="margin-bottom:0.6rem;"></p>
-
-        <div id="training-session-bereich"></div>
 
         <div id="training-sportart-ziele-liste" style="margin-bottom:0.6rem;"></div>
         <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-bottom:1.2rem;">
