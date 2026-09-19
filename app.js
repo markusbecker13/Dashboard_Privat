@@ -65,6 +65,9 @@
   let intervallTimer = [];
   let timerBearbeitenId = null;
   let timerSession = null; // laufender Timer im Fokus-Modus
+  let zielEvents = [];
+  let zielEventBearbeitenId = null;
+  let auswertungJahr = new Date().getFullYear();
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
   let aktiveKategorie = null; // Schlüssel der gerade offenen Themen-Kachel-Gruppe, oder null
   let aktiverTab = null; // Schlüssel des gerade angezeigten Reiters (view-*), für den Zurück-Button
@@ -396,6 +399,7 @@
     trainingsplanUebungen = data.trainingsplan_uebungen || [];
     trainingStammdaten = data.training_stammdaten || [];
     intervallTimer = data.intervall_timer || [];
+    zielEvents = data.training_ziel_events || [];
     bereichAnwenden();
     renderReiterVerwaltung();
     render();
@@ -2660,6 +2664,7 @@
         <input type="number" id="${praefix}-ueb-saetze-${i}" value="${u.saetze ?? ""}" placeholder="Sätze" min="0" style="width:4.3rem;">
         <input type="number" id="${praefix}-ueb-wdh-${i}" value="${u.wiederholungen ?? ""}" placeholder="Wdh" min="0" style="width:4.3rem;">
         <input type="number" id="${praefix}-ueb-gewicht-${i}" value="${u.gewicht_kg ?? ""}" placeholder="kg" min="0" step="0.5" style="width:4.3rem;">
+        <input type="text" id="${praefix}-ueb-progression-${i}" value="${escapeAttr(u.progression || "")}" placeholder="Variante (z.B. unterstützt)" style="flex:1; min-width:110px;">
         <button class="task-delete" type="button" onclick="trainingUebungZeileEntfernen('${praefix}', ${i})">×</button>
       </div>`;
   }
@@ -2682,6 +2687,7 @@
         saetze: document.getElementById(`${praefix}-ueb-saetze-${i}`)?.value || "",
         wiederholungen: document.getElementById(`${praefix}-ueb-wdh-${i}`)?.value || "",
         gewicht_kg: document.getElementById(`${praefix}-ueb-gewicht-${i}`)?.value || "",
+        progression: document.getElementById(`${praefix}-ueb-progression-${i}`)?.value.trim() || "",
       });
     }
     return arr;
@@ -2786,6 +2792,8 @@
     renderTrainingsplaene();
     renderTrainingsstammdaten();
     renderTimerVerwaltung();
+    renderZielEvents();
+    renderKategorieAuswertung();
     renderTrainingsverlauf();
 
     // Fortschritts-Trend: letztes bekanntes Gewicht je Übungsname (gleicher
@@ -2857,10 +2865,41 @@
           werte += `${u.gewicht_kg} kg`;
           if (t) werte += trendSymbol(u.gewicht_kg, vorherigesGewicht(t, u));
         }
+        if (u.progression) werte += `${werte ? " · " : ""}${escapeHtml(u.progression)}`;
         const bestleistung = t && istBestleistung(t, u);
         return `<span class="chip" style="cursor:default; padding-right:0.7rem;" ${bestleistung ? 'title="Neue Bestleistung"' : ""}>${chipBildHtml("uebung", u.name)}${bestleistung ? "🏆 " : ""}${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
       });
       return `<div class="chip-liste" style="margin-top:0.4rem;">${chips.join("")}</div>`;
+    }
+
+    // Bestleistung (Strecke/Höhenmeter): neues Maximum für diese
+    // Sportart (gleicher Bereich), verglichen mit allen vorherigen
+    // Einträgen derselben Sportart. Ohne vorherigen Eintrag zu dieser
+    // Sportart gilt es noch nicht als "neu".
+    function istEntryBestleistung(t) {
+      const hatStrecke = t.strecke_km !== null && t.strecke_km !== undefined && t.strecke_km !== "";
+      const hatHoehenmeter = t.hoehenmeter !== null && t.hoehenmeter !== undefined && t.hoehenmeter !== "";
+      if (!hatStrecke && !hatHoehenmeter) return false;
+      const sportartName = (t.sportart || "").trim().toLowerCase();
+      if (!sportartName) return false;
+      let maxStrecke = null, maxHoehenmeter = null;
+      eintraegeAktuell.forEach((other) => {
+        if (other.id === t.id) return;
+        if ((other.sportart || "").trim().toLowerCase() !== sportartName) return;
+        if (other.datum > t.datum) return;
+        if (other.strecke_km !== null && other.strecke_km !== undefined && other.strecke_km !== "") {
+          const s = Number(other.strecke_km);
+          if (maxStrecke === null || s > maxStrecke) maxStrecke = s;
+        }
+        if (other.hoehenmeter !== null && other.hoehenmeter !== undefined && other.hoehenmeter !== "") {
+          const h = Number(other.hoehenmeter);
+          if (maxHoehenmeter === null || h > maxHoehenmeter) maxHoehenmeter = h;
+        }
+      });
+      if (maxStrecke === null && maxHoehenmeter === null) return false; // erster Eintrag: kein Vergleich möglich
+      const streckeNeu = hatStrecke && (maxStrecke === null || Number(t.strecke_km) > maxStrecke);
+      const hoehenmeterNeu = hatHoehenmeter && (maxHoehenmeter === null || Number(t.hoehenmeter) > maxHoehenmeter);
+      return streckeNeu || hoehenmeterNeu;
     }
 
     function eintragHtml(t) {
@@ -2873,6 +2912,8 @@
               <input type="text" id="training-edit-sportart-${t.id}" value="${escapeAttr(t.sportart)}" placeholder="Sportart">
               <input type="text" id="training-edit-ort-${t.id}" value="${escapeAttr(t.ort || "")}" placeholder="Ort">
               <input type="number" id="training-edit-dauer-${t.id}" value="${t.dauer_minuten ?? ""}" placeholder="Minuten" min="0" style="width:6rem;">
+              <input type="number" id="training-edit-strecke-${t.id}" value="${t.strecke_km ?? ""}" placeholder="km" min="0" step="0.1" style="width:5.5rem;" title="Strecke in km">
+              <input type="number" id="training-edit-hoehenmeter-${t.id}" value="${t.hoehenmeter ?? ""}" placeholder="Höhenmeter" min="0" style="width:6.5rem;" title="Höhenmeter">
               <input type="text" id="training-edit-notiz-${t.id}" value="${escapeAttr(t.notiz || "")}" placeholder="Notiz" style="flex:1; min-width:150px;">
               <select id="training-edit-plan-${t.id}" title="Verknüpfter Trainingsplan">
                 <option value="">Kein Plan</option>
@@ -2891,9 +2932,11 @@
       return `
         <div class="notiz-item" style="cursor:pointer;" onclick="trainingBearbeitenStart('${t.id}')">
           <div style="flex:1;">
-            <span class="notiz-text">${escapeHtml(t.sportart)}${t.ort ? " · " + escapeHtml(t.ort) : ""}</span>
+            <span class="notiz-text">${istEntryBestleistung(t) ? '<span title="Neue Bestleistung">🏆</span> ' : ""}${escapeHtml(t.sportart)}${t.ort ? " · " + escapeHtml(t.ort) : ""}</span>
             <span class="notiz-meta">
               ${datumDe(t.datum)}${t.dauer_minuten ? " · " + t.dauer_minuten + " Min." : ""}
+              ${t.strecke_km ? " · " + t.strecke_km + " km" : ""}
+              ${t.hoehenmeter ? " · " + t.hoehenmeter + " Hm" : ""}
               ${t.notiz ? " · " + escapeHtml(t.notiz) : ""}
               ${t.plan_id ? " · Plan: " + escapeHtml(planName(t.plan_id) || "?") : ""}
             </span>
@@ -2939,14 +2982,18 @@
     const datum = document.getElementById("training-datum").value || heuteISO();
     const ort = document.getElementById("training-ort").value.trim() || null;
     const dauer_minuten = document.getElementById("training-dauer").value || null;
+    const strecke_km = document.getElementById("training-strecke").value || null;
+    const hoehenmeter = document.getElementById("training-hoehenmeter").value || null;
     const notiz = document.getElementById("training-notiz").value.trim() || null;
     const uebungen = trainingUebungenAusDom("neu", trainingFormUebungen.length);
 
-    await api("training_hinzufuegen", { bereich: aktiverBereich, datum, sportart, ort, dauer_minuten, notiz, uebungen, plan_id: trainingFormPlanId });
+    await api("training_hinzufuegen", { bereich: aktiverBereich, datum, sportart, ort, dauer_minuten, strecke_km, hoehenmeter, notiz, uebungen, plan_id: trainingFormPlanId });
 
     document.getElementById("training-sportart").value = "";
     document.getElementById("training-ort").value = "";
     document.getElementById("training-dauer").value = "";
+    document.getElementById("training-strecke").value = "";
+    document.getElementById("training-hoehenmeter").value = "";
     document.getElementById("training-notiz").value = "";
     document.getElementById("training-datum").value = "";
     trainingFormUebungen = [];
@@ -2967,7 +3014,7 @@
     trainingBearbeitenUebungen = trainingUebungen
       .filter((u) => u.training_id === id)
       .sort((a, b) => a.reihenfolge - b.reihenfolge)
-      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "" }));
+      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
     renderTraining();
   };
 
@@ -2983,11 +3030,13 @@
     const datum = document.getElementById(`training-edit-datum-${id}`).value;
     const ort = document.getElementById(`training-edit-ort-${id}`).value.trim() || null;
     const dauer_minuten = document.getElementById(`training-edit-dauer-${id}`).value || null;
+    const strecke_km = document.getElementById(`training-edit-strecke-${id}`).value || null;
+    const hoehenmeter = document.getElementById(`training-edit-hoehenmeter-${id}`).value || null;
     const notiz = document.getElementById(`training-edit-notiz-${id}`).value.trim() || null;
     const plan_id = document.getElementById(`training-edit-plan-${id}`).value || null;
     const uebungen = trainingUebungenAusDom(`edit-${id}`, trainingBearbeitenUebungen.length);
 
-    await api("training_aktualisieren", { id, datum, sportart, ort, dauer_minuten, notiz, plan_id, uebungen });
+    await api("training_aktualisieren", { id, datum, sportart, ort, dauer_minuten, strecke_km, hoehenmeter, notiz, plan_id, uebungen });
     trainingBearbeitenId = null;
     trainingBearbeitenUebungen = [];
     await ladeDaten();
@@ -3031,7 +3080,7 @@
     trainingFormPlanId = planId || null;
     if (planId) {
       trainingFormUebungen = planUebungenFuer(planId)
-        .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "" }));
+        .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
     }
     renderTraining();
   };
@@ -3055,6 +3104,7 @@
         let werte = "";
         if (u.saetze || u.wiederholungen) werte += `${u.saetze || "?"}×${u.wiederholungen || "?"}`;
         if (u.gewicht_kg) werte += `${werte ? " · " : ""}${u.gewicht_kg} kg`;
+        if (u.progression) werte += `${werte ? " · " : ""}${escapeHtml(u.progression)}`;
         return `<span class="chip" style="cursor:default; padding-right:0.7rem;">${chipBildHtml("uebung", u.name)}${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
       });
       return `<div class="chip-liste" style="margin-top:0.4rem;">${chips.join("")}</div>`;
@@ -3116,7 +3166,7 @@
   window.planBearbeitenStart = function(id) {
     planBearbeitenId = id;
     planBearbeitenUebungen = planUebungenFuer(id)
-      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "" }));
+      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
     renderTraining();
   };
 
@@ -3158,6 +3208,7 @@
         saetze: u.saetze ?? null,
         wiederholungen: u.wiederholungen ?? null,
         gewicht_kg: u.gewicht_kg ?? null,
+        progression: u.progression ?? null,
       })),
     };
   }
@@ -3199,6 +3250,7 @@
     const idxSaetze = findeSpalte(kopf, ["sätze", "saetze", "sets"]);
     const idxWdh = findeSpalte(kopf, ["wiederholungen", "wdh", "reps"]);
     const idxGewicht = findeSpalte(kopf, ["gewicht (kg)", "gewicht_kg", "gewicht", "kg"]);
+    const idxProgression = findeSpalte(kopf, ["variante", "progression", "stufe"]);
 
     if (idxPlan === -1 || idxUebung === -1) {
       throw new Error(
@@ -3219,6 +3271,7 @@
         saetze: idxSaetze > -1 ? csvGanzzahlOderNull(felder[idxSaetze]) : null,
         wiederholungen: idxWdh > -1 ? csvGanzzahlOderNull(felder[idxWdh]) : null,
         gewicht_kg: idxGewicht > -1 ? parseCsvBetrag(felder[idxGewicht]) : null,
+        progression: idxProgression > -1 ? (felder[idxProgression] || "").trim() || null : null,
       });
     }
     return reihenfolge.map((name) => ({ name, uebungen: nachPlan.get(name) }));
@@ -3405,6 +3458,7 @@
         return `
           <div class="notiz-item" style="flex-direction:column; align-items:stretch;">
             <strong>${escapeHtml(s.name)}</strong>
+            ${s.typ === "sportart" ? `<input type="text" id="stammdaten-edit-kategorie-${s.id}" value="${escapeAttr(s.kategorie || "")}" placeholder="Kategorie (z.B. Ausdauer, Kraft, Calisthenics)" list="stammdaten-kategorie-liste" style="margin-top:0.5rem;">` : ""}
             <textarea id="stammdaten-edit-beschreibung-${s.id}" placeholder="Beschreibung (optional)" rows="2" style="margin-top:0.5rem; width:100%;">${escapeHtml(s.beschreibung || "")}</textarea>
             <div class="row" style="align-items:center; margin-top:0.5rem; gap:0.6rem; flex-wrap:wrap;">
               ${s.bild_pfad ? `<img src="${bildUrl ? escapeAttr(bildUrl) : ""}" class="stammdaten-bild" alt="">` : ""}
@@ -3422,7 +3476,7 @@
         <div class="notiz-item">
           ${s.bild_pfad && bildUrl ? `<img src="${escapeAttr(bildUrl)}" class="stammdaten-bild" alt="">` : ""}
           <div style="flex:1;">
-            <span class="notiz-text">${escapeHtml(s.name)}</span>
+            <span class="notiz-text">${escapeHtml(s.name)}${s.kategorie ? ` <span class="notiz-meta">· ${escapeHtml(s.kategorie)}</span>` : ""}</span>
             ${s.beschreibung ? `<span class="notiz-meta" style="white-space:pre-wrap;">${escapeHtml(s.beschreibung)}</span>` : ""}
           </div>
           <button class="task-edit-btn" onclick="stammdatenBearbeitenStart('${s.id}')" title="Bearbeiten">✎</button>
@@ -3439,6 +3493,12 @@
     if (sportartenListEl) sportartenListEl.innerHTML = listeHtml(sportarten);
     const uebungenListEl = document.getElementById("stammdaten-uebungen-liste");
     if (uebungenListEl) uebungenListEl.innerHTML = listeHtml(uebungen);
+
+    const kategorieListEl = document.getElementById("stammdaten-kategorie-liste");
+    if (kategorieListEl) {
+      const kategorien = [...new Set(sportarten.map((s) => s.kategorie).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      kategorieListEl.innerHTML = kategorien.map((k) => `<option value="${escapeAttr(k)}">`).join("");
+    }
 
     // Vorschläge für die Autovervollständigung: verwaltete Liste +
     // bisher tatsächlich genutzte Werte zusammengeführt.
@@ -3494,10 +3554,12 @@
 
   window.stammdatenBearbeitenSpeichern = async function(id) {
     const beschreibungEl = document.getElementById(`stammdaten-edit-beschreibung-${id}`);
+    const kategorieEl = document.getElementById(`stammdaten-edit-kategorie-${id}`);
     const dateiEl = document.getElementById(`stammdaten-edit-bild-${id}`);
     const entfernenEl = document.getElementById(`stammdaten-edit-bild-entfernen-${id}`);
 
     const payload = { id, beschreibung: beschreibungEl ? beschreibungEl.value.trim() : "" };
+    if (kategorieEl) payload.kategorie = kategorieEl.value.trim();
 
     const datei = dateiEl && dateiEl.files[0];
     if (datei) {
@@ -3604,7 +3666,7 @@
     const plan = trainingsplaene.find((p) => p.id === planId);
     if (!plan) return;
     const uebungen = planUebungenFuer(planId)
-      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "" }));
+      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
     if (!uebungen.length) return;
     trainingSession = { planId, planName: plan.name, sportart: plan.name, ort: "", index: 0, uebungen };
     sessionFokusOeffnen();
@@ -3646,6 +3708,8 @@
     if (wdhEl) u.wiederholungen = wdhEl.value;
     const gewichtEl = document.getElementById("session-ueb-gewicht");
     if (gewichtEl) u.gewicht_kg = gewichtEl.value;
+    const progressionEl = document.getElementById("session-ueb-progression");
+    if (progressionEl) u.progression = progressionEl.value.trim();
   }
 
   window.trainingSessionWeiter = function() {
@@ -3719,6 +3783,7 @@
           <div><label>Wdh</label><input type="number" id="session-ueb-wdh" value="${escapeAttr(u.wiederholungen)}" min="0"></div>
           <div><label>Gewicht (kg)</label><input type="number" id="session-ueb-gewicht" value="${escapeAttr(u.gewicht_kg)}" min="0" step="0.5"></div>
         </div>
+        <input type="text" id="session-ueb-progression" value="${escapeAttr(u.progression || "")}" placeholder="Variante (z.B. unterstützt)">
       </div>
       <div class="session-fokus-fuss">
         <button class="session-fokus-btn-sek" onclick="trainingSessionZurueck()" ${i === 0 ? "disabled" : ""}>← Zurück</button>
@@ -4002,6 +4067,197 @@
         <button class="session-fokus-btn-primaer" onclick="timerAbbrechen()">${t.phase === "fertig" ? "Fertig" : "Beenden"}</button>
       </div>`;
   }
+
+  // ------------------------------------------------------------
+  // Ziel-Events: benannte Ziele mit Datum (z.B. Wettkampf-Termine)
+  // und Countdown-Anzeige, optional mit einem Trainingsplan verlinkt.
+  // ------------------------------------------------------------
+
+  function renderZielEvents() {
+    const listEl = document.getElementById("zielevent-liste");
+    if (!listEl) return;
+    const heute = heuteISO();
+    const liste = zielEvents
+      .filter((z) => bereichVon(z) === aktiverBereich)
+      .slice()
+      .sort((a, b) => a.datum.localeCompare(b.datum));
+
+    const planAuswahlEl = document.getElementById("zielevent-neu-plan");
+    if (planAuswahlEl) {
+      planAuswahlEl.innerHTML = '<option value="">Kein Plan</option>'
+        + trainingsplaeneAktuell().map((p) => `<option value="${p.id}">${escapeAttr(p.name)}</option>`).join("");
+    }
+
+    function countdownText(datum) {
+      const tage = Math.round((new Date(datum + "T00:00:00") - new Date(heute + "T00:00:00")) / 86400000);
+      if (tage < 0) return `war vor ${Math.abs(tage)} Tag${Math.abs(tage) === 1 ? "" : "en"}`;
+      if (tage === 0) return "heute!";
+      const wochenText = tage >= 14 ? ` (≈ ${Math.round(tage / 7)} Wochen)` : "";
+      return `noch ${tage} Tag${tage === 1 ? "" : "e"}${wochenText}`;
+    }
+
+    function eventHtml(z) {
+      const istVorbei = z.datum < heute;
+      if (zielEventBearbeitenId === z.id) {
+        return `
+          <div class="notiz-item" style="flex-direction:column; align-items:stretch;">
+            <input type="text" id="zielevent-edit-name-${z.id}" value="${escapeAttr(z.name)}" placeholder="Name (z.B. Mud Master)">
+            <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+              <input type="date" id="zielevent-edit-datum-${z.id}" value="${z.datum}">
+              <select id="zielevent-edit-plan-${z.id}">
+                <option value="">Kein Plan</option>
+                ${trainingsplaeneAktuell().map((p) => `<option value="${p.id}" ${p.id === z.plan_id ? "selected" : ""}>${escapeAttr(p.name)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="row" style="margin-top:0.6rem;">
+              <button class="btn-primary" onclick="zieleventBearbeitenSpeichern('${z.id}')">Speichern</button>
+              <button class="link-btn" onclick="zieleventBearbeitenAbbrechen()">Abbrechen</button>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="notiz-item" ${istVorbei ? 'style="opacity:0.55;"' : ""}>
+          <div style="flex:1;">
+            <span class="notiz-text">${escapeHtml(z.name)}</span>
+            <span class="notiz-meta">${datumDe(z.datum)} · ${countdownText(z.datum)}${z.plan_id ? " · Plan: " + escapeHtml(planName(z.plan_id) || "?") : ""}</span>
+          </div>
+          ${z.plan_id ? `<button class="link-btn" onclick="planStarten('${z.plan_id}')">▶ Starten</button>` : ""}
+          <button class="task-edit-btn" onclick="zieleventBearbeitenStart('${z.id}')" title="Bearbeiten">✎</button>
+          <button class="task-delete" onclick="zieleventLoeschen('${z.id}')">×</button>
+        </div>`;
+    }
+
+    listEl.innerHTML = liste.length
+      ? `<div class="notiz-list">${liste.map(eventHtml).join("")}</div>`
+      : '<p class="empty-text">Noch keine Ziele angelegt.</p>';
+  }
+
+  const btnZieleventHinzufuegen = document.getElementById("btn-zielevent-hinzufuegen");
+  if (btnZieleventHinzufuegen) btnZieleventHinzufuegen.addEventListener("click", zieleventHinzufuegen);
+
+  async function zieleventHinzufuegen() {
+    const nameEl = document.getElementById("zielevent-neu-name");
+    const datumEl = document.getElementById("zielevent-neu-datum");
+    const name = nameEl.value.trim();
+    const datum = datumEl.value;
+    if (!name || !datum) return;
+    const plan_id = document.getElementById("zielevent-neu-plan").value || null;
+    await api("zielevent_hinzufuegen", { bereich: aktiverBereich, name, datum, plan_id });
+    nameEl.value = "";
+    datumEl.value = "";
+    await ladeDaten();
+    renderTraining();
+  }
+
+  window.zieleventBearbeitenStart = function(id) {
+    zielEventBearbeitenId = id;
+    renderTraining();
+  };
+
+  window.zieleventBearbeitenAbbrechen = function() {
+    zielEventBearbeitenId = null;
+    renderTraining();
+  };
+
+  window.zieleventBearbeitenSpeichern = async function(id) {
+    const name = document.getElementById(`zielevent-edit-name-${id}`).value.trim();
+    const datum = document.getElementById(`zielevent-edit-datum-${id}`).value;
+    if (!name || !datum) return;
+    const plan_id = document.getElementById(`zielevent-edit-plan-${id}`).value || null;
+    await api("zielevent_aktualisieren", { id, name, datum, plan_id });
+    zielEventBearbeitenId = null;
+    await ladeDaten();
+    renderTraining();
+  };
+
+  window.zieleventLoeschen = async function(id) {
+    if (!confirm("Dieses Ziel endgültig löschen?")) return;
+    await api("zielevent_loeschen", { id });
+    await ladeDaten();
+    renderTraining();
+  };
+
+  // ------------------------------------------------------------
+  // Auswertung nach Kategorie: Sportart-Kategorien (aus den
+  // Stammdaten) je gewähltem Jahr als Balkendiagramm – Anzahl
+  // Einheiten (Balkenlänge) + Gesamtdauer je Kategorie.
+  // ------------------------------------------------------------
+
+  function sportartKategorie(sportartName) {
+    const name = (sportartName || "").trim().toLowerCase();
+    if (!name) return "Ohne Kategorie";
+    const eintrag = trainingStammdaten.find(
+      (s) => bereichVon(s) === aktiverBereich && s.typ === "sportart" && s.name.trim().toLowerCase() === name
+    );
+    return (eintrag && eintrag.kategorie) || "Ohne Kategorie";
+  }
+
+  function formatMinuten(min) {
+    if (!min) return "0 Min.";
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    if (!h) return `${m} Min.`;
+    return m ? `${h} Std. ${m} Min.` : `${h} Std.`;
+  }
+
+  function trainingKategorienChartSvg(jahr) {
+    const proKategorie = {};
+    training
+      .filter((t) => bereichVon(t) === aktiverBereich && (t.datum || "").slice(0, 4) === String(jahr))
+      .forEach((t) => {
+        const kat = sportartKategorie(t.sportart);
+        if (!proKategorie[kat]) proKategorie[kat] = { minuten: 0, einheiten: 0 };
+        proKategorie[kat].minuten += Number(t.dauer_minuten) || 0;
+        proKategorie[kat].einheiten += 1;
+      });
+
+    const eintraege = Object.entries(proKategorie).sort((a, b) => b[1].einheiten - a[1].einheiten);
+    if (!eintraege.length) return `<p class="empty-text">Keine Trainings für ${jahr}.</p>`;
+
+    const breite = 700;
+    const zeilenHoehe = 26;
+    const hoehe = eintraege.length * zeilenHoehe + 10;
+    const maxWert = Math.max(...eintraege.map(([, w]) => w.einheiten));
+    const labelBreite = 130;
+    const balkenMax = breite - labelBreite - 90;
+
+    const balken = eintraege.map(([kat, w], i) => {
+      const y = i * zeilenHoehe + 6;
+      const b = (balkenMax * w.einheiten) / maxWert;
+      return `
+        <text x="0" y="${y + 13}" font-size="10" fill="var(--ink)">${escapeHtml(kat.length > 16 ? kat.slice(0, 15) + "…" : kat)}</text>
+        <rect x="${labelBreite}" y="${y}" width="${Math.max(2, b)}" height="16" rx="3" fill="var(--accent)"></rect>
+        <text x="${labelBreite + b + 6}" y="${y + 13}" font-size="10" fill="var(--ink-dim)">${w.einheiten} · ${formatMinuten(w.minuten)}</text>
+      `;
+    }).join("");
+
+    return `<svg viewBox="0 0 ${breite} ${hoehe}" style="width:100%; height:auto; display:block;">${balken}</svg>`;
+  }
+
+  function renderKategorieAuswertung() {
+    const bereichEl = document.getElementById("auswertung-kategorie-bereich");
+    if (!bereichEl) return;
+
+    const jahreVorhanden = [...new Set(
+      training.filter((t) => bereichVon(t) === aktiverBereich).map((t) => (t.datum || "").slice(0, 4))
+    )].filter(Boolean).sort((a, b) => b.localeCompare(a));
+    if (!jahreVorhanden.includes(String(auswertungJahr))) {
+      auswertungJahr = jahreVorhanden.length ? Number(jahreVorhanden[0]) : new Date().getFullYear();
+    }
+
+    const jahrAuswahlEl = document.getElementById("auswertung-jahr-auswahl");
+    if (jahrAuswahlEl) {
+      const jahre = jahreVorhanden.length ? jahreVorhanden : [String(new Date().getFullYear())];
+      jahrAuswahlEl.innerHTML = jahre.map((j) => `<option value="${j}" ${Number(j) === auswertungJahr ? "selected" : ""}>${j}</option>`).join("");
+    }
+
+    bereichEl.innerHTML = trainingKategorienChartSvg(auswertungJahr);
+  }
+
+  window.auswertungJahrGewaehlt = function(jahr) {
+    auswertungJahr = Number(jahr);
+    renderTraining();
+  };
 
   // ------------------------------------------------------------
   // Übungsverlauf (Langzeit-Diagramm: Gewicht je Übung über die Zeit)
