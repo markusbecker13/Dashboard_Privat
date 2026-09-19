@@ -580,14 +580,16 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Trainingsverlauf und -erfolg – bewusst offen für beliebige Sportarten und Orte, weil sich beides über die Zeit ändern soll.</p>
               <ul>
-                <li><strong>Neuer Eintrag:</strong> Datum (leer = heute), Sportart und Ort als Freitext mit Autovervollständigung aus bisherigen Einträgen, Dauer in Minuten, optional Notiz</li>
-                <li><strong>Übungen (optional):</strong> „+ Übung hinzufügen" fügt beliebig viele Zeilen mit Name, Sätzen, Wiederholungen und Gewicht hinzu – sinnvoll für Kraft-Training wie das Rücken-Training, bei anderen Sportarten einfach weglassen</li>
+                <li><strong>Neuer Eintrag:</strong> Datum (leer = heute), Sportart und Ort als Freitext mit Autovervollständigung aus bisherigen Einträgen, Dauer in Minuten, optional Strecke (km) und Höhenmeter (für Laufen, Wandern, Radfahren), optional Notiz. Bei neuer Bestmarke in Strecke oder Höhenmeter für diese Sportart erscheint ein 🏆 (erst ab dem zweiten Eintrag dieser Sportart möglich)</li>
+                <li><strong>Übungen (optional):</strong> „+ Übung hinzufügen" fügt beliebig viele Zeilen mit Name, Sätzen, Wiederholungen, Gewicht und optional einer Variante/Progression (Freitext, z.B. „Klimmzug unterstützt" – für Calisthenics, wo der Fortschritt oft eine andere Übungsvariante statt mehr Gewicht ist) hinzu – sinnvoll für Kraft-Training wie das Rücken-Training, bei anderen Sportarten einfach weglassen</li>
                 <li><strong>Plan starten:</strong> bei einem Trainingsplan auf „▶ Starten" klicken – öffnet einen Vollbild-Fokus-Modus (deckt den ganzen Bildschirm ab, kein Scrollen nötig), dann Übung für Übung mit „Weiter"/"← Zurück" durchklicken, Werte bei Bedarf anpassen. „×" oben rechts bricht die Session ab (mit Rückfrage). Am Ende („Training speichern") wird automatisch ein neuer, mit dem Plan verlinkter Trainingseintrag mit heutigem Datum angelegt und der Fokus-Modus schließt sich</li>
                 <li><strong>Trainingspläne:</strong> unter „Trainingspläne verwalten" lassen sich benannte Vorlagen (z. B. „Rücken A", „Rücken B") mit eigenen Übungslisten anlegen. Im Formular oben füllt die Auswahl „Kein Plan"/Plan-Name die Übungen automatisch vor – danach frei editierbar. Der genutzte Plan wird beim Eintrag mit angezeigt ("· Plan: …") und lässt sich beim Bearbeiten auch nachträglich ändern oder entfernen. Über „⇩ Export" bei einem Plan bzw. „⇩ Alle exportieren" lässt sich eine Datei herunterladen; über „⇪ Pläne importieren (CSV/JSON)" lässt sich eine solche Datei (auch mit mehreren Plänen) wieder einlesen – bei Namensgleichheit mit vorhandenen Plänen kommt vorher eine Sicherheitsabfrage. Am einfachsten zum Selberausfüllen (z. B. in Excel/LibreOffice Calc) ist eine CSV-Datei mit den Spalten Plan, Übung, Sätze, Wiederholungen, Gewicht (kg) – eine Zeile je Übung, mehrere Zeilen mit gleichem Plan-Namen ergeben zusammen einen Plan. „⇩ CSV-Vorlage" liefert eine ausgefüllte Beispieldatei zum Anpassen. Beim Import werden alle enthaltenen Übungsnamen automatisch auch in „Übungen verwalten" ergänzt (bereits vorhandene Namen werden übersprungen). Jeder Plan-Eintrag ist aufklappbar (Klick auf den Namen zeigt/verbirgt die Übungen); Bearbeiten läuft über „✎"</li>
                 <li><strong>Sportarten & Übungen – Beschreibung & Bild:</strong> Einträge stehen untereinander in einer Liste. Über „✎" lässt sich zu jedem Eintrag jederzeit eine Beschreibung sowie ein Bild (JPG/PNG/WebP/GIF, max. 5 MB) hinterlegen, ändern oder entfernen. Hinterlegte Bilder erscheinen als kleines Vorschaubild überall dort, wo die Übung als Chip angezeigt wird (Trainingseinträge, Trainingspläne, „Plan starten")</li>
                 <li><strong>Intervall-Timer:</strong> unter „Intervall-Timer verwalten" lassen sich benannte Vorlagen mit Arbeitszeit, Pause, Anzahl Runden und optionaler Vorbereitungszeit anlegen – unabhängig von Trainingsplänen. „▶ Starten" öffnet denselben Vollbild-Fokus-Modus wie „Plan starten": der Countdown läuft automatisch durch Vorbereitung → Arbeit → Pause → nächste Runde, bei jedem Phasenwechsel Signalton + Vibration (sofern vom Gerät unterstützt), das Display bleibt währenddessen an. „⏸ Pause"/"▶ Weiter" hält den Timer an, „×"/"Beenden" bricht ab (mit Rückfrage, solange nicht fertig)</li>
                 <li><strong>Übungsverlauf:</strong> Auswahl einer Übung zeigt ihr Gewicht über die Zeit als Diagramm – braucht mindestens zwei Einträge mit Gewichtsangabe für dieselbe Übung, um eine Linie zeichnen zu können</li>
-                <li><strong>Sportarten verwalten / Übungen verwalten:</strong> zwei getrennte Bereiche mit Vorschlägen für Sportart- bzw. Übungsnamen, unabhängig davon ob sie schon mal genutzt wurden. Freitext bleibt überall möglich – die Listen erscheinen nur als Vorschlag bei der Autovervollständigung, zusammen mit bereits genutzten Werten</li>
+                <li><strong>Sportarten verwalten / Übungen verwalten:</strong> zwei getrennte Bereiche mit Vorschlägen für Sportart- bzw. Übungsnamen, unabhängig davon ob sie schon mal genutzt wurden. Freitext bleibt überall möglich – die Listen erscheinen nur als Vorschlag bei der Autovervollständigung, zusammen mit bereits genutzten Werten. Bei Sportarten lässt sich zusätzlich über „✎" eine Kategorie hinterlegen (Freitext mit Vorschlägen, z.B. „Ausdauer", „Kraft", „Calisthenics") – Grundlage für die Auswertung nach Kategorie</li>
+                <li><strong>Auswertung nach Kategorie:</strong> Balkendiagramm mit Anzahl Trainings und Gesamtdauer je Kategorie für ein wählbares Jahr. Sportarten ohne hinterlegte Kategorie laufen unter „Ohne Kategorie"</li>
+                <li><strong>Ziele verwalten:</strong> Ziel-Termine mit Countdown ("noch X Tage"), z.B. ein Wettkampf oder Event, optional mit einem Trainingsplan verknüpft – dann lässt sich der Plan direkt aus der Zielliste heraus starten. Vergangene Ziele bleiben sichtbar (abgeblendet), Bearbeiten über „✎"</li>
                 <li><strong>Wochenziel:</strong> oben "X von Y diese Woche" mit einem ✓ sobald erreicht. Ziel über „Ziel ändern" jederzeit anpassbar (Woche zählt Montag bis Sonntag). Darunter die längste je erreichte Serie von Wochen in Folge mit erreichtem Ziel</li>
                 <li><strong>Sportart-Ziele:</strong> zusätzlich zum Gesamtziel lässt sich pro Sportart ein eigenes Wochenziel festlegen (Auswahl + Zahl + „+ Sportart-Ziel"). Ist ein Sportart-Filter aktiv, bezieht sich die Wochenziel-/Serien-Anzeige oben auf diese Sportart und ihr eigenes Ziel (falls eines hinterlegt ist, sonst das Gesamtziel)</li>
                 <li><strong>Filter:</strong> Sportart, Ort und Zeitraum sind kombinierbar und wirken auf die Liste darunter sowie auf die Wochenziel-/Serien-Anzeige oben. „Filter zurücksetzen" hebt alle wieder auf</li>
@@ -841,6 +843,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <datalist id="training-ort-liste"></datalist>
           <datalist id="training-uebung-namen-liste"></datalist>
           <input type="number" id="training-dauer" placeholder="Minuten" min="0" style="width:6rem;">
+          <input type="number" id="training-strecke" placeholder="km" min="0" step="0.1" style="width:5.5rem;" title="Strecke in km">
+          <input type="number" id="training-hoehenmeter" placeholder="Höhenmeter" min="0" style="width:6.5rem;" title="Höhenmeter">
           <input type="text" id="training-notiz" placeholder="Notiz (optional)" style="flex:1; min-width:150px;">
           <select id="training-plan-auswahl" title="Plan anwenden (füllt Übungen unten aus)" onchange="planAufTrainingAnwenden(this.value)">
             <option value="">Kein Plan</option>
@@ -862,6 +866,15 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         </details>
 
         <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
+          <summary>Auswertung nach Kategorie</summary>
+          <div class="anleitung-text">
+            <select id="auswertung-jahr-auswahl" onchange="auswertungJahrGewaehlt(this.value)" style="width:100%;"></select>
+            <div id="auswertung-kategorie-bereich" style="margin-top:0.8rem;"></div>
+            <p class="empty-text" style="margin-top:0.6rem;">Kategorie wird bei „Sportarten verwalten" je Sportart hinterlegt; Trainings ohne zugeordnete Kategorie laufen unter „Ohne Kategorie".</p>
+          </div>
+        </details>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
           <summary>Sportarten verwalten</summary>
           <div class="anleitung-text">
             <p class="empty-text" style="margin-top:0;">Freitext bleibt überall möglich – diese Liste liefert nur die Vorschläge bei der Autovervollständigung.</p>
@@ -870,6 +883,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <button class="btn-primary" id="btn-stammdaten-sportart-hinzufuegen">+ Sportart</button>
             </div>
             <div id="stammdaten-sportarten-liste" style="margin-top:0.6rem;"></div>
+            <datalist id="stammdaten-kategorie-liste"></datalist>
           </div>
         </details>
 
@@ -935,6 +949,23 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <button class="btn-primary" id="btn-timer-hinzufuegen" style="margin-top:0.8rem;">Timer speichern</button>
 
             <div id="timer-liste" style="margin-top:1.2rem;"></div>
+          </div>
+        </details>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
+          <summary>Ziele verwalten</summary>
+          <div class="anleitung-text">
+            <p class="empty-text" style="margin-top:0;">Ziel-Termine mit Countdown, z.B. ein Wettkampf oder Event – optional mit einem Trainingsplan verknüpft.</p>
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start; gap:0.5rem;">
+              <input type="text" id="zielevent-neu-name" placeholder="Name (z.B. Mud Master)" style="flex:1; min-width:150px;">
+              <input type="date" id="zielevent-neu-datum">
+              <select id="zielevent-neu-plan" title="Optional verknüpfter Trainingsplan">
+                <option value="">Kein Plan</option>
+              </select>
+            </div>
+            <button class="btn-primary" id="btn-zielevent-hinzufuegen" style="margin-top:0.8rem;">Ziel speichern</button>
+
+            <div id="zielevent-liste" style="margin-top:1.2rem;"></div>
           </div>
         </details>
       </div>
