@@ -589,7 +589,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Übungsverlauf:</strong> Auswahl einer Übung zeigt ihr Gewicht über die Zeit als Diagramm – braucht mindestens zwei Einträge mit Gewichtsangabe für dieselbe Übung, um eine Linie zeichnen zu können</li>
                 <li><strong>Sportarten verwalten / Übungen verwalten:</strong> zwei getrennte Bereiche mit Vorschlägen für Sportart- bzw. Übungsnamen, unabhängig davon ob sie schon mal genutzt wurden. Freitext bleibt überall möglich – die Listen erscheinen nur als Vorschlag bei der Autovervollständigung, zusammen mit bereits genutzten Werten. Bei Sportarten lässt sich zusätzlich über „✎" eine Kategorie hinterlegen (Freitext mit Vorschlägen, z.B. „Ausdauer", „Kraft", „Calisthenics") – Grundlage für die Auswertung nach Kategorie</li>
                 <li><strong>Auswertung nach Kategorie:</strong> Balkendiagramm mit Anzahl Trainings und Gesamtdauer je Kategorie für ein wählbares Jahr. Sportarten ohne hinterlegte Kategorie laufen unter „Ohne Kategorie"</li>
-                <li><strong>Ziele verwalten:</strong> Ziel-Termine mit Countdown ("noch X Tage"), z.B. ein Wettkampf oder Event, optional mit einem Trainingsplan verknüpft – dann lässt sich der Plan direkt aus der Zielliste heraus starten. Vergangene Ziele bleiben sichtbar (abgeblendet), Bearbeiten über „✎"</li>
+                <li><strong>Ziele verwalten:</strong> Ziel-Termine mit Countdown ("noch X Tage"), z.B. ein Wettkampf oder Event, optional mit einem Trainingsplan verknüpft – dann lässt sich der Plan direkt aus der Zielliste heraus starten. Zusätzlich optional Ort, Ziel-Strecke (km) und eine Beschreibung. Vergangene Ziele bleiben sichtbar (abgeblendet), Bearbeiten über „✎"</li>
                 <li><strong>Wochenziel:</strong> oben "X von Y diese Woche" mit einem ✓ sobald erreicht. Ziel über „Ziel ändern" jederzeit anpassbar (Woche zählt Montag bis Sonntag). Darunter die längste je erreichte Serie von Wochen in Folge mit erreichtem Ziel</li>
                 <li><strong>Sportart-Ziele:</strong> zusätzlich zum Gesamtziel lässt sich pro Sportart ein eigenes Wochenziel festlegen (Auswahl + Zahl + „+ Sportart-Ziel"). Ist ein Sportart-Filter aktiv, bezieht sich die Wochenziel-/Serien-Anzeige oben auf diese Sportart und ihr eigenes Ziel (falls eines hinterlegt ist, sonst das Gesamtziel)</li>
                 <li><strong>Filter:</strong> Sportart, Ort und Zeitraum sind kombinierbar und wirken auf die Liste darunter sowie auf die Wochenziel-/Serien-Anzeige oben. „Filter zurücksetzen" hebt alle wieder auf</li>
@@ -963,6 +963,11 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <option value="">Kein Plan</option>
               </select>
             </div>
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start; margin-top:0.5rem; gap:0.5rem;">
+              <input type="text" id="zielevent-neu-ort" placeholder="Ort (optional)" style="flex:1; min-width:130px;">
+              <input type="number" id="zielevent-neu-strecke" placeholder="Ziel-Strecke (km)" min="0" step="0.1" style="width:9rem;">
+            </div>
+            <textarea id="zielevent-neu-beschreibung" placeholder="Beschreibung (optional)" rows="2" style="margin-top:0.5rem; width:100%;"></textarea>
             <button class="btn-primary" id="btn-zielevent-hinzufuegen" style="margin-top:0.8rem;">Ziel speichern</button>
 
             <div id="zielevent-liste" style="margin-top:1.2rem;"></div>
