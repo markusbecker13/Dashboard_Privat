@@ -4109,6 +4109,11 @@
                 ${trainingsplaeneAktuell().map((p) => `<option value="${p.id}" ${p.id === z.plan_id ? "selected" : ""}>${escapeAttr(p.name)}</option>`).join("")}
               </select>
             </div>
+            <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+              <input type="text" id="zielevent-edit-ort-${z.id}" value="${escapeAttr(z.ort || "")}" placeholder="Ort (optional)" style="flex:1; min-width:130px;">
+              <input type="number" id="zielevent-edit-strecke-${z.id}" value="${z.strecke_km ?? ""}" placeholder="Ziel-Strecke (km)" min="0" step="0.1" style="width:9rem;">
+            </div>
+            <textarea id="zielevent-edit-beschreibung-${z.id}" placeholder="Beschreibung (optional)" rows="2" style="margin-top:0.5rem; width:100%;">${escapeHtml(z.beschreibung || "")}</textarea>
             <div class="row" style="margin-top:0.6rem;">
               <button class="btn-primary" onclick="zieleventBearbeitenSpeichern('${z.id}')">Speichern</button>
               <button class="link-btn" onclick="zieleventBearbeitenAbbrechen()">Abbrechen</button>
@@ -4118,8 +4123,13 @@
       return `
         <div class="notiz-item" ${istVorbei ? 'style="opacity:0.55;"' : ""}>
           <div style="flex:1;">
-            <span class="notiz-text">${escapeHtml(z.name)}</span>
-            <span class="notiz-meta">${datumDe(z.datum)} · ${countdownText(z.datum)}${z.plan_id ? " · Plan: " + escapeHtml(planName(z.plan_id) || "?") : ""}</span>
+            <span class="notiz-text">${escapeHtml(z.name)}${z.ort ? " · " + escapeHtml(z.ort) : ""}</span>
+            <span class="notiz-meta">
+              ${datumDe(z.datum)} · ${countdownText(z.datum)}
+              ${z.strecke_km ? " · " + z.strecke_km + " km" : ""}
+              ${z.plan_id ? " · Plan: " + escapeHtml(planName(z.plan_id) || "?") : ""}
+            </span>
+            ${z.beschreibung ? `<span class="notiz-meta" style="white-space:pre-wrap;">${escapeHtml(z.beschreibung)}</span>` : ""}
           </div>
           ${z.plan_id ? `<button class="link-btn" onclick="planStarten('${z.plan_id}')">▶ Starten</button>` : ""}
           <button class="task-edit-btn" onclick="zieleventBearbeitenStart('${z.id}')" title="Bearbeiten">✎</button>
@@ -4142,9 +4152,15 @@
     const datum = datumEl.value;
     if (!name || !datum) return;
     const plan_id = document.getElementById("zielevent-neu-plan").value || null;
-    await api("zielevent_hinzufuegen", { bereich: aktiverBereich, name, datum, plan_id });
+    const ort = document.getElementById("zielevent-neu-ort").value.trim() || null;
+    const strecke_km = document.getElementById("zielevent-neu-strecke").value || null;
+    const beschreibung = document.getElementById("zielevent-neu-beschreibung").value.trim() || null;
+    await api("zielevent_hinzufuegen", { bereich: aktiverBereich, name, datum, plan_id, ort, strecke_km, beschreibung });
     nameEl.value = "";
     datumEl.value = "";
+    document.getElementById("zielevent-neu-ort").value = "";
+    document.getElementById("zielevent-neu-strecke").value = "";
+    document.getElementById("zielevent-neu-beschreibung").value = "";
     await ladeDaten();
     renderTraining();
   }
@@ -4164,7 +4180,10 @@
     const datum = document.getElementById(`zielevent-edit-datum-${id}`).value;
     if (!name || !datum) return;
     const plan_id = document.getElementById(`zielevent-edit-plan-${id}`).value || null;
-    await api("zielevent_aktualisieren", { id, name, datum, plan_id });
+    const ort = document.getElementById(`zielevent-edit-ort-${id}`).value.trim() || null;
+    const strecke_km = document.getElementById(`zielevent-edit-strecke-${id}`).value || null;
+    const beschreibung = document.getElementById(`zielevent-edit-beschreibung-${id}`).value.trim() || null;
+    await api("zielevent_aktualisieren", { id, name, datum, plan_id, ort, strecke_km, beschreibung });
     zielEventBearbeitenId = null;
     await ladeDaten();
     renderTraining();
