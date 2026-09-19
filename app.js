@@ -3297,7 +3297,7 @@
     }
 
     // Übungsnamen aus den importierten Plänen zusätzlich in die
-    // Stammdaten übernehmen (Tab "Sportarten & Übungen verwalten"),
+    // Stammdaten übernehmen (Tab "Übungen verwalten"),
     // damit sie dort direkt gelistet sind und bei der Autovervoll-
     // ständigung erscheinen. Bereits vorhandene Namen werden dabei
     // übersprungen (stammdaten_hinzufuegen würde sie ohnehin ignorieren).
