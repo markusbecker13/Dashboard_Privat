@@ -421,7 +421,7 @@
   }
 
   function badgeHtml(cls, text) {
-    return `<span class="badge ${cls}">${text}</span>`;
+    return `<span class="badge ${cls}">${escapeHtml(text)}</span>`;
   }
 
   let aufgabeBearbeitenId = null;
@@ -715,7 +715,7 @@
 
         if (googleCode) {
           try {
-            await api("google_auth_callback", { code: googleCode });
+            await api("google_auth_callback", { code: googleCode, state: urlParams.get("state") });
             history.replaceState({}, "", location.pathname);
             tabWechseln("kalender");
           } catch (e) {
@@ -3602,7 +3602,7 @@
           return `
             <div class="notiz-item">
               <span style="flex:1;">${escapeHtml(z.sportart)}: <strong>${anzahl} von ${z.wochenziel}</strong> diese Woche${erreicht ? " ✓" : ""}</span>
-              <button class="task-delete" onclick="trainingSportartZielLoeschen('${escapeAttr(z.sportart)}')">×</button>
+              <button class="task-delete" data-sportart="${escapeAttr(z.sportart)}" onclick="trainingSportartZielLoeschen(this.dataset.sportart)">×</button>
             </div>`;
         }).join("")
       : "";
