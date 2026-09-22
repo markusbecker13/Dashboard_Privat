@@ -2663,6 +2663,7 @@
         <input type="text" id="${praefix}-ueb-name-${i}" value="${escapeAttr(u.name || "")}" placeholder="Übung (z.B. Rudern)" list="training-uebung-namen-liste" style="flex:1; min-width:120px;">
         <input type="number" id="${praefix}-ueb-saetze-${i}" value="${u.saetze ?? ""}" placeholder="Sätze" min="0" style="width:4.3rem;">
         <input type="number" id="${praefix}-ueb-wdh-${i}" value="${u.wiederholungen ?? ""}" placeholder="Wdh" min="0" style="width:4.3rem;">
+        <input type="number" id="${praefix}-ueb-sekunden-${i}" value="${u.sekunden ?? ""}" placeholder="Sek." min="0" title="Sekunden (statt Wdh., z.B. für Plank)" style="width:4.3rem;">
         <input type="number" id="${praefix}-ueb-gewicht-${i}" value="${u.gewicht_kg ?? ""}" placeholder="kg" min="0" step="0.5" style="width:4.3rem;">
         <input type="text" id="${praefix}-ueb-progression-${i}" value="${escapeAttr(u.progression || "")}" placeholder="Variante (z.B. unterstützt)" style="flex:1; min-width:110px;">
         <button class="task-delete" type="button" onclick="trainingUebungZeileEntfernen('${praefix}', ${i})">×</button>
@@ -2686,6 +2687,7 @@
         name: document.getElementById(`${praefix}-ueb-name-${i}`)?.value.trim() || "",
         saetze: document.getElementById(`${praefix}-ueb-saetze-${i}`)?.value || "",
         wiederholungen: document.getElementById(`${praefix}-ueb-wdh-${i}`)?.value || "",
+        sekunden: document.getElementById(`${praefix}-ueb-sekunden-${i}`)?.value || "",
         gewicht_kg: document.getElementById(`${praefix}-ueb-gewicht-${i}`)?.value || "",
         progression: document.getElementById(`${praefix}-ueb-progression-${i}`)?.value.trim() || "",
       });
@@ -2823,10 +2825,11 @@
     function istBestleistung(t, u) {
       const hatGewicht = u.gewicht_kg !== null && u.gewicht_kg !== undefined && u.gewicht_kg !== "";
       const hatWdh = u.wiederholungen !== null && u.wiederholungen !== undefined && u.wiederholungen !== "";
-      if (!hatGewicht && !hatWdh) return false;
+      const hatSekunden = u.sekunden !== null && u.sekunden !== undefined && u.sekunden !== "";
+      if (!hatGewicht && !hatWdh && !hatSekunden) return false;
       const name = (u.name || "").trim().toLowerCase();
       if (!name) return false;
-      let maxGewicht = null, maxWdh = null;
+      let maxGewicht = null, maxWdh = null, maxSekunden = null;
       trainingUebungen.forEach((other) => {
         if (other.training_id === t.id) return;
         if ((other.name || "").trim().toLowerCase() !== name) return;
@@ -2840,11 +2843,16 @@
           const r = Number(other.wiederholungen);
           if (maxWdh === null || r > maxWdh) maxWdh = r;
         }
+        if (other.sekunden !== null && other.sekunden !== undefined && other.sekunden !== "") {
+          const s = Number(other.sekunden);
+          if (maxSekunden === null || s > maxSekunden) maxSekunden = s;
+        }
       });
-      if (maxGewicht === null && maxWdh === null) return false; // erster Eintrag: kein Vergleich möglich
+      if (maxGewicht === null && maxWdh === null && maxSekunden === null) return false; // erster Eintrag: kein Vergleich möglich
       const gewichtNeu = hatGewicht && (maxGewicht === null || Number(u.gewicht_kg) > maxGewicht);
       const wdhNeu = hatWdh && (maxWdh === null || Number(u.wiederholungen) > maxWdh);
-      return gewichtNeu || wdhNeu;
+      const sekundenNeu = hatSekunden && (maxSekunden === null || Number(u.sekunden) > maxSekunden);
+      return gewichtNeu || wdhNeu || sekundenNeu;
     }
 
     function trendSymbol(aktuell, vorher) {
@@ -2859,7 +2867,9 @@
       if (!uebungenListe.length) return "";
       const chips = uebungenListe.map((u) => {
         let werte = "";
-        if (u.saetze || u.wiederholungen) werte += `${u.saetze || "?"}×${u.wiederholungen || "?"}`;
+        if (u.wiederholungen) werte += `${u.saetze || "?"}×${u.wiederholungen}`;
+        else if (u.sekunden) werte += `${u.saetze || "?"}×${u.sekunden}s`;
+        else if (u.saetze) werte += `${u.saetze} Sätze`;
         if (u.gewicht_kg) {
           if (werte) werte += " · ";
           werte += `${u.gewicht_kg} kg`;
@@ -3014,7 +3024,7 @@
     trainingBearbeitenUebungen = trainingUebungen
       .filter((u) => u.training_id === id)
       .sort((a, b) => a.reihenfolge - b.reihenfolge)
-      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
+      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", sekunden: u.sekunden ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
     renderTraining();
   };
 
@@ -3080,7 +3090,7 @@
     trainingFormPlanId = planId || null;
     if (planId) {
       trainingFormUebungen = planUebungenFuer(planId)
-        .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
+        .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", sekunden: u.sekunden ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
     }
     renderTraining();
   };
@@ -3102,7 +3112,9 @@
       if (!liste.length) return "";
       const chips = liste.map((u) => {
         let werte = "";
-        if (u.saetze || u.wiederholungen) werte += `${u.saetze || "?"}×${u.wiederholungen || "?"}`;
+        if (u.wiederholungen) werte += `${u.saetze || "?"}×${u.wiederholungen}`;
+        else if (u.sekunden) werte += `${u.saetze || "?"}×${u.sekunden}s`;
+        else if (u.saetze) werte += `${u.saetze} Sätze`;
         if (u.gewicht_kg) werte += `${werte ? " · " : ""}${u.gewicht_kg} kg`;
         if (u.progression) werte += `${werte ? " · " : ""}${escapeHtml(u.progression)}`;
         return `<span class="chip" style="cursor:default; padding-right:0.7rem;">${chipBildHtml("uebung", u.name)}${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
@@ -3166,7 +3178,7 @@
   window.planBearbeitenStart = function(id) {
     planBearbeitenId = id;
     planBearbeitenUebungen = planUebungenFuer(id)
-      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
+      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", sekunden: u.sekunden ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
     renderTraining();
   };
 
@@ -3207,6 +3219,7 @@
         name: u.name,
         saetze: u.saetze ?? null,
         wiederholungen: u.wiederholungen ?? null,
+        sekunden: u.sekunden ?? null,
         gewicht_kg: u.gewicht_kg ?? null,
         progression: u.progression ?? null,
       })),
@@ -3249,6 +3262,7 @@
     const idxUebung = findeSpalte(kopf, ["übung", "uebung", "übungsname", "uebungsname", "name"]);
     const idxSaetze = findeSpalte(kopf, ["sätze", "saetze", "sets"]);
     const idxWdh = findeSpalte(kopf, ["wiederholungen", "wdh", "reps"]);
+    const idxSekunden = findeSpalte(kopf, ["sekunden", "sek", "sec", "seconds"]);
     const idxGewicht = findeSpalte(kopf, ["gewicht (kg)", "gewicht_kg", "gewicht", "kg"]);
     const idxProgression = findeSpalte(kopf, ["variante", "progression", "stufe"]);
 
@@ -3270,6 +3284,7 @@
         name: uebungName,
         saetze: idxSaetze > -1 ? csvGanzzahlOderNull(felder[idxSaetze]) : null,
         wiederholungen: idxWdh > -1 ? csvGanzzahlOderNull(felder[idxWdh]) : null,
+        sekunden: idxSekunden > -1 ? csvGanzzahlOderNull(felder[idxSekunden]) : null,
         gewicht_kg: idxGewicht > -1 ? parseCsvBetrag(felder[idxGewicht]) : null,
         progression: idxProgression > -1 ? (felder[idxProgression] || "").trim() || null : null,
       });
@@ -3286,12 +3301,12 @@
 
   window.planVorlageHerunterladen = function() {
     const vorlage =
-      "Plan;Übung;Sätze;Wiederholungen;Gewicht (kg)\n" +
-      "Rücken A;Latzug;3;12;40\n" +
-      "Rücken A;Rudern;3;10;35\n" +
-      "Rücken A;Klimmzug;3;8;\n" +
-      "Rücken B;Kreuzheben;4;6;60\n" +
-      "Rücken B;T-Bar-Rudern;3;10;30\n";
+      "Plan;Übung;Sätze;Wiederholungen;Sekunden;Gewicht (kg)\n" +
+      "Rücken A;Latzug;3;12;;40\n" +
+      "Rücken A;Rudern;3;10;;35\n" +
+      "Rücken A;Klimmzug;3;8;;\n" +
+      "Rücken B;Plank;3;;45;\n" +
+      "Rücken B;Kreuzheben;4;6;;60\n";
     downloadDatei("trainingsplaene-vorlage.csv", vorlage, "text/csv");
   };
 
@@ -3329,7 +3344,9 @@
                 name: u.name.trim(),
                 saetze: u.saetze ?? null,
                 wiederholungen: u.wiederholungen ?? null,
+                sekunden: u.sekunden ?? null,
                 gewicht_kg: u.gewicht_kg ?? null,
+                progression: u.progression ?? null,
               }))
           : [],
       }));
@@ -3666,7 +3683,7 @@
     const plan = trainingsplaene.find((p) => p.id === planId);
     if (!plan) return;
     const uebungen = planUebungenFuer(planId)
-      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
+      .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", sekunden: u.sekunden ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
     if (!uebungen.length) return;
     trainingSession = { planId, planName: plan.name, sportart: plan.name, ort: "", index: 0, uebungen };
     sessionFokusOeffnen();
@@ -3706,6 +3723,8 @@
     if (saetzeEl) u.saetze = saetzeEl.value;
     const wdhEl = document.getElementById("session-ueb-wdh");
     if (wdhEl) u.wiederholungen = wdhEl.value;
+    const sekundenEl = document.getElementById("session-ueb-sekunden");
+    if (sekundenEl) u.sekunden = sekundenEl.value;
     const gewichtEl = document.getElementById("session-ueb-gewicht");
     if (gewichtEl) u.gewicht_kg = gewichtEl.value;
     const progressionEl = document.getElementById("session-ueb-progression");
@@ -3781,6 +3800,7 @@
         <div class="session-fokus-werte">
           <div><label>Sätze</label><input type="number" id="session-ueb-saetze" value="${escapeAttr(u.saetze)}" min="0"></div>
           <div><label>Wdh</label><input type="number" id="session-ueb-wdh" value="${escapeAttr(u.wiederholungen)}" min="0"></div>
+          <div><label>Sek.</label><input type="number" id="session-ueb-sekunden" value="${escapeAttr(u.sekunden)}" min="0"></div>
           <div><label>Gewicht (kg)</label><input type="number" id="session-ueb-gewicht" value="${escapeAttr(u.gewicht_kg)}" min="0" step="0.5"></div>
         </div>
         <input type="text" id="session-ueb-progression" value="${escapeAttr(u.progression || "")}" placeholder="Variante (z.B. unterstützt)">
