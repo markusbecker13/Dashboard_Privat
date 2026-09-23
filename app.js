@@ -72,7 +72,6 @@
   let zielEventBearbeitenId = null;
   let auswertungJahr = new Date().getFullYear();
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
-  let aktiveKategorie = null; // Schlüssel der gerade offenen Themen-Kachel-Gruppe, oder null
   let aktiverTab = null; // Schlüssel des gerade angezeigten Reiters (view-*), für den Zurück-Button
 
   const VIEW_ELEMENTE = {
@@ -115,11 +114,9 @@
     return (STANDARD_SICHTBAR[bereich] || []).includes(schluessel);
   }
 
-  // Themen-Kacheln (Hauptkategorien) je Bereich. Fasst dieselben Reiter
-  // zusammen, die vorher als Sidebar-Gruppen (Heute/Planen/Sammeln/...)
-  // dargestellt wurden – jetzt als zweite Kachel-Ebene nach der
-  // Bereichsauswahl. "arbeit" trägt bewusst Label/Icon des aktiven
-  // Bereichs (analog zur früheren "tab-group-arbeit-label").
+  // Themen (Hauptkategorien) je Bereich – bilden die Leiste unten, ihre
+  // Reiter die Reiter-Leiste oben. "arbeit" trägt bewusst das Label des
+  // aktiven Bereichs.
   const BEREICH_ARBEIT_ICON = { ogs: "🏫", awo: "🤝" };
 
   function hauptkategorien() {
@@ -142,6 +139,7 @@
 
   let wetterOrt = localStorage.getItem("wetter-ort") || "Erftstadt";
   let wetterDaten = null; // letzte erfolgreiche Antwort vom Server
+  let wetterAusblickOffen = false; // 5-Tage-Ausblick auf dem Start-Screen aufgeklappt?
   let wetterLetzterAbruf = 0; // Timestamp (ms), für einfaches Caching
   const WETTER_CACHE_MS = 30 * 60 * 1000; // 30 Minuten
 
@@ -212,8 +210,6 @@
     farbweltAnwenden("neutral");
     document.getElementById("app").classList.add("hidden");
     document.getElementById("bereich-screen").classList.add("hidden");
-    document.getElementById("kategorie-screen").classList.add("hidden");
-    document.getElementById("unterkategorie-screen").classList.add("hidden");
     document.getElementById("login-screen").classList.remove("hidden");
     document.getElementById("login-error").textContent = fehler || "";
   }
@@ -223,16 +219,12 @@
     willkommenDatumAnzeigen();
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("app").classList.add("hidden");
-    document.getElementById("kategorie-screen").classList.add("hidden");
-    document.getElementById("unterkategorie-screen").classList.add("hidden");
     document.getElementById("bereich-screen").classList.remove("hidden");
   }
 
   function zeigeApp() {
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("bereich-screen").classList.add("hidden");
-    document.getElementById("kategorie-screen").classList.add("hidden");
-    document.getElementById("unterkategorie-screen").classList.add("hidden");
     document.getElementById("app").classList.remove("hidden");
     dashboardNameAnzeigen();
     untertitelAnzeigen();
@@ -240,69 +232,89 @@
   }
 
   // ==========================================================
-  // Kachel-Navigation: Bereich -> Hauptkategorie (Thema) -> Reiter
+  // Navigation: Leiste unten (Themen) + Reiter-Leiste oben (Reiter im
+  // aktuellen Thema). Ersetzt die frühere Kachel-Navigation
+  // Bereich -> Thema -> Reiter. Die Bereichswahl läuft über den
+  // Bereichs-Knopf oben links (bzw. ⋮-Menü).
   // ==========================================================
-  function zeigeKategorien() {
-    document.getElementById("login-screen").classList.add("hidden");
-    document.getElementById("bereich-screen").classList.add("hidden");
-    document.getElementById("app").classList.add("hidden");
-    document.getElementById("unterkategorie-screen").classList.add("hidden");
-    document.getElementById("kategorie-screen").classList.remove("hidden");
-    aktiveKategorie = null;
-    renderKategorieTiles();
+  const SVG_ATTR = 'width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+  const NAV_ICON = {
+    heute: `<svg ${SVG_ATTR}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
+    planen: `<svg ${SVG_ATTR}><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
+    sammeln: `<svg ${SVG_ATTR}><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>`,
+    arbeit: `<svg ${SVG_ATTR}><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>`,
+    verwalten: `<svg ${SVG_ATTR}><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>`,
+  };
+  const BEREICH_KNOPF_TEXT = { privat: "Privat", ogs: "OGS", awo: "AWO", verwaltung: "Verwaltung" };
+
+  function sichtbareGruppen() {
+    return hauptkategorien().filter((g) => sichtbareTabsInGruppe(g).length > 0);
   }
 
-  function renderKategorieTiles() {
-    const titel = document.getElementById("kategorie-screen-bereichsname");
-    if (titel) titel.textContent = BEREICH_TITEL_VERWALTUNG[aktiverBereich] || "";
-    const container = document.getElementById("kategorie-tiles");
-    if (!container) return;
-    container.innerHTML = hauptkategorien()
-      .filter((g) => sichtbareTabsInGruppe(g).length > 0)
-      .map((g) => `
-        <button class="bereich-tile" onclick="kategorieAuswaehlen('${g.schluessel}')">
-          <span class="bereich-tile-icon">${g.icon}</span>
-          <span class="bereich-tile-label">${escapeHtml(g.label)}</span>
-        </button>
-      `).join("");
+  // Zuletzt geöffneter Reiter je Bereich + Thema, damit ein Tipp auf ein
+  // Thema dort weitermacht, wo du zuletzt warst.
+  function letzterReiterSchluessel(gruppe) {
+    return `letzter-reiter-${aktiverBereich}-${gruppe}`;
   }
 
-  window.kategorieAuswaehlen = function(schluessel) {
+  function ersterSichtbarerReiter() {
+    if (reiterIstSichtbar(aktiverBereich, "heute")) return "heute";
+    const gruppe = sichtbareGruppen()[0];
+    return gruppe ? sichtbareTabsInGruppe(gruppe)[0] : "heute";
+  }
+
+  window.gruppeOeffnen = function(schluessel) {
     const gruppe = hauptkategorien().find((g) => g.schluessel === schluessel);
-    const sichtbar = gruppe ? sichtbareTabsInGruppe(gruppe) : [];
-    // Nur ein sichtbarer Reiter im Thema? Dann direkt hinein, statt eine
-    // Zwischenseite mit nur einer Kachel zu zeigen.
-    if (sichtbar.length <= 1) {
-      tabWechseln(sichtbar[0] || "heute");
-      return;
-    }
-    zeigeUnterkategorien(schluessel);
+    if (!gruppe) return;
+    const sichtbar = sichtbareTabsInGruppe(gruppe);
+    if (sichtbar.length === 0) return;
+    const gemerkt = localStorage.getItem(letzterReiterSchluessel(schluessel));
+    tabWechseln(sichtbar.includes(gemerkt) ? gemerkt : sichtbar[0]);
   };
 
-  function zeigeUnterkategorien(schluessel) {
-    document.getElementById("kategorie-screen").classList.add("hidden");
-    document.getElementById("app").classList.add("hidden");
-    document.getElementById("unterkategorie-screen").classList.remove("hidden");
-    aktiveKategorie = schluessel;
-    renderUnterkategorieTiles();
-  }
+  function renderNavigation() {
+    const bereichKnopf = document.getElementById("content-bereich-text");
+    if (bereichKnopf) bereichKnopf.textContent = BEREICH_KNOPF_TEXT[aktiverBereich] || "Bereich";
 
-  function renderUnterkategorieTiles() {
-    const gruppe = hauptkategorien().find((g) => g.schluessel === aktiveKategorie);
-    if (!gruppe) return;
-    const titel = document.getElementById("unterkategorie-screen-titel");
-    if (titel) titel.textContent = gruppe.label;
-    const container = document.getElementById("unterkategorie-tiles");
-    if (!container) return;
-    container.innerHTML = sichtbareTabsInGruppe(gruppe).map((schluessel) => {
-      const eintrag = ALLE_REITER.find(([s]) => s === schluessel);
-      const label = eintrag ? eintrag[1] : schluessel;
-      return `
-        <button class="bereich-tile" onclick="tabWechseln('${schluessel}')">
-          <span class="bereich-tile-label">${escapeHtml(label)}</span>
-        </button>
-      `;
+    const nav = document.getElementById("bottom-nav");
+    const leiste = document.getElementById("reiter-leiste");
+    const main = document.querySelector("#app main");
+    if (!nav || !leiste) return;
+
+    // Verwaltung hat nur einen Reiter – keine Navigation nötig
+    if (aktiverBereich === "verwaltung") {
+      nav.classList.add("hidden");
+      leiste.classList.add("hidden");
+      if (main) main.classList.remove("mit-nav");
+      return;
+    }
+    nav.classList.remove("hidden");
+    if (main) main.classList.add("mit-nav");
+
+    const aktiveGruppe = gruppeVonTab(aktiverTab);
+    nav.innerHTML = sichtbareGruppen().map((g) => {
+      const aktiv = aktiveGruppe && aktiveGruppe.schluessel === g.schluessel;
+      return `<button class="bottom-nav-btn${aktiv ? " aktiv" : ""}" onclick="gruppeOeffnen('${g.schluessel}')"
+        aria-label="${escapeHtml(g.label)}" title="${escapeHtml(g.label)}"${aktiv ? ' aria-current="page"' : ""}>
+        ${NAV_ICON[g.schluessel] || NAV_ICON.verwalten}${aktiv ? `<span class="bottom-nav-label">${escapeHtml(g.label)}</span>` : ""}
+      </button>`;
     }).join("");
+
+    const reiter = aktiveGruppe ? sichtbareTabsInGruppe(aktiveGruppe) : [];
+    if (reiter.length > 1) {
+      leiste.classList.remove("hidden");
+      leiste.innerHTML = reiter.map((schluessel) => {
+        const eintrag = ALLE_REITER.find(([s]) => s === schluessel);
+        const label = eintrag ? eintrag[1] : schluessel;
+        const aktiv = schluessel === aktiverTab;
+        return `<button class="reiter-chip${aktiv ? " aktiv" : ""}" onclick="tabWechseln('${schluessel}')"${aktiv ? ' aria-current="page"' : ""}>${escapeHtml(label)}</button>`;
+      }).join("");
+      const aktivChip = leiste.querySelector(".reiter-chip.aktiv");
+      if (aktivChip) aktivChip.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } else {
+      leiste.classList.add("hidden");
+      leiste.innerHTML = "";
+    }
   }
 
   window.bereichAuswaehlen = function(bereich) {
@@ -319,7 +331,7 @@
     if (bereich === "verwaltung") {
       tabWechseln("reiterverwaltung");
     } else {
-      zeigeKategorien();
+      tabWechseln(ersterSichtbarerReiter());
     }
   };
 
@@ -950,6 +962,7 @@
   const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar" };
 
   function bereichAnwenden() {
+    renderNavigation();
     const ideenTitel = document.getElementById("ogs-ideen-titel");
     const ideenUntertitel = document.getElementById("ogs-ideen-untertitel");
     if (ideenTitel) ideenTitel.textContent = "Ideen";
@@ -966,8 +979,12 @@
       document.getElementById(VIEW_ELEMENTE[key]).classList.toggle("hidden", key !== aktiv);
     }
     aktiverTab = aktiv;
-    document.getElementById("kategorie-screen").classList.add("hidden");
-    document.getElementById("unterkategorie-screen").classList.add("hidden");
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("bereich-screen").classList.add("hidden");
+    const gruppeAktiv = gruppeVonTab(aktiv);
+    if (gruppeAktiv) localStorage.setItem(letzterReiterSchluessel(gruppeAktiv.schluessel), aktiv);
+    renderNavigation();
+    window.scrollTo(0, 0);
     document.getElementById("app").classList.remove("hidden");
     dashboardNameAnzeigen();
     untertitelAnzeigen();
@@ -987,27 +1004,8 @@
   }
   window.tabWechseln = tabWechseln;
 
-  // Zurück-Button: eine Ebene zurück zu den Reiter-Kacheln des aktuellen
-  // Themas (oder direkt zu den Themen-Kacheln, wenn das Thema nur einen
-  // sichtbaren Reiter hatte und deshalb übersprungen wurde). Im Bereich
-  // "Verwaltung" gibt es keine Kachel-Ebenen – dort geht's zurück zur
-  // Bereichsauswahl.
-  document.getElementById("content-back-btn").addEventListener("click", () => {
-    if (aktiverBereich === "verwaltung") { zeigeBereichAuswahl(); return; }
-    const gruppe = gruppeVonTab(aktiverTab);
-    if (gruppe && sichtbareTabsInGruppe(gruppe).length > 1) {
-      zeigeUnterkategorien(gruppe.schluessel);
-    } else {
-      zeigeKategorien();
-    }
-  });
-  // Home-Button: direkt zu den Themen-Kacheln des aktuellen Bereichs.
-  document.getElementById("content-home-btn").addEventListener("click", () => {
-    if (aktiverBereich === "verwaltung") { zeigeBereichAuswahl(); return; }
-    zeigeKategorien();
-  });
-  document.getElementById("kategorie-zurueck-btn").addEventListener("click", zeigeBereichAuswahl);
-  document.getElementById("unterkategorie-zurueck-btn").addEventListener("click", zeigeKategorien);
+  // Bereichs-Knopf oben links: zurück zur Willkommensseite (Bereichswahl)
+  document.getElementById("content-bereich-btn").addEventListener("click", zeigeBereichAuswahl);
 
   // Konto-/Einstellungs-Menü (⋮ oben rechts): Name/Untertitel ändern,
   // Bereich wechseln, Abmelden – ersetzt die frühere Sidebar-Ecke.
@@ -1090,7 +1088,7 @@
       renderWetter();
       return;
     }
-    container.innerHTML = `<div class="wetter-karte wetter-laedt">Wetter wird geladen …</div>`;
+    container.innerHTML = `<div class="heute-kachel heute-kachel--wetter"><span class="heute-kachel-titel">Wetter</span><span class="heute-kachel-text">wird geladen …</span></div>`;
     try {
       const daten = await api("wetter_abrufen", { ort: jetzigerOrt });
       // Falls der Ort zwischenzeitlich geändert wurde, veraltete Antwort verwerfen.
@@ -1101,8 +1099,10 @@
     } catch (fehler) {
       console.error("[Wetter] Laden fehlgeschlagen:", fehler);
       container.innerHTML =
-        `<div class="wetter-karte wetter-fehler">Wetter konnte nicht geladen werden (${escapeHtml(fehler.message || "Fehler")}).
-         <button class="link-btn" onclick="ladeWetter(true)">Erneut versuchen</button></div>`;
+        `<button class="heute-kachel heute-kachel--wetter" onclick="ladeWetter(true)" title="${escapeHtml(fehler.message || "Fehler")}">
+          <span class="heute-kachel-titel">Wetter</span>
+          <span class="heute-kachel-text">nicht geladen – tippen für neuen Versuch</span>
+        </button>`;
     }
   }
 
@@ -1122,22 +1122,30 @@
         </div>`;
     }).join("");
 
+    // Kompakte Kachel oben (aktuelles Wetter), Tipp klappt den Ausblick auf
     document.getElementById("wetter-bereich").innerHTML = `
-      <div class="wetter-karte">
-        <div class="wetter-kopf">
-          <div class="wetter-jetzt">
-            <span class="wetter-jetzt-icon">${aktIcon}</span>
-            <span class="wetter-jetzt-temp">${Math.round(wetterDaten.aktuelle_temperatur)}°</span>
-            <span class="wetter-jetzt-text">${aktText}</span>
-          </div>
+      <button class="heute-kachel heute-kachel--wetter" onclick="wetterAusblickUmschalten()" aria-expanded="${wetterAusblickOffen}" aria-controls="wetter-ausblick">
+        <span class="heute-kachel-titel">Wetter · ${escapeHtml(wetterDaten.ort_gefunden || wetterOrt)}</span>
+        <span class="heute-kachel-zahl">${Math.round(wetterDaten.aktuelle_temperatur)}° <span class="heute-kachel-text">${aktIcon} ${escapeHtml(aktText)}</span></span>
+      </button>`;
+    const ausblick = document.getElementById("wetter-ausblick");
+    if (ausblick) {
+      ausblick.classList.toggle("hidden", !wetterAusblickOffen);
+      ausblick.innerHTML = `
+        <div class="wetter-karte">
           <div class="wetter-ort-zeile">
-            <span>${escapeHtml(wetterDaten.ort_gefunden || wetterOrt)}</span>
+            <span>5-Tage-Ausblick · ${escapeHtml(wetterDaten.ort_gefunden || wetterOrt)}</span>
             <button class="project-edit-btn" onclick="wetterOrtBearbeiten()" title="Ort ändern">✎</button>
           </div>
-        </div>
-        <div class="wetter-kachel-grid">${tage}</div>
-      </div>`;
+          <div class="wetter-kachel-grid">${tage}</div>
+        </div>`;
+    }
   }
+
+  window.wetterAusblickUmschalten = function () {
+    wetterAusblickOffen = !wetterAusblickOffen;
+    renderWetter();
+  };
 
   window.wetterOrtBearbeiten = function () {
     const neu = prompt("Ort für die Wettervorhersage:", wetterOrt);
@@ -1170,8 +1178,76 @@
 
     let html = "";
 
-    if (termineGanztags.length > 0) {
-      html += `<div class="jetzt-naechster" style="margin-top:0;">Ganztägig: <strong>${termineGanztags.map((t) => escapeHtml(t.titel)).join(", ")}</strong></div>`;
+    // ---- Kopf: Datum + Gruß mit Anzahl + Überfällig-Kachel ----
+    const datumEl = document.getElementById("heute-datum");
+    if (datumEl) datumEl.textContent = jetztDate.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
+
+    // ---- Zeitleiste: Überfälliges, heutige Termine und Aufgaben ----
+    const ueberfaellig = offenEnriched
+      .filter((a) => a.status === "ueberfaellig")
+      .sort((a, b) => (a.faellig_am || "").localeCompare(b.faellig_am || ""));
+    const ueberfaelligZahl = document.getElementById("heute-ueberfaellig-zahl");
+    if (ueberfaelligZahl) ueberfaelligZahl.textContent = ueberfaellig.length;
+
+    const zlEintraege = [];
+    ueberfaellig.forEach((a) => zlEintraege.push({
+      zeit: formatDatumKurz(a.faellig_am), titel: a.titel, chip: "Überfällig", art: "ueberfaellig", tab: "aufgaben", sort: -2,
+    }));
+    termineGanztags.forEach((t) => zlEintraege.push({
+      zeit: "ganzt.", titel: t.titel, chip: "Termin · ganztägig", art: "termin", tab: "kalender", sort: -1, erledigt: !!t.erledigt,
+    }));
+    termine
+      .filter((t) => t.datum === heuteIso && t.uhrzeit && bereichVon(t) === aktiverBereich)
+      .forEach((t) => {
+        const start = t.uhrzeit.slice(0, 5);
+        const ende = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0, 5) : null;
+        zlEintraege.push({
+          zeit: start, start, ende: ende || minutenZuZeit(zeitZuMinuten(start) + 30), titel: t.titel,
+          chip: "Termin · " + start + (ende ? "–" + ende : ""), art: "termin", tab: "kalender",
+          sort: zeitZuMinuten(start), erledigt: !!t.erledigt,
+        });
+      });
+    const schonDrin = new Set(ueberfaellig.map((a) => a.id));
+    offenEnriched
+      .filter((a) => !schonDrin.has(a.id) && (a.status === "heute" || a.erinnerungFaellig))
+      .forEach((a) => {
+        const start = a.status === "heute" && a.uhrzeit ? a.uhrzeit.slice(0, 5) : null;
+        const ende = start ? (a.ende_uhrzeit ? a.ende_uhrzeit.slice(0, 5) : minutenZuZeit(zeitZuMinuten(start) + 30)) : null;
+        zlEintraege.push({
+          zeit: start || "Heute", start, ende, titel: a.titel,
+          chip: a.status === "heute" ? "Aufgabe" + (start ? " · " + start + (a.ende_uhrzeit ? "–" + a.ende_uhrzeit.slice(0, 5) : "") : "") : "Erinnerung",
+          art: "aufgabe", tab: "aufgaben", sort: start ? zeitZuMinuten(start) : 24 * 60,
+        });
+      });
+    zlEintraege.sort((a, b) => a.sort - b.sort);
+
+    const offeneDinge = zlEintraege.filter((e) => !e.erledigt).length;
+    const grussEl = document.getElementById("heute-gruss");
+    if (grussEl) {
+      grussEl.innerHTML = offeneDinge > 0
+        ? `Moin Markus.<br><span class="heute-gruss-akzent">${offeneDinge} ${offeneDinge === 1 ? "Ding" : "Dinge"}</span> heute.`
+        : `Moin Markus.<br>Freie Bahn heute.`;
+    }
+
+    html += `<h2 class="heute-abschnitt">Zeitleiste</h2>`;
+    if (zlEintraege.length === 0) {
+      html += `<p class="empty-text">Nichts Dringendes für heute – guter Tag.</p>`;
+    } else {
+      html += `<div class="zeitleiste">` + zlEintraege.map((e) => {
+        const laeuftJetzt = !e.erledigt && e.start && e.ende &&
+          zeitZuMinuten(e.start) <= jetztMinuten && jetztMinuten < zeitZuMinuten(e.ende);
+        const klassen = ["zl-eintrag"];
+        if (laeuftJetzt) klassen.push("jetzt");
+        if (e.erledigt) klassen.push("erledigt");
+        return `
+          <button class="${klassen.join(" ")}" onclick="tabWechseln('${e.tab}')">
+            <span class="zl-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
+            <span class="zl-karte">
+              <span class="zl-chip zl-chip--${e.art}">${escapeHtml(e.chip)}</span>
+              <span class="zl-titel">${escapeHtml(e.titel)}</span>
+            </span>
+          </button>`;
+      }).join("") + `</div>`;
     }
 
     // ---- Jetzt-Zeitleiste ----
@@ -1195,7 +1271,7 @@
       html += `
         <div class="jetzt-leiste-wrap">
           <div class="jetzt-leiste-kopf">
-            <span class="jetzt-leiste-titel">Heute</span>
+            <span class="jetzt-leiste-titel">Freie Zeit</span>
             <span class="jetzt-leiste-zeit">${jetztLabel} Uhr</span>
           </div>
           <div class="jetzt-leiste" onclick="heuteFreiOeffnen()" style="cursor:pointer;">
@@ -1258,10 +1334,6 @@
             </button>`;
         }).join("") +
         `</div>`;
-    }
-
-    if (termineGanztags.length === 0 && !(rahmen.aktiv && heuteEintraege) && aufgabenZahl === 0 && einkaufOffen.length === 0 && aktuelleZiele.length === 0) {
-      html = '<p class="empty-text">Nichts Dringendes für heute — guter Tag.</p>';
     }
 
     document.getElementById("heute-bereich").innerHTML = html;
