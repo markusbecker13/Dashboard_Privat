@@ -3524,7 +3524,9 @@
         const bildUrl = trainingBildUrls[s.id]?.url;
         return `
           <div class="notiz-item" style="flex-direction:column; align-items:stretch;">
-            <strong>${escapeHtml(s.name)}</strong>
+            ${s.typ === "uebung"
+              ? `<input type="text" id="stammdaten-edit-name-${s.id}" value="${escapeAttr(s.name)}" placeholder="Name der Übung">`
+              : `<strong>${escapeHtml(s.name)}</strong>`}
             ${s.typ === "sportart"
               ? `<input type="text" id="stammdaten-edit-kategorie-${s.id}" value="${escapeAttr(s.kategorie || "")}" placeholder="Kategorie (z.B. Ausdauer, Kraft, Calisthenics)" list="stammdaten-kategorie-liste" style="margin-top:0.5rem;">`
               : `<input type="text" id="stammdaten-edit-kategorie-${s.id}" value="${escapeAttr(s.kategorie || "")}" placeholder="Kategorie${uebungKategorieVorschlag(s.name) ? ` (Vorschlag: ${escapeAttr(uebungKategorieVorschlag(s.name))})` : " (z.B. Rücken, Core, Push)"}" list="stammdaten-uebung-kategorie-liste" style="margin-top:0.5rem;">`}
@@ -3864,6 +3866,46 @@
     }
 
     await api("stammdaten_aktualisieren", payload);
+
+    // Umbenennen (nur Übungen): läuft nach dem Speichern der übrigen
+    // Felder, damit diese bei einem Zusammenführen mit übernommen
+    // werden (leere Felder des Ziels werden serverseitig ergänzt).
+    const nameEl = document.getElementById(`stammdaten-edit-name-${id}`);
+    const eintrag = trainingStammdaten.find((s) => s.id === id);
+    const neuerName = nameEl ? nameEl.value.trim() : "";
+    if (nameEl && eintrag && neuerName && neuerName !== eintrag.name) {
+      try {
+        let res = await api("stammdaten_umbenennen", { id, neuer_name: neuerName });
+        if (res.konflikt) {
+          const ok = confirm(
+            `„${res.ziel_name}" gibt es bereits als Übung.\n\n` +
+            `Zusammenführen? „${eintrag.name}" wird dann in allen Trainingseinträgen und Plänen zu „${res.ziel_name}". ` +
+            `Beschreibung, Kategorie und Bild werden nur übernommen, wo „${res.ziel_name}" noch keine hat. ` +
+            `Der Eintrag „${eintrag.name}" wird danach gelöscht.`
+          );
+          if (ok) {
+            res = await api("stammdaten_umbenennen", { id, neuer_name: neuerName, zusammenfuehren: true });
+          } else {
+            alert("Name nicht geändert. Die übrigen Änderungen wurden gespeichert.");
+            res = null;
+          }
+        }
+        if (res && res.ok) {
+          delete trainingBildUrls[id];
+          const betroffen = (res.anzahl_eintraege || 0) + (res.anzahl_plaene || 0);
+          if (res.zusammengefuehrt || betroffen) {
+            alert(
+              (res.zusammengefuehrt ? "Übungen zusammengeführt." : "Übung umbenannt.") +
+              `\n${res.anzahl_eintraege || 0} Übung(en) in Trainingseinträgen und ${res.anzahl_plaene || 0} in Trainingsplänen angepasst.`
+            );
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Umbenennen fehlgeschlagen: " + (err.message || err));
+      }
+    }
+
     stammdatenBearbeitenId = null;
     await ladeDaten();
     renderTraining();
