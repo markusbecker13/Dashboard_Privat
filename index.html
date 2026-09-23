@@ -52,6 +52,10 @@
         <span class="bereich-karte-farbe"></span>
         <span class="bereich-karte-name">AWO OV Liblar</span>
       </button>
+      <button class="bereich-karte bereich-karte--business" onclick="bereichAuswaehlen('business')">
+        <span class="bereich-karte-farbe"></span>
+        <span><span class="bereich-karte-name">Business</span><span class="bereich-karte-zusatz">zwischenkaffeeundchaos</span></span>
+      </button>
       <button class="bereich-karte bereich-karte--verwaltung" onclick="bereichAuswaehlen('verwaltung')">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
         <span class="bereich-karte-name">Verwaltung</span>
@@ -338,19 +342,20 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Bereiche: Privat / OGS Rapunzel / AWO OV Liblar / Verwaltung</summary>
+            <summary>Bereiche: Privat / OGS Rapunzel / AWO OV Liblar / Business / Verwaltung</summary>
             <div class="anleitung-text">
-              <p>Das Dashboard trennt drei Lebensbereiche sauber voneinander: <strong>Privat</strong>, <strong>OGS Rapunzel</strong> (Beruf) und <strong>AWO OV Liblar</strong> (Ehrenamt). Ein vierter Bereich <strong>Verwaltung</strong> (⚙️) hat keine eigenen Daten, sondern enthält nur die Reiter-Verwaltung.</p>
+              <p>Das Dashboard trennt vier Lebensbereiche sauber voneinander: <strong>Privat</strong>, <strong>OGS Rapunzel</strong> (Beruf), <strong>AWO OV Liblar</strong> (Ehrenamt) und <strong>Business</strong> (zwischenkaffeeundchaos). Ein weiterer Bereich <strong>Verwaltung</strong> (⚙️) hat keine eigenen Daten, sondern enthält nur die Reiter-Verwaltung.</p>
               <ul>
-                <li><strong>Nach dem Login:</strong> die Willkommensseite mit Datum und vier farbigen Bereichs-Karten (Bereich wählen). Verwaltung öffnet direkt die Reiter-Verwaltung; Privat/OGS/AWO öffnen direkt den Start-Screen (Heute)</li>
+                <li><strong>Nach dem Login:</strong> die Willkommensseite mit Datum und farbigen Bereichs-Karten (Bereich wählen). Verwaltung öffnet direkt die Reiter-Verwaltung; Privat/OGS/AWO öffnen direkt den Start-Screen (Heute)</li>
                 <li><strong>Leiste unten:</strong> die Themen Heute, Planen, Sammeln, der bereichsspezifische Block (Glühbirne, z.B. Ideen/Inventar/Projekte/Verleih) und Verwalten (Raster-Symbol). Das aktive Thema ist hervorgehoben und beschriftet. Ein Tipp auf ein Thema öffnet den Reiter, den du darin zuletzt offen hattest (beim ersten Mal den ersten)</li>
                 <li><strong>Reiter-Leiste oben:</strong> hat das aktive Thema mehrere sichtbare Reiter, stehen sie als Knöpfe unter der Kopfzeile (seitlich wischbar). Thema mit nur einem Reiter (z.B. Heute): keine Reiter-Leiste</li>
                 <li><strong>Bereich wechseln:</strong> über den Bereichs-Knopf oben links (z.B. „Privat ▾") oder „↔ Bereich wechseln" im ⋮-Menü – beides führt zur Willkommensseite, ohne dich abzumelden</li>
               </ul>
               <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar, -Projekte und -Verleih haben ebenfalls ein eigenes bereich-Feld.</p>
-              <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS- und AWO-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Links/Reflexion/Einkauf/Export gibt es nur im Privat-Bereich.</p>
-              <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS oder AWO bleiben grundsätzlich rein lokal im Dashboard.</p>
-              <p><strong>Farbwelt je Bereich:</strong> Jeder Bereich hat eigene Farben – Privat Blautöne, OGS Rapunzel Gelb/Blau aus dem Rapunzel-Logo (das Logo steht dort statt des Dashboard-Namens oben in der Kopfzeile), AWO OV Liblar Rottöne. Login, Willkommensseite und Verwaltung sind neutral gehalten. So ist auf einen Blick klar, in welchem Bereich du gerade bist. In AWO sind überfällige Einträge orange statt rot markiert, damit sie sich vom AWO-Rot abheben.</p>
+              <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS-, AWO- und Business-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Reflexion/Einkauf/Export sind standardmäßig nur im Privat-Bereich eingeblendet, Links in Privat und Business.</p>
+              <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS, AWO oder Business bleiben grundsätzlich rein lokal im Dashboard.</p>
+              <p><strong>Business:</strong> startet mit Start, Aufgaben, Kalender, Notizen, Links, Ideen, Verlauf und Anleitung. Weitere Reiter (z.B. Finanzen, Projekte) lassen sich in der Reiter-Verwaltung einblenden – wie in den anderen Bereichen bereichsgetrennt.</p>
+              <p><strong>Farbwelt je Bereich:</strong> Jeder Bereich hat eigene Farben – Privat Blautöne, OGS Rapunzel Gelb/Blau aus dem Rapunzel-Logo (das Logo steht dort statt des Dashboard-Namens oben in der Kopfzeile), AWO OV Liblar Rottöne, Business Brauntöne. Login, Willkommensseite und Verwaltung sind neutral gehalten. So ist auf einen Blick klar, in welchem Bereich du gerade bist. In AWO sind überfällige Einträge orange statt rot markiert, damit sie sich vom AWO-Rot abheben.</p>
               <p><strong>Welche Reiter tatsächlich sichtbar sind</strong>, lässt sich zusätzlich pro Bereich ein-/ausschalten – siehe Reiter unten. Das hier Beschriebene ist die technische Obergrenze, nicht zwingend das, was gerade angezeigt wird.</p>
             </div>
           </details>
@@ -654,6 +659,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Schriften:</strong> Bricolage Grotesque und DM Sans liegen direkt im Dashboard (Ordner fonts/, Lizenz SIL OFL 1.1). Beim Öffnen wird keine Verbindung zu Google Fonts mehr aufgebaut, die IP-Adresse geht also nicht an Google</li>
                 <li>Aktuell werden nur eigene Daten gespeichert (keine Daten Dritter) – das fällt unter die private Haushaltsausnahme der DSGVO</li>
                 <li><strong>OGS Rapunzel &amp; AWO OV Liblar:</strong> beide Bereiche enthalten ausschließlich organisatorische Inhalte, keine personenbezogenen Daten über Kinder, Familien oder Kolleg:innen. Sollten künftig doch personenbezogene Daten Dritter hinzukommen, braucht es eine erneute Prüfung</li>
+                <li><strong>Business (zwischenkaffeeundchaos):</strong> Für geschäftliche Tätigkeit gilt die private Haushaltsausnahme nicht. Solange dort nur eigene Planungsdaten liegen (Aufgaben, Ideen, Notizen), ist das unkritisch. Bitte <strong>keine Kundendaten</strong> (Namen, E-Mail-Adressen, Bestellungen) im Dashboard ablegen – dafür bräuchte es u.a. einen Auftragsverarbeitungsvertrag mit Supabase und einen Eintrag im Verzeichnis der Verarbeitungstätigkeiten</li>
                 <li><strong>Google-Kalender-Sync:</strong> Termindaten werden zwischen Supabase (EU) und Googles Servern übertragen, die auch außerhalb der EU liegen können. Rechtsgrundlage ist aktuell das EU-US Data Privacy Framework. Da es weiterhin nur um eigene Termine geht, ändert das nichts an der Haushaltsausnahme</li>
               </ul>
             </div>
