@@ -2,14 +2,12 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://juxoxltaeugsmtvirfcm.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' https://juxoxltaeugsmtvirfcm.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'none';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Dashboard</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#1c2430">
+<meta name="theme-color" content="#1b1b1b">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -39,42 +37,27 @@
   </div>
 
   <div id="bereich-screen" class="hidden">
-    <svg class="login-logo" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logo">
-      <defs>
-        <linearGradient id="bereich-logo-bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#232d3d"/>
-          <stop offset="100%" stop-color="#161d29"/>
-        </linearGradient>
-      </defs>
-      <rect x="0" y="0" width="192" height="192" rx="42" fill="url(#bereich-logo-bg)"/>
-      <g fill="none" stroke="#f4f1ea" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M 50 132 L 50 62 L 76 100 L 102 62 L 102 132"/>
-        <path d="M 102 62 L 120 62 C 136 62 136 92 120 92 L 102 92
-                 L 122 92 C 139 92 139 132 122 132 L 102 132"/>
-      </g>
-      <circle cx="102" cy="97" r="8" fill="#e8793f"/>
-    </svg>
-    <h1 style="font-size:1.5rem;">Willkommen zurück</h1>
-    <p class="hero-text">Welchen Bereich möchtest du öffnen?</p>
-    <div class="bereich-tiles">
-      <button class="bereich-tile" onclick="bereichAuswaehlen('privat')">
-        <span class="bereich-tile-icon">🏠</span>
-        <span class="bereich-tile-label">Privat</span>
+    <div class="willkommen-datum" id="willkommen-datum"></div>
+    <h1 class="willkommen-titel">Moin Markus.<br>Wohin heute?</h1>
+    <div class="bereich-liste">
+      <button class="bereich-karte bereich-karte--privat" onclick="bereichAuswaehlen('privat')">
+        <span class="bereich-karte-farbe"></span>
+        <span class="bereich-karte-name">Privat</span>
       </button>
-      <button class="bereich-tile" onclick="bereichAuswaehlen('ogs')">
-        <span class="bereich-tile-icon">🏫</span>
-        <span class="bereich-tile-label">OGS Rapunzel</span>
+      <button class="bereich-karte bereich-karte--ogs" onclick="bereichAuswaehlen('ogs')" aria-label="OGS Rapunzel">
+        <img class="bereich-karte-logo" src="logos/rapunzel.png" alt="">
+        <span class="bereich-karte-name">OGS</span>
       </button>
-      <button class="bereich-tile" onclick="bereichAuswaehlen('awo')">
-        <span class="bereich-tile-icon">🤝</span>
-        <span class="bereich-tile-label">AWO OV Liblar</span>
+      <button class="bereich-karte bereich-karte--awo" onclick="bereichAuswaehlen('awo')">
+        <span class="bereich-karte-farbe"></span>
+        <span class="bereich-karte-name">AWO OV Liblar</span>
       </button>
-      <button class="bereich-tile" onclick="bereichAuswaehlen('verwaltung')">
-        <span class="bereich-tile-icon">⚙️</span>
-        <span class="bereich-tile-label">Verwaltung</span>
+      <button class="bereich-karte bereich-karte--verwaltung" onclick="bereichAuswaehlen('verwaltung')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+        <span class="bereich-karte-name">Verwaltung</span>
       </button>
     </div>
-    <button class="link-btn" id="bereich-screen-abmelden" style="margin-top:1.4rem;">Abmelden</button>
+    <button class="link-btn" id="bereich-screen-abmelden">Abmelden</button>
   </div>
 
   <div id="kategorie-screen" class="hidden">
@@ -99,6 +82,7 @@
     <header class="content-topbar">
       <button class="content-topbar-btn" id="content-back-btn" title="Zurück" aria-label="Zurück">←</button>
       <button class="content-topbar-btn" id="content-home-btn" title="Kategorien" aria-label="Kategorien">🏠</button>
+      <img class="topbar-logo hidden" id="topbar-logo" src="" alt="">
       <span class="brand" id="brand-name">Dashboard</span>
       <span class="brand-sub" id="brand-sub">Aufgaben</span>
       <button class="content-topbar-btn content-menu-btn" id="menu-toggle" aria-label="Menü öffnen" aria-expanded="false">⋮</button>
@@ -365,7 +349,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Das Dashboard trennt drei Lebensbereiche sauber voneinander: <strong>Privat</strong>, <strong>OGS Rapunzel</strong> (Beruf) und <strong>AWO OV Liblar</strong> (Ehrenamt). Ein vierter Bereich <strong>Verwaltung</strong> (⚙️) hat keine eigenen Daten, sondern enthält nur die Reiter-Verwaltung.</p>
               <ul>
-                <li><strong>Nach dem Login:</strong> ein Auswahlscreen mit vier Kacheln (Bereich wählen). Verwaltung öffnet direkt die Reiter-Verwaltung; Privat/OGS/AWO öffnen eine zweite Kachel-Ebene mit Themen: Heute, Planen, Sammeln, dem bereichsspezifischen Themenblock (z.B. „OGS Rapunzel" mit Ideen/Inventar/Projekte/Verleih) und Verwalten</li>
+                <li><strong>Nach dem Login:</strong> die Willkommensseite mit Datum und vier farbigen Bereichs-Karten (Bereich wählen). Verwaltung öffnet direkt die Reiter-Verwaltung; Privat/OGS/AWO öffnen eine zweite Kachel-Ebene mit Themen: Heute, Planen, Sammeln, dem bereichsspezifischen Themenblock (z.B. „OGS Rapunzel" mit Ideen/Inventar/Projekte/Verleih) und Verwalten</li>
                 <li><strong>Dritte Ebene – Reiter:</strong> jede Themen-Kachel öffnet die einzelnen Reiter als eigene Kacheln. Enthält ein Thema gerade nur einen sichtbaren Reiter, springt die App direkt hinein und überspringt diese Zwischenseite</li>
                 <li><strong>Zurück &amp; Home:</strong> in jeder Ansicht oben ein ← (eine Ebene zurück zu den Reiter- bzw. Themen-Kacheln) und ein 🏠 (direkt zu den Themen-Kacheln des aktuellen Bereichs)</li>
                 <li><strong>„↔ Bereich wechseln":</strong> im ⋮-Menü oben rechts, führt zurück zum Bereichs-Kacheln-Screen, ohne dich abzumelden</li>
@@ -373,6 +357,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar, -Projekte und -Verleih haben ebenfalls ein eigenes bereich-Feld.</p>
               <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS- und AWO-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Links/Reflexion/Einkauf/Export gibt es nur im Privat-Bereich.</p>
               <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS oder AWO bleiben grundsätzlich rein lokal im Dashboard.</p>
+              <p><strong>Farbwelt je Bereich:</strong> Jeder Bereich hat eigene Farben – Privat Blautöne, OGS Rapunzel Gelb/Blau aus dem Rapunzel-Logo (das Logo steht dort statt des Dashboard-Namens oben in der Kopfzeile), AWO OV Liblar Rottöne. Login, Willkommensseite und Verwaltung sind neutral gehalten. So ist auf einen Blick klar, in welchem Bereich du gerade bist. In AWO sind überfällige Einträge orange statt rot markiert, damit sie sich vom AWO-Rot abheben.</p>
               <p><strong>Welche Reiter tatsächlich sichtbar sind</strong>, lässt sich zusätzlich pro Bereich ein-/ausschalten – siehe Reiter unten. Das hier Beschriebene ist die technische Obergrenze, nicht zwingend das, was gerade angezeigt wird.</p>
             </div>
           </details>
@@ -590,7 +575,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Übungsverlauf:</strong> Auswahl einer Übung zeigt ihr Gewicht über die Zeit als Diagramm – braucht mindestens zwei Einträge mit Gewichtsangabe für dieselbe Übung, um eine Linie zeichnen zu können</li>
                 <li><strong>Sportarten verwalten / Übungen verwalten:</strong> zwei getrennte Bereiche mit Vorschlägen für Sportart- bzw. Übungsnamen, unabhängig davon ob sie schon mal genutzt wurden. Freitext bleibt überall möglich – die Listen erscheinen nur als Vorschlag bei der Autovervollständigung, zusammen mit bereits genutzten Werten. Bei Sportarten lässt sich zusätzlich über „✎" eine Kategorie hinterlegen (Freitext mit Vorschlägen, z.B. „Ausdauer", „Kraft", „Calisthenics") – Grundlage für die Auswertung nach Kategorie</li>
                 <li><strong>Übungen nach Kategorie:</strong> „Übungen verwalten" zeigt die Übungen gruppiert nach Kategorie (Rücken, Core, Push, Pull, Beine, Ganzkörper, Mobilität, eigene Kategorien, zuletzt „Ohne Kategorie"). Jede Gruppe ist aufklappbar und zeigt die Anzahl. Das Suchfeld filtert live nach Name und Beschreibung; Gruppen mit Treffern klappen dabei automatisch auf. Beim Anlegen einer neuen Übung wird die Kategorie anhand des Namens automatisch vorausgefüllt (z.B. „Klimmzug" → Pull, „Plank" → Core) und lässt sich vorher überschreiben. „✨ Kategorien vorschlagen" ordnet alle Übungen ohne Kategorie auf einmal zu: Es erscheint zuerst eine Vorschau, in der einzelne Vorschläge abgewählt oder geändert werden können – gespeichert wird erst mit „Übernehmen". Übungen mit bereits gesetzter Kategorie werden nie verändert; nicht erkannte Namen werden aufgelistet und lassen sich über „✎" von Hand zuordnen. Freitext bleibt möglich, die Automatik schlägt nur aus dem festen Set vor. Die Übungs-Kategorie ist unabhängig von der Sportart-Kategorie und fließt nicht in die „Auswertung nach Kategorie" ein</li>
-                <li><strong>Übungen umbenennen:</strong> im „✎"-Bearbeiten-Panel einer Übung lässt sich der Name ändern. Der neue Name gilt überall im aktiven Bereich – auch in allen bisherigen Trainingseinträgen und Trainingsplänen (Groß-/Kleinschreibung egal), damit Bild und 🏆-Bestleistung weiter zusammenpassen. Gibt es den neuen Namen bereits als Übung, kommt eine Rückfrage zum Zusammenführen: Dann landen alle Einträge unter der bestehenden Übung, deren Beschreibung, Kategorie und Bild werden nur dort ergänzt, wo sie noch fehlen, und die umbenannte Übung wird gelöscht. Sportarten lassen sich (noch) nicht umbenennen</li>
+                <li><strong>Übungen umbenennen:</strong> im „✎"-Bearbeiten-Panel einer Übung lässt sich der Name ändern. Der neue Name gilt überall im aktiven Bereich – auch in allen bisherigen Trainingseinträgen und Trainingsplänen (Groß-/Kleinschreibung egal), damit Bild und 🏆-Bestleistung weiter zusammenpassen. Gibt es den neuen Namen bereits als Übung, kommt eine Rückfrage zum Zusammenführen: Dann landen alle Einträge unter der bestehenden Übung, deren Beschreibung, Kategorie und Bild werden nur dort ergänzt, wo sie noch fehlen, und die umbenannte Übung wird gelöscht. Wird das Zusammenführen abgelehnt, bleibt der Name unverändert, die übrigen Änderungen aus dem Panel werden trotzdem gespeichert. Sportarten lassen sich (noch) nicht umbenennen</li>
                 <li><strong>Auswertung nach Kategorie:</strong> Balkendiagramm mit Anzahl Trainings und Gesamtdauer je Kategorie für ein wählbares Jahr. Sportarten ohne hinterlegte Kategorie laufen unter „Ohne Kategorie"</li>
                 <li><strong>Ziele verwalten:</strong> Ziel-Termine mit Countdown ("noch X Tage"), z.B. ein Wettkampf oder Event, optional mit einem Trainingsplan verknüpft – dann lässt sich der Plan direkt aus der Zielliste heraus starten. Zusätzlich optional Ort, Ziel-Strecke (km) und eine Beschreibung. Vergangene Ziele bleiben sichtbar (abgeblendet), Bearbeiten über „✎"</li>
                 <li><strong>Wochenziel:</strong> oben "X von Y diese Woche" mit einem ✓ sobald erreicht. Ziel über „Ziel ändern" jederzeit anpassbar (Woche zählt Montag bis Sonntag). Darunter die längste je erreichte Serie von Wochen in Folge mit erreichtem Ziel</li>
@@ -669,6 +654,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <ul>
                 <li>Supabase-Projekt läuft in der EU-Region (Frankfurt); Zugriff auf die Datenbank ausschließlich über die Edge Function mit Passwort-Schutz</li>
+                <li><strong>Schriften:</strong> Bricolage Grotesque und DM Sans liegen direkt im Dashboard (Ordner fonts/, Lizenz SIL OFL 1.1). Beim Öffnen wird keine Verbindung zu Google Fonts mehr aufgebaut, die IP-Adresse geht also nicht an Google</li>
                 <li>Aktuell werden nur eigene Daten gespeichert (keine Daten Dritter) – das fällt unter die private Haushaltsausnahme der DSGVO</li>
                 <li><strong>OGS Rapunzel &amp; AWO OV Liblar:</strong> beide Bereiche enthalten ausschließlich organisatorische Inhalte, keine personenbezogenen Daten über Kinder, Familien oder Kolleg:innen. Sollten künftig doch personenbezogene Daten Dritter hinzukommen, braucht es eine erneute Prüfung</li>
                 <li><strong>Google-Kalender-Sync:</strong> Termindaten werden zwischen Supabase (EU) und Googles Servern übertragen, die auch außerhalb der EU liegen können. Rechtsgrundlage ist aktuell das EU-US Data Privacy Framework. Da es weiterhin nur um eigene Termine geht, ändert das nichts an der Haushaltsausnahme</li>
