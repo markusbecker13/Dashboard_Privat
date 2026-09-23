@@ -62,6 +62,9 @@
   let trainingStammdaten = [];
   let stammdatenBearbeitenId = null;
   let trainingBildUrls = {}; // stammdaten-id -> { url, ablauf }
+  let uebungGruppenOffen = new Set(); // aufgeklappte Kategorie-Gruppen in "Übungen verwalten"
+  let uebungKategorieVorschlaege = null; // Vorschau-Liste für "Kategorien vorschlagen" (null = keine Vorschau aktiv)
+  let uebungKategorieNeuManuell = false; // true, sobald die Kategorie beim Anlegen von Hand geändert wurde
   let intervallTimer = [];
   let timerBearbeitenId = null;
   let timerSession = null; // laufender Timer im Fokus-Modus
@@ -3386,7 +3389,9 @@
     renderTraining();
     alert(
       `${gueltig.length} Trainingsplan/-pläne importiert.` +
-      (neueUebungsnamen.size ? `\n${neueUebungsnamen.size} neue Übung(en) in den Stammdaten ergänzt.` : "")
+      (neueUebungsnamen.size
+        ? `\n${neueUebungsnamen.size} neue Übung(en) in den Stammdaten ergänzt.\nTipp: Unter „Übungen verwalten" → „Kategorien vorschlagen" lassen sie sich automatisch zuordnen.`
+        : "")
     );
   }
 
@@ -3465,6 +3470,51 @@
     return url ? `<img src="${escapeAttr(url)}" class="chip-bild" alt="">` : "";
   }
 
+  // ------------------------------------------------------------
+  // Übungen: Kategorien (Muskelgruppen) + automatische Vorschläge
+  // per Stichwort-Regeln. Freitext bleibt möglich, die Automatik
+  // schlägt aber nur aus dem festen Set vor. Reihenfolge der Regeln
+  // ist wichtig: spezifische Begriffe zuerst (z.B. "Muscle-up" vor
+  // "Pull", "Leg Raise" vor "Beine", "Leg Curl" vor "Curl").
+  // ------------------------------------------------------------
+  const UEBUNG_KATEGORIEN = ["Rücken", "Core", "Push", "Pull", "Beine", "Ganzkörper", "Mobilität"];
+  const UEBUNG_OHNE_KATEGORIE = "Ohne Kategorie";
+
+  const UEBUNG_KATEGORIE_REGELN = [
+    ["Mobilität", ["dehn", "stretch", "mobil", "cat cow", "katze kuh", "katzenbuckel", "kindhaltung", "child pose", "kobra", "cobra", "hüftbeuger", "hip flexor", "faszien", "foam", "blackroll", "yoga", "world greatest", "brustwirbel"]],
+    ["Ganzkörper", ["burpee", "muscle up", "muscleup", "bear crawl", "bärengang", "mountain climber", "bergsteiger", "kettlebell swing", "swing", "thruster", "turkish", "get up", "jumping jack", "hampelmann", "seilspring", "rope skip", "clean", "snatch", "sprawl", "farmer", "carry"]],
+    ["Core", ["plank", "unterarmstütz", "seitstütz", "side plank", "hollow", "dead bug", "deadbug", "crunch", "sit up", "situp", "l sit", "lsit", "leg raise", "beinheben", "knee raise", "knieheben", "russian twist", "ab wheel", "rollout", "bauch", "pallof", "v up", "flutter kick", "windscheibenwischer", "windshield", "dragon flag"]],
+    ["Rücken", ["superman", "bird dog", "birddog", "vierfüßler", "hyperext", "rückenstreck", "back extension", "reverse fly", "reverse flys", "good morning", "kreuzheben", "deadlift", "y raise", "t raise", "w raise", "swimmer", "rückentrain", "rückenübung"]],
+    ["Beine", ["kniebeug", "squat", "ausfallschritt", "lunge", "wadenheb", "calf", "step up", "stepup", "aufsteig", "pistol", "glute", "hip thrust", "beckenheb", "brücke", "bridge", "beinpresse", "leg press", "leg curl", "beinbeuger", "beinstreck", "leg extension", "wall sit", "wandsitz", "box jump", "bulgarian", "sprungkniebeuge", "nordic", "gesäß", "adduktor", "abduktor"]],
+    ["Pull", ["klimmzug", "pull up", "pullup", "chin up", "chinup", "rudern", "row", "australian", "scapula", "face pull", "latzug", "lat pull", "bizeps", "biceps", "curl", "pull"]],
+    ["Push", ["liegestütz", "push up", "pushup", "dips", "dip", "bankdrück", "bench", "schulterdrück", "overhead press", "military press", "pike", "handstand", "trizeps", "triceps", "seitheben", "lateral raise", "frontheben", "press", "push"]],
+  ];
+
+  function kategorieNormText(text) {
+    return String(text || "").toLowerCase().replace(/[-_/.]+/g, " ").replace(/\s+/g, " ").trim();
+  }
+
+  // Liefert eine Kategorie aus dem festen Set oder null, wenn kein
+  // Stichwort passt.
+  function uebungKategorieVorschlag(name) {
+    const text = kategorieNormText(name);
+    if (!text) return null;
+    for (const [kategorie, stichworte] of UEBUNG_KATEGORIE_REGELN) {
+      if (stichworte.some((w) => text.includes(w))) return kategorie;
+    }
+    return null;
+  }
+
+  // Vereinheitlicht die Schreibweise (z.B. "core" -> "Core"), damit
+  // gleiche Kategorien in einer Gruppe landen. Eigene Kategorien
+  // bleiben wie eingegeben.
+  function uebungKategorieAnzeige(kategorie) {
+    const wert = String(kategorie || "").trim();
+    if (!wert) return UEBUNG_OHNE_KATEGORIE;
+    const fest = UEBUNG_KATEGORIEN.find((k) => k.toLowerCase() === wert.toLowerCase());
+    return fest || wert;
+  }
+
   function renderTrainingsstammdaten() {
     const sportarten = trainingStammdatenAktuell("sportart");
     const uebungen = trainingStammdatenAktuell("uebung");
@@ -3475,7 +3525,9 @@
         return `
           <div class="notiz-item" style="flex-direction:column; align-items:stretch;">
             <strong>${escapeHtml(s.name)}</strong>
-            ${s.typ === "sportart" ? `<input type="text" id="stammdaten-edit-kategorie-${s.id}" value="${escapeAttr(s.kategorie || "")}" placeholder="Kategorie (z.B. Ausdauer, Kraft, Calisthenics)" list="stammdaten-kategorie-liste" style="margin-top:0.5rem;">` : ""}
+            ${s.typ === "sportart"
+              ? `<input type="text" id="stammdaten-edit-kategorie-${s.id}" value="${escapeAttr(s.kategorie || "")}" placeholder="Kategorie (z.B. Ausdauer, Kraft, Calisthenics)" list="stammdaten-kategorie-liste" style="margin-top:0.5rem;">`
+              : `<input type="text" id="stammdaten-edit-kategorie-${s.id}" value="${escapeAttr(s.kategorie || "")}" placeholder="Kategorie${uebungKategorieVorschlag(s.name) ? ` (Vorschlag: ${escapeAttr(uebungKategorieVorschlag(s.name))})` : " (z.B. Rücken, Core, Push)"}" list="stammdaten-uebung-kategorie-liste" style="margin-top:0.5rem;">`}
             <textarea id="stammdaten-edit-beschreibung-${s.id}" placeholder="Beschreibung (optional)" rows="2" style="margin-top:0.5rem; width:100%;">${escapeHtml(s.beschreibung || "")}</textarea>
             <div class="row" style="align-items:center; margin-top:0.5rem; gap:0.6rem; flex-wrap:wrap;">
               ${s.bild_pfad ? `<img src="${bildUrl ? escapeAttr(bildUrl) : ""}" class="stammdaten-bild" alt="">` : ""}
@@ -3506,10 +3558,85 @@
       return `<div class="notiz-list">${liste.map(eintragHtml).join("")}</div>`;
     }
 
+    // Kompakte Zeile für die gruppierte Übungsliste (Kategorie steht
+    // schon in der Gruppenüberschrift, Beschreibung einzeilig gekürzt).
+    function uebungZeileHtml(s) {
+      if (stammdatenBearbeitenId === s.id) return eintragHtml(s);
+      const bildUrl = trainingBildUrls[s.id]?.url;
+      return `
+        <div class="notiz-item uebung-zeile">
+          ${s.bild_pfad && bildUrl ? `<img src="${escapeAttr(bildUrl)}" class="stammdaten-bild-klein" alt="">` : `<span class="stammdaten-bild-klein stammdaten-bild-leer"></span>`}
+          <div style="flex:1; min-width:0;">
+            <span class="notiz-text">${escapeHtml(s.name)}</span>
+            ${s.beschreibung ? `<span class="notiz-meta uebung-zeile-beschreibung">${escapeHtml(s.beschreibung)}</span>` : ""}
+          </div>
+          <button class="task-edit-btn" onclick="stammdatenBearbeitenStart('${s.id}')" title="Bearbeiten">✎</button>
+          <button class="task-delete" onclick="stammdatenLoeschen('${s.id}')">×</button>
+        </div>`;
+    }
+
+    function uebungenGruppiertHtml(liste) {
+      if (!liste.length) return '<p class="empty-text">Noch keine hinterlegt.</p>';
+      const sucheEl = document.getElementById("stammdaten-uebung-suche");
+      const suche = kategorieNormText(sucheEl ? sucheEl.value : "");
+      const gefiltert = suche
+        ? liste.filter((s) => kategorieNormText(`${s.name} ${s.beschreibung || ""}`).includes(suche))
+        : liste;
+      if (!gefiltert.length) return '<p class="empty-text">Keine Übung gefunden.</p>';
+
+      const gruppen = {};
+      gefiltert.forEach((s) => {
+        const k = uebungKategorieAnzeige(s.kategorie);
+        (gruppen[k] = gruppen[k] || []).push(s);
+      });
+      // Reihenfolge: festes Set, dann eigene Kategorien alphabetisch,
+      // "Ohne Kategorie" immer zuletzt.
+      const eigene = Object.keys(gruppen)
+        .filter((k) => !UEBUNG_KATEGORIEN.includes(k) && k !== UEBUNG_OHNE_KATEGORIE)
+        .sort((a, b) => a.localeCompare(b));
+      const reihenfolge = [...UEBUNG_KATEGORIEN.filter((k) => gruppen[k]), ...eigene];
+      if (gruppen[UEBUNG_OHNE_KATEGORIE]) reihenfolge.push(UEBUNG_OHNE_KATEGORIE);
+
+      return reihenfolge.map((k) => {
+        const eintraege = gruppen[k];
+        const offen = suche || uebungGruppenOffen.has(k) || eintraege.some((s) => s.id === stammdatenBearbeitenId);
+        return `
+          <details class="plan-item uebung-gruppe" data-kategorie="${escapeAttr(k)}" ${offen ? "open" : ""}>
+            <summary>
+              <span><span class="chevron">▸</span><strong>${escapeHtml(k)}</strong></span>
+              <span class="uebung-gruppe-anzahl">${eintraege.length}</span>
+            </summary>
+            <div class="notiz-list" style="margin-top:0.6rem;">${eintraege.map(uebungZeileHtml).join("")}</div>
+          </details>`;
+      }).join("");
+    }
+
     const sportartenListEl = document.getElementById("stammdaten-sportarten-liste");
     if (sportartenListEl) sportartenListEl.innerHTML = listeHtml(sportarten);
     const uebungenListEl = document.getElementById("stammdaten-uebungen-liste");
-    if (uebungenListEl) uebungenListEl.innerHTML = listeHtml(uebungen);
+    if (uebungenListEl) {
+      uebungenListEl.innerHTML = uebungenGruppiertHtml(uebungen);
+      // Auf-/Zuklapp-Zustand merken, damit er ein Neu-Rendern übersteht
+      // (nicht während einer Suche – da klappen Treffer-Gruppen automatisch auf).
+      uebungenListEl.querySelectorAll(".uebung-gruppe").forEach((d) => {
+        d.addEventListener("toggle", () => {
+          const sucheEl = document.getElementById("stammdaten-uebung-suche");
+          if (sucheEl && sucheEl.value.trim()) return;
+          if (d.open) uebungGruppenOffen.add(d.dataset.kategorie);
+          else uebungGruppenOffen.delete(d.dataset.kategorie);
+        });
+      });
+    }
+    renderUebungKategorieVorschlag();
+
+    const uebungKategorieListEl = document.getElementById("stammdaten-uebung-kategorie-liste");
+    if (uebungKategorieListEl) {
+      const kategorien = [...new Set([
+        ...UEBUNG_KATEGORIEN,
+        ...uebungen.map((s) => s.kategorie).filter(Boolean).map(uebungKategorieAnzeige),
+      ])];
+      uebungKategorieListEl.innerHTML = kategorien.map((k) => `<option value="${escapeAttr(k)}">`).join("");
+    }
 
     const kategorieListEl = document.getElementById("stammdaten-kategorie-liste");
     if (kategorieListEl) {
@@ -3547,11 +3674,151 @@
     const el = document.getElementById(inputId);
     const name = el.value.trim();
     if (!name) return;
+    const kategorieEl = typ === "uebung" ? document.getElementById("stammdaten-uebung-kategorie-neu") : null;
+    const kategorie = kategorieEl ? kategorieEl.value.trim() : "";
+
     await api("stammdaten_hinzufuegen", { bereich: aktiverBereich, typ, name });
     el.value = "";
+    if (kategorieEl) {
+      kategorieEl.value = "";
+      uebungKategorieNeuManuell = false;
+    }
     await ladeDaten();
+
+    // stammdaten_hinzufuegen kennt keine Kategorie – daher direkt im
+    // Anschluss nachtragen. Existierte die Übung schon mit eigener
+    // Kategorie, bleibt diese unangetastet.
+    if (kategorie) {
+      const eintrag = trainingStammdaten.find(
+        (s) => bereichVon(s) === aktiverBereich && s.typ === typ && s.name.trim().toLowerCase() === name.toLowerCase()
+      );
+      if (eintrag && !eintrag.kategorie) {
+        await api("stammdaten_aktualisieren", { id: eintrag.id, kategorie });
+        eintrag.kategorie = kategorie;
+        uebungGruppenOffen.add(uebungKategorieAnzeige(kategorie));
+      }
+    }
     renderTraining();
   }
+
+  // Beim Tippen eines neuen Übungsnamens die Kategorie automatisch
+  // vorausfüllen – solange sie nicht von Hand geändert wurde.
+  const stammUebungNeuEl = document.getElementById("stammdaten-uebung-neu");
+  const stammUebungKatNeuEl = document.getElementById("stammdaten-uebung-kategorie-neu");
+  if (stammUebungNeuEl && stammUebungKatNeuEl) {
+    stammUebungNeuEl.addEventListener("input", () => {
+      if (uebungKategorieNeuManuell) return;
+      stammUebungKatNeuEl.value = uebungKategorieVorschlag(stammUebungNeuEl.value) || "";
+    });
+    stammUebungKatNeuEl.addEventListener("input", () => {
+      uebungKategorieNeuManuell = stammUebungKatNeuEl.value.trim() !== "";
+    });
+    stammUebungNeuEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") stammdatenHinzufuegen("uebung");
+    });
+  }
+
+  const stammUebungSucheEl = document.getElementById("stammdaten-uebung-suche");
+  if (stammUebungSucheEl) stammUebungSucheEl.addEventListener("input", () => renderTrainingsstammdaten());
+
+  // ------------------------------------------------------------
+  // "Kategorien vorschlagen": Vorschau für alle Übungen ohne
+  // Kategorie, gespeichert wird erst nach Bestätigung.
+  // ------------------------------------------------------------
+  function renderUebungKategorieVorschlag() {
+    const el = document.getElementById("stammdaten-uebung-vorschlag");
+    if (!el) return;
+    if (!uebungKategorieVorschlaege) {
+      el.innerHTML = "";
+      return;
+    }
+    const erkannt = uebungKategorieVorschlaege.filter((v) => v.kategorie);
+    const unerkannt = uebungKategorieVorschlaege.filter((v) => !v.kategorie);
+    const anzahlUebernehmen = erkannt.filter((v) => v.uebernehmen).length;
+    const optionen = (aktuell) => UEBUNG_KATEGORIEN
+      .map((k) => `<option value="${escapeAttr(k)}" ${k === aktuell ? "selected" : ""}>${escapeHtml(k)}</option>`).join("");
+
+    el.innerHTML = `
+      <div class="kategorie-vorschlag-box">
+        ${erkannt.length ? `
+          <p class="empty-text" style="margin-top:0;">Vorschläge prüfen, Häkchen entfernen oder Kategorie ändern, dann übernehmen.</p>
+          <div class="kategorie-vorschlag-liste">
+            ${erkannt.map((v) => `
+              <label class="kategorie-vorschlag-zeile">
+                <input type="checkbox" ${v.uebernehmen ? "checked" : ""} onchange="uebungKategorieVorschlagHaken('${v.id}', this.checked)">
+                <span class="kategorie-vorschlag-name">${escapeHtml(v.name)}</span>
+                <select onchange="uebungKategorieVorschlagAendern('${v.id}', this.value)">${optionen(v.kategorie)}</select>
+              </label>`).join("")}
+          </div>` : `<p class="empty-text" style="margin-top:0;">Für keine Übung ohne Kategorie wurde ein passendes Stichwort gefunden.</p>`}
+        ${unerkannt.length ? `<p class="empty-text">Nicht erkannt (bitte über „✎" von Hand zuordnen): ${unerkannt.map((v) => escapeHtml(v.name)).join(", ")}</p>` : ""}
+        <div class="row" style="margin-top:0.6rem;">
+          ${erkannt.length ? `<button class="btn-primary" id="btn-kategorie-vorschlag-uebernehmen" onclick="uebungKategorieVorschlaegeUebernehmen()" ${anzahlUebernehmen ? "" : "disabled"}>Übernehmen (${anzahlUebernehmen})</button>` : ""}
+          <button class="link-btn" onclick="uebungKategorieVorschlaegeSchliessen()">${erkannt.length ? "Abbrechen" : "Schließen"}</button>
+        </div>
+      </div>`;
+  }
+
+  const btnKategorieVorschlagen = document.getElementById("btn-uebung-kategorien-vorschlagen");
+  if (btnKategorieVorschlagen) {
+    btnKategorieVorschlagen.addEventListener("click", () => {
+      const ohne = trainingStammdatenAktuell("uebung").filter((s) => !(s.kategorie || "").trim());
+      if (!ohne.length) {
+        alert("Alle Übungen haben bereits eine Kategorie.");
+        return;
+      }
+      uebungKategorieVorschlaege = ohne.map((s) => {
+        const kategorie = uebungKategorieVorschlag(s.name);
+        return { id: s.id, name: s.name, kategorie, uebernehmen: !!kategorie };
+      });
+      renderUebungKategorieVorschlag();
+    });
+  }
+
+  window.uebungKategorieVorschlagHaken = function(id, haken) {
+    const v = uebungKategorieVorschlaege && uebungKategorieVorschlaege.find((x) => x.id === id);
+    if (v) v.uebernehmen = haken;
+    renderUebungKategorieVorschlag();
+  };
+
+  window.uebungKategorieVorschlagAendern = function(id, kategorie) {
+    const v = uebungKategorieVorschlaege && uebungKategorieVorschlaege.find((x) => x.id === id);
+    if (v) v.kategorie = kategorie;
+  };
+
+  window.uebungKategorieVorschlaegeSchliessen = function() {
+    uebungKategorieVorschlaege = null;
+    renderUebungKategorieVorschlag();
+  };
+
+  window.uebungKategorieVorschlaegeUebernehmen = async function() {
+    if (!uebungKategorieVorschlaege) return;
+    const auswahl = uebungKategorieVorschlaege.filter((v) => v.uebernehmen && v.kategorie);
+    if (!auswahl.length) return;
+    const btn = document.getElementById("btn-kategorie-vorschlag-uebernehmen");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Speichere …";
+    }
+    try {
+      // In kleinen Paketen parallel speichern (schneller als strikt
+      // nacheinander, ohne die Edge Function zu fluten).
+      for (let i = 0; i < auswahl.length; i += 5) {
+        await Promise.all(
+          auswahl.slice(i, i + 5).map((v) => api("stammdaten_aktualisieren", { id: v.id, kategorie: v.kategorie }))
+        );
+      }
+      uebungKategorieVorschlaege = null;
+      await ladeDaten();
+      renderTraining();
+    } catch (err) {
+      console.error(err);
+      alert("Speichern fehlgeschlagen: " + (err.message || err));
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Übernehmen";
+      }
+    }
+  };
 
   window.stammdatenLoeschen = async function(id) {
     await api("stammdaten_loeschen", { id });
