@@ -94,8 +94,8 @@
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
     ["training", "Training"],
   ];
-  const BEREICH_TABS = { privat: ALLE_REITER, ogs: ALLE_REITER, awo: ALLE_REITER };
-  const BEREICH_TITEL_VERWALTUNG = { privat: "🏠 Privat", ogs: "🏫 OGS Rapunzel", awo: "🤝 AWO OV Liblar" };
+  const BEREICH_TABS = { privat: ALLE_REITER, ogs: ALLE_REITER, awo: ALLE_REITER, business: ALLE_REITER };
+  const BEREICH_TITEL_VERWALTUNG = { privat: "🏠 Privat", ogs: "🏫 OGS Rapunzel", awo: "🤝 AWO OV Liblar", business: "☕ Business" };
 
   // Vorbelegung, solange in tab_einstellungen noch kein expliziter Eintrag
   // existiert – entspricht dem bisherigen Standardverhalten, damit sich
@@ -106,6 +106,7 @@
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen"],
+    business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen"],
   };
 
   function reiterIstSichtbar(bereich, schluessel) {
@@ -173,8 +174,8 @@
   // und ggf. das Bereichs-Logo in der Kopfzeile. Neues Logo = Datei
   // unter logos/ ablegen und hier eintragen.
   // ==========================================================
-  const BEREICH_FARBWELT = ["privat", "ogs", "awo"];
-  const BEREICH_THEME_FARBE = { neutral: "#1b1b1b", privat: "#10233f", ogs: "#1e3a5c", awo: "#3b1215" };
+  const BEREICH_FARBWELT = ["privat", "ogs", "awo", "business"];
+  const BEREICH_THEME_FARBE = { neutral: "#1b1b1b", privat: "#10233f", ogs: "#1e3a5c", awo: "#3b1215", business: "#2a1d15" };
   const BEREICH_LOGO = {
     ogs: { src: "logos/rapunzel.png", alt: "Rapunzel Kinderhaus e.V." },
   };
@@ -245,7 +246,7 @@
     arbeit: `<svg ${SVG_ATTR}><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>`,
     verwalten: `<svg ${SVG_ATTR}><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>`,
   };
-  const BEREICH_KNOPF_TEXT = { privat: "Privat", ogs: "OGS", awo: "AWO", verwaltung: "Verwaltung" };
+  const BEREICH_KNOPF_TEXT = { privat: "Privat", ogs: "OGS", awo: "AWO", business: "Business", verwaltung: "Verwaltung" };
 
   function sichtbareGruppen() {
     return hauptkategorien().filter((g) => sichtbareTabsInGruppe(g).length > 0);
@@ -959,7 +960,7 @@
     return training.filter((t) => bereichVon(t) === aktiverBereich);
   }
 
-  const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar" };
+  const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar", business: "Business" };
 
   function bereichAnwenden() {
     renderNavigation();
