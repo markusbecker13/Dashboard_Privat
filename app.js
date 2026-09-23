@@ -172,14 +172,14 @@
   // Farbwelt je Bereich: setzt data-bereich am <html>-Element (die
   // Farben stehen als Variablen in style.css), die Statusleisten-Farbe
   // und ggf. das Bereichs-Logo in der Kopfzeile. Neues Logo = Datei
-  // unter logos/ ablegen und hier eintragen.
+  // unter icons/ ablegen und hier eintragen.
   // ==========================================================
   const BEREICH_FARBWELT = ["privat", "ogs", "awo", "business"];
   const BEREICH_THEME_FARBE = { neutral: "#1b1b1b", privat: "#10233f", ogs: "#1e3a5c", awo: "#3b1215", business: "#2a1d15" };
   const BEREICH_LOGO = {
-    ogs: { src: "logos/rapunzel.png", alt: "Rapunzel Kinderhaus e.V." },
-    awo: { src: "logos/awo-liblar.png", alt: "AWO Ortsverein Liblar-Köttingen e.V." },
-    business: { src: "logos/zwischenkaffeeundchaos.png", alt: "zwischenkaffeeundchaos" },
+    ogs: { src: "icons/rapunzel.png", alt: "Rapunzel Kinderhaus e.V." },
+    awo: { src: "icons/awo-liblar.png", alt: "AWO Ortsverein Liblar-Köttingen e.V." },
+    business: { src: "icons/zwischenkaffeeundchaos.png", alt: "zwischenkaffeeundchaos" },
   };
 
   function farbweltAnwenden(bereich) {
