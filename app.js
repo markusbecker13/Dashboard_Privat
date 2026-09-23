@@ -1195,9 +1195,11 @@
 
     const zlEintraege = [];
     ueberfaellig.forEach((a) => zlEintraege.push({
+      id: a.id, typ: "aufgabe",
       zeit: formatDatumKurz(a.faellig_am), titel: a.titel, chip: "Überfällig", art: "ueberfaellig", tab: "aufgaben", sort: -2,
     }));
     termineGanztags.forEach((t) => zlEintraege.push({
+      id: t.id, typ: "termin",
       zeit: "ganzt.", titel: t.titel, chip: "Termin · ganztägig", art: "termin", tab: "kalender", sort: -1, erledigt: !!t.erledigt,
     }));
     termine
@@ -1206,6 +1208,7 @@
         const start = t.uhrzeit.slice(0, 5);
         const ende = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0, 5) : null;
         zlEintraege.push({
+          id: t.id, typ: "termin",
           zeit: start, start, ende: ende || minutenZuZeit(zeitZuMinuten(start) + 30), titel: t.titel,
           chip: "Termin · " + start + (ende ? "–" + ende : ""), art: "termin", tab: "kalender",
           sort: zeitZuMinuten(start), erledigt: !!t.erledigt,
@@ -1218,6 +1221,7 @@
         const start = a.status === "heute" && a.uhrzeit ? a.uhrzeit.slice(0, 5) : null;
         const ende = start ? (a.ende_uhrzeit ? a.ende_uhrzeit.slice(0, 5) : minutenZuZeit(zeitZuMinuten(start) + 30)) : null;
         zlEintraege.push({
+          id: a.id, typ: "aufgabe",
           zeit: start || "Heute", start, ende, titel: a.titel,
           chip: a.status === "heute" ? "Aufgabe" + (start ? " · " + start + (a.ende_uhrzeit ? "–" + a.ende_uhrzeit.slice(0, 5) : "") : "") : "Erinnerung",
           art: "aufgabe", tab: "aufgaben", sort: start ? zeitZuMinuten(start) : 24 * 60,
@@ -1244,13 +1248,17 @@
         if (laeuftJetzt) klassen.push("jetzt");
         if (e.erledigt) klassen.push("erledigt");
         return `
-          <button class="${klassen.join(" ")}" onclick="tabWechseln('${e.tab}')">
+          <div class="${klassen.join(" ")}">
             <span class="zl-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
-            <span class="zl-karte">
-              <span class="zl-chip zl-chip--${e.art}">${escapeHtml(e.chip)}</span>
-              <span class="zl-titel">${escapeHtml(e.titel)}</span>
-            </span>
-          </button>`;
+            <div class="zl-karte">
+              <button class="task-check zl-check ${e.erledigt ? "done" : ""}" onclick="zeitleisteUmschalten('${e.typ}','${e.id}', this)"
+                title="${e.erledigt ? "Wieder offen" : "Erledigt"}" aria-label="${escapeHtml(e.titel)} ${e.erledigt ? "wieder öffnen" : "als erledigt markieren"}"></button>
+              <button class="zl-inhalt" onclick="tabWechseln('${e.tab}')" title="${e.tab === "kalender" ? "Im Kalender öffnen" : "In Aufgaben öffnen"}">
+                <span class="zl-chip zl-chip--${e.art}">${escapeHtml(e.chip)}</span>
+                <span class="zl-titel">${escapeHtml(e.titel)}</span>
+              </button>
+            </div>
+          </div>`;
       }).join("") + `</div>`;
     }
 
@@ -1840,6 +1848,28 @@
         </div>`;
     }).join("");
   }
+
+  // Abhaken direkt in der Zeitleiste auf dem Start-Screen. Nutzt dieselben
+  // Backend-Aktionen wie Aufgaben bzw. Kalender – erledigte Aufgaben
+  // verschwinden danach aus der Zeitleiste (unter Aufgaben → Erledigt),
+  // Termine bleiben durchgestrichen stehen und lassen sich zurücknehmen.
+  window.zeitleisteUmschalten = async function(typ, id, knopf) {
+    if (knopf) {
+      if (knopf.disabled) return;
+      knopf.disabled = true;
+      knopf.classList.toggle("done");
+    }
+    try {
+      await api(typ === "termin" ? "termin_umschalten" : "aufgabe_umschalten", { id });
+      await ladeDaten();
+    } catch (fehler) {
+      if (knopf) {
+        knopf.disabled = false;
+        knopf.classList.toggle("done");
+        }
+      alert("Konnte nicht gespeichert werden. Bitte nochmal versuchen.");
+    }
+  };
 
   window.freiTerminUmschalten = async function(id) {
     await api("termin_umschalten", { id });
