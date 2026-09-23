@@ -178,6 +178,8 @@
   const BEREICH_THEME_FARBE = { neutral: "#1b1b1b", privat: "#10233f", ogs: "#1e3a5c", awo: "#3b1215", business: "#2a1d15" };
   const BEREICH_LOGO = {
     ogs: { src: "logos/rapunzel.png", alt: "Rapunzel Kinderhaus e.V." },
+    awo: { src: "logos/awo-liblar.png", alt: "AWO Ortsverein Liblar-Köttingen e.V." },
+    business: { src: "logos/zwischenkaffeeundchaos.png", alt: "zwischenkaffeeundchaos" },
   };
 
   function farbweltAnwenden(bereich) {
