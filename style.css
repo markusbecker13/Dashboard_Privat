@@ -105,6 +105,19 @@
   .chip button:hover { color: var(--accent); }
   .chip-bild { width: 1.1rem; height: 1.1rem; border-radius: 3px; object-fit: cover; margin-right: 0.35rem; vertical-align: middle; }
   .stammdaten-bild { width: 2.4rem; height: 2.4rem; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+  .stammdaten-bild-klein { width: 1.8rem; height: 1.8rem; border-radius: 5px; object-fit: cover; flex-shrink: 0; }
+  .stammdaten-bild-leer { display: inline-block; background: var(--bg); border: 1px dashed var(--border); }
+
+  /* Übungen verwalten: gruppiert nach Kategorie (nutzt .plan-item) */
+  .uebung-gruppe { margin-bottom: 0.5rem; }
+  .uebung-gruppe-anzahl { font-size: 0.78rem; color: var(--ink-dim); background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.55rem; }
+  .uebung-zeile { align-items: center; }
+  .uebung-zeile-beschreibung { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kategorie-vorschlag-box { margin-top: 0.7rem; padding: 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+  .kategorie-vorschlag-liste { display: flex; flex-direction: column; gap: 0.35rem; }
+  .kategorie-vorschlag-zeile { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+  .kategorie-vorschlag-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kategorie-vorschlag-zeile select { width: auto; }
 
   /* "Plan starten": Vollbild-Fokus-Modus für die geführte Session */
   .session-fokus-overlay {
