@@ -588,6 +588,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Intervall-Timer:</strong> unter „Intervall-Timer verwalten" lassen sich benannte Vorlagen mit Arbeitszeit, Pause, Anzahl Runden und optionaler Vorbereitungszeit anlegen – unabhängig von Trainingsplänen. „▶ Starten" öffnet denselben Vollbild-Fokus-Modus wie „Plan starten": der Countdown läuft automatisch durch Vorbereitung → Arbeit → Pause → nächste Runde, bei jedem Phasenwechsel Signalton + Vibration (sofern vom Gerät unterstützt), das Display bleibt währenddessen an. „⏸ Pause"/"▶ Weiter" hält den Timer an, „×"/"Beenden" bricht ab (mit Rückfrage, solange nicht fertig)</li>
                 <li><strong>Übungsverlauf:</strong> Auswahl einer Übung zeigt ihr Gewicht über die Zeit als Diagramm – braucht mindestens zwei Einträge mit Gewichtsangabe für dieselbe Übung, um eine Linie zeichnen zu können</li>
                 <li><strong>Sportarten verwalten / Übungen verwalten:</strong> zwei getrennte Bereiche mit Vorschlägen für Sportart- bzw. Übungsnamen, unabhängig davon ob sie schon mal genutzt wurden. Freitext bleibt überall möglich – die Listen erscheinen nur als Vorschlag bei der Autovervollständigung, zusammen mit bereits genutzten Werten. Bei Sportarten lässt sich zusätzlich über „✎" eine Kategorie hinterlegen (Freitext mit Vorschlägen, z.B. „Ausdauer", „Kraft", „Calisthenics") – Grundlage für die Auswertung nach Kategorie</li>
+                <li><strong>Übungen nach Kategorie:</strong> „Übungen verwalten" zeigt die Übungen gruppiert nach Kategorie (Rücken, Core, Push, Pull, Beine, Ganzkörper, Mobilität, eigene Kategorien, zuletzt „Ohne Kategorie"). Jede Gruppe ist aufklappbar und zeigt die Anzahl. Das Suchfeld filtert live nach Name und Beschreibung; Gruppen mit Treffern klappen dabei automatisch auf. Beim Anlegen einer neuen Übung wird die Kategorie anhand des Namens automatisch vorausgefüllt (z.B. „Klimmzug" → Pull, „Plank" → Core) und lässt sich vorher überschreiben. „✨ Kategorien vorschlagen" ordnet alle Übungen ohne Kategorie auf einmal zu: Es erscheint zuerst eine Vorschau, in der einzelne Vorschläge abgewählt oder geändert werden können – gespeichert wird erst mit „Übernehmen". Übungen mit bereits gesetzter Kategorie werden nie verändert; nicht erkannte Namen werden aufgelistet und lassen sich über „✎" von Hand zuordnen. Freitext bleibt möglich, die Automatik schlägt nur aus dem festen Set vor. Die Übungs-Kategorie ist unabhängig von der Sportart-Kategorie und fließt nicht in die „Auswertung nach Kategorie" ein</li>
                 <li><strong>Auswertung nach Kategorie:</strong> Balkendiagramm mit Anzahl Trainings und Gesamtdauer je Kategorie für ein wählbares Jahr. Sportarten ohne hinterlegte Kategorie laufen unter „Ohne Kategorie"</li>
                 <li><strong>Ziele verwalten:</strong> Ziel-Termine mit Countdown ("noch X Tage"), z.B. ein Wettkampf oder Event, optional mit einem Trainingsplan verknüpft – dann lässt sich der Plan direkt aus der Zielliste heraus starten. Zusätzlich optional Ort, Ziel-Strecke (km) und eine Beschreibung. Vergangene Ziele bleiben sichtbar (abgeblendet), Bearbeiten über „✎"</li>
                 <li><strong>Wochenziel:</strong> oben "X von Y diese Woche" mit einem ✓ sobald erreicht. Ziel über „Ziel ändern" jederzeit anpassbar (Woche zählt Montag bis Sonntag). Darunter die längste je erreichte Serie von Wochen in Folge mit erreichtem Ziel</li>
@@ -893,8 +894,15 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <p class="empty-text" style="margin-top:0;">Freitext bleibt überall möglich – diese Liste liefert nur die Vorschläge bei der Autovervollständigung.</p>
             <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
               <input type="text" id="stammdaten-uebung-neu" placeholder="Neue Übung">
+              <input type="text" id="stammdaten-uebung-kategorie-neu" placeholder="Kategorie (wird vorgeschlagen)" list="stammdaten-uebung-kategorie-liste">
               <button class="btn-primary" id="btn-stammdaten-uebung-hinzufuegen">+ Übung</button>
             </div>
+            <datalist id="stammdaten-uebung-kategorie-liste"></datalist>
+            <div class="row" style="flex-wrap:wrap; align-items:center; margin-top:0.8rem;">
+              <input type="search" id="stammdaten-uebung-suche" placeholder="Übung suchen …" style="flex:1; min-width:10rem;">
+              <button class="link-btn" id="btn-uebung-kategorien-vorschlagen">✨ Kategorien vorschlagen</button>
+            </div>
+            <div id="stammdaten-uebung-vorschlag"></div>
             <div id="stammdaten-uebungen-liste" style="margin-top:0.6rem;"></div>
           </div>
         </details>
