@@ -2609,6 +2609,7 @@
   let trainingFilterOrt = "";
   let trainingFilterVon = "";
   let trainingFilterBis = "";
+  let sessionTickHandle = null; // Tick für Gesamtzeit + Satz-Countdown im Fokus-Modus
   let trainingSession = null; // aktive "Plan starten"-Session: { planId, planName, sportart, ort, index, uebungen }
 
   // Montag der Woche, in der "iso" liegt (lokale Zeit, ISO-Datum rein/raus).
@@ -3994,7 +3995,12 @@
     const uebungen = planUebungenFuer(planId)
       .map((u) => ({ name: u.name, saetze: u.saetze ?? "", wiederholungen: u.wiederholungen ?? "", sekunden: u.sekunden ?? "", gewicht_kg: u.gewicht_kg ?? "", progression: u.progression ?? "" }));
     if (!uebungen.length) return;
-    trainingSession = { planId, planName: plan.name, sportart: plan.name, ort: "", index: 0, uebungen };
+    trainingSession = {
+      planId, planName: plan.name, sportart: plan.name, ort: "", index: 0, uebungen,
+      startMs: Date.now(), // Gesamtzeit läuft ab Start der Session
+      countdown: null,      // Satz-Countdown der aktuellen Übung (siehe sessionCountdown*)
+      wakeLock: null,
+    };
     sessionFokusOeffnen();
   };
 
@@ -4009,9 +4015,22 @@
     // Safari nicht verfügbar – die Overlay-Ansicht deckt den
     // Bildschirm dann trotzdem vollständig ab.
     try { document.documentElement.requestFullscreen?.()?.catch(() => {}); } catch {}
+    // Bildschirm während der Session anlassen (Gesamtzeit + Countdown).
+    if ("wakeLock" in navigator) {
+      navigator.wakeLock.request("screen")
+        .then((lock) => { if (trainingSession) trainingSession.wakeLock = lock; else lock.release(); })
+        .catch(() => {});
+    }
+    clearInterval(sessionTickHandle);
+    sessionTickHandle = setInterval(sessionTick, 250);
   }
 
   function sessionFokusSchliessen() {
+    clearInterval(sessionTickHandle);
+    sessionTickHandle = null;
+    if (trainingSession && trainingSession.wakeLock) {
+      try { trainingSession.wakeLock.release(); } catch {}
+    }
     const overlay = document.getElementById("session-fokus-overlay");
     if (overlay) overlay.remove();
     if (document.fullscreenElement) {
@@ -4043,19 +4062,21 @@
   window.trainingSessionWeiter = function() {
     trainingSessionAusDomUebernehmen();
     trainingSession.index = Math.min(trainingSession.index + 1, trainingSession.uebungen.length - 1);
+    trainingSession.countdown = null; // neue Übung = frischer Countdown
     renderTrainingSession();
   };
 
   window.trainingSessionZurueck = function() {
     trainingSessionAusDomUebernehmen();
     trainingSession.index = Math.max(trainingSession.index - 1, 0);
+    trainingSession.countdown = null;
     renderTrainingSession();
   };
 
   window.trainingSessionAbbrechen = function() {
     if (!confirm("Trainings-Session abbrechen? Bisher eingegebene Werte gehen verloren.")) return;
-    trainingSession = null;
     sessionFokusSchliessen();
+    trainingSession = null;
     renderTraining();
   };
 
@@ -4066,22 +4087,166 @@
     const uebungen = trainingSession.uebungen.filter((u) => (u.name || "").trim());
     const planId = trainingSession.planId;
     const ort = trainingSession.ort;
+    // Gemessene Gesamtzeit als Dauer (gerundet, mindestens 1 Minute).
+    const dauerMinuten = Math.max(1, Math.round((Date.now() - trainingSession.startMs) / 60000));
 
     await api("training_hinzufuegen", {
       bereich: aktiverBereich,
       datum: heuteISO(),
       sportart,
       ort,
-      dauer_minuten: "",
+      dauer_minuten: dauerMinuten,
       notiz: "",
       uebungen,
       plan_id: planId,
     });
-    trainingSession = null;
     sessionFokusSchliessen();
+    trainingSession = null;
     await ladeDaten();
     renderTraining();
   };
+
+  // ------------------------------------------------------------
+  // Gesamtzeit + Satz-Countdown im "Plan starten"-Fokus-Modus.
+  // Zeiten laufen über Zeitstempel (nicht über Tick-Zählen), damit
+  // sie auch stimmen, wenn der Browser den Tab kurz drosselt. Der
+  // Tick aktualisiert nur die Zeit-Anzeigen per textContent – ein
+  // komplettes Neu-Rendern würde sonst laufende Eingaben stören.
+  // ------------------------------------------------------------
+  function zeitFormat(sekunden, mitStunden) {
+    const s = Math.max(0, Math.floor(sekunden));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sek = String(s % 60).padStart(2, "0");
+    if (mitStunden && h > 0) return `${h}:${String(m).padStart(2, "0")}:${sek}`;
+    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${sek}`;
+  }
+
+  function sessionCountdownRestMs(c) {
+    if (c.status === "laeuft") return Math.max(0, c.endeMs - Date.now());
+    if (c.status === "pausiert") return c.restMs;
+    return c.sekunden * 1000;
+  }
+
+  // Countdown-Zustand der aktuellen Übung; null, wenn keine Sekunden
+  // hinterlegt sind.
+  function sessionCountdownAktuell() {
+    if (!trainingSession) return null;
+    const u = trainingSession.uebungen[trainingSession.index];
+    const sekunden = parseInt(u.sekunden, 10);
+    if (!(sekunden > 0)) return null;
+    if (!trainingSession.countdown) {
+      trainingSession.countdown = {
+        sekunden,
+        saetze: Math.max(1, parseInt(u.saetze, 10) || 1),
+        satz: 1,
+        status: "bereit", // bereit | laeuft | pausiert | fertig
+        endeMs: 0,
+        restMs: 0,
+      };
+    }
+    return trainingSession.countdown;
+  }
+
+  function sessionTick() {
+    if (!trainingSession) return;
+    const gesamtEl = document.getElementById("session-gesamtzeit");
+    if (gesamtEl) gesamtEl.textContent = zeitFormat((Date.now() - trainingSession.startMs) / 1000, true);
+
+    const c = trainingSession.countdown;
+    if (!c || c.status !== "laeuft") return;
+    const rest = sessionCountdownRestMs(c);
+    const anzeigeEl = document.getElementById("session-countdown-zeit");
+    if (anzeigeEl) anzeigeEl.textContent = zeitFormat(Math.ceil(rest / 1000));
+    if (rest <= 0) {
+      // Satz geschafft: kurzer Ton, beim letzten Satz das Abschluss-Signal.
+      trainingSessionAusDomUebernehmen();
+      if (c.satz >= c.saetze) {
+        c.status = "fertig";
+        timerSignal("fertig");
+      } else {
+        c.satz++;
+        c.status = "bereit";
+        timerSignal("satz");
+      }
+      renderTrainingSession();
+    }
+  }
+
+  window.sessionCountdownStart = function() {
+    const c = sessionCountdownAktuell();
+    if (!c) return;
+    audioFreischalten(); // innerhalb des Tipps, sonst blockiert iOS den späteren Ton
+    trainingSessionAusDomUebernehmen();
+    if (c.status === "pausiert") {
+      c.endeMs = Date.now() + c.restMs;
+    } else {
+      // Vor dem ersten Satz ggf. geänderte Werte aus den Feldern übernehmen.
+      if (c.satz === 1) {
+        const u = trainingSession.uebungen[trainingSession.index];
+        const sek = parseInt(u.sekunden, 10);
+        if (sek > 0) c.sekunden = sek;
+        c.saetze = Math.max(1, parseInt(u.saetze, 10) || 1);
+      }
+      c.endeMs = Date.now() + c.sekunden * 1000;
+    }
+    c.status = "laeuft";
+    renderTrainingSession();
+  };
+
+  window.sessionCountdownPause = function() {
+    const c = trainingSession && trainingSession.countdown;
+    if (!c || c.status !== "laeuft") return;
+    c.restMs = sessionCountdownRestMs(c);
+    c.status = "pausiert";
+    trainingSessionAusDomUebernehmen();
+    renderTrainingSession();
+  };
+
+  // Sätze/Sekunden im Fokus-Modus geändert: Countdown neu aufbauen,
+  // solange er noch nicht begonnen hat (so erscheint er auch, wenn die
+  // Sekunden erst hier eingetragen werden).
+  window.sessionCountdownWerteGeaendert = function() {
+    if (!trainingSession) return;
+    const c = trainingSession.countdown;
+    if (c && !(c.status === "bereit" && c.satz === 1)) return;
+    trainingSessionAusDomUebernehmen();
+    trainingSession.countdown = null;
+    renderTrainingSession();
+  };
+
+  window.sessionCountdownNeu = function() {
+    if (!trainingSession) return;
+    trainingSessionAusDomUebernehmen();
+    trainingSession.countdown = null;
+    renderTrainingSession();
+  };
+
+  function sessionCountdownHtml() {
+    const c = sessionCountdownAktuell();
+    if (!c) return "";
+    const rest = Math.ceil(sessionCountdownRestMs(c) / 1000);
+    let status, knoepfe;
+    if (c.status === "fertig") {
+      status = c.saetze > 1 ? `Alle ${c.saetze} Sätze geschafft ✓` : "Geschafft ✓";
+      knoepfe = `<button class="session-fokus-btn-sek" onclick="sessionCountdownNeu()">↺ Nochmal</button>`;
+    } else if (c.status === "laeuft") {
+      status = `Satz ${c.satz} von ${c.saetze} läuft`;
+      knoepfe = `<button class="session-fokus-btn-sek" onclick="sessionCountdownPause()">⏸ Pause</button>`;
+    } else if (c.status === "pausiert") {
+      status = `Satz ${c.satz} von ${c.saetze} pausiert`;
+      knoepfe = `<button class="session-fokus-btn-primaer" onclick="sessionCountdownStart()">▶ Weiter</button>`;
+    } else {
+      status = `Satz ${c.satz} von ${c.saetze}`;
+      knoepfe = `<button class="session-fokus-btn-primaer" onclick="sessionCountdownStart()">▶ ${c.saetze > 1 ? `Satz ${c.satz} starten` : "Start"}</button>`;
+    }
+    return `
+      <div class="session-countdown session-countdown-${c.status}">
+        <div class="session-countdown-status">${status}</div>
+        ${c.status !== "fertig" ? `<div class="timer-countdown" id="session-countdown-zeit">${zeitFormat(rest)}</div>` : ""}
+        <div class="session-countdown-knoepfe">${knoepfe}</div>
+      </div>`;
+  }
 
   function renderTrainingSession() {
     const overlay = document.getElementById("session-fokus-overlay");
@@ -4097,6 +4262,7 @@
     overlay.innerHTML = `
       <div class="session-fokus-kopf">
         <span class="session-fokus-titel">${escapeHtml(trainingSession.planName)} · Übung ${i + 1} von ${gesamt}</span>
+        <span class="session-gesamtzeit" title="Gesamtzeit">⏱ <span id="session-gesamtzeit">${zeitFormat((Date.now() - trainingSession.startMs) / 1000, true)}</span></span>
         <button class="session-fokus-schliessen" onclick="trainingSessionAbbrechen()" aria-label="Schließen">×</button>
       </div>
       <div class="session-fokus-inhalt">
@@ -4106,10 +4272,11 @@
         </div>
         ${bildUrl ? `<img src="${escapeAttr(bildUrl)}" class="session-fokus-bild" alt="">` : ""}
         <input type="text" id="session-ueb-name" class="session-fokus-uebung-name" value="${escapeAttr(u.name)}" placeholder="Übung" list="training-uebung-namen-liste">
+        ${sessionCountdownHtml()}
         <div class="session-fokus-werte">
-          <div><label>Sätze</label><input type="number" id="session-ueb-saetze" value="${escapeAttr(u.saetze)}" min="0"></div>
+          <div><label>Sätze</label><input type="number" id="session-ueb-saetze" value="${escapeAttr(u.saetze)}" min="0" onchange="sessionCountdownWerteGeaendert()"></div>
           <div><label>Wdh</label><input type="number" id="session-ueb-wdh" value="${escapeAttr(u.wiederholungen)}" min="0"></div>
-          <div><label>Sek.</label><input type="number" id="session-ueb-sekunden" value="${escapeAttr(u.sekunden)}" min="0"></div>
+          <div><label>Sek.</label><input type="number" id="session-ueb-sekunden" value="${escapeAttr(u.sekunden)}" min="0" onchange="sessionCountdownWerteGeaendert()"></div>
           <div><label>Gewicht (kg)</label><input type="number" id="session-ueb-gewicht" value="${escapeAttr(u.gewicht_kg)}" min="0" step="0.5"></div>
         </div>
         <input type="text" id="session-ueb-progression" value="${escapeAttr(u.progression || "")}" placeholder="Variante (z.B. unterstützt)">
@@ -4253,6 +4420,7 @@
       laeuft: true,
       wakeLock: null,
     };
+    audioFreischalten();
     timerFokusOeffnen();
     timerSignal(timerSession.phase);
   };
@@ -4327,6 +4495,25 @@
     renderTimerSession();
   }
 
+  // Ein gemeinsamer AudioContext für alle Signaltöne (Intervall-Timer
+  // und Satz-Countdown). Browser begrenzen die Zahl gleichzeitiger
+  // Contexts, und iOS spielt Ton nur ab, wenn der Context einmal
+  // innerhalb eines Tipps gestartet wurde – daher audioFreischalten()
+  // bei jedem Start-Knopf.
+  let signalAudioCtx = null;
+
+  function audioFreischalten() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return null;
+      if (!signalAudioCtx) signalAudioCtx = new AudioCtx();
+      if (signalAudioCtx.state === "suspended") signalAudioCtx.resume().catch(() => {});
+      return signalAudioCtx;
+    } catch {
+      return null;
+    }
+  }
+
   function timerSignal(phase) {
     try {
       if (navigator.vibrate) {
@@ -4334,9 +4521,8 @@
       }
     } catch {}
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
+      const ctx = audioFreischalten();
+      if (!ctx) return;
       const beep = (freq, start, dauer) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
