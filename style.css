@@ -155,6 +155,18 @@
   .session-fokus-btn-sek:disabled { opacity: 0.4; cursor: default; }
   .session-fokus-btn-primaer { background: var(--accent); color: #fff; font-weight: 600; }
 
+  /* "Plan starten": Gesamtzeit im Kopf + Satz-Countdown je Übung */
+  .session-gesamtzeit { margin-left: auto; font-size: 0.92rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-dim); white-space: nowrap; }
+  .session-countdown {
+    display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
+    padding: 1rem; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; text-align: center;
+  }
+  .session-countdown .timer-countdown { font-size: 4rem; }
+  .session-countdown-status { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+  .session-countdown-laeuft .session-countdown-status { color: var(--overdue-text); }
+  .session-countdown-fertig .session-countdown-status { color: var(--accent); font-size: 1.05rem; }
+  .session-countdown-knoepfe { display: flex; gap: 0.6rem; width: 100%; max-width: 20rem; }
+
   /* Trainingspläne: aufklappbare Einträge (native <details>) */
   .plan-item {
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
