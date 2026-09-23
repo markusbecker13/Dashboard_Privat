@@ -695,7 +695,12 @@
   .bereich-karte--ogs { background: #fff4c7; color: #1e3a5c; }
   .bereich-karte--ogs .bereich-karte-name { margin-left: auto; }
   .bereich-karte--awo { background: #c8102e; color: #ffffff; }
-  .bereich-karte--awo .bereich-karte-farbe { background: #ffffff; }
+  .bereich-karte-badge {
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    height: 3.75rem; padding: 0.3rem 0.45rem; border-radius: 14px; background: #ffffff;
+  }
+  .bereich-karte-badge img { height: 100%; width: auto; display: block; }
+  .bereich-karte-rund { width: 3.5rem; height: 3.5rem; border-radius: 50%; flex-shrink: 0; }
   .bereich-karte--business { background: #2a1d15; color: #f4ede3; }
   .bereich-karte--business .bereich-karte-farbe { background: #e4572e; }
   .bereich-karte-zusatz { display: block; font-family: var(--font-text); font-size: 0.82rem; font-weight: 500; opacity: 0.8; }
