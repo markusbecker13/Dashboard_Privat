@@ -693,7 +693,8 @@
   .bereich-karte--privat { background: #10233f; color: #eaf0f7; }
   .bereich-karte--privat .bereich-karte-farbe { background: #2a5bd7; }
   .bereich-karte--ogs { background: #fff4c7; color: #1e3a5c; }
-  .bereich-karte--ogs .bereich-karte-name { margin-left: auto; }
+  /* Bereichs-Titel rechtsbündig (letztes Element jeder Karte) */
+  .bereich-karte > :last-child { margin-left: auto; text-align: right; }
   .bereich-karte--awo { background: #c8102e; color: #ffffff; }
   .bereich-karte-badge {
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
