@@ -49,6 +49,13 @@
     --overdue-bg: #fce8d2; --overdue-text: #8f4700; --overdue-border: #f3c89a;
     --reminder-bg: #f3e3e4;
   }
+  :root[data-bereich="business"] {
+    --bg: #f4ede3; --ink: #2a1d15; --ink-dim: #7a4f33;
+    --accent: #c2461f; --accent-2: #f2b134; --border: #e6d9c6;
+    --akzent-flaeche: #f2b134; --nav-bg: #2a1d15; --nav-ink: #f4ede3;
+    --overdue-bg: #fde3d8; --overdue-text: #9e2f0c;
+    --reminder-bg: #efe3d3;
+  }
   html { background: var(--bg); }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-text); min-height: 100vh; }
@@ -689,6 +696,9 @@
   .bereich-karte--ogs .bereich-karte-name { margin-left: auto; }
   .bereich-karte--awo { background: #c8102e; color: #ffffff; }
   .bereich-karte--awo .bereich-karte-farbe { background: #ffffff; }
+  .bereich-karte--business { background: #2a1d15; color: #f4ede3; }
+  .bereich-karte--business .bereich-karte-farbe { background: #e4572e; }
+  .bereich-karte-zusatz { display: block; font-family: var(--font-text); font-size: 0.82rem; font-weight: 500; opacity: 0.8; }
   .bereich-karte--verwaltung {
     min-height: 4rem; background: transparent; color: var(--ink); border: 1.5px solid var(--border);
   }
