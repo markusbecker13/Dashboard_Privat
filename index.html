@@ -87,7 +87,7 @@
     <main>
       <div id="view-heute">
         <div class="heute-datum" id="heute-datum"></div>
-        <h1 class="heute-gruss"><span id="heute-gruss">Moin Markus.</span> <button class="hilfe-icon" data-hilfe="Zeigt oben Wetter und Überfälliges, darunter alles, was heute ansteht, als Zeitleiste – überfällige und heute fällige Aufgaben sowie heutige Termine. Was gerade läuft, ist als „Jetzt“ hervorgehoben. Ein Tipp auf einen Eintrag öffnet Aufgaben bzw. Kalender – bearbeitet wird dort.">?</button></h1>
+        <h1 class="heute-gruss"><span id="heute-gruss">Moin Markus.</span> <button class="hilfe-icon" data-hilfe="Zeigt oben Wetter und Überfälliges, darunter alles, was heute ansteht, als Zeitleiste – überfällige und heute fällige Aufgaben sowie heutige Termine. Was gerade läuft, ist als „Jetzt“ hervorgehoben. Über den Kreis links hakst du Aufgaben und Termine direkt hier ab. Ein Tipp auf den Text öffnet Aufgaben bzw. Kalender – bearbeitet wird dort.">?</button></h1>
         <div class="heute-kacheln">
           <div id="wetter-bereich"></div>
           <button class="heute-kachel heute-kachel--dunkel" id="heute-ueberfaellig" onclick="tabWechseln('aufgaben')">
@@ -368,7 +368,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Kopf:</strong> Datum und Gruß mit der Zahl offener Dinge heute (überfällige und heute fällige Aufgaben, fällige Erinnerungen, heutige Termine). Ist nichts offen: „Freie Bahn heute."</li>
                 <li><strong>Wetter-Kachel:</strong> aktuelles Wetter am eingestellten Ort. Antippen klappt den 5-Tage-Ausblick auf bzw. zu; dort lässt sich über ✎ der Ort ändern</li>
                 <li><strong>Überfällig-Kachel:</strong> Anzahl überfälliger Aufgaben im Bereich, Antippen öffnet Aufgaben</li>
-                <li><strong>Zeitleiste:</strong> alles für heute als Karten – zuerst Überfälliges (mit Fälligkeitsdatum), dann Ganztägiges, dann Termine und Aufgaben nach Uhrzeit, Aufgaben ohne Uhrzeit am Ende. Was gerade läuft, steht als „Jetzt" farbig hervorgehoben. Erledigte Termine erscheinen durchgestrichen. Antippen öffnet Aufgaben bzw. Kalender</li>
+                <li><strong>Zeitleiste:</strong> alles für heute als Karten – zuerst Überfälliges (mit Fälligkeitsdatum), dann Ganztägiges, dann Termine und Aufgaben nach Uhrzeit, Aufgaben ohne Uhrzeit am Ende. Was gerade läuft, steht als „Jetzt" farbig hervorgehoben. Erledigte Termine erscheinen durchgestrichen. Über den Kreis links auf jeder Karte hakst du direkt hier ab: Aufgaben verschwinden dann aus der Zeitleiste und stehen unter Aufgaben → Erledigt (wiederkehrende Aufgaben verhalten sich wie beim Abhaken unter Aufgaben), Termine bleiben durchgestrichen stehen und lassen sich per erneutem Tipp zurücknehmen. Ein Tipp auf den Text öffnet Aufgaben bzw. Kalender</li>
                 <li><strong>Freie Zeit:</strong> zeigt den heutigen Zeitrahmen (siehe Frei) als Farbleiste – belegt/frei/erledigt als Segmente, ein oranger Marker zeigt die aktuelle Uhrzeit. Antippen springt in den Frei-Tab. Darunter steht der nächste offene Termin</li>
                 <li><strong>Drei Kacheln:</strong> fällige Aufgaben (inkl. fällige wiederkehrende Erinnerungen), aktive Ziele der laufenden Woche/Monat/Jahr, offene Artikel auf der Einkaufsliste – jede Kachel springt beim Antippen in den passenden Tab</li>
                 <li><strong>Ziel-Kacheln:</strong> darunter, falls für den aktuellen Zeitraum Ziele angelegt sind, mit Fortschritt</li>
