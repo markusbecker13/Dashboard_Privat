@@ -169,7 +169,47 @@
     return res.json();
   }
 
+  // ==========================================================
+  // Farbwelt je Bereich: setzt data-bereich am <html>-Element (die
+  // Farben stehen als Variablen in style.css), die Statusleisten-Farbe
+  // und ggf. das Bereichs-Logo in der Kopfzeile. Neues Logo = Datei
+  // unter logos/ ablegen und hier eintragen.
+  // ==========================================================
+  const BEREICH_FARBWELT = ["privat", "ogs", "awo"];
+  const BEREICH_THEME_FARBE = { neutral: "#1b1b1b", privat: "#10233f", ogs: "#1e3a5c", awo: "#3b1215" };
+  const BEREICH_LOGO = {
+    ogs: { src: "logos/rapunzel.png", alt: "Rapunzel Kinderhaus e.V." },
+  };
+
+  function farbweltAnwenden(bereich) {
+    const welt = BEREICH_FARBWELT.includes(bereich) ? bereich : "neutral";
+    document.documentElement.dataset.bereich = welt;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", BEREICH_THEME_FARBE[welt]);
+    const logo = document.getElementById("topbar-logo");
+    const name = document.getElementById("brand-name");
+    const eintrag = BEREICH_LOGO[welt];
+    if (logo) {
+      if (eintrag) {
+        logo.src = eintrag.src;
+        logo.alt = eintrag.alt;
+      } else {
+        logo.removeAttribute("src");
+        logo.alt = "";
+      }
+      logo.classList.toggle("hidden", !eintrag);
+    }
+    // Mit Logo ersetzt das Logo den Dashboard-Namen in der Kopfzeile
+    if (name) name.classList.toggle("hidden", !!eintrag);
+  }
+
+  function willkommenDatumAnzeigen() {
+    const el = document.getElementById("willkommen-datum");
+    if (el) el.textContent = new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
+  }
+
   function zeigeLogin(fehler) {
+    farbweltAnwenden("neutral");
     document.getElementById("app").classList.add("hidden");
     document.getElementById("bereich-screen").classList.add("hidden");
     document.getElementById("kategorie-screen").classList.add("hidden");
@@ -179,6 +219,8 @@
   }
 
   function zeigeBereichAuswahl() {
+    farbweltAnwenden("neutral");
+    willkommenDatumAnzeigen();
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("app").classList.add("hidden");
     document.getElementById("kategorie-screen").classList.add("hidden");
@@ -194,6 +236,7 @@
     document.getElementById("app").classList.remove("hidden");
     dashboardNameAnzeigen();
     untertitelAnzeigen();
+    farbweltAnwenden(aktiverBereich);
   }
 
   // ==========================================================
@@ -265,6 +308,7 @@
   window.bereichAuswaehlen = function(bereich) {
     aktiverBereich = bereich;
     localStorage.setItem("aktiver-bereich", bereich);
+    farbweltAnwenden(bereich);
     bereichAnwenden();
     render();
     renderNotizen();
