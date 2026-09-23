@@ -720,7 +720,7 @@
     border: none; border-radius: 999px; background: var(--nav-bg); color: var(--nav-ink);
     font-family: var(--font-text); font-size: 0.9rem; font-weight: 600; cursor: pointer; flex-shrink: 0;
   }
-  .bereich-knopf:focus-visible, .bottom-nav-btn:focus-visible, .reiter-chip:focus-visible, .zl-eintrag:focus-visible, .heute-kachel:focus-visible {
+  .bereich-knopf:focus-visible, .bottom-nav-btn:focus-visible, .reiter-chip:focus-visible, .zl-check:focus-visible, .zl-inhalt:focus-visible, .heute-kachel:focus-visible {
     outline: 3px solid var(--accent); outline-offset: 2px;
   }
 
@@ -780,14 +780,29 @@
 
   .heute-abschnitt { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; margin: 1.4rem 0 0.7rem; }
   .zeitleiste { display: flex; flex-direction: column; gap: 0.6rem; }
-  .zl-eintrag {
-    display: flex; gap: 0.75rem; align-items: stretch; width: 100%; padding: 0; border: none;
-    background: none; text-align: left; cursor: pointer; font-family: var(--font-text); color: var(--ink);
-  }
+  .zl-eintrag { display: flex; gap: 0.75rem; align-items: stretch; width: 100%; color: var(--ink); }
   .zl-zeit { width: 3.2rem; flex-shrink: 0; padding-top: 1rem; font-size: 0.82rem; font-weight: 600; color: var(--ink-dim); }
   .zl-karte {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.2rem;
+    background: var(--panel); border-radius: 18px; padding: 0.35rem 0.4rem 0.35rem 0.55rem;
+  }
+  /* Abhak-Kreis mit großer Tippfläche (44px), sichtbar bleibt der Kreis */
+  .zl-check { width: 2.75rem; height: 2.75rem; border: none; background: none; position: relative; flex-shrink: 0; font-size: 0.8rem; }
+  .zl-check::before {
+    content: ""; position: absolute; inset: 0.65rem; border-radius: 50%;
+    border: 1.5px solid var(--ink-dim); z-index: 0;
+  }
+  .zl-check.done::before { background: var(--accent); border-color: var(--accent); }
+  .zl-check.done { background: none; }
+  .zl-check.done::after {
+    content: "✓"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #ffffff; font-size: 0.8rem;
+  }
+  .zl-check:disabled { cursor: wait; }
+  .zl-inhalt {
     flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem;
-    background: var(--panel); border-radius: 18px; padding: 0.85rem 1rem;
+    padding: 0.5rem 0.6rem 0.5rem 0.2rem; border: none; background: none; cursor: pointer;
+    text-align: left; font-family: var(--font-text); color: inherit;
   }
   .zl-chip { font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 8px; background: var(--bg); color: var(--ink-dim); }
   .zl-chip--ueberfaellig { background: var(--overdue-bg); color: var(--overdue-text); }
@@ -795,6 +810,9 @@
   .zl-eintrag.jetzt .zl-zeit { color: var(--accent); }
   .zl-eintrag.jetzt .zl-karte { background: var(--accent); color: #ffffff; }
   .zl-eintrag.jetzt .zl-chip { background: rgba(255, 255, 255, 0.22); color: #ffffff; }
+  .zl-eintrag.jetzt .zl-check::before { border-color: #ffffff; }
+  .zl-eintrag.jetzt .zl-check.done::before { background: #ffffff; }
+  .zl-eintrag.jetzt .zl-check.done::after { color: var(--accent); }
   .zl-eintrag.erledigt .zl-titel { text-decoration: line-through; opacity: 0.55; }
 
   @media (prefers-reduced-motion: reduce) {
