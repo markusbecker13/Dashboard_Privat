@@ -60,28 +60,12 @@
     <button class="link-btn" id="bereich-screen-abmelden">Abmelden</button>
   </div>
 
-  <div id="kategorie-screen" class="hidden">
-    <div class="kachel-screen-top">
-      <button class="link-btn" id="kategorie-zurueck-btn">↔ Bereich wechseln</button>
-    </div>
-    <h1 style="font-size:1.4rem;" id="kategorie-screen-bereichsname">Bereich</h1>
-    <p class="hero-text">Was möchtest du tun?</p>
-    <div class="bereich-tiles" id="kategorie-tiles"></div>
-  </div>
-
-  <div id="unterkategorie-screen" class="hidden">
-    <div class="kachel-screen-top">
-      <button class="link-btn" id="unterkategorie-zurueck-btn">← Zurück</button>
-    </div>
-    <h1 style="font-size:1.4rem;" id="unterkategorie-screen-titel">Kategorie</h1>
-    <p class="hero-text">Welcher Reiter?</p>
-    <div class="bereich-tiles" id="unterkategorie-tiles"></div>
-  </div>
-
   <div id="app" class="hidden app-shell">
     <header class="content-topbar">
-      <button class="content-topbar-btn" id="content-back-btn" title="Zurück" aria-label="Zurück">←</button>
-      <button class="content-topbar-btn" id="content-home-btn" title="Kategorien" aria-label="Kategorien">🏠</button>
+      <button class="bereich-knopf" id="content-bereich-btn" title="Bereich wechseln" aria-label="Bereich wechseln">
+        <span id="content-bereich-text">Bereich</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
       <img class="topbar-logo hidden" id="topbar-logo" src="" alt="">
       <span class="brand" id="brand-name">Dashboard</span>
       <span class="brand-sub" id="brand-sub">Aufgaben</span>
@@ -94,11 +78,20 @@
       <button class="link-btn" id="btn-abmelden">Abmelden</button>
     </div>
 
+    <nav class="reiter-leiste hidden" id="reiter-leiste" aria-label="Reiter"></nav>
+
     <main>
       <div id="view-heute">
-        <h1>Start <button class="hilfe-icon" data-hilfe="Zeigt heutige Termine und fällige/überfällige Aufgaben gemeinsam in einer Zeitleiste, plus das aktuelle Wetter oben. Reine Übersicht – bearbeitet wird in den Reitern Aufgaben bzw. Kalender.">?</button></h1>
-        <p class="hero-text">Was heute ansteht – Aufgaben und Termine kombiniert.</p>
-        <div id="wetter-bereich"></div>
+        <div class="heute-datum" id="heute-datum"></div>
+        <h1 class="heute-gruss"><span id="heute-gruss">Moin Markus.</span> <button class="hilfe-icon" data-hilfe="Zeigt oben Wetter und Überfälliges, darunter alles, was heute ansteht, als Zeitleiste – überfällige und heute fällige Aufgaben sowie heutige Termine. Was gerade läuft, ist als „Jetzt“ hervorgehoben. Ein Tipp auf einen Eintrag öffnet Aufgaben bzw. Kalender – bearbeitet wird dort.">?</button></h1>
+        <div class="heute-kacheln">
+          <div id="wetter-bereich"></div>
+          <button class="heute-kachel heute-kachel--dunkel" id="heute-ueberfaellig" onclick="tabWechseln('aufgaben')">
+            <span class="heute-kachel-titel">Überfällig</span>
+            <span class="heute-kachel-zahl" id="heute-ueberfaellig-zahl">0</span>
+          </button>
+        </div>
+        <div id="wetter-ausblick"></div>
         <div id="heute-bereich"></div>
       </div>
 
@@ -349,10 +342,10 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Das Dashboard trennt drei Lebensbereiche sauber voneinander: <strong>Privat</strong>, <strong>OGS Rapunzel</strong> (Beruf) und <strong>AWO OV Liblar</strong> (Ehrenamt). Ein vierter Bereich <strong>Verwaltung</strong> (⚙️) hat keine eigenen Daten, sondern enthält nur die Reiter-Verwaltung.</p>
               <ul>
-                <li><strong>Nach dem Login:</strong> die Willkommensseite mit Datum und vier farbigen Bereichs-Karten (Bereich wählen). Verwaltung öffnet direkt die Reiter-Verwaltung; Privat/OGS/AWO öffnen eine zweite Kachel-Ebene mit Themen: Heute, Planen, Sammeln, dem bereichsspezifischen Themenblock (z.B. „OGS Rapunzel" mit Ideen/Inventar/Projekte/Verleih) und Verwalten</li>
-                <li><strong>Dritte Ebene – Reiter:</strong> jede Themen-Kachel öffnet die einzelnen Reiter als eigene Kacheln. Enthält ein Thema gerade nur einen sichtbaren Reiter, springt die App direkt hinein und überspringt diese Zwischenseite</li>
-                <li><strong>Zurück &amp; Home:</strong> in jeder Ansicht oben ein ← (eine Ebene zurück zu den Reiter- bzw. Themen-Kacheln) und ein 🏠 (direkt zu den Themen-Kacheln des aktuellen Bereichs)</li>
-                <li><strong>„↔ Bereich wechseln":</strong> im ⋮-Menü oben rechts, führt zurück zum Bereichs-Kacheln-Screen, ohne dich abzumelden</li>
+                <li><strong>Nach dem Login:</strong> die Willkommensseite mit Datum und vier farbigen Bereichs-Karten (Bereich wählen). Verwaltung öffnet direkt die Reiter-Verwaltung; Privat/OGS/AWO öffnen direkt den Start-Screen (Heute)</li>
+                <li><strong>Leiste unten:</strong> die Themen Heute, Planen, Sammeln, der bereichsspezifische Block (Glühbirne, z.B. Ideen/Inventar/Projekte/Verleih) und Verwalten (Raster-Symbol). Das aktive Thema ist hervorgehoben und beschriftet. Ein Tipp auf ein Thema öffnet den Reiter, den du darin zuletzt offen hattest (beim ersten Mal den ersten)</li>
+                <li><strong>Reiter-Leiste oben:</strong> hat das aktive Thema mehrere sichtbare Reiter, stehen sie als Knöpfe unter der Kopfzeile (seitlich wischbar). Thema mit nur einem Reiter (z.B. Heute): keine Reiter-Leiste</li>
+                <li><strong>Bereich wechseln:</strong> über den Bereichs-Knopf oben links (z.B. „Privat ▾") oder „↔ Bereich wechseln" im ⋮-Menü – beides führt zur Willkommensseite, ohne dich abzumelden</li>
               </ul>
               <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar, -Projekte und -Verleih haben ebenfalls ein eigenes bereich-Feld.</p>
               <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS- und AWO-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Links/Reflexion/Einkauf/Export gibt es nur im Privat-Bereich.</p>
@@ -365,12 +358,16 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Start</summary>
             <div class="anleitung-text">
-              <p>Startansicht beim Öffnen der App.</p>
+              <p>Startansicht beim Öffnen eines Bereichs.</p>
               <ul>
-                <li><strong>Jetzt-Zeitleiste:</strong> zeigt den heutigen Zeitrahmen (siehe Frei) als Farbleiste – belegt/frei/erledigt als Segmente, ein oranger Marker zeigt die aktuelle Uhrzeit. Antippen springt in den Frei-Tab. Darunter steht der nächste offene Termin</li>
+                <li><strong>Kopf:</strong> Datum und Gruß mit der Zahl offener Dinge heute (überfällige und heute fällige Aufgaben, fällige Erinnerungen, heutige Termine). Ist nichts offen: „Freie Bahn heute."</li>
+                <li><strong>Wetter-Kachel:</strong> aktuelles Wetter am eingestellten Ort. Antippen klappt den 5-Tage-Ausblick auf bzw. zu; dort lässt sich über ✎ der Ort ändern</li>
+                <li><strong>Überfällig-Kachel:</strong> Anzahl überfälliger Aufgaben im Bereich, Antippen öffnet Aufgaben</li>
+                <li><strong>Zeitleiste:</strong> alles für heute als Karten – zuerst Überfälliges (mit Fälligkeitsdatum), dann Ganztägiges, dann Termine und Aufgaben nach Uhrzeit, Aufgaben ohne Uhrzeit am Ende. Was gerade läuft, steht als „Jetzt" farbig hervorgehoben. Erledigte Termine erscheinen durchgestrichen. Antippen öffnet Aufgaben bzw. Kalender</li>
+                <li><strong>Freie Zeit:</strong> zeigt den heutigen Zeitrahmen (siehe Frei) als Farbleiste – belegt/frei/erledigt als Segmente, ein oranger Marker zeigt die aktuelle Uhrzeit. Antippen springt in den Frei-Tab. Darunter steht der nächste offene Termin</li>
                 <li><strong>Drei Kacheln:</strong> fällige Aufgaben (inkl. fällige wiederkehrende Erinnerungen), aktive Ziele der laufenden Woche/Monat/Jahr, offene Artikel auf der Einkaufsliste – jede Kachel springt beim Antippen in den passenden Tab</li>
                 <li><strong>Ziel-Kacheln:</strong> darunter, falls für den aktuellen Zeitraum Ziele angelegt sind, mit Fortschritt</li>
-                <li>Ist nichts dringend, steht dort „Nichts Dringendes für heute — guter Tag."</li>
+                <li>Ist in der Zeitleiste nichts, steht dort „Nichts Dringendes für heute – guter Tag."</li>
               </ul>
             </div>
           </details>
@@ -616,9 +613,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Reiter <span class="anleitung-nur">(nur Verwaltung)</span></summary>
             <div class="anleitung-text">
-              <p>Checkboxen-Übersicht, gruppiert nach Privat/OGS/AWO: legt für jeden Bereich einzeln und frei fest, welche Reiter als Kachel sichtbar sein sollen – auch außerhalb der ursprünglichen Zuordnung (z.B. Finanzen auch in OGS einblenden).</p>
+              <p>Checkboxen-Übersicht, gruppiert nach Privat/OGS/AWO: legt für jeden Bereich einzeln und frei fest, welche Reiter sichtbar sein sollen – auch außerhalb der ursprünglichen Zuordnung (z.B. Finanzen auch in OGS einblenden).</p>
               <ul>
-                <li>Ausblenden entfernt einen Reiter nur aus der Kachel-Ansicht – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen. Eine Themen-Kachel (z.B. „Sammeln") erscheint nur, solange mindestens ein Reiter darin sichtbar ist</li>
+                <li>Ausblenden entfernt einen Reiter nur aus der Navigation – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen. Ein Thema (z.B. „Sammeln") erscheint in der Leiste unten nur, solange mindestens ein Reiter darin sichtbar ist</li>
                 <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
                 <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital) sowie OGS-Inventar, -Projekte und -Verleih haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten.</li>
               </ul>
@@ -971,6 +968,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         </details>
       </div>
     </main>
+
+    <nav class="bottom-nav hidden" id="bottom-nav" aria-label="Hauptnavigation"></nav>
   </div>
 
 <script src="app.js"></script>
