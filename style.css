@@ -694,3 +694,92 @@
   }
   .bereich-karte--verwaltung .bereich-karte-name { font-family: var(--font-text); font-size: 1.05rem; font-weight: 600; }
   #bereich-screen-abmelden { display: block; margin: 1.6rem auto 0; min-height: 44px; }
+
+  /* ==========================================================
+     Navigation: Bereichs-Knopf oben, Reiter-Leiste, Leiste unten
+     ========================================================== */
+  .bereich-knopf {
+    display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.75rem; padding: 0 1rem;
+    border: none; border-radius: 999px; background: var(--nav-bg); color: var(--nav-ink);
+    font-family: var(--font-text); font-size: 0.9rem; font-weight: 600; cursor: pointer; flex-shrink: 0;
+  }
+  .bereich-knopf:focus-visible, .bottom-nav-btn:focus-visible, .reiter-chip:focus-visible, .zl-eintrag:focus-visible, .heute-kachel:focus-visible {
+    outline: 3px solid var(--accent); outline-offset: 2px;
+  }
+
+  .reiter-leiste {
+    display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.8rem 1.2rem 0.2rem;
+    max-width: 700px; margin: 0 auto; scrollbar-width: none;
+  }
+  .reiter-leiste::-webkit-scrollbar { display: none; }
+  .reiter-chip {
+    flex-shrink: 0; min-height: 2.5rem; padding: 0 1rem; border-radius: 999px; cursor: pointer;
+    border: 1.5px solid var(--border); background: var(--panel); color: var(--ink);
+    font-family: var(--font-text); font-size: 0.88rem; font-weight: 600;
+  }
+  .reiter-chip.aktiv { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+
+  main.mit-nav { padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px)); }
+
+  .bottom-nav {
+    position: fixed; z-index: 40; left: 50%; transform: translateX(-50%);
+    bottom: calc(0.9rem + env(safe-area-inset-bottom, 0px));
+    width: min(calc(100% - 1.75rem), 480px); min-height: 4.25rem; padding: 0 0.5rem;
+    display: flex; align-items: center; justify-content: space-around;
+    background: var(--nav-bg); border-radius: 999px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  }
+  .bottom-nav-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+    min-width: 3.25rem; height: 3.25rem; padding: 0 0.6rem; border: none; border-radius: 999px;
+    background: none; color: var(--nav-ink); opacity: 0.65; cursor: pointer;
+    font-family: var(--font-text); font-size: 0.82rem; font-weight: 600;
+  }
+  .bottom-nav-btn.aktiv { background: var(--bg); color: var(--ink); opacity: 1; padding: 0 1rem; }
+  :root[data-bereich="ogs"] .bottom-nav-btn.aktiv { background: var(--akzent-flaeche); }
+  .bottom-nav-label { white-space: nowrap; }
+
+  /* ==========================================================
+     Start-Screen (Heute)
+     ========================================================== */
+  .heute-datum { font-size: 0.9rem; font-weight: 600; color: var(--ink-dim); }
+  .heute-gruss { font-size: 2.6rem; line-height: 1; margin: 0.35rem 0 1.2rem; }
+  .heute-gruss-akzent { color: var(--accent); }
+  .heute-kacheln { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; margin-bottom: 0.6rem; }
+  #wetter-bereich { display: flex; min-width: 0; }
+  .heute-kachel {
+    display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 0.3rem;
+    width: 100%; min-height: 5.25rem; padding: 0.85rem 1rem; border: none; border-radius: 20px;
+    text-align: left; cursor: pointer; font-family: var(--font-text); color: var(--ink);
+  }
+  .heute-kachel--wetter { background: var(--akzent-flaeche); }
+  .heute-kachel--dunkel { background: var(--nav-bg); color: var(--nav-ink); }
+  .heute-kachel-titel { font-size: 0.78rem; font-weight: 600; opacity: 0.8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .heute-kachel-zahl { font-family: var(--font-display); font-size: 1.75rem; font-weight: 700; line-height: 1.05; }
+  .heute-kachel-text { font-family: var(--font-text); font-size: 0.85rem; font-weight: 500; }
+  #heute-ueberfaellig-zahl { color: #ffa98f; }
+  :root[data-bereich="awo"] #heute-ueberfaellig-zahl { color: #ffb36b; }
+  #wetter-ausblick { margin-bottom: 0.6rem; }
+  #wetter-ausblick .wetter-karte { border-radius: 20px; }
+
+  .heute-abschnitt { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; margin: 1.4rem 0 0.7rem; }
+  .zeitleiste { display: flex; flex-direction: column; gap: 0.6rem; }
+  .zl-eintrag {
+    display: flex; gap: 0.75rem; align-items: stretch; width: 100%; padding: 0; border: none;
+    background: none; text-align: left; cursor: pointer; font-family: var(--font-text); color: var(--ink);
+  }
+  .zl-zeit { width: 3.2rem; flex-shrink: 0; padding-top: 1rem; font-size: 0.82rem; font-weight: 600; color: var(--ink-dim); }
+  .zl-karte {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem;
+    background: var(--panel); border-radius: 18px; padding: 0.85rem 1rem;
+  }
+  .zl-chip { font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 8px; background: var(--bg); color: var(--ink-dim); }
+  .zl-chip--ueberfaellig { background: var(--overdue-bg); color: var(--overdue-text); }
+  .zl-titel { font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+  .zl-eintrag.jetzt .zl-zeit { color: var(--accent); }
+  .zl-eintrag.jetzt .zl-karte { background: var(--accent); color: #ffffff; }
+  .zl-eintrag.jetzt .zl-chip { background: rgba(255, 255, 255, 0.22); color: #ffffff; }
+  .zl-eintrag.erledigt .zl-titel { text-decoration: line-through; opacity: 0.55; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bereich-karte { transition: none; }
+  }
