@@ -1,23 +1,66 @@
-:root {
-    --bg: #eef1f5; --panel: #ffffff; --ink: #1c2430; --ink-dim: #5c6779;
-    --accent: #3b6ef6; --accent-2: #e8793f; --border: #dbe1ea;
-    --jetzt: #e8793f;
+/* ==========================================================
+     Schriften – selbst gehostet (fonts/), keine Verbindung zu Google.
+     Lizenz: SIL Open Font License 1.1 (siehe fonts/OFL-*.txt)
+     ========================================================== */
+  @font-face {
+    font-family: "Bricolage Grotesque"; font-style: normal; font-display: swap;
+    font-weight: 200 800; src: url("fonts/bricolage-grotesque.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "DM Sans"; font-style: normal; font-display: swap;
+    font-weight: 100 1000; src: url("fonts/dm-sans.woff2") format("woff2");
+  }
+
+  /* ==========================================================
+     Farbwelten: :root = neutral (Login, Bereichsauswahl, Verwaltung).
+     Jeder Bereich überschreibt die Variablen über :root[data-bereich] (html-Element).
+     Neuer Bereich = neuer Block unten, sonst nichts.
+     ========================================================== */
+  :root {
+    --font-display: "Bricolage Grotesque", "DM Sans", system-ui, sans-serif;
+    --font-text: "DM Sans", system-ui, sans-serif;
+    --bg: #f3f2ef; --panel: #ffffff; --ink: #1b1b1b; --ink-dim: #5e5e5e;
+    --accent: #2b2b2b; --accent-2: #e4572e; --border: #dedbd4;
+    --akzent-flaeche: #e7e4dd; /* helle Fläche, z.B. Wetter-Kachel */
+    --nav-bg: #1b1b1b; --nav-ink: #f3f2ef;
+    --jetzt: var(--accent);
     --mod-aufgaben: #3b6ef6; --mod-termine: #2f9e6f; --mod-finanzen: #c98a2c; --mod-planung: #8b5fd9;
-    --overdue-bg: #fde2e1; --overdue-text: #b3261e; --overdue-border: #f5b7b4;
+    --overdue-bg: #fde3de; --overdue-text: #b2301a; --overdue-border: #f5b7b4;
     --today-bg: #fdead1; --today-text: #935e00; --today-border: #f3cf8e;
     --reminder-bg: #e4ecfd;
   }
+  :root[data-bereich="privat"] {
+    --bg: #eaf0f7; --ink: #10233f; --ink-dim: #3f5f8a;
+    --accent: #2a5bd7; --border: #d0dcea;
+    --akzent-flaeche: #a9cdf3; --nav-bg: #10233f; --nav-ink: #eaf0f7;
+    --reminder-bg: #dde8fb;
+  }
+  :root[data-bereich="ogs"] {
+    --bg: #fff9e3; --ink: #1e3a5c; --ink-dim: #4d6582;
+    --accent: #1872b8; --accent-2: #ffcc00; --border: #f0e3b0;
+    --akzent-flaeche: #ffcc00; --nav-bg: #1e3a5c; --nav-ink: #fff9e3;
+    --reminder-bg: #e0f1fd;
+  }
+  :root[data-bereich="awo"] {
+    --bg: #fbf0ee; --ink: #3b1215; --ink-dim: #8a4148;
+    --accent: #c8102e; --accent-2: #f6c1b9; --border: #efd3ce;
+    --akzent-flaeche: #f6c1b9; --nav-bg: #3b1215; --nav-ink: #fbf0ee;
+    /* Überfällig hier orange statt rot, damit es sich vom AWO-Rot abhebt */
+    --overdue-bg: #fce8d2; --overdue-text: #8f4700; --overdue-border: #f3c89a;
+    --reminder-bg: #f3e3e4;
+  }
+  html { background: var(--bg); }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Inter", system-ui, sans-serif; min-height: 100vh; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-text); min-height: 100vh; }
   .app-shell { min-height: 100vh; position: relative; }
   .content-topbar {
     display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
     padding: 0.8rem 1.2rem; border-bottom: 1px solid var(--border);
-    background: var(--panel); position: sticky; top: 0; z-index: 30;
+    background: var(--bg); position: sticky; top: 0; z-index: 30;
   }
   .content-topbar-btn {
-    background: none; border: 1px solid var(--border); border-radius: 8px;
-    width: 2.1rem; height: 2.1rem; flex-shrink: 0;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 50%;
+    width: 2.75rem; height: 2.75rem; flex-shrink: 0;
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 1rem; color: var(--ink); cursor: pointer; line-height: 1;
   }
@@ -30,26 +73,27 @@
     display: flex; flex-direction: column; gap: 0.55rem; min-width: 190px;
   }
   .account-menu .link-btn { text-align: left; }
-  .brand { font-family: "Fraunces", serif; font-weight: 600; font-size: 1.15rem; }
+  .brand { font-family: var(--font-display); font-weight: 800; font-size: 1.25rem; letter-spacing: -0.01em; }
+  .topbar-logo { height: 2.5rem; width: auto; display: block; }
   .brand-sub { color: var(--ink-dim); font-size: 0.85rem; }
   main { max-width: 700px; margin: 0 auto; padding: 1.8rem 1.6rem 4rem; }
-  h1 { font-family: "Fraunces", serif; font-weight: 700; font-size: 2rem; margin: 0 0 0.4rem; }
+  h1 { font-family: var(--font-display); font-weight: 800; font-size: 2.2rem; line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 0.4rem; }
   .hero-text { color: var(--ink-dim); margin: 0 0 1.6rem; max-width: 46ch; }
   .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
-  input, select, button { font-family: "Inter", sans-serif; font-size: 0.9rem; }
+  input, select, button { font-family: var(--font-text); font-size: 0.9rem; }
   input, select, textarea {
-    padding: 0.75rem 0.8rem; border: 1px solid var(--border); border-radius: 8px;
-    background: var(--panel); color: var(--ink); font-family: "Inter", sans-serif; font-size: 0.9rem;
+    padding: 0.75rem 0.8rem; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--panel); color: var(--ink); font-family: var(--font-text); font-size: 0.9rem;
   }
   textarea { resize: vertical; }
   input[type="text"] { flex: 1 1 200px; }
   input[type="number"] { width: 8rem; }
   .btn-primary {
-    padding: 0.75rem 1.1rem; border: none; border-radius: 8px;
+    padding: 0.75rem 1.3rem; border: none; border-radius: 999px;
     background: var(--accent); color: #fff; font-weight: 500; cursor: pointer;
   }
   .btn-secondary {
-    padding: 0.6rem 1rem; border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.6rem 1.1rem; border: 1px solid var(--border); border-radius: 999px;
     background: var(--panel); color: var(--ink); cursor: pointer; font-size: 0.85rem;
   }
   .link-btn { background: none; border: none; color: var(--ink-dim); cursor: pointer; padding: 0; font-size: 0.85rem; }
@@ -217,8 +261,8 @@
   .bereich-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.7rem; margin-bottom: 1.6rem; }
   .bereich-tile {
     display: flex; flex-direction: column; align-items: center; gap: 0.3rem; text-align: center; cursor: pointer;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1rem;
-    font-family: "Inter", sans-serif;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 1.1rem 1rem; color: var(--ink);
+    font-family: var(--font-text);
   }
   .bereich-tile:hover { border-color: var(--accent); }
   .bereich-tile.active { border-color: var(--accent); border-width: 2px; }
@@ -232,7 +276,7 @@
 
 
   .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-  .cal-header h2 { font-family: "Fraunces", serif; font-size: 1.2rem; margin: 0; }
+  .cal-header h2 { font-family: var(--font-display); font-size: 1.2rem; margin: 0; }
   .cal-nav button {
     background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
     width: 2rem; height: 2rem; cursor: pointer; color: var(--ink); font-size: 1rem;
@@ -250,7 +294,7 @@
   .cal-day .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-2); }
   .cal-day.selected .dot { background: #fff; }
   .cal-day-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
-  .cal-day-panel h3 { font-family: "Fraunces", serif; font-size: 1rem; margin: 0 0 0.8rem; }
+  .cal-day-panel h3 { font-family: var(--font-display); font-size: 1rem; margin: 0 0 0.8rem; }
   .termin-item { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
   .termin-item:last-of-type { border-bottom: none; }
   .termin-zeit { color: var(--ink-dim); font-size: 0.82rem; min-width: 3.2rem; }
@@ -307,7 +351,7 @@
   .reflex-form input[type="date"] { align-self: flex-start; }
   .reflex-form textarea {
     padding: 0.75rem 0.8rem; border: 1px solid var(--border); border-radius: 8px;
-    background: var(--panel); color: var(--ink); font-family: "Inter", sans-serif;
+    background: var(--panel); color: var(--ink); font-family: var(--font-text);
     font-size: 0.92rem; resize: vertical;
   }
   .reflex-item {
@@ -315,7 +359,7 @@
     padding: 0.9rem 1rem; margin-bottom: 0.7rem;
   }
   .reflex-datum {
-    font-family: "Fraunces", serif; font-weight: 600; font-size: 0.9rem;
+    font-family: var(--font-display); font-weight: 600; font-size: 0.9rem;
     color: var(--accent); margin-bottom: 0.4rem; display: flex; justify-content: space-between; align-items: baseline;
   }
   .reflex-text { white-space: pre-wrap; font-size: 0.92rem; line-height: 1.5; }
@@ -360,7 +404,7 @@
     font-size: 0.85rem; padding: 0; width: 1rem; flex-shrink: 0;
   }
   .ziel-toggle:hover { color: var(--accent); }
-  .ziel-titel { font-family: "Fraunces", serif; font-weight: 600; font-size: 1rem; flex: 1; }
+  .ziel-titel { font-family: var(--font-display); font-weight: 600; font-size: 1rem; flex: 1; }
   .ziel-fortschritt { font-size: 0.78rem; color: var(--ink-dim); }
   .ziel-uebergeordnet { font-size: 0.78rem; color: var(--accent); margin-top: 0.15rem; margin-left: 1.6rem; }
   .ziel-details { margin-top: 0.7rem; margin-left: 1.6rem; }
@@ -370,14 +414,14 @@
   .ziel-schritt-add { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
   .ziel-schritt-add input {
     flex: 1; padding: 0.45rem 0.6rem; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--bg); color: var(--ink); font-family: "Inter", sans-serif; font-size: 0.85rem;
+    background: var(--bg); color: var(--ink); font-family: var(--font-text); font-size: 0.85rem;
   }
   .ziel-schritt-add button {
     padding: 0.45rem 0.7rem; border: 1px solid var(--border); border-radius: 6px;
     background: var(--bg); color: var(--ink); cursor: pointer; font-size: 0.85rem;
   }
   .plan-overview-heading {
-    font-family: "Fraunces", serif; font-size: 1.05rem; font-weight: 600; margin: 0 0 0.8rem;
+    font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; margin: 0 0 0.8rem;
   }
 
   .ziel-kachel-grid {
@@ -386,7 +430,7 @@
   .ziel-kachel {
     display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem;
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
-    padding: 0.8rem 0.9rem; cursor: pointer; text-align: left; font-family: "Inter", sans-serif;
+    padding: 0.8rem 0.9rem; cursor: pointer; text-align: left; font-family: var(--font-text);
   }
   .ziel-kachel:hover { border-color: var(--accent); }
   .ziel-kachel-typ {
@@ -398,7 +442,7 @@
   /* Start-Tab: Jetzt-Zeitleiste */
   .jetzt-leiste-wrap { margin: 0.6rem 0 1.6rem; }
   .jetzt-leiste-kopf { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
-  .jetzt-leiste-titel { font-family: "Fraunces", serif; font-size: 1.05rem; font-weight: 600; }
+  .jetzt-leiste-titel { font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; }
   .jetzt-leiste-zeit { font-size: 0.82rem; color: var(--accent-2); font-weight: 600; }
   .jetzt-leiste {
     position: relative; height: 30px; border-radius: 8px; overflow: hidden;
@@ -429,7 +473,7 @@
   .wetter-kopf { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; }
   .wetter-jetzt { display: flex; align-items: baseline; gap: 0.5rem; }
   .wetter-jetzt-icon { font-size: 1.8rem; }
-  .wetter-jetzt-temp { font-family: "Fraunces", serif; font-size: 1.9rem; font-weight: 600; }
+  .wetter-jetzt-temp { font-family: var(--font-display); font-size: 1.9rem; font-weight: 600; }
   .wetter-jetzt-text { color: var(--ink-dim); font-size: 0.9rem; }
   .wetter-ort-zeile { display: flex; align-items: center; gap: 0.3rem; color: var(--ink-dim); font-size: 0.85rem; }
   .wetter-tage { display: flex; gap: 0.6rem; margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
@@ -440,11 +484,11 @@
   .wetter-kachel {
     display: flex; flex-direction: column; align-items: center; gap: 0.2rem; text-align: center;
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-    padding: 0.7rem 0.4rem; font-family: "Inter", sans-serif;
+    padding: 0.7rem 0.4rem; font-family: var(--font-text);
   }
   .wetter-kachel-tag { font-size: 0.78rem; color: var(--ink-dim); font-weight: 500; }
   .wetter-kachel-icon { font-size: 1.5rem; margin: 0.1rem 0; }
-  .wetter-kachel-max { font-family: "Fraunces", serif; font-size: 1.15rem; font-weight: 600; line-height: 1; }
+  .wetter-kachel-max { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; line-height: 1; }
   .wetter-kachel-min { font-size: 0.78rem; color: var(--ink-dim); }
   .wetter-tag { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; font-size: 0.8rem; }
   .wetter-tag-name { color: var(--ink-dim); font-weight: 500; }
@@ -458,13 +502,13 @@
   .start-kachel {
     display: flex; flex-direction: column; gap: 0.15rem; text-align: left; cursor: pointer;
     background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent);
-    border-radius: 10px; padding: 0.85rem 1rem; font-family: "Inter", sans-serif;
+    border-radius: 10px; padding: 0.85rem 1rem; font-family: var(--font-text);
   }
   .start-kachel:hover { border-color: var(--accent); border-left-color: var(--accent); }
   .start-kachel.mod-aufgaben { border-left-color: var(--mod-aufgaben); }
   .start-kachel.mod-planung { border-left-color: var(--mod-planung); }
   .start-kachel.mod-einkauf { border-left-color: var(--mod-finanzen); }
-  .start-kachel-zahl { font-family: "Fraunces", serif; font-size: 1.7rem; font-weight: 600; line-height: 1; }
+  .start-kachel-zahl { font-family: var(--font-display); font-size: 1.7rem; font-weight: 600; line-height: 1; }
   .start-kachel-label { font-size: 0.8rem; color: var(--ink-dim); }
 
   /* Finanzen-Modul */
@@ -492,11 +536,11 @@
   .fin-summary-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.6rem; }
   .fin-summary-item { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--mod-finanzen); border-radius: 10px; padding: 0.7rem 1rem; min-width: 9rem; }
   .fin-summary-label { color: var(--ink-dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
-  .fin-summary-value { font-family: "Fraunces", serif; font-size: 1.2rem; font-weight: 600; margin-top: 0.15rem; }
+  .fin-summary-value { font-family: var(--font-display); font-size: 1.2rem; font-weight: 600; margin-top: 0.15rem; }
 
   /* Buchungen-Tab */
   .fin-quick-form { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.4rem; }
-  .fin-quick-betrag { width: 100%; font-size: 1.4rem; text-align: center; margin: 0.7rem 0; font-family: "Fraunces", serif; }
+  .fin-quick-betrag { width: 100%; font-size: 1.4rem; text-align: center; margin: 0.7rem 0; font-family: var(--font-display); }
   .fin-kat-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
   .fin-kat-btn {
     padding: 0.5rem 0.9rem; border: 1px solid var(--border); border-radius: 999px;
@@ -522,7 +566,7 @@
     max-height: 85vh; display: flex; flex-direction: column; overflow: hidden;
   }
   .fin-modal-kopf { padding: 1.2rem 1.4rem 0.8rem; border-bottom: 1px solid var(--border); }
-  .fin-modal-kopf h2 { font-family: "Fraunces", serif; font-size: 1.2rem; margin: 0 0 0.3rem; }
+  .fin-modal-kopf h2 { font-family: var(--font-display); font-size: 1.2rem; margin: 0 0 0.3rem; }
   .fin-modal-body { padding: 0.6rem 1.4rem; overflow-y: auto; flex: 1 1 auto; }
   .fin-modal-fuss {
     padding: 0.9rem 1.4rem; border-top: 1px solid var(--border);
@@ -540,7 +584,7 @@
 
   /* Jahresübersicht & Charts */
   .fin-chart-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.4rem; }
-  .fin-chart-wrap h3 { font-family: "Fraunces", serif; font-size: 1rem; margin: 0 0 0.7rem; }
+  .fin-chart-wrap h3 { font-family: var(--font-display); font-size: 1rem; margin: 0 0 0.7rem; }
   .fin-chart-legende { display: flex; gap: 1rem; font-size: 0.78rem; color: var(--ink-dim); margin-top: 0.5rem; }
   .fin-legende-punkt { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; margin-right: 0.3rem; }
   .fin-startkapital-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.2rem; font-size: 0.85rem; color: var(--ink-dim); }
@@ -572,13 +616,13 @@
     margin-bottom: 0.6rem; overflow: hidden;
   }
   .anleitung-abschnitt summary {
-    padding: 0.85rem 1rem; cursor: pointer; font-family: "Fraunces", serif;
+    padding: 0.85rem 1rem; cursor: pointer; font-family: var(--font-display);
     font-weight: 600; font-size: 1rem; list-style: none; user-select: none;
   }
   .anleitung-abschnitt summary::-webkit-details-marker { display: none; }
   .anleitung-abschnitt summary::before { content: "▸ "; color: var(--accent); }
   .anleitung-abschnitt[open] summary::before { content: "▾ "; }
-  .anleitung-nur { font-family: "Inter", sans-serif; font-weight: 400; font-size: 0.78rem; color: var(--ink-dim); }
+  .anleitung-nur { font-family: var(--font-text); font-weight: 400; font-size: 0.78rem; color: var(--ink-dim); }
   .anleitung-text { padding: 0 1.1rem 1rem; font-size: 0.88rem; line-height: 1.55; }
   .anleitung-text p { margin: 0 0 0.7rem; }
   .anleitung-text p:last-child { margin-bottom: 0; }
@@ -620,3 +664,33 @@
     color: var(--ink); cursor: pointer;
   }
   .reiter-verwaltung-item input[type="checkbox"] { width: 1.05rem; height: 1.05rem; flex-shrink: 0; }
+
+  /* ==========================================================
+     Willkommensseite (Bereichsauswahl) – neutral, jede Karte in
+     der Farbe ihres Bereichs
+     ========================================================== */
+  #bereich-screen { max-width: 420px; text-align: left; margin: 0 auto; padding: 2.4rem 1.25rem 1.5rem; }
+  .willkommen-datum { font-size: 0.9rem; font-weight: 600; color: var(--ink-dim); }
+  .willkommen-titel { font-size: 2.6rem; line-height: 1; margin: 0.4rem 0 1.4rem; }
+  .bereich-liste { display: flex; flex-direction: column; gap: 0.8rem; }
+  .bereich-karte {
+    display: flex; align-items: center; gap: 0.9rem; min-height: 5.25rem; padding: 0 1.1rem;
+    border: none; border-radius: 22px; cursor: pointer; text-align: left;
+    font-family: var(--font-text); transition: transform 0.12s ease;
+  }
+  .bereich-karte:active { transform: scale(0.98); }
+  .bereich-karte:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .bereich-karte-name { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; }
+  .bereich-karte-farbe { width: 2.75rem; height: 2.75rem; border-radius: 14px; flex-shrink: 0; }
+  .bereich-karte-logo { height: 3.5rem; width: auto; }
+  .bereich-karte--privat { background: #10233f; color: #eaf0f7; }
+  .bereich-karte--privat .bereich-karte-farbe { background: #2a5bd7; }
+  .bereich-karte--ogs { background: #fff4c7; color: #1e3a5c; }
+  .bereich-karte--ogs .bereich-karte-name { margin-left: auto; }
+  .bereich-karte--awo { background: #c8102e; color: #ffffff; }
+  .bereich-karte--awo .bereich-karte-farbe { background: #ffffff; }
+  .bereich-karte--verwaltung {
+    min-height: 4rem; background: transparent; color: var(--ink); border: 1.5px solid var(--border);
+  }
+  .bereich-karte--verwaltung .bereich-karte-name { font-family: var(--font-text); font-size: 1.05rem; font-weight: 600; }
+  #bereich-screen-abmelden { display: block; margin: 1.6rem auto 0; min-height: 44px; }
