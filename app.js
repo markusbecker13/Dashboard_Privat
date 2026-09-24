@@ -337,6 +337,7 @@
     rezeptOffenId = null;
     rezeptEinkaufId = null;
     rezeptEinkaufAuswahl = new Set();
+    if (kochmodus) window.kochmodusSchliessen();
     rezeptFormRendern();
     bereichAnwenden();
     render();
@@ -2469,6 +2470,12 @@
   let rezeptEinkaufId = null;        // Rezept, bei dem gerade Zutaten ausgewählt werden
   let rezeptEinkaufAuswahl = new Set(); // Zeilen-Indizes der ausgewählten Zutaten
   const rezeptGekochtVorher = {};    // id -> Datum vor "Heute gekocht" (zum Zurücknehmen)
+  // Etappe 3
+  const rezeptBildUrls = {};         // id -> { url, ablauf } (signierte URL, 60 Min. gültig)
+  const rezeptBildLaedt = new Set(); // ids, deren URL gerade abgerufen wird
+  let rezeptFotoNeu = null;          // { base64, typ, vorschau } – im Formular gewähltes, verkleinertes Foto
+  let rezeptFotoEntfernen = false;   // im Formular "Foto entfernen" gewählt
+  let kochmodus = null;              // { id, zutatenErledigt:Set, schritteErledigt:Set, wakeLock, wach }
 
   function rezeptHeuteIso() {
     // lokales Datum, nicht UTC – sonst wäre "heute" nachts bis 2 Uhr noch gestern
@@ -2549,6 +2556,7 @@
 
   function rezeptMeta(r) {
     const teile = [];
+    if (r.bild_pfad) teile.push("📷");
     if (r.kategorie) teile.push(escapeHtml(r.kategorie));
     if (r.portionen) teile.push(`${r.portionen} ${r.portionen === 1 ? "Portion" : "Portionen"}`);
     if (r.zeit_minuten) teile.push(`${r.zeit_minuten} Min.`);
@@ -2616,6 +2624,235 @@
       return `<a href="${escapeAttr(quelle)}" target="_blank" rel="noopener noreferrer">${escapeHtml(anzeige)} ↗</a>`;
     }
     return escapeHtml(quelle);
+  }
+
+  // ---- Fotos ----
+  function rezeptBildUrl(id) {
+    const eintrag = rezeptBildUrls[id];
+    return eintrag && eintrag.ablauf > Date.now() ? eintrag.url : null;
+  }
+
+  async function rezeptBildLaden(id) {
+    if (rezeptBildUrl(id) || rezeptBildLaedt.has(id)) return;
+    rezeptBildLaedt.add(id);
+    try {
+      const res = await api("rezept_bild_url", { id });
+      rezeptBildUrls[id] = { url: res.url, ablauf: Date.now() + 55 * 60 * 1000 };
+    } catch (e) {
+      console.error("Rezeptfoto konnte nicht geladen werden:", e);
+      return;
+    } finally {
+      rezeptBildLaedt.delete(id);
+    }
+    if (rezeptOffenId === id) renderRezepte();
+    if (rezeptFormId === id) rezeptFotoVorschauZeigen();
+    if (kochmodus && kochmodus.id === id) renderKochmodus();
+  }
+
+  // Verkleinert ein Foto im Browser auf max. 1600 px (JPEG) – Handyfotos
+  // haben sonst schnell 5–10 MB. createImageBitmap statt <img src=blob:>,
+  // weil die CSP blob:-Bilder nicht erlaubt.
+  async function fotoVerkleinern(datei) {
+    const MAX_KANTE = 1600;
+    let quelle;
+    try {
+      quelle = await createImageBitmap(datei, { imageOrientation: "from-image" });
+    } catch (e) {
+      quelle = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error("Das Bildformat wird nicht unterstützt (z.B. HEIC). Bitte als JPG speichern."));
+          img.src = reader.result;
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(datei);
+      });
+    }
+    const faktor = Math.min(1, MAX_KANTE / Math.max(quelle.width, quelle.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(quelle.width * faktor);
+    canvas.height = Math.round(quelle.height * faktor);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff"; // transparente PNGs sonst schwarz im JPEG
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(quelle, 0, 0, canvas.width, canvas.height);
+    if (typeof quelle.close === "function") quelle.close();
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+    return { base64: dataUrl.split(",")[1], typ: "image/jpeg", vorschau: dataUrl };
+  }
+
+  function rezeptFotoVorschauZeigen() {
+    const box = document.getElementById("rezept-f-foto-vorschau");
+    if (!box) return;
+    const r = rezeptFormId && rezeptFormId !== "neu" ? rezepte.find((x) => x.id === rezeptFormId) : null;
+    let src = null;
+    if (rezeptFotoNeu) src = rezeptFotoNeu.vorschau;
+    else if (r && r.bild_pfad && !rezeptFotoEntfernen) src = rezeptBildUrl(r.id);
+    const hatFoto = !!rezeptFotoNeu || !!(r && r.bild_pfad && !rezeptFotoEntfernen);
+    box.innerHTML = src
+      ? `<img src="${escapeAttr(src)}" class="rezept-foto-vorschau" alt="Vorschau des Fotos">`
+      : (hatFoto ? '<p class="notiz-meta">Foto wird geladen …</p>' : '<p class="notiz-meta">Kein Foto</p>');
+    const entfernen = document.getElementById("rezept-f-foto-entfernen");
+    if (entfernen) entfernen.classList.toggle("hidden", !hatFoto);
+  }
+
+  window.rezeptFotoEntfernenKlick = function() {
+    rezeptFotoNeu = null;
+    rezeptFotoEntfernen = true;
+    const input = document.getElementById("rezept-f-foto");
+    if (input) input.value = "";
+    rezeptFotoVorschauZeigen();
+  };
+
+  // ---- Kochmodus: Vollbild, große Schrift, Bildschirm bleibt an ----
+  async function kochWachHalten() {
+    if (!kochmodus) return;
+    if (!("wakeLock" in navigator)) { kochmodus.wach = "nicht"; kochWachAnzeigen(); return; }
+    try {
+      const lock = await navigator.wakeLock.request("screen");
+      if (!kochmodus) { lock.release(); return; }
+      kochmodus.wakeLock = lock;
+      kochmodus.wach = "an";
+      lock.addEventListener("release", () => {
+        if (kochmodus && kochmodus.wakeLock === lock) { kochmodus.wakeLock = null; kochmodus.wach = "aus"; kochWachAnzeigen(); }
+      });
+    } catch (e) {
+      kochmodus.wach = "fehler";
+    }
+    kochWachAnzeigen();
+  }
+
+  function kochWachAnzeigen() {
+    const el = document.getElementById("koch-wach");
+    if (!el || !kochmodus) return;
+    const texte = {
+      an: "🔆 Bildschirm bleibt an",
+      aus: "Bildschirm-Sperre wieder aktiv – kurz antippen, um sie erneut zu verhindern",
+      nicht: "Dieser Browser kann den Bildschirm nicht wach halten",
+      fehler: "Bildschirm konnte nicht wach gehalten werden",
+    };
+    el.textContent = texte[kochmodus.wach] || "";
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    // Das Betriebssystem gibt die Sperre beim Wechsel in eine andere App frei
+    if (kochmodus && document.visibilityState === "visible" && !kochmodus.wakeLock) kochWachHalten();
+  });
+
+  window.kochmodusStarten = function(id) {
+    const r = rezepte.find((x) => x.id === id);
+    if (!r) return;
+    kochmodus = { id, zutatenErledigt: new Set(), schritteErledigt: new Set(), wakeLock: null, wach: "" };
+    const overlay = document.createElement("div");
+    overlay.className = "session-fokus-overlay koch-overlay";
+    overlay.id = "koch-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "koch-titel");
+    document.body.appendChild(overlay);
+    document.body.classList.add("koch-offen");
+    // Zurück-Taste (Android) schließt den Kochmodus statt die App
+    history.pushState({ kochmodus: true }, "");
+    renderKochmodus();
+    kochWachHalten();
+    if (r.bild_pfad) rezeptBildLaden(r.id);
+  };
+
+  function kochmodusAufraeumen() {
+    if (!kochmodus) return;
+    if (kochmodus.wakeLock) { try { kochmodus.wakeLock.release(); } catch (e) { /* egal */ } }
+    kochmodus = null;
+    const overlay = document.getElementById("koch-overlay");
+    if (overlay) overlay.remove();
+    document.body.classList.remove("koch-offen");
+  }
+
+  window.kochmodusSchliessen = function() {
+    if (!kochmodus) return;
+    if (history.state && history.state.kochmodus) history.back(); // räumt über popstate auf
+    else kochmodusAufraeumen();
+  };
+
+  window.addEventListener("popstate", () => { if (kochmodus) kochmodusAufraeumen(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && kochmodus) window.kochmodusSchliessen(); });
+
+  window.kochZutatUmschalten = function(index) {
+    if (!kochmodus) return;
+    const set = kochmodus.zutatenErledigt;
+    if (set.has(index)) set.delete(index); else set.add(index);
+    renderKochmodus();
+  };
+
+  window.kochSchrittUmschalten = function(index) {
+    if (!kochmodus) return;
+    const set = kochmodus.schritteErledigt;
+    if (set.has(index)) set.delete(index); else set.add(index);
+    renderKochmodus();
+  };
+
+  window.kochPortionenAendern = function(delta) {
+    if (!kochmodus) return;
+    window.rezeptPortionenAendern(kochmodus.id, delta);
+    renderKochmodus();
+  };
+
+  window.kochFertig = async function() {
+    if (!kochmodus) return;
+    const id = kochmodus.id;
+    const r = rezepte.find((x) => x.id === id);
+    window.kochmodusSchliessen();
+    if (r && r.zuletzt_gekocht !== rezeptHeuteIso()) await window.rezeptHeuteGekocht(id);
+  };
+
+  function renderKochmodus() {
+    const overlay = document.getElementById("koch-overlay");
+    if (!overlay || !kochmodus) return;
+    const r = rezepte.find((x) => x.id === kochmodus.id);
+    if (!r) { kochmodusAufraeumen(); return; }
+    const basis = r.portionen || null;
+    const anzeige = basis ? (rezeptPortionenAnzeige[r.id] || basis) : null;
+    const faktor = basis ? anzeige / basis : 1;
+    const zutaten = rezeptZutatenZeilen(r.zutaten, faktor).map((z) => {
+      if (z.typ === "titel") return `<p class="koch-zwischentitel">${escapeHtml(z.text)}</p>`;
+      const erledigt = kochmodus.zutatenErledigt.has(z.index);
+      return `<button class="koch-zeile${erledigt ? " erledigt" : ""}" onclick="kochZutatUmschalten(${z.index})" aria-pressed="${erledigt}">
+        <span class="koch-haken" aria-hidden="true">${erledigt ? "✓" : ""}</span><span>${escapeHtml(z.text)}</span></button>`;
+    }).join("");
+    const schritte = String(r.zubereitung || "").split("\n").map((z) => z.trim()).filter(Boolean);
+    const aktuell = schritte.findIndex((_, i) => !kochmodus.schritteErledigt.has(i));
+    const schritteHtml = schritte.map((text, i) => {
+      const erledigt = kochmodus.schritteErledigt.has(i);
+      return `<button class="koch-schritt${erledigt ? " erledigt" : ""}${i === aktuell ? " aktuell" : ""}" onclick="kochSchrittUmschalten(${i})" aria-pressed="${erledigt}">${escapeHtml(text)}</button>`;
+    }).join("");
+    const bildUrl = r.bild_pfad ? rezeptBildUrl(r.id) : null;
+    const scrollPos = overlay.querySelector(".session-fokus-inhalt")?.scrollTop || 0;
+    overlay.innerHTML = `
+      <div class="session-fokus-kopf">
+        <span class="session-fokus-titel" id="koch-titel">👨‍🍳 ${escapeHtml(r.titel)}</span>
+        <button class="session-fokus-schliessen" onclick="kochmodusSchliessen()" aria-label="Kochmodus schließen">✕</button>
+      </div>
+      <div class="session-fokus-inhalt koch-inhalt">
+        <p class="notiz-meta" id="koch-wach"></p>
+        ${bildUrl ? `<img src="${escapeAttr(bildUrl)}" class="session-fokus-bild" alt="">` : ""}
+        ${zutaten ? `<h3 class="rezept-abschnitt">Zutaten</h3>
+          ${basis ? `<div class="rezept-portionen">
+            <button class="rezept-portionen-btn" onclick="kochPortionenAendern(-1)" aria-label="Eine Portion weniger" ${anzeige <= 1 ? "disabled" : ""}>−</button>
+            <span class="rezept-portionen-zahl">${anzeige} ${anzeige === 1 ? "Portion" : "Portionen"}</span>
+            <button class="rezept-portionen-btn" onclick="kochPortionenAendern(1)" aria-label="Eine Portion mehr" ${anzeige >= 100 ? "disabled" : ""}>+</button>
+          </div>` : ""}
+          <div class="koch-liste">${zutaten}</div>` : ""}
+        ${schritteHtml ? `<h3 class="rezept-abschnitt">Zubereitung <span class="koch-hinweis">– Schritt antippen, wenn erledigt</span></h3><div class="koch-liste">${schritteHtml}</div>` : ""}
+        ${r.notiz ? `<h3 class="rezept-abschnitt">Notiz</h3><p class="koch-text">${escapeHtml(r.notiz)}</p>` : ""}
+      </div>
+      <div class="session-fokus-fuss">
+        <button class="session-fokus-btn-sek" onclick="kochmodusSchliessen()">Schließen</button>
+        <button class="session-fokus-btn-primaer" onclick="kochFertig()">Fertig – heute gekocht</button>
+      </div>`;
+    const inhalt = overlay.querySelector(".session-fokus-inhalt");
+    if (inhalt) inhalt.scrollTop = scrollPos;
+    kochWachAnzeigen();
   }
 
   function rezeptVergleich(a, b) {
@@ -2694,9 +2931,17 @@
               <button class="rezept-portionen-btn" onclick="rezeptPortionenAendern('${r.id}', 1)" aria-label="Eine Portion mehr" ${anzeige >= 100 ? "disabled" : ""}>+</button>
               ${anzeige !== basis ? `<button class="link-btn" onclick="rezeptPortionenZuruecksetzen('${r.id}')">zurück auf ${basis}</button>` : ""}
             </div>` : "";
+        let fotoHtml = "";
+        if (r.bild_pfad) {
+          const url = rezeptBildUrl(r.id);
+          if (url) fotoHtml = `<img src="${escapeAttr(url)}" class="rezept-foto" alt="Foto: ${escapeAttr(r.titel)}">`;
+          else { fotoHtml = '<div class="rezept-foto rezept-foto-platzhalter">Foto wird geladen …</div>'; rezeptBildLaden(r.id); }
+        }
         detail = `
           <div class="rezept-detail">
+            ${fotoHtml}
             <p class="notiz-meta rezept-gekocht-info">${rezeptGekochtText(r.zuletzt_gekocht)}</p>
+            ${(hatZutaten || r.zubereitung) && !einkaufModus ? `<button class="btn-primary rezept-koch-start" onclick="kochmodusStarten('${r.id}')">👨‍🍳 Kochmodus</button>` : ""}
             ${zutaten ? `<h3 class="rezept-abschnitt">Zutaten</h3>${portionenLeiste}${zutaten}` : ""}
             ${hatZutaten && !einkaufModus ? `<button class="btn-secondary rezept-einkauf-start" onclick="rezeptEinkaufStarten('${r.id}')">🛒 Zutaten auf die Einkaufsliste …</button>` : ""}
             ${r.zubereitung ? `<h3 class="rezept-abschnitt">Zubereitung</h3><p class="rezept-text">${escapeHtml(r.zubereitung)}</p>` : ""}
@@ -2746,6 +2991,14 @@
       <div class="row">
         <input type="text" id="rezept-f-titel" placeholder="Titel, z.B. Linsensuppe" value="${escapeAttr(r.titel || "")}">
       </div>
+      <div class="rezept-foto-feld">
+        <div id="rezept-f-foto-vorschau"></div>
+        <div class="rezept-foto-knoepfe">
+          <label class="btn-secondary rezept-foto-label" for="rezept-f-foto">📷 Foto wählen</label>
+          <input type="file" id="rezept-f-foto" accept="image/jpeg,image/png,image/webp" class="rezept-foto-input">
+          <button type="button" class="link-btn hidden" id="rezept-f-foto-entfernen" onclick="rezeptFotoEntfernenKlick()">Foto entfernen</button>
+        </div>
+      </div>
       <div class="row">
         <input type="text" id="rezept-f-kategorie" placeholder="Kategorie (optional)" list="rezept-kategorie-liste" value="${escapeAttr(r.kategorie || "")}">
         <input type="number" id="rezept-f-portionen" placeholder="Portionen" min="1" max="100" inputmode="numeric" value="${r.portionen ?? ""}">
@@ -2764,6 +3017,25 @@
         <button class="btn-primary" onclick="rezeptSpeichern()">Speichern</button>
         <button class="btn-secondary" onclick="rezeptFormSchliessen()">Abbrechen</button>
       </div>`;
+    rezeptFotoNeu = null;
+    rezeptFotoEntfernen = false;
+    rezeptFotoVorschauZeigen();
+    if (r.id && r.bild_pfad) rezeptBildLaden(r.id);
+    document.getElementById("rezept-f-foto").addEventListener("change", async (e) => {
+      const datei = e.target.files && e.target.files[0];
+      if (!datei) return;
+      const box = document.getElementById("rezept-f-foto-vorschau");
+      if (box) box.innerHTML = '<p class="notiz-meta">Foto wird verkleinert …</p>';
+      try {
+        rezeptFotoNeu = await fotoVerkleinern(datei);
+        rezeptFotoEntfernen = false;
+      } catch (err) {
+        rezeptFotoNeu = null;
+        e.target.value = "";
+        alert(err.message || "Foto konnte nicht gelesen werden.");
+      }
+      rezeptFotoVorschauZeigen();
+    });
     document.getElementById("rezept-f-titel").focus();
     formBereich.scrollIntoView({ block: "start", behavior: "smooth" });
   }
@@ -2917,13 +3189,25 @@
       bereich: aktiverBereich,
     };
     if (rezeptFormId && rezeptFormId !== "neu") payload.id = rezeptFormId;
+    if (rezeptFotoNeu) {
+      payload.bild_base64 = rezeptFotoNeu.base64;
+      payload.bild_typ = rezeptFotoNeu.typ;
+    } else if (rezeptFotoEntfernen) {
+      payload.bild_entfernen = true;
+    }
+    const knopf = document.querySelector("#rezept-form-bereich .btn-primary");
+    if (knopf) { knopf.disabled = true; knopf.textContent = "Speichert …"; }
     try {
       await api("rezept_speichern", payload);
     } catch (e) {
       alert("Speichern fehlgeschlagen: " + e.message);
+      if (knopf) { knopf.disabled = false; knopf.textContent = "Speichern"; }
       return; // Formular bleibt offen, nichts geht verloren
     }
     if (payload.id) rezeptOffenId = payload.id;
+    if (payload.id && (rezeptFotoNeu || rezeptFotoEntfernen)) delete rezeptBildUrls[payload.id];
+    rezeptFotoNeu = null;
+    rezeptFotoEntfernen = false;
     rezeptFormId = null;
     rezeptFormRendern();
     await ladeDaten();
@@ -6272,6 +6556,8 @@
       Portionen: r.portionen ?? "",
       "Zeit (Min.)": r.zeit_minuten ?? "",
       Favorit: r.favorit ? "Ja" : "Nein",
+      "Zuletzt gekocht": r.zuletzt_gekocht || "",
+      Foto: r.bild_pfad ? "Ja" : "Nein",
       Zutaten: r.zutaten || "",
       Zubereitung: r.zubereitung || "",
       Quelle: r.quelle || "",
