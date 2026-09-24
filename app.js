@@ -335,6 +335,8 @@
     // Offenes Rezept-Formular gehört zum alten Bereich – schließen
     rezeptFormId = null;
     rezeptOffenId = null;
+    rezeptEinkaufId = null;
+    rezeptEinkaufAuswahl = new Set();
     rezeptFormRendern();
     bereichAnwenden();
     render();
@@ -2461,6 +2463,85 @@
   let rezeptKategorie = "alle";
   let rezeptOffenId = null;   // aufgeklappte Detailansicht
   let rezeptFormId = null;    // null = Formular zu, "neu" = neues Rezept, sonst id
+  // Etappe 2
+  let rezeptSortierung = localStorage.getItem("rezept-sortierung") || "favorit"; // favorit | lange | zuletzt
+  const rezeptPortionenAnzeige = {}; // id -> gerade angezeigte Portionenzahl (Umrechnung)
+  let rezeptEinkaufId = null;        // Rezept, bei dem gerade Zutaten ausgewählt werden
+  let rezeptEinkaufAuswahl = new Set(); // Zeilen-Indizes der ausgewählten Zutaten
+  const rezeptGekochtVorher = {};    // id -> Datum vor "Heute gekocht" (zum Zurücknehmen)
+
+  function rezeptHeuteIso() {
+    // lokales Datum, nicht UTC – sonst wäre "heute" nachts bis 2 Uhr noch gestern
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  function rezeptGekochtText(iso) {
+    if (!iso) return "noch nie gekocht";
+    const tage = tageSeitIso(iso, rezeptHeuteIso());
+    if (tage <= 0) return "heute gekocht";
+    if (tage === 1) return "gestern gekocht";
+    return `vor ${tage} Tagen gekocht`;
+  }
+
+  // ---- Portionsrechner: Menge am Zeilenanfang erkennen und umrechnen ----
+  const BRUCH_ZEICHEN = { "½": 1 / 2, "¼": 1 / 4, "¾": 3 / 4, "⅓": 1 / 3, "⅔": 2 / 3, "⅛": 1 / 8 };
+  const MENGE_MUSTER = [
+    // Reihenfolge wichtig: spezifischere Formen zuerst
+    [/^(\d+)\s+(\d+)\/(\d+)/, (m) => Number(m[1]) + Number(m[2]) / Number(m[3])],   // 1 1/2
+    [/^(\d+)\/(\d+)/, (m) => Number(m[1]) / Number(m[2])],                          // 1/2
+    [/^(\d*)\s?([½¼¾⅓⅔⅛])/, (m) => (m[1] ? Number(m[1]) : 0) + BRUCH_ZEICHEN[m[2]]], // 1½, ½
+    [/^(\d{1,3}(?:\.\d{3})+)(?![\d,])/, (m) => Number(m[1].replace(/\./g, ""))],   // 1.000 (Tausenderpunkt)
+    [/^(\d+(?:[.,]\d+)?)/, (m) => Number(m[1].replace(",", "."))],                   // 200, 1,5, 1.5
+  ];
+
+  function mengeLesen(text) {
+    for (const [muster, wert] of MENGE_MUSTER) {
+      const m = text.match(muster);
+      if (m) {
+        const zahl = wert(m);
+        if (Number.isFinite(zahl) && zahl > 0) return { zahl, laenge: m[0].length };
+      }
+    }
+    return null;
+  }
+
+  function mengeFormatieren(zahl) {
+    const gerundet = zahl >= 10 ? Math.round(zahl) : Math.max(0.1, Math.round(zahl * 10) / 10);
+    return gerundet.toLocaleString("de-DE", { maximumFractionDigits: 1 });
+  }
+
+  // Rechnet die Menge am Zeilenanfang um (auch Spannen wie "2-3" und
+  // Vorsätze wie "ca."). Zeilen ohne Zahl bleiben unverändert.
+  function zutatSkalieren(zeile, faktor) {
+    if (faktor === 1) return zeile;
+    const vorsatz = (zeile.match(/^(ca\.?\s*|etwa\s+|~\s*)/i) || [""])[0];
+    let rest = zeile.slice(vorsatz.length);
+    const erste = mengeLesen(rest);
+    if (!erste) return zeile;
+    let ergebnis = vorsatz + mengeFormatieren(erste.zahl * faktor);
+    rest = rest.slice(erste.laenge);
+    const spanne = rest.match(/^\s*[-–]\s*/);
+    if (spanne) {
+      const zweite = mengeLesen(rest.slice(spanne[0].length));
+      if (zweite) {
+        ergebnis += "–" + mengeFormatieren(zweite.zahl * faktor);
+        rest = rest.slice(spanne[0].length + zweite.laenge);
+      }
+    }
+    return ergebnis + rest;
+  }
+
+  // Zerlegt den Zutaten-Text in Zeilen: { typ: "titel" | "zutat", text, index }
+  function rezeptZutatenZeilen(text, faktor) {
+    const zeilen = String(text || "").split("\n").map((z) => z.trim()).filter(Boolean);
+    let index = 0;
+    return zeilen.map((z) => {
+      if (z.endsWith(":")) return { typ: "titel", text: z.slice(0, -1) };
+      const ohneZeichen = z.replace(/^[-*•]\s*/, "");
+      return { typ: "zutat", text: zutatSkalieren(ohneZeichen, faktor), index: index++ };
+    });
+  }
 
   function rezepteAktuell() {
     return rezepte.filter((r) => bereichVon(r) === aktiverBereich);
@@ -2474,22 +2555,57 @@
     return teile.join(" · ");
   }
 
-  function rezeptZutatenHtml(text) {
-    const zeilen = String(text || "").split("\n").map((z) => z.trim()).filter(Boolean);
+  function rezeptZutatenHtml(text, faktor = 1) {
+    const zeilen = rezeptZutatenZeilen(text, faktor);
     if (zeilen.length === 0) return "";
     let html = "";
     let listeOffen = false;
     for (const z of zeilen) {
-      if (z.endsWith(":")) {
+      if (z.typ === "titel") {
         if (listeOffen) { html += "</ul>"; listeOffen = false; }
-        html += `<p class="rezept-zwischentitel">${escapeHtml(z.slice(0, -1))}</p>`;
+        html += `<p class="rezept-zwischentitel">${escapeHtml(z.text)}</p>`;
       } else {
         if (!listeOffen) { html += '<ul class="rezept-zutaten">'; listeOffen = true; }
-        html += `<li>${escapeHtml(z.replace(/^[-*•]\s*/, ""))}</li>`;
+        html += `<li>${escapeHtml(z.text)}</li>`;
       }
     }
     if (listeOffen) html += "</ul>";
     return html;
+  }
+
+  // Auswahl-Ansicht: Zutaten mit Checkboxen für die Einkaufsliste.
+  // Was schon offen auf der Einkaufsliste steht, ist markiert und nicht wählbar.
+  function rezeptEinkaufHtml(r, faktor) {
+    const offeneArtikel = new Set(einkaufsliste
+      .filter((e) => bereichVon(e) === aktiverBereich && !e.erledigt)
+      .map((e) => e.text.trim().toLowerCase()));
+    const zeilen = rezeptZutatenZeilen(r.zutaten, faktor);
+    const html = zeilen.map((z) => {
+      if (z.typ === "titel") return `<p class="rezept-zwischentitel">${escapeHtml(z.text)}</p>`;
+      const schonDa = offeneArtikel.has(z.text.toLowerCase());
+      return `
+        <label class="rezept-einkauf-zeile${schonDa ? " schon-da" : ""}">
+          <input type="checkbox" ${schonDa ? "disabled" : ""} ${rezeptEinkaufAuswahl.has(z.index) ? "checked" : ""}
+            onchange="rezeptEinkaufWaehlen(${z.index}, this.checked)">
+          <span>${escapeHtml(z.text)}${schonDa ? ' <em class="notiz-meta" style="display:inline;">steht schon drauf</em>' : ""}</span>
+        </label>`;
+    }).join("");
+    const anzahl = rezeptEinkaufAuswahl.size;
+    return `
+      <div class="rezept-einkauf">
+        <p class="notiz-meta" style="margin:0 0 0.4rem;">Tipp an, was fehlt:</p>
+        ${html}
+        <div class="rezept-aktionen">
+          <button class="btn-primary" id="rezept-einkauf-uebernehmen" onclick="rezeptEinkaufUebernehmen('${r.id}')" ${anzahl === 0 ? "disabled" : ""}>
+            ${rezeptEinkaufButtonText(anzahl)}</button>
+          <button class="link-btn" onclick="rezeptEinkaufAlle('${r.id}')">Alle auswählen</button>
+          <button class="link-btn" onclick="rezeptEinkaufAbbrechen()">Abbrechen</button>
+        </div>
+      </div>`;
+  }
+
+  function rezeptEinkaufButtonText(anzahl) {
+    return anzahl === 0 ? "Zutaten auswählen" : `${anzahl} auf die Einkaufsliste`;
   }
 
   function rezeptQuelleHtml(quelle) {
@@ -2502,10 +2618,28 @@
     return escapeHtml(quelle);
   }
 
+  function rezeptVergleich(a, b) {
+    const alphabetisch = a.titel.localeCompare(b.titel, "de");
+    if (rezeptSortierung === "lange") {
+      // noch nie gekocht zuerst, dann am längsten her
+      const da = a.zuletzt_gekocht || "0000-00-00";
+      const db = b.zuletzt_gekocht || "0000-00-00";
+      return da.localeCompare(db) || alphabetisch;
+    }
+    if (rezeptSortierung === "zuletzt") {
+      const da = a.zuletzt_gekocht || "0000-00-00";
+      const db = b.zuletzt_gekocht || "0000-00-00";
+      return db.localeCompare(da) || alphabetisch;
+    }
+    return (b.favorit === true) - (a.favorit === true) || alphabetisch;
+  }
+
   function renderRezepte() {
     const listeBereich = document.getElementById("rezept-liste-bereich");
     const filter = document.getElementById("rezept-kategorie-filter");
     if (!listeBereich || !filter) return;
+    const sortFeld = document.getElementById("rezept-sortierung");
+    if (sortFeld) sortFeld.value = rezeptSortierung;
 
     const alle = rezepteAktuell();
     const kategorien = [...new Set(alle.map((r) => r.kategorie).filter(Boolean))].sort((a, b) => a.localeCompare(b, "de"));
@@ -2528,7 +2662,7 @@
       .filter((r) => rezeptKategorie === "alle" || r.kategorie === rezeptKategorie)
       .filter((r) => !suche || [r.titel, r.kategorie, r.zutaten, r.notiz]
         .some((feld) => String(feld || "").toLowerCase().includes(suche)))
-      .sort((a, b) => (b.favorit === true) - (a.favorit === true) || a.titel.localeCompare(b.titel, "de"));
+      .sort(rezeptVergleich);
 
     if (alle.length === 0) {
       listeBereich.innerHTML = '<p class="empty-text">Noch keine Rezepte. Leg mit „+ Neues Rezept“ dein erstes an.</p>';
@@ -2541,18 +2675,38 @@
 
     listeBereich.innerHTML = '<div class="rezept-liste">' + gefiltert.map((r) => {
       const offen = rezeptOffenId === r.id;
-      const meta = rezeptMeta(r);
+      let meta = rezeptMeta(r);
+      if (rezeptSortierung !== "favorit") meta = [meta, rezeptGekochtText(r.zuletzt_gekocht)].filter(Boolean).join(" · ");
       let detail = "";
       if (offen) {
-        const zutaten = rezeptZutatenHtml(r.zutaten);
+        const basis = r.portionen || null;
+        const anzeige = basis ? (rezeptPortionenAnzeige[r.id] || basis) : null;
+        const faktor = basis ? anzeige / basis : 1;
+        const einkaufModus = rezeptEinkaufId === r.id;
+        const zutaten = einkaufModus ? rezeptEinkaufHtml(r, faktor) : rezeptZutatenHtml(r.zutaten, faktor);
+        const hatZutaten = rezeptZutatenZeilen(r.zutaten, 1).some((z) => z.typ === "zutat");
+        const heute = rezeptHeuteIso();
+        const heuteGekocht = r.zuletzt_gekocht === heute;
+        const portionenLeiste = basis ? `
+            <div class="rezept-portionen">
+              <button class="rezept-portionen-btn" onclick="rezeptPortionenAendern('${r.id}', -1)" aria-label="Eine Portion weniger" ${anzeige <= 1 ? "disabled" : ""}>−</button>
+              <span class="rezept-portionen-zahl">${anzeige} ${anzeige === 1 ? "Portion" : "Portionen"}</span>
+              <button class="rezept-portionen-btn" onclick="rezeptPortionenAendern('${r.id}', 1)" aria-label="Eine Portion mehr" ${anzeige >= 100 ? "disabled" : ""}>+</button>
+              ${anzeige !== basis ? `<button class="link-btn" onclick="rezeptPortionenZuruecksetzen('${r.id}')">zurück auf ${basis}</button>` : ""}
+            </div>` : "";
         detail = `
           <div class="rezept-detail">
-            ${zutaten ? `<h3 class="rezept-abschnitt">Zutaten</h3>${zutaten}` : ""}
+            <p class="notiz-meta rezept-gekocht-info">${rezeptGekochtText(r.zuletzt_gekocht)}</p>
+            ${zutaten ? `<h3 class="rezept-abschnitt">Zutaten</h3>${portionenLeiste}${zutaten}` : ""}
+            ${hatZutaten && !einkaufModus ? `<button class="btn-secondary rezept-einkauf-start" onclick="rezeptEinkaufStarten('${r.id}')">🛒 Zutaten auf die Einkaufsliste …</button>` : ""}
             ${r.zubereitung ? `<h3 class="rezept-abschnitt">Zubereitung</h3><p class="rezept-text">${escapeHtml(r.zubereitung)}</p>` : ""}
             ${r.notiz ? `<h3 class="rezept-abschnitt">Notiz</h3><p class="rezept-text">${escapeHtml(r.notiz)}</p>` : ""}
             ${r.quelle ? `<p class="notiz-meta">Quelle: ${rezeptQuelleHtml(r.quelle)}</p>` : ""}
             ${!zutaten && !r.zubereitung && !r.notiz ? '<p class="empty-text">Noch keine Zutaten oder Zubereitung eingetragen.</p>' : ""}
             <div class="rezept-aktionen">
+              ${heuteGekocht
+                ? `<button class="btn-secondary rezept-gekocht-btn erledigt" onclick="rezeptGekochtZuruecknehmen('${r.id}')">✓ Heute gekocht · zurücknehmen</button>`
+                : `<button class="btn-secondary rezept-gekocht-btn" onclick="rezeptHeuteGekocht('${r.id}')">✓ Heute gekocht</button>`}
               <button class="btn-secondary" onclick="rezeptBearbeiten('${r.id}')">✎ Bearbeiten</button>
               <button class="link-btn" onclick="rezeptLoeschen('${r.id}')">Löschen</button>
             </div>
@@ -2629,7 +2783,110 @@
 
   window.rezeptUmschalten = function(id) {
     rezeptOffenId = rezeptOffenId === id ? null : id;
+    if (rezeptEinkaufId && rezeptEinkaufId !== rezeptOffenId) { rezeptEinkaufId = null; rezeptEinkaufAuswahl = new Set(); }
     renderRezepte();
+  };
+
+  document.getElementById("rezept-sortierung").addEventListener("change", (e) => {
+    rezeptSortierung = e.target.value;
+    localStorage.setItem("rezept-sortierung", rezeptSortierung);
+    renderRezepte();
+  });
+
+  window.rezeptPortionenAendern = function(id, delta) {
+    const r = rezepte.find((x) => x.id === id);
+    if (!r || !r.portionen) return;
+    const aktuell = rezeptPortionenAnzeige[id] || r.portionen;
+    rezeptPortionenAnzeige[id] = Math.min(100, Math.max(1, aktuell + delta));
+    renderRezepte();
+  };
+
+  window.rezeptPortionenZuruecksetzen = function(id) {
+    delete rezeptPortionenAnzeige[id];
+    renderRezepte();
+  };
+
+  window.rezeptEinkaufStarten = function(id) {
+    rezeptEinkaufId = id;
+    rezeptEinkaufAuswahl = new Set();
+    renderRezepte();
+  };
+
+  window.rezeptEinkaufAbbrechen = function() {
+    rezeptEinkaufId = null;
+    rezeptEinkaufAuswahl = new Set();
+    renderRezepte();
+  };
+
+  window.rezeptEinkaufWaehlen = function(index, an) {
+    if (an) rezeptEinkaufAuswahl.add(index); else rezeptEinkaufAuswahl.delete(index);
+    // nur den Knopf aktualisieren, nicht neu zeichnen (Scrollposition bleibt)
+    const knopf = document.getElementById("rezept-einkauf-uebernehmen");
+    if (knopf) {
+      knopf.textContent = rezeptEinkaufButtonText(rezeptEinkaufAuswahl.size);
+      knopf.disabled = rezeptEinkaufAuswahl.size === 0;
+    }
+  };
+
+  function rezeptEinkaufKandidaten(r) {
+    const faktor = r.portionen ? (rezeptPortionenAnzeige[r.id] || r.portionen) / r.portionen : 1;
+    const offeneArtikel = new Set(einkaufsliste
+      .filter((e) => bereichVon(e) === aktiverBereich && !e.erledigt)
+      .map((e) => e.text.trim().toLowerCase()));
+    return rezeptZutatenZeilen(r.zutaten, faktor)
+      .filter((z) => z.typ === "zutat" && !offeneArtikel.has(z.text.toLowerCase()));
+  }
+
+  window.rezeptEinkaufAlle = function(id) {
+    const r = rezepte.find((x) => x.id === id);
+    if (!r) return;
+    rezeptEinkaufAuswahl = new Set(rezeptEinkaufKandidaten(r).map((z) => z.index));
+    renderRezepte();
+  };
+
+  window.rezeptEinkaufUebernehmen = async function(id) {
+    const r = rezepte.find((x) => x.id === id);
+    if (!r || rezeptEinkaufAuswahl.size === 0) return;
+    const texte = rezeptEinkaufKandidaten(r)
+      .filter((z) => rezeptEinkaufAuswahl.has(z.index))
+      .map((z) => z.text);
+    if (texte.length === 0) return;
+    try {
+      await api("einkauf_mehrere_hinzufuegen", { texte, bereich: aktiverBereich, herkunft: r.titel });
+    } catch (e) {
+      alert("Übernehmen fehlgeschlagen: " + e.message);
+      return;
+    }
+    rezeptEinkaufId = null;
+    rezeptEinkaufAuswahl = new Set();
+    await ladeDaten();
+    alert(`${texte.length} ${texte.length === 1 ? "Zutat steht" : "Zutaten stehen"} jetzt auf der Einkaufsliste.`);
+  };
+
+  window.rezeptHeuteGekocht = async function(id) {
+    const r = rezepte.find((x) => x.id === id);
+    if (!r) return;
+    rezeptGekochtVorher[id] = r.zuletzt_gekocht || null;
+    try {
+      await api("rezept_gekocht", { id, datum: rezeptHeuteIso() });
+    } catch (e) {
+      alert("Speichern fehlgeschlagen: " + e.message);
+      return;
+    }
+    await ladeDaten();
+  };
+
+  window.rezeptGekochtZuruecknehmen = async function(id) {
+    // Vorheriges Datum aus dieser Sitzung wiederherstellen; unbekannt = null
+    const vorher = Object.prototype.hasOwnProperty.call(rezeptGekochtVorher, id) ? rezeptGekochtVorher[id] : null;
+    try {
+      await api("rezept_gekocht", { id, datum: vorher });
+    } catch (e) {
+      alert("Speichern fehlgeschlagen: " + e.message);
+      return;
+    }
+    delete rezeptGekochtVorher[id];
+    await ladeDaten();
   };
 
   window.rezeptBearbeiten = function(id) {
