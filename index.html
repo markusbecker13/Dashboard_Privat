@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' https://juxoxltaeugsmtvirfcm.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' https://juxoxltaeugsmtvirfcm.supabase.co; img-src 'self' data: https://juxoxltaeugsmtvirfcm.supabase.co; base-uri 'none'; form-action 'none';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Dashboard</title>
 <link rel="manifest" href="manifest.json">
@@ -639,7 +639,10 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Einkaufsliste:</strong> „🛒 Zutaten auf die Einkaufsliste …“ zeigt die Zutaten mit Häkchen – in der gerade eingestellten Portionenzahl. Antippen, was fehlt, dann übernehmen. Was schon offen auf der Einkaufsliste steht, ist markiert und nicht wählbar</li>
                 <li><strong>„✓ Heute gekocht“</strong> vermerkt das heutige Datum. Versehentlich getippt? „zurücknehmen“ stellt das vorherige Datum wieder her (solange die App nicht neu geladen wurde, sonst wird das Datum geleert)</li>
                 <li><strong>Sortierung:</strong> „Favoriten, A–Z“, „Lange nicht gekocht“ (noch nie Gekochtes zuerst – gut als Ideengeber) oder „Zuletzt gekocht“. Die Wahl merkt sich das Gerät</li>
-                <li>Rezepte sind im Export (Excel/Word) enthalten – gut als Sicherung</li>
+                <li><strong>Foto:</strong> im Formular „📷 Foto wählen“ (Kamera oder Galerie). Das Foto wird vor dem Hochladen im Browser auf max. 1600 px verkleinert und als JPG gespeichert. „Foto entfernen“ löscht es beim Speichern. In der Liste zeigt 📷, dass ein Foto da ist</li>
+                <li><strong>👨‍🍳 Kochmodus:</strong> Vollbild mit großer Schrift, der Bildschirm bleibt an (in Chrome/Android; zeigt oben an, ob es klappt). Zutaten und Schritte antippen zum Abhaken, der nächste offene Schritt ist umrandet. Portionen lassen sich auch hier umrechnen. „Fertig – heute gekocht“ schließt und vermerkt das Datum. Die Zurück-Taste schließt nur den Kochmodus</li>
+                <li><strong>Zubereitung:</strong> Im Kochmodus wird jede Zeile ein eigener Schritt – also am besten einen Schritt pro Zeile schreiben</li>
+                <li>Rezepte sind im Export (Excel/Word) enthalten – gut als Sicherung (Fotos nicht, nur der Hinweis „Foto: Ja“)</li>
               </ul>
             </div>
           </details>
@@ -705,6 +708,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li>Aktuell werden nur eigene Daten gespeichert (keine Daten Dritter) – das fällt unter die private Haushaltsausnahme der DSGVO</li>
                 <li><strong>Wetter:</strong> die Abfrage läuft serverseitig über die Edge Function bei Open-Meteo (ohne API-Schlüssel). Open-Meteo bekommt nur den eingestellten Ort, nicht deine IP-Adresse</li>
                 <li><strong>OGS Rapunzel &amp; AWO OV Liblar:</strong> beide Bereiche sind für organisatorische Inhalte gedacht, keine personenbezogenen Daten über Kinder, Familien oder Kolleg:innen. Sollten künftig doch personenbezogene Daten Dritter hinzukommen, braucht es eine erneute Prüfung. <strong>Achtung Verleih:</strong> das Feld „An wen" nimmt Namen auf – dort möglichst Kürzel, Gruppen oder Funktionen statt vollständiger Namen eintragen</li>
+                <li><strong>Rezeptfotos:</strong> liegen in einem privaten Storage-Bucket (EU), sichtbar nur über kurzlebige signierte Links nach dem Login. Empfehlung: nur das Essen fotografieren, keine Personen – in OGS und AWO erst recht keine Kinder (Einschätzung, keine Rechtsprüfung)</li>
                 <li><strong>Business (zwischenkaffeeundchaos):</strong> Für geschäftliche Tätigkeit gilt die private Haushaltsausnahme nicht. Solange dort nur eigene Planungsdaten liegen (Aufgaben, Ideen, Notizen), ist das unkritisch. Bitte <strong>keine Kundendaten</strong> (Namen, E-Mail-Adressen, Bestellungen) im Dashboard ablegen – dafür bräuchte es u.a. einen Auftragsverarbeitungsvertrag mit Supabase und einen Eintrag im Verzeichnis der Verarbeitungstätigkeiten</li>
                 <li><strong>Google-Kalender-Sync:</strong> Termindaten werden zwischen Supabase (EU) und Googles Servern übertragen, die auch außerhalb der EU liegen können. Rechtsgrundlage ist aktuell das EU-US Data Privacy Framework. Da es weiterhin nur um eigene Termine geht, ändert das nichts an der Haushaltsausnahme</li>
               </ul>
