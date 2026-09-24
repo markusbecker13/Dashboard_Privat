@@ -761,6 +761,10 @@
   .heute-datum { font-size: 0.9rem; font-weight: 600; color: var(--ink-dim); }
   .heute-gruss { font-size: 2.6rem; line-height: 1; margin: 0.35rem 0 1.2rem; }
   .heute-gruss-akzent { color: var(--accent); }
+  .tages-zitat { margin: -0.5rem 0 1.2rem; padding: 0.1rem 0 0.1rem 0.85rem; border-left: 3px solid var(--accent); }
+  .tages-zitat-text { margin: 0; font-family: var(--font-text); font-size: 1rem; font-style: italic; line-height: 1.45; color: var(--ink); }
+  .tages-zitat-quelle { margin-top: 0.3rem; font-size: 0.78rem; color: var(--ink-dim); }
+  .tages-zitat-quelle cite { font-style: normal; }
   .heute-kacheln { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; margin-bottom: 0.6rem; }
   #wetter-bereich { display: flex; min-width: 0; }
   .heute-kachel {
