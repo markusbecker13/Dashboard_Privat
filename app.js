@@ -148,7 +148,8 @@
     const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, token, ...extra }),
+      // aktiver_bereich: ordnet Verlauf-Einträge dem gerade aktiven Bereich zu
+      body: JSON.stringify({ action, token, aktiver_bereich: aktiverBereich, ...extra }),
     });
     if (res.status === 401) {
       localStorage.removeItem("aufgaben-token");
@@ -1003,6 +1004,7 @@
     if (aktiv === "spiele") renderSpiele();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "training") renderTraining();
+    if (aktiv === "verlauf") renderVerlauf();
     if (aktiv === "reiterverwaltung") renderReiterVerwaltung();
     kontoMenuSchliessen();
   }
@@ -5471,6 +5473,7 @@
   }
   function fV() {
     return verlauf.map((v) => ({
+      Bereich: BEREICH_KNOPF_TEXT[bereichVon(v)] || bereichVon(v),
       Zeitpunkt: v.erstellt_am ? new Date(v.erstellt_am).toLocaleString("de-DE") : "",
       Kategorie: v.kategorie,
       Aktion: v.aktion,
@@ -5649,11 +5652,13 @@
   // ==========================================================
   function renderVerlauf() {
     const bereich = document.getElementById("verlauf-bereich");
-    if (verlauf.length === 0) {
-      bereich.innerHTML = '<p class="empty-text">Noch keine Aktivitäten aufgezeichnet.</p>';
+    // Verlauf je Bereich getrennt: nur Einträge des aktiven Bereichs
+    const eintraege = verlauf.filter((v) => bereichVon(v) === aktiverBereich);
+    if (eintraege.length === 0) {
+      bereich.innerHTML = '<p class="empty-text">In diesem Bereich noch keine Aktivitäten aufgezeichnet.</p>';
       return;
     }
-    bereich.innerHTML = verlauf.map((v) => {
+    bereich.innerHTML = eintraege.map((v) => {
       const dt = new Date(v.erstellt_am);
       const zeit = dt.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }) + " · " +
         dt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
