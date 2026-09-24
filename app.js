@@ -69,6 +69,7 @@
   let timerBearbeitenId = null;
   let timerSession = null; // laufender Timer im Fokus-Modus
   let zielEvents = [];
+  let rezepte = [];
   let zielEventBearbeitenId = null;
   let auswertungJahr = new Date().getFullYear();
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
@@ -81,6 +82,7 @@
     verlauf: "view-verlauf", anleitung: "view-anleitung", ogsideen: "view-ogs-ideen",
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training",
+    rezepte: "view-rezepte",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -92,7 +94,7 @@
     ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["einkauf", "Einkauf"], ["export", "Export"],
     ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
-    ["training", "Training"],
+    ["training", "Training"], ["rezepte", "Rezepte"],
   ];
   const BEREICH_TABS = { privat: ALLE_REITER, ogs: ALLE_REITER, awo: ALLE_REITER, business: ALLE_REITER };
   const BEREICH_TITEL_VERWALTUNG = { privat: "🏠 Privat", ogs: "🏫 OGS Rapunzel", awo: "🤝 AWO OV Liblar", business: "☕ Business" };
@@ -102,7 +104,7 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung", "training"],
+      "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen"],
@@ -124,7 +126,7 @@
     return [
       { schluessel: "heute", label: "Heute", icon: "☀️", tabs: ["heute"] },
       { schluessel: "planen", label: "Planen", icon: "🗓️", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
-      { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf", "training"] },
+      { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf", "rezepte", "training"] },
       { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", icon: BEREICH_ARBEIT_ICON[aktiverBereich] || "📌", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih"] },
       { schluessel: "verwalten", label: "Verwalten", icon: "🛠️", tabs: ["export", "verlauf", "anleitung"] },
     ];
@@ -330,6 +332,10 @@
     aktiverBereich = bereich;
     localStorage.setItem("aktiver-bereich", bereich);
     farbweltAnwenden(bereich);
+    // Offenes Rezept-Formular gehört zum alten Bereich – schließen
+    rezeptFormId = null;
+    rezeptOffenId = null;
+    rezeptFormRendern();
     bereichAnwenden();
     render();
     renderNotizen();
@@ -468,6 +474,7 @@
     trainingStammdaten = data.training_stammdaten || [];
     intervallTimer = data.intervall_timer || [];
     zielEvents = data.training_ziel_events || [];
+    rezepte = data.rezepte || [];
     bereichAnwenden();
     renderReiterVerwaltung();
     render();
@@ -486,6 +493,7 @@
     renderInventar();
     renderProjekte();
     renderSpiele();
+    renderRezepte();
   }
 
   function badgeHtml(cls, text) {
@@ -1008,6 +1016,7 @@
     if (aktiv === "spiele") renderSpiele();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "training") renderTraining();
+    if (aktiv === "rezepte") renderRezepte();
     if (aktiv === "verlauf") renderVerlauf();
     if (aktiv === "reiterverwaltung") renderReiterVerwaltung();
     kontoMenuSchliessen();
@@ -2437,6 +2446,252 @@
 
   window.ogsIdeeLoeschen = async function(id) {
     await api("ogs_idee_loeschen", { id });
+    await ladeDaten();
+  };
+
+
+  // ==========================================================
+  // Rezepte (Etappe 1: Sammlung mit Suche, Kategorie-Filter,
+  // Favoriten, Detailansicht, Anlegen/Bearbeiten/Löschen)
+  // Zutaten = freier Text, eine Zeile pro Zutat. Eine Zeile, die auf
+  // ":" endet (z.B. "Für den Teig:"), wird als Zwischenüberschrift gezeigt.
+  // ==========================================================
+  const REZEPT_KATEGORIE_VORSCHLAEGE = ["Frühstück", "Hauptgericht", "Suppe", "Salat", "Beilage", "Snack", "Dessert", "Backen", "Getränk"];
+  let rezeptSuche = "";
+  let rezeptKategorie = "alle";
+  let rezeptOffenId = null;   // aufgeklappte Detailansicht
+  let rezeptFormId = null;    // null = Formular zu, "neu" = neues Rezept, sonst id
+
+  function rezepteAktuell() {
+    return rezepte.filter((r) => bereichVon(r) === aktiverBereich);
+  }
+
+  function rezeptMeta(r) {
+    const teile = [];
+    if (r.kategorie) teile.push(escapeHtml(r.kategorie));
+    if (r.portionen) teile.push(`${r.portionen} ${r.portionen === 1 ? "Portion" : "Portionen"}`);
+    if (r.zeit_minuten) teile.push(`${r.zeit_minuten} Min.`);
+    return teile.join(" · ");
+  }
+
+  function rezeptZutatenHtml(text) {
+    const zeilen = String(text || "").split("\n").map((z) => z.trim()).filter(Boolean);
+    if (zeilen.length === 0) return "";
+    let html = "";
+    let listeOffen = false;
+    for (const z of zeilen) {
+      if (z.endsWith(":")) {
+        if (listeOffen) { html += "</ul>"; listeOffen = false; }
+        html += `<p class="rezept-zwischentitel">${escapeHtml(z.slice(0, -1))}</p>`;
+      } else {
+        if (!listeOffen) { html += '<ul class="rezept-zutaten">'; listeOffen = true; }
+        html += `<li>${escapeHtml(z.replace(/^[-*•]\s*/, ""))}</li>`;
+      }
+    }
+    if (listeOffen) html += "</ul>";
+    return html;
+  }
+
+  function rezeptQuelleHtml(quelle) {
+    if (!quelle) return "";
+    if (/^https?:\/\/\S+$/i.test(quelle)) {
+      let anzeige = quelle;
+      try { anzeige = new URL(quelle).hostname.replace(/^www\./, ""); } catch (e) { /* Rohtext zeigen */ }
+      return `<a href="${escapeAttr(quelle)}" target="_blank" rel="noopener noreferrer">${escapeHtml(anzeige)} ↗</a>`;
+    }
+    return escapeHtml(quelle);
+  }
+
+  function renderRezepte() {
+    const listeBereich = document.getElementById("rezept-liste-bereich");
+    const filter = document.getElementById("rezept-kategorie-filter");
+    if (!listeBereich || !filter) return;
+
+    const alle = rezepteAktuell();
+    const kategorien = [...new Set(alle.map((r) => r.kategorie).filter(Boolean))].sort((a, b) => a.localeCompare(b, "de"));
+    if (rezeptKategorie !== "alle" && !kategorien.includes(rezeptKategorie)) rezeptKategorie = "alle";
+
+    filter.innerHTML = `<option value="alle">Alle Kategorien (${alle.length})</option>` +
+      kategorien.map((k) => {
+        const anzahl = alle.filter((r) => r.kategorie === k).length;
+        return `<option value="${escapeAttr(k)}" ${rezeptKategorie === k ? "selected" : ""}>${escapeHtml(k)} (${anzahl})</option>`;
+      }).join("");
+
+    const datalist = document.getElementById("rezept-kategorie-liste");
+    if (datalist) {
+      const vorschlaege = [...new Set([...REZEPT_KATEGORIE_VORSCHLAEGE, ...kategorien])];
+      datalist.innerHTML = vorschlaege.map((k) => `<option value="${escapeAttr(k)}"></option>`).join("");
+    }
+
+    const suche = rezeptSuche.trim().toLowerCase();
+    const gefiltert = alle
+      .filter((r) => rezeptKategorie === "alle" || r.kategorie === rezeptKategorie)
+      .filter((r) => !suche || [r.titel, r.kategorie, r.zutaten, r.notiz]
+        .some((feld) => String(feld || "").toLowerCase().includes(suche)))
+      .sort((a, b) => (b.favorit === true) - (a.favorit === true) || a.titel.localeCompare(b.titel, "de"));
+
+    if (alle.length === 0) {
+      listeBereich.innerHTML = '<p class="empty-text">Noch keine Rezepte. Leg mit „+ Neues Rezept“ dein erstes an.</p>';
+      return;
+    }
+    if (gefiltert.length === 0) {
+      listeBereich.innerHTML = '<p class="empty-text">Kein Rezept passt zur Suche.</p>';
+      return;
+    }
+
+    listeBereich.innerHTML = '<div class="rezept-liste">' + gefiltert.map((r) => {
+      const offen = rezeptOffenId === r.id;
+      const meta = rezeptMeta(r);
+      let detail = "";
+      if (offen) {
+        const zutaten = rezeptZutatenHtml(r.zutaten);
+        detail = `
+          <div class="rezept-detail">
+            ${zutaten ? `<h3 class="rezept-abschnitt">Zutaten</h3>${zutaten}` : ""}
+            ${r.zubereitung ? `<h3 class="rezept-abschnitt">Zubereitung</h3><p class="rezept-text">${escapeHtml(r.zubereitung)}</p>` : ""}
+            ${r.notiz ? `<h3 class="rezept-abschnitt">Notiz</h3><p class="rezept-text">${escapeHtml(r.notiz)}</p>` : ""}
+            ${r.quelle ? `<p class="notiz-meta">Quelle: ${rezeptQuelleHtml(r.quelle)}</p>` : ""}
+            ${!zutaten && !r.zubereitung && !r.notiz ? '<p class="empty-text">Noch keine Zutaten oder Zubereitung eingetragen.</p>' : ""}
+            <div class="rezept-aktionen">
+              <button class="btn-secondary" onclick="rezeptBearbeiten('${r.id}')">✎ Bearbeiten</button>
+              <button class="link-btn" onclick="rezeptLoeschen('${r.id}')">Löschen</button>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="rezept-karte${offen ? " offen" : ""}">
+          <div class="rezept-kopf">
+            <button class="rezept-stern${r.favorit ? " aktiv" : ""}" onclick="rezeptFavoritUmschalten('${r.id}')"
+              aria-label="${r.favorit ? "Aus Favoriten entfernen" : "Als Favorit markieren"}" aria-pressed="${r.favorit ? "true" : "false"}">${r.favorit ? "★" : "☆"}</button>
+            <button class="rezept-titel-btn" onclick="rezeptUmschalten('${r.id}')" aria-expanded="${offen ? "true" : "false"}">
+              <span class="rezept-titel">${escapeHtml(r.titel)}</span>
+              ${meta ? `<span class="notiz-meta">${meta}</span>` : ""}
+            </button>
+            <span class="rezept-pfeil" aria-hidden="true">${offen ? "▴" : "▾"}</span>
+          </div>
+          ${detail}
+        </div>`;
+    }).join("") + "</div>";
+  }
+
+  function rezeptFormRendern() {
+    const formBereich = document.getElementById("rezept-form-bereich");
+    const neuBtn = document.getElementById("btn-rezept-neu");
+    if (!formBereich) return;
+    if (!rezeptFormId) {
+      formBereich.innerHTML = "";
+      formBereich.classList.add("hidden");
+      if (neuBtn) neuBtn.classList.remove("hidden");
+      return;
+    }
+    const r = rezeptFormId === "neu" ? {} : (rezepte.find((x) => x.id === rezeptFormId) || {});
+    if (neuBtn) neuBtn.classList.add("hidden");
+    formBereich.classList.remove("hidden");
+    formBereich.innerHTML = `
+      <h2 class="rezept-form-titel">${rezeptFormId === "neu" ? "Neues Rezept" : "Rezept bearbeiten"}</h2>
+      <div class="row">
+        <input type="text" id="rezept-f-titel" placeholder="Titel, z.B. Linsensuppe" value="${escapeAttr(r.titel || "")}">
+      </div>
+      <div class="row">
+        <input type="text" id="rezept-f-kategorie" placeholder="Kategorie (optional)" list="rezept-kategorie-liste" value="${escapeAttr(r.kategorie || "")}">
+        <input type="number" id="rezept-f-portionen" placeholder="Portionen" min="1" max="100" inputmode="numeric" value="${r.portionen ?? ""}">
+        <input type="number" id="rezept-f-zeit" placeholder="Minuten" min="0" max="1440" inputmode="numeric" value="${r.zeit_minuten ?? ""}">
+      </div>
+      <label class="rezept-label" for="rezept-f-zutaten">Zutaten – eine pro Zeile, Menge vorne</label>
+      <textarea id="rezept-f-zutaten" rows="8" placeholder="200 g Mehl&#10;2 Eier&#10;1 Prise Salz&#10;Für die Soße:&#10;1 Becher Sahne">${escapeHtml(r.zutaten || "")}</textarea>
+      <label class="rezept-label" for="rezept-f-zubereitung">Zubereitung</label>
+      <textarea id="rezept-f-zubereitung" rows="8" placeholder="1. Mehl und Eier verrühren …">${escapeHtml(r.zubereitung || "")}</textarea>
+      <div class="row" style="margin-top:0.8rem;">
+        <input type="text" id="rezept-f-quelle" placeholder="Quelle: Link oder z.B. „von Oma“ (optional)" value="${escapeAttr(r.quelle || "")}">
+      </div>
+      <textarea id="rezept-f-notiz" rows="2" placeholder="Notiz, z.B. „mit weniger Zucker besser“ (optional)">${escapeHtml(r.notiz || "")}</textarea>
+      <label class="rezept-favorit-check"><input type="checkbox" id="rezept-f-favorit" ${r.favorit ? "checked" : ""}> Favorit ★</label>
+      <div class="row">
+        <button class="btn-primary" onclick="rezeptSpeichern()">Speichern</button>
+        <button class="btn-secondary" onclick="rezeptFormSchliessen()">Abbrechen</button>
+      </div>`;
+    document.getElementById("rezept-f-titel").focus();
+    formBereich.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  document.getElementById("rezept-suche").addEventListener("input", (e) => {
+    rezeptSuche = e.target.value;
+    renderRezepte();
+  });
+  document.getElementById("rezept-kategorie-filter").addEventListener("change", (e) => {
+    rezeptKategorie = e.target.value;
+    renderRezepte();
+  });
+  document.getElementById("btn-rezept-neu").addEventListener("click", () => {
+    rezeptFormId = "neu";
+    rezeptFormRendern();
+  });
+
+  window.rezeptUmschalten = function(id) {
+    rezeptOffenId = rezeptOffenId === id ? null : id;
+    renderRezepte();
+  };
+
+  window.rezeptBearbeiten = function(id) {
+    rezeptFormId = id;
+    rezeptFormRendern();
+  };
+
+  window.rezeptFormSchliessen = function() {
+    rezeptFormId = null;
+    rezeptFormRendern();
+  };
+
+  window.rezeptSpeichern = async function() {
+    const titelFeld = document.getElementById("rezept-f-titel");
+    const titel = titelFeld.value.trim();
+    if (!titel) { titelFeld.focus(); alert("Bitte einen Titel eintragen."); return; }
+    const wert = (id) => document.getElementById(id).value.trim();
+    const payload = {
+      titel,
+      kategorie: wert("rezept-f-kategorie"),
+      portionen: wert("rezept-f-portionen"),
+      zeit_minuten: wert("rezept-f-zeit"),
+      zutaten: wert("rezept-f-zutaten"),
+      zubereitung: wert("rezept-f-zubereitung"),
+      quelle: wert("rezept-f-quelle"),
+      notiz: wert("rezept-f-notiz"),
+      favorit: document.getElementById("rezept-f-favorit").checked,
+      bereich: aktiverBereich,
+    };
+    if (rezeptFormId && rezeptFormId !== "neu") payload.id = rezeptFormId;
+    try {
+      await api("rezept_speichern", payload);
+    } catch (e) {
+      alert("Speichern fehlgeschlagen: " + e.message);
+      return; // Formular bleibt offen, nichts geht verloren
+    }
+    if (payload.id) rezeptOffenId = payload.id;
+    rezeptFormId = null;
+    rezeptFormRendern();
+    await ladeDaten();
+  };
+
+  window.rezeptFavoritUmschalten = async function(id) {
+    const r = rezepte.find((x) => x.id === id);
+    if (!r) return;
+    r.favorit = !r.favorit; // sofort anzeigen, Server im Hintergrund
+    renderRezepte();
+    try {
+      await api("rezept_favorit", { id, favorit: r.favorit });
+    } catch (e) {
+      r.favorit = !r.favorit;
+      renderRezepte();
+      alert("Favorit konnte nicht gespeichert werden: " + e.message);
+    }
+  };
+
+  window.rezeptLoeschen = async function(id) {
+    const r = rezepte.find((x) => x.id === id);
+    if (!r || !confirm(`Rezept „${r.titel}“ wirklich löschen?`)) return;
+    await api("rezept_loeschen", { id });
+    if (rezeptOffenId === id) rezeptOffenId = null;
+    if (rezeptFormId === id) { rezeptFormId = null; rezeptFormRendern(); }
     await ladeDaten();
   };
 
@@ -5752,6 +6007,21 @@
     });
   }
 
+  function fRz() {
+    return rezepte.map((r) => ({
+      Bereich: BEREICH_KNOPF_TEXT[bereichVon(r)] || bereichVon(r),
+      Titel: r.titel,
+      Kategorie: r.kategorie || "",
+      Portionen: r.portionen ?? "",
+      "Zeit (Min.)": r.zeit_minuten ?? "",
+      Favorit: r.favorit ? "Ja" : "Nein",
+      Zutaten: r.zutaten || "",
+      Zubereitung: r.zubereitung || "",
+      Quelle: r.quelle || "",
+      Notiz: r.notiz || "",
+    }));
+  }
+
   const EXPORT_KATEGORIEN = [
     { id: "aufgaben", name: "Aufgaben", daten: fA },
     { id: "termine", name: "Termine", daten: fT },
@@ -5759,6 +6029,7 @@
     { id: "links", name: "Links", daten: fL },
     { id: "reflexion", name: "Reflexion", daten: fR },
     { id: "einkauf", name: "Einkaufsliste", daten: fE },
+    { id: "rezepte", name: "Rezepte", daten: fRz },
     { id: "verlauf", name: "Verlauf", daten: fV },
     { id: "ziele", name: "Ziele", daten: fZ },
   ];
