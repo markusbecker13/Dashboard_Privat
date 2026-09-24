@@ -899,3 +899,34 @@
   .rezept-einkauf .btn-primary:disabled { opacity: 0.45; cursor: default; }
   .rezept-aktionen { flex-wrap: wrap; }
   .rezept-gekocht-btn.erledigt { border-color: var(--accent); color: var(--accent); }
+
+  /* Rezepte, Etappe 3: Foto + Kochmodus */
+  .rezept-foto { display: block; width: 100%; max-height: 18rem; object-fit: cover; border-radius: 8px; margin-top: 1rem; background: var(--bg); }
+  .rezept-foto-platzhalter { display: flex; align-items: center; justify-content: center; height: 8rem; color: var(--ink-dim); font-size: 0.85rem; }
+  .rezept-foto-feld { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
+  .rezept-foto-vorschau { width: 5.5rem; height: 5.5rem; object-fit: cover; border-radius: 8px; display: block; }
+  .rezept-foto-knoepfe { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+  .rezept-foto-label { display: inline-flex; align-items: center; min-height: 44px; }
+  .rezept-foto-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+  .rezept-foto-input:focus-visible + .rezept-foto-label, .rezept-foto-label:focus-within { outline: 3px solid var(--accent); }
+  .rezept-koch-start { margin-top: 0.8rem; }
+  body.koch-offen { overflow: hidden; }
+  .koch-inhalt { font-size: 1.15rem; }
+  .koch-liste { display: flex; flex-direction: column; gap: 0.4rem; }
+  .koch-zeile, .koch-schritt {
+    display: flex; align-items: flex-start; gap: 0.7rem; width: 100%; text-align: left;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.8rem 0.9rem; font-size: 1.15rem; line-height: 1.45; color: var(--ink); cursor: pointer;
+    font-family: var(--font-text); white-space: pre-wrap;
+  }
+  .koch-haken {
+    flex-shrink: 0; width: 1.5rem; height: 1.5rem; border: 2px solid var(--ink-dim); border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; margin-top: 0.1rem;
+  }
+  .koch-zeile.erledigt, .koch-schritt.erledigt { color: var(--ink-dim); text-decoration: line-through; background: var(--bg); }
+  .koch-zeile.erledigt .koch-haken { background: var(--accent); border-color: var(--accent); color: #fff; text-decoration: none; }
+  .koch-schritt.aktuell { border: 2px solid var(--accent); }
+  .koch-zwischentitel { font-weight: 600; margin: 0.6rem 0 0; }
+  .koch-hinweis { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .koch-text { white-space: pre-wrap; margin: 0; line-height: 1.5; }
+  .koch-inhalt .session-fokus-bild { max-height: 24vh; object-fit: cover; flex-shrink: 0; }
