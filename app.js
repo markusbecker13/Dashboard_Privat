@@ -1163,6 +1163,200 @@
     ladeWetter(true);
   };
 
+  // ==========================================================
+  // Zitat des Tages (Start-Screen, je Bereich eigene Liste)
+  // Nur gemeinfreie Zitate mit Quellenangabe. Lateinische und
+  // griechische Texte (Seneca, Marc Aurel, Aristoteles) sowie
+  // englische/chinesische sind eigene Übersetzungen – ältere
+  // deutsche Übersetzungen können urheberrechtlich geschützt sein.
+  // Wechsel täglich um Mitternacht (lokale Zeit).
+  // ==========================================================
+  const ZITATE = {
+    privat: [
+      { text: "Während man es aufschiebt, eilt das Leben vorüber.", autor: "Seneca", quelle: "Briefe an Lucilius 1,2 (eigene Übersetzung)" },
+      { text: "Alles andere gehört nicht uns, nur die Zeit ist unser.", autor: "Seneca", quelle: "Briefe an Lucilius 1,3 (eigene Übersetzung)" },
+      { text: "Tu wenig, wenn du heiter bleiben willst.", autor: "Marc Aurel (nach Demokrit)", quelle: "Selbstbetrachtungen 4,24 (eigene Übersetzung)" },
+      { text: "Wie deine Gedanken meistens sind, so wird auch dein Gemüt sein; denn die Seele wird von den Gedanken gefärbt.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 5,16 (eigene Übersetzung)" },
+      { text: "Grabe nach innen. Innen ist die Quelle des Guten, und sie kann immer wieder hervorsprudeln, wenn du immer weiter gräbst.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 7,59 (eigene Übersetzung)" },
+      { text: "Ohne Musik wäre das Leben ein Irrtum.", autor: "Friedrich Nietzsche", quelle: "Götzen-Dämmerung, Sprüche und Pfeile 33" },
+      { text: "Es ist ein Brauch von alters her: Wer Sorgen hat, hat auch Likör!", autor: "Wilhelm Busch", quelle: "Die fromme Helene" },
+      { text: "Das ist ein weites Feld.", autor: "Theodor Fontane", quelle: "Effi Briest" },
+      { text: "Kein Mensch muß müssen.", autor: "Gotthold Ephraim Lessing", quelle: "Nathan der Weise, I,3" },
+      { text: "Haben Sie Geduld gegen alles Ungelöste in Ihrem Herzen und versuchen Sie, die Fragen selbst liebzuhaben.", autor: "Rainer Maria Rilke", quelle: "Briefe an einen jungen Dichter, 16. Juli 1903" },
+      { text: "Wo aber Gefahr ist, wächst das Rettende auch.", autor: "Friedrich Hölderlin", quelle: "Patmos" },
+      { text: "Grau, teurer Freund, ist alle Theorie, und grün des Lebens goldner Baum.", autor: "Johann Wolfgang von Goethe", quelle: "Faust I, Studierzimmer" },
+      { text: "Allen Gewalten zum Trutz sich erhalten, nimmer sich beugen, kräftig sich zeigen.", autor: "Johann Wolfgang von Goethe", quelle: "Lila" },
+      { text: "Wenn jemand eine Reise tut, so kann er was verzählen.", autor: "Matthias Claudius", quelle: "Urians Reise um die Welt" },
+      { text: "Am Ziele deiner Wünsche wirst du jedenfalls eines vermissen: dein Wandern zum Ziel.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Der Gedanke an die Vergänglichkeit aller irdischen Dinge ist ein Quell unendlichen Leids – und ein Quell unendlichen Trostes.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "In der Jugend lernt, im Alter versteht man.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Wie teuer du eine schöne Illusion auch bezahltest, du hast doch einen guten Handel gemacht.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Wenn man das Dasein als eine Aufgabe betrachtet, dann vermag man es immer zu ertragen.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Im Unglück finden wir meistens die Ruhe wieder, die uns durch die Furcht vor dem Unglück geraubt wurde.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Es gibt mehr Dinge, die uns schrecken, als solche, die uns bedrängen; öfter leiden wir in der Vorstellung als in Wirklichkeit.", autor: "Seneca", quelle: "Briefe an Lucilius 13,4 (eigene Übersetzung)" },
+      { text: "Du musst deine Gesinnung ändern, nicht den Himmel über dir.", autor: "Seneca", quelle: "Briefe an Lucilius 28,1–2 (eigene Übersetzung)" },
+      { text: "Wir haben nicht zu wenig Zeit, sondern wir vergeuden viel davon.", autor: "Seneca", quelle: "Von der Kürze des Lebens 1,3 (eigene Übersetzung)" },
+      { text: "Lebe nicht, als hättest du zehntausend Jahre vor dir. Solange du lebst, solange es möglich ist, werde gut.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 4,17 (eigene Übersetzung)" },
+      { text: "Lass dich durch die Zukunft nicht beunruhigen. Du wirst ihr, wenn nötig, mit derselben Vernunft begegnen, die du jetzt für die Gegenwart gebrauchst.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 7,8 (eigene Übersetzung)" },
+      { text: "Hier bin ich Mensch, hier darf ich's sein!", autor: "Johann Wolfgang von Goethe", quelle: "Faust I, Vor dem Tor" },
+      { text: "Willst du immer weiter schweifen? Sieh, das Gute liegt so nah. Lerne nur das Glück ergreifen, denn das Glück ist immer da.", autor: "Johann Wolfgang von Goethe", quelle: "Erinnerung" },
+      { text: "Wo viel Licht ist, ist starker Schatten.", autor: "Johann Wolfgang von Goethe", quelle: "Götz von Berlichingen, 1. Akt" },
+      { text: "Raum ist in der kleinsten Hütte für ein glücklich liebend Paar.", autor: "Friedrich Schiller", quelle: "Der Jüngling am Bache" },
+      { text: "Die Uhr schlägt keinem Glücklichen.", autor: "Friedrich Schiller", quelle: "Die Piccolomini, III,3" },
+      { text: "Es ist der Geist, der sich den Körper baut.", autor: "Friedrich Schiller", quelle: "Wallensteins Tod, III,13" },
+      { text: "Zwei Dinge erfüllen das Gemüt mit immer neuer und zunehmender Bewunderung und Ehrfurcht: der bestirnte Himmel über mir und das moralische Gesetz in mir.", autor: "Immanuel Kant", quelle: "Kritik der praktischen Vernunft, Beschluss" },
+      { text: "Was mich nicht umbringt, macht mich stärker.", autor: "Friedrich Nietzsche", quelle: "Götzen-Dämmerung, Sprüche und Pfeile 8" },
+      { text: "Und verloren sei uns der Tag, wo nicht Ein Mal getanzt wurde!", autor: "Friedrich Nietzsche", quelle: "Also sprach Zarathustra, Von alten und neuen Tafeln 23" },
+      { text: "Nur die ergangenen Gedanken haben Werth.", autor: "Friedrich Nietzsche", quelle: "Götzen-Dämmerung, Sprüche und Pfeile 34" },
+      { text: "Das Gute – dieser Satz steht fest – ist stets das Böse, was man läßt!", autor: "Wilhelm Busch", quelle: "Die fromme Helene" },
+      { text: "Der Himmel ist ebenso unter unseren Füßen wie über unseren Köpfen.", autor: "Henry David Thoreau", quelle: "Walden, Der Teich im Winter (eigene Übersetzung)" },
+      { text: "In der Wildnis liegt die Bewahrung der Welt.", autor: "Henry David Thoreau", quelle: "Walking, 1862 (eigene Übersetzung)" },
+      { text: "Nicht die Dinge selbst beunruhigen die Menschen, sondern ihre Meinungen über die Dinge.", autor: "Epiktet", quelle: "Handbüchlein der Moral 5 (eigene Übersetzung)" },
+      { text: "Wer andere kennt, ist klug. Wer sich selbst kennt, ist weise.", autor: "Laozi", quelle: "Daodejing 33 (eigene Übersetzung)" },
+    ],
+    ogs: [
+      { text: "Der Mensch spielt nur, wo er in voller Bedeutung des Worts Mensch ist, und er ist nur da ganz Mensch, wo er spielt.", autor: "Friedrich Schiller", quelle: "Über die ästhetische Erziehung des Menschen, 15. Brief" },
+      { text: "Der Mensch kann nur Mensch werden durch Erziehung.", autor: "Immanuel Kant", quelle: "Über Pädagogik" },
+      { text: "Habe Mut, dich deines eigenen Verstandes zu bedienen!", autor: "Immanuel Kant", quelle: "Beantwortung der Frage: Was ist Aufklärung?" },
+      { text: "Indem die Menschen lehren, lernen sie.", autor: "Seneca", quelle: "Briefe an Lucilius 7,8 (eigene Übersetzung)" },
+      { text: "Lang ist der Weg durch Lehren, kurz und wirksam durch Beispiele.", autor: "Seneca", quelle: "Briefe an Lucilius 6,5 (eigene Übersetzung)" },
+      { text: "Nicht weil es schwer ist, wagen wir es nicht, sondern weil wir es nicht wagen, ist es schwer.", autor: "Seneca", quelle: "Briefe an Lucilius 104,26 (eigene Übersetzung)" },
+      { text: "Was man gelernt haben muss, um es zu tun, das lernt man, indem man es tut.", autor: "Aristoteles", quelle: "Nikomachische Ethik II,1 (eigene Übersetzung)" },
+      { text: "Wenn wir die Menschen nur nehmen, wie sie sind, so machen wir sie schlechter; wenn wir sie behandeln, als wären sie, was sie sein sollten, so bringen wir sie dahin, wohin sie zu bringen sind.", autor: "Johann Wolfgang von Goethe", quelle: "Wilhelm Meisters Lehrjahre, 8. Buch" },
+      { text: "Früh übt sich, was ein Meister werden will.", autor: "Friedrich Schiller", quelle: "Wilhelm Tell, III,3" },
+      { text: "Musik wird störend oft empfunden, dieweil sie mit Geräusch verbunden.", autor: "Wilhelm Busch", quelle: "Dideldum!" },
+      { text: "Vater werden ist nicht schwer, Vater sein dagegen sehr.", autor: "Wilhelm Busch", quelle: "Julchen" },
+      { text: "Es ist nicht genug zu wissen, man muß auch anwenden; es ist nicht genug zu wollen, man muß auch tun.", autor: "Johann Wolfgang von Goethe", quelle: "Wilhelm Meisters Wanderjahre, Betrachtungen im Sinne der Wanderer" },
+      { text: "Wer sich seiner eigenen Kindheit nicht mehr deutlich erinnert, ist ein schlechter Erzieher.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen" },
+      { text: "Eltern verzeihen ihren Kindern die Fehler am schwersten, die sie ihnen selbst anerzogen haben.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen" },
+      { text: "Das Leben erzieht die großen Menschen und lässt die kleinen laufen.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Die verstehen sehr wenig, die nur das verstehen, was sich erklären läßt.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Auch das kleinste Licht hat sein Atmosphärchen.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Ein Urteil läßt sich widerlegen, aber niemals ein Vorurteil.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen" },
+      { text: "Wer nichts weiß, muss alles glauben.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "So lange muss man lernen, wie man etwas nicht weiß – und wenn wir dem Sprichwort glauben, so lange man lebt.", autor: "Seneca", quelle: "Briefe an Lucilius 76,3 (eigene Übersetzung)" },
+      { text: "Wenn dir etwas schwerfällt, halte es nicht für menschenunmöglich. Was aber menschenmöglich ist, das halte auch für dir erreichbar.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 6,19 (eigene Übersetzung)" },
+      { text: "Es bildet ein Talent sich in der Stille, sich ein Charakter in dem Strom der Welt.", autor: "Johann Wolfgang von Goethe", quelle: "Torquato Tasso, I,2" },
+      { text: "Es irrt der Mensch, solang er strebt.", autor: "Johann Wolfgang von Goethe", quelle: "Faust I, Prolog im Himmel" },
+      { text: "Wer fremde Sprachen nicht kennt, weiß nichts von seiner eigenen.", autor: "Johann Wolfgang von Goethe", quelle: "Maximen und Reflexionen" },
+      { text: "Kinder sollen nicht dem gegenwärtigen, sondern dem zukünftig möglich bessern Zustande des menschlichen Geschlechts … erzogen werden.", autor: "Immanuel Kant", quelle: "Über Pädagogik" },
+      { text: "Der Mensch ist nichts, als was die Erziehung aus ihm macht.", autor: "Immanuel Kant", quelle: "Über Pädagogik" },
+      { text: "Du sollst der werden, der du bist.", autor: "Friedrich Nietzsche", quelle: "Die fröhliche Wissenschaft 270" },
+      { text: "Ach, was muß man oft von bösen Kindern hören oder lesen!", autor: "Wilhelm Busch", quelle: "Max und Moritz, Vorwort" },
+      { text: "Aber wehe, wehe, wehe! Wenn ich auf das Ende sehe!!", autor: "Wilhelm Busch", quelle: "Max und Moritz, Vorwort" },
+      { text: "Sage nicht alles, was du weißt, aber wisse immer, was du sagst.", autor: "Matthias Claudius", quelle: "An meinen Sohn Johannes (1799)" },
+      { text: "Nicht die Kinder bloß speist man mit Märchen ab.", autor: "Gotthold Ephraim Lessing", quelle: "Nathan der Weise, III,6" },
+      { text: "Was die Erziehung bei dem einzelnen Menschen ist, ist die Offenbarung bei dem ganzen Menschengeschlechte.", autor: "Gotthold Ephraim Lessing", quelle: "Die Erziehung des Menschengeschlechts, § 1" },
+      { text: "Der Geist muss nicht wie ein Gefäß gefüllt werden, sondern er braucht, wie Holz, nur einen Funken, der ihn entzündet.", autor: "Plutarch", quelle: "Über das Hören 18 (eigene Übersetzung)" },
+      { text: "Wissen, was man weiß, und wissen, was man nicht weiß – das ist Wissen.", autor: "Konfuzius", quelle: "Gespräche 2,17 (eigene Übersetzung)" },
+      { text: "Lernen und das Gelernte immer wieder üben – ist das nicht auch eine Freude?", autor: "Konfuzius", quelle: "Gespräche 1,1 (eigene Übersetzung)" },
+      { text: "Wenn drei miteinander gehen, ist gewiss einer darunter, von dem ich lernen kann.", autor: "Konfuzius", quelle: "Gespräche, Buch 7 (eigene Übersetzung)" },
+      { text: "Nichts in der Welt ist weicher und schwächer als das Wasser, und doch kommt ihm im Angriff auf das Harte und Starke nichts gleich.", autor: "Laozi", quelle: "Daodejing 78 (eigene Übersetzung)" },
+    ],
+    awo: [
+      { text: "Wo immer ein Mensch ist, da ist Gelegenheit zu einer Wohltat.", autor: "Seneca", quelle: "Vom glücklichen Leben 24,3 (eigene Übersetzung)" },
+      { text: "Du musst für den anderen leben, wenn du für dich leben willst.", autor: "Seneca", quelle: "Briefe an Lucilius 48,2 (eigene Übersetzung)" },
+      { text: "Wir sind Glieder eines großen Körpers.", autor: "Seneca", quelle: "Briefe an Lucilius 95,52 (eigene Übersetzung)" },
+      { text: "Was dem Schwarm nicht nützt, nützt auch der Biene nicht.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 6,54 (eigene Übersetzung)" },
+      { text: "Rede nicht länger darüber, wie ein guter Mensch sein soll, sondern sei einer.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 10,16 (eigene Übersetzung)" },
+      { text: "Die beste Art, sich zu wehren, ist, nicht so zu werden wie der, der Unrecht tut.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 6,6 (eigene Übersetzung)" },
+      { text: "Verbunden werden auch die Schwachen mächtig.", autor: "Friedrich Schiller", quelle: "Wilhelm Tell, I,3" },
+      { text: "Alle Menschen werden Brüder.", autor: "Friedrich Schiller", quelle: "An die Freude (Fassung von 1803)" },
+      { text: "Edel sei der Mensch, hülfreich und gut!", autor: "Johann Wolfgang von Goethe", quelle: "Das Göttliche" },
+      { text: "Von guten Mächten wunderbar geborgen, erwarten wir getrost, was kommen mag.", autor: "Dietrich Bonhoeffer", quelle: "Von guten Mächten (1944)" },
+      { text: "Wer immer strebend sich bemüht, den können wir erlösen.", autor: "Johann Wolfgang von Goethe", quelle: "Faust II, Bergschluchten" },
+      { text: "Vom sichern Port läßt sich's gemächlich raten.", autor: "Friedrich Schiller", quelle: "Wilhelm Tell, I,1" },
+      { text: "Handle so, daß du die Menschheit, sowohl in deiner Person, als in der Person eines jeden andern, jederzeit zugleich als Zweck, niemals bloß als Mittel brauchest.", autor: "Immanuel Kant", quelle: "Grundlegung zur Metaphysik der Sitten" },
+      { text: "Die Menschen, denen wir eine Stütze sind, die geben uns den Halt im Leben.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Haben und nicht geben ist in manchen Fällen schlimmer als stehlen.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Mut des Schwachen, Milde des Starken – beide anbetungswürdig!", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Das Recht des Stärkeren ist das stärkste Unrecht.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Der größte Feind des Rechtes ist das Vorrecht.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Suche immer zu nützen! Suche nie, dich unentbehrlich zu machen.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Wir sollen immer verzeihen, dem Reuigen um seinetwillen, dem Reuelosen um unseretwillen.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Bis zu einem gewissen Grade selbstlos sollte man schon aus Selbstsucht sein.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Wenn du geliebt werden willst, liebe.", autor: "Seneca (nach Hekaton)", quelle: "Briefe an Lucilius 9,6 (eigene Übersetzung)" },
+      { text: "Wer eine Wohltat erwiesen hat, schweige; erzählen soll, wer sie empfangen hat.", autor: "Seneca", quelle: "Über die Wohltaten 2,11 (eigene Übersetzung)" },
+      { text: "Dem Menschen ist es eigen, auch die zu lieben, die fehlen.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 7,22 (eigene Übersetzung)" },
+      { text: "Die Menschen sind füreinander da. Belehre sie also oder ertrage sie.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 8,59 (eigene Übersetzung)" },
+      { text: "Ein guter Mensch in seinem dunklen Drange ist sich des rechten Weges wohl bewußt.", autor: "Johann Wolfgang von Goethe", quelle: "Faust I, Prolog im Himmel" },
+      { text: "Ein edler Mensch zieht edle Menschen an und weiß sie festzuhalten.", autor: "Johann Wolfgang von Goethe", quelle: "Torquato Tasso, I,1" },
+      { text: "Die Tat ist alles, nichts der Ruhm.", autor: "Johann Wolfgang von Goethe", quelle: "Faust II, 4. Akt" },
+      { text: "Der brave Mann denkt an sich selbst zuletzt.", autor: "Friedrich Schiller", quelle: "Wilhelm Tell, I,1" },
+      { text: "Der Mensch ist frei geschaffen, ist frei, und würd' er in Ketten geboren.", autor: "Friedrich Schiller", quelle: "Die Worte des Glaubens" },
+      { text: "Aus so krummem Holze, als woraus der Mensch gemacht ist, kann nichts ganz Gerades gezimmert werden.", autor: "Immanuel Kant", quelle: "Idee zu einer allgemeinen Geschichte in weltbürgerlicher Absicht, 6. Satz" },
+      { text: "Es eifre jeder seiner unbestochnen, von Vorurteilen freien Liebe nach!", autor: "Gotthold Ephraim Lessing", quelle: "Nathan der Weise, III,7" },
+      { text: "Die einzige Art, einen Freund zu haben, ist, einer zu sein.", autor: "Ralph Waldo Emerson", quelle: "Friendship, 1841 (eigene Übersetzung)" },
+      { text: "Der Mensch ist von Natur aus ein Gemeinschaftswesen.", autor: "Aristoteles", quelle: "Politik I,2 (eigene Übersetzung)" },
+      { text: "Der Weise häuft nicht an. Je mehr er für andere tut, desto mehr hat er selbst.", autor: "Laozi", quelle: "Daodejing 81 (eigene Übersetzung)" },
+      { text: "Was du selbst nicht wünschst, das tu auch anderen nicht an.", autor: "Konfuzius", quelle: "Gespräche, Buch 15 (eigene Übersetzung)" },
+      { text: "Ich bin ein Mensch; nichts Menschliches, meine ich, ist mir fremd.", autor: "Terenz", quelle: "Der Selbstquäler 77 (eigene Übersetzung)" },
+      { text: "Nicht das Beliebige, sondern das Rechte tun und wagen, nicht im Möglichen schweben, das Wirkliche tapfer ergreifen.", autor: "Dietrich Bonhoeffer", quelle: "Stationen auf dem Wege zur Freiheit (1944)" },
+      { text: "Wo Mäßigung ein Fehler ist, da ist Gleichgültigkeit ein Verbrechen.", autor: "Georg Christoph Lichtenberg", quelle: "Sudelbücher, Heft G" },
+    ],
+    business: [
+      { text: "Man muss noch Chaos in sich haben, um einen tanzenden Stern gebären zu können.", autor: "Friedrich Nietzsche", quelle: "Also sprach Zarathustra, Vorrede 5" },
+      { text: "Wer nicht weiß, welchen Hafen er ansteuert, für den ist kein Wind der richtige.", autor: "Seneca", quelle: "Briefe an Lucilius 71,3 (eigene Übersetzung)" },
+      { text: "Eine Reise von tausend Meilen beginnt unter deinen Füßen.", autor: "Laozi", quelle: "Daodejing 64 (eigene Übersetzung)" },
+      { text: "Gut gemacht ist besser als gut gesagt.", autor: "Benjamin Franklin", quelle: "Poor Richard's Almanack 1737 (eigene Übersetzung)" },
+      { text: "Nichts Großes ist je ohne Begeisterung erreicht worden.", autor: "Ralph Waldo Emerson", quelle: "Circles, 1841 (eigene Übersetzung)" },
+      { text: "Das Was bedenke, mehr bedenke Wie.", autor: "Johann Wolfgang von Goethe", quelle: "Faust II, Laboratorium" },
+      { text: "Wer gar zu viel bedenkt, wird wenig leisten.", autor: "Friedrich Schiller", quelle: "Wilhelm Tell, III,1" },
+      { text: "Dem Mann kann geholfen werden.", autor: "Friedrich Schiller", quelle: "Die Räuber, V,2" },
+      { text: "Getretner Quark wird breit, nicht stark.", autor: "Johann Wolfgang von Goethe", quelle: "West-östlicher Divan, Buch der Sprüche" },
+      { text: "Die Axt im Haus erspart den Zimmermann.", autor: "Friedrich Schiller", quelle: "Wilhelm Tell, III,1" },
+      { text: "Was du ererbt von deinen Vätern hast, erwirb es, um es zu besitzen.", autor: "Johann Wolfgang von Goethe", quelle: "Faust I, Nacht" },
+      { text: "Die Welt ist Wandel, das Leben Auffassung.", autor: "Marc Aurel", quelle: "Selbstbetrachtungen 4,3 (eigene Übersetzung)" },
+      { text: "Ernst ist das Leben, heiter ist die Kunst.", autor: "Friedrich Schiller", quelle: "Wallensteins Lager, Prolog" },
+      { text: "Für das Können gibt es nur einen Beweis: das Tun.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen" },
+      { text: "Was noch zu leisten ist, das bedenke; was du schon geleistet hast, das vergiss.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Zwischen Können und Tun liegt ein großes Meer und auf seinem Grunde die gescheiterte Willenskraft.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Ausnahmen sind nicht immer Bestätigungen der alten Regel; sie können auch die Vorboten einer neuen Regel sein.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Sag etwas, das sich von selbst versteht, zum ersten Mal, und du bist unsterblich.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Nichts Besseres kann der Künstler sich wünschen als grobe Freunde und höfliche Feinde.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Wenn die Zeit kommt, in der man könnte, ist die vorüber, in der man kann.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen" },
+      { text: "Begeisterung spricht nicht immer für den, der sie erweckt, und immer für den, der sie empfindet.", autor: "Marie von Ebner-Eschenbach", quelle: "Aphorismen (Ausgabe 1893)" },
+      { text: "Nirgends ist, wer überall ist.", autor: "Seneca", quelle: "Briefe an Lucilius 2,2 (eigene Übersetzung)" },
+      { text: "Das größte Hindernis für das Leben ist das Warten, das am Morgen hängt und das Heute verliert.", autor: "Seneca", quelle: "Von der Kürze des Lebens 9,1 (eigene Übersetzung)" },
+      { text: "Wer vieles bringt, wird manchem etwas bringen.", autor: "Johann Wolfgang von Goethe", quelle: "Faust I, Vorspiel auf dem Theater" },
+      { text: "Der Worte sind genug gewechselt, laßt mich auch endlich Taten sehn!", autor: "Johann Wolfgang von Goethe", quelle: "Faust I, Vorspiel auf dem Theater" },
+      { text: "Was glänzt, ist für den Augenblick geboren; das Echte bleibt der Nachwelt unverloren.", autor: "Johann Wolfgang von Goethe", quelle: "Faust I, Vorspiel auf dem Theater" },
+      { text: "Gebraucht der Zeit, sie geht so schnell von hinnen, doch Ordnung lehrt Euch Zeit gewinnen.", autor: "Johann Wolfgang von Goethe", quelle: "Faust I, Studierzimmer" },
+      { text: "Die ich rief, die Geister, werd ich nun nicht los.", autor: "Johann Wolfgang von Goethe", quelle: "Der Zauberlehrling" },
+      { text: "Von der Stirne heiß rinnen muß der Schweiß, soll das Werk den Meister loben.", autor: "Friedrich Schiller", quelle: "Das Lied von der Glocke" },
+      { text: "Leicht beieinander wohnen die Gedanken, doch hart im Raume stoßen sich die Sachen.", autor: "Friedrich Schiller", quelle: "Wallensteins Tod, II,2" },
+      { text: "Verlorene Zeit findet sich nie wieder.", autor: "Benjamin Franklin", quelle: "Poor Richard's Almanack 1748 (eigene Übersetzung)" },
+      { text: "Kleine Hiebe fällen große Eichen.", autor: "Benjamin Franklin", quelle: "Poor Richard's Almanack 1750 (eigene Übersetzung)" },
+      { text: "Vertraue dir selbst: Jedes Herz schwingt mit dieser eisernen Saite.", autor: "Ralph Waldo Emerson", quelle: "Self-Reliance, 1841 (eigene Übersetzung)" },
+      { text: "Eine Schwalbe macht noch keinen Frühling.", autor: "Aristoteles", quelle: "Nikomachische Ethik I,6 (eigene Übersetzung)" },
+      { text: "Das Schwierige der Welt beginnt immer im Leichten, das Große der Welt beginnt immer im Kleinen.", autor: "Laozi", quelle: "Daodejing 63 (eigene Übersetzung)" },
+      { text: "Wer angefangen hat, hat schon die Hälfte getan: Wage, weise zu sein!", autor: "Horaz", quelle: "Briefe I,2,40 (eigene Übersetzung)" },
+      { text: "Der Tropfen höhlt den Stein.", autor: "Ovid", quelle: "Briefe aus dem Pontus IV,10,5 (eigene Übersetzung)" },
+      { text: "Weil, so schließt er messerscharf, nicht sein kann, was nicht sein darf.", autor: "Christian Morgenstern", quelle: "Die unmögliche Tatsache (Palmström)" },
+      { text: "Ich kann freilich nicht sagen, ob es besser werden wird, wenn es anders wird; aber so viel kann ich sagen, es muß anders werden, wenn es gut werden soll.", autor: "Georg Christoph Lichtenberg", quelle: "Sudelbücher" },
+      { text: "Die Neigung der Menschen, kleine Dinge für wichtig zu halten, hat sehr viel Großes hervorgebracht.", autor: "Georg Christoph Lichtenberg", quelle: "Sudelbücher" },
+    ],
+  };
+
+  function zitatDesTages(bereich, datum = new Date()) {
+    const liste = ZITATE[bereich];
+    if (!liste || liste.length === 0) return null;
+    // Tageszähler nach lokalem Kalendertag (UTC-Konstruktor vermeidet
+    // Sprünge durch Sommer-/Winterzeit)
+    const tag = Math.floor(Date.UTC(datum.getFullYear(), datum.getMonth(), datum.getDate()) / 86400000);
+    return liste[((tag % liste.length) + liste.length) % liste.length];
+  }
+
+  function renderTagesZitat() {
+    const el = document.getElementById("tages-zitat");
+    if (!el) return;
+    const z = zitatDesTages(aktiverBereich);
+    if (!z) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+    el.classList.remove("hidden");
+    el.innerHTML = `<blockquote class="tages-zitat-text">${escapeHtml(z.text)}</blockquote>` +
+      `<figcaption class="tages-zitat-quelle">${escapeHtml(z.autor)} · <cite>${escapeHtml(z.quelle)}</cite></figcaption>`;
+  }
+
   function renderHeute() {
     bereichAnwenden();
     const heuteIso = heuteISO();
@@ -1238,6 +1432,7 @@
         ? `Moin Markus.<br><span class="heute-gruss-akzent">${offeneDinge} ${offeneDinge === 1 ? "Ding" : "Dinge"}</span> heute.`
         : `Moin Markus.<br>Freie Bahn heute.`;
     }
+    renderTagesZitat();
 
     html += `<h2 class="heute-abschnitt">Zeitleiste</h2>`;
     if (zlEintraege.length === 0) {
