@@ -49,12 +49,15 @@
     --overdue-bg: #fce8d2; --overdue-text: #8f4700; --overdue-border: #f3c89a;
     --reminder-bg: #f3e3e4;
   }
+  /* Business = Markenkit zwischenkaffeeundchaos: #1e3a5f, #f47c4a, #f2e7c9,
+     #5ca9e8, #f8f9fa. --accent ist das Markenorange abgedunkelt (#c2410c),
+     weil #f47c4a mit weißer Schrift nur Kontrast 2,7:1 hat (WCAG AA: 4,5:1).
+     Das echte Markenorange steht in --accent-2 (Streifen, Punkte). */
   :root[data-bereich="business"] {
-    --bg: #f4ede3; --ink: #2a1d15; --ink-dim: #7a4f33;
-    --accent: #c2461f; --accent-2: #f2b134; --border: #e6d9c6;
-    --akzent-flaeche: #f2b134; --nav-bg: #2a1d15; --nav-ink: #f4ede3;
-    --overdue-bg: #fde3d8; --overdue-text: #9e2f0c;
-    --reminder-bg: #efe3d3;
+    --bg: #f8f9fa; --ink: #1e3a5f; --ink-dim: #4f6784;
+    --accent: #c2410c; --accent-2: #f47c4a; --border: #dde3ea;
+    --akzent-flaeche: #f2e7c9; --nav-bg: #1e3a5f; --nav-ink: #f8f9fa;
+    --reminder-bg: #eef5fc; /* helle Tönung von #5ca9e8 */
   }
   html { background: var(--bg); }
   * { box-sizing: border-box; }
