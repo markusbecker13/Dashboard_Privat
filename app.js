@@ -185,7 +185,7 @@
     privat: { src: "icons/privat.png", alt: "Privat" },
     ogs: { src: "icons/rapunzel.png", alt: "Rapunzel Kinderhaus e.V." },
     awo: { src: "icons/awo-liblar.png", alt: "AWO Ortsverein Liblar-Köttingen e.V." },
-    business: { src: "icons/zwischenkaffeeundchaos.png", alt: "zwischenkaffeeundchaos" },
+    business: { src: "icons/zwischenkaffeeundchaos-herz.png", alt: "zwischenkaffeeundchaos" },
   };
 
   function farbweltAnwenden(bereich) {
