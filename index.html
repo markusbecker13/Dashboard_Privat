@@ -318,7 +318,7 @@
 
       <div id="view-anleitung" class="hidden">
         <h1>Anleitung</h1>
-        <p class="hero-text">Die komplette Gesamtanleitung zum Dashboard – zum Aufklappen. Sichtbar in allen drei Bereichen und wird mit jeder neuen Funktion aktualisiert.</p>
+        <p class="hero-text">Die komplette Gesamtanleitung zum Dashboard – zum Aufklappen. Sichtbar in allen Bereichen und wird mit jeder neuen Funktion aktualisiert.</p>
 
         <div class="anleitung-inhalt">
 
@@ -346,12 +346,12 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Das Dashboard trennt vier Lebensbereiche sauber voneinander: <strong>Privat</strong>, <strong>OGS Rapunzel</strong> (Beruf), <strong>AWO OV Liblar</strong> (Ehrenamt) und <strong>Business</strong> (zwischenkaffeeundchaos). Ein weiterer Bereich <strong>Verwaltung</strong> (⚙️) hat keine eigenen Daten, sondern enthält nur die Reiter-Verwaltung.</p>
               <ul>
-                <li><strong>Nach dem Login:</strong> die Willkommensseite mit Datum und farbigen Bereichs-Karten (Bereich wählen). Verwaltung öffnet direkt die Reiter-Verwaltung; Privat/OGS/AWO öffnen direkt den Start-Screen (Heute)</li>
+                <li><strong>Nach dem Login:</strong> die Willkommensseite mit Datum und farbigen Bereichs-Karten (Bereich wählen). Verwaltung öffnet direkt die Reiter-Verwaltung; Privat/OGS/AWO/Business öffnen direkt den Start-Screen (Heute)</li>
                 <li><strong>Leiste unten:</strong> die Themen Heute, Planen, Sammeln, der bereichsspezifische Block (Glühbirne, z.B. Ideen/Inventar/Projekte/Verleih) und Verwalten (Raster-Symbol). Das aktive Thema ist hervorgehoben und beschriftet. Ein Tipp auf ein Thema öffnet den Reiter, den du darin zuletzt offen hattest (beim ersten Mal den ersten)</li>
                 <li><strong>Reiter-Leiste oben:</strong> hat das aktive Thema mehrere sichtbare Reiter, stehen sie als Knöpfe unter der Kopfzeile (seitlich wischbar). Thema mit nur einem Reiter (z.B. Heute): keine Reiter-Leiste</li>
                 <li><strong>Bereich wechseln:</strong> über den Bereichs-Knopf oben links (z.B. „Privat ▾") oder „↔ Bereich wechseln" im ⋮-Menü – beides führt zur Willkommensseite, ohne dich abzumelden</li>
               </ul>
-              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar, -Projekte und -Verleih haben ebenfalls ein eigenes bereich-Feld.</p>
+              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Finanzen, Training sowie Inventar, Projekte und Verleih haben ebenfalls ein eigenes bereich-Feld.</p>
               <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS-, AWO- und Business-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Reflexion/Einkauf/Export sind standardmäßig nur im Privat-Bereich eingeblendet, Links in Privat und Business.</p>
               <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS, AWO oder Business bleiben grundsätzlich rein lokal im Dashboard.</p>
               <p><strong>Business:</strong> startet mit Start, Aufgaben, Kalender, Notizen, Links, Ideen, Verlauf und Anleitung. Weitere Reiter (z.B. Finanzen, Projekte) lassen sich in der Reiter-Verwaltung einblenden – wie in den anderen Bereichen bereichsgetrennt.</p>
@@ -415,7 +415,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Frei</summary>
+            <summary>Frei <span class="anleitung-nur">(Standard: nur Privat)</span></summary>
             <div class="anleitung-text">
               <p>Zeigt für einen wählbaren Tag, wo im festgelegten Zeitrahmen noch freie Zeit ist – berechnet aus Terminen, Aufgaben mit Uhrzeit und den Blockzeiten des jeweiligen Wochentags.</p>
               <ul>
@@ -427,7 +427,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Planung <span class="anleitung-nur">(nur Privat)</span></summary>
+            <summary>Planung <span class="anleitung-nur">(Standard: nur Privat)</span></summary>
             <div class="anleitung-text">
               <p>Ziele für Woche, Monat oder Jahr, mit Unterschritten.</p>
               <ul>
@@ -440,9 +440,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Finanzen <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
+            <summary>Finanzen <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
-              <p>Übersicht über Fixkosten, Sonderausgaben und einzelne Buchungen, über vier Reiter oben im Tab. Fixkosten, Sonderausgaben, Buchungen und Startkapital haben ein eigenes <code>bereich</code>-Feld – zusätzlich in OGS/AWO eingeblendet, sind das komplett eigene, getrennte Datensätze inkl. eigenem Startkapital pro Jahr.</p>
+              <p>Übersicht über Fixkosten, Sonderausgaben und einzelne Buchungen, über vier Reiter oben im Tab. Fixkosten, Sonderausgaben, Buchungen und Startkapital haben ein eigenes <code>bereich</code>-Feld – zusätzlich in einem anderen Bereich eingeblendet, sind das komplett eigene, getrennte Datensätze inkl. eigenem Startkapital pro Jahr.</p>
               <p><strong>Fixkosten</strong> – zwei Excel-artige 12-Monats-Tabellen (Ausgaben, Einnahmen). Zelle anklicken, um die ganze Zeile inline zu bearbeiten; Summenspalte/-zeile aktualisieren sich automatisch.</p>
               <p><strong>Sonderausgaben</strong> – einmalige, größere Posten als Karten-Liste, ebenfalls inline bearbeitbar.</p>
               <p><strong>Buchungen</strong> – laufende Kontobewegungen:</p>
@@ -457,12 +457,12 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li>Drei Charts: Einnahmen vs. Ausgaben pro Monat, Kontostand-Verlauf, Ausgaben nach Kategorie</li>
                 <li>Rechnet <strong>ausschließlich</strong> aus den erfassten Buchungen – Fixkosten und Sonderausgaben fließen bewusst nicht mit ein, damit nichts doppelt gezählt wird</li>
               </ul>
-              <p><strong>Massenlöschung</strong> (unten in der Übersicht) wirkt nur auf den aktuell aktiven Bereich – löscht in Privat keine OGS/AWO-Buchungen und umgekehrt.</p>
+              <p><strong>Massenlöschung</strong> (unten in der Übersicht) wirkt nur auf den aktuell aktiven Bereich – löscht in Privat keine Buchungen anderer Bereiche und umgekehrt.</p>
             </div>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Ideen <span class="anleitung-nur">(OGS Rapunzel &amp; AWO OV Liblar, per Reiter-Verwaltung auch Privat)</span></summary>
+            <summary>Ideen <span class="anleitung-nur">(Standard: OGS, AWO und Business, per Reiter-Verwaltung auch Privat)</span></summary>
             <div class="anleitung-text">
               <p>Sammlung für Angebots- und Projektideen, getrennt nach Bereich.</p>
               <ul>
@@ -473,7 +473,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Inventar <span class="anleitung-nur">(Standard: nur OGS Rapunzel, per Reiter-Verwaltung auch Privat/AWO – bereichsgetrennt)</span></summary>
+            <summary>Inventar <span class="anleitung-nur">(Standard: nur OGS Rapunzel, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <ul>
                 <li>Name, Kategorie (mit Autovervollständigung aus bestehenden Kategorien), Menge, optional Standort, optional Beschreibung, Zustand (Gut / Eingeschränkt nutzbar / Defekt)</li>
@@ -484,7 +484,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Projekte <span class="anleitung-nur">(Standard: nur OGS Rapunzel, per Reiter-Verwaltung auch Privat/AWO – bereichsgetrennt)</span></summary>
+            <summary>Projekte <span class="anleitung-nur">(Standard: nur OGS Rapunzel, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <p>Ausgearbeitete Konzepte und Projekte, optional mit hinterlegten Dateien.</p>
               <ul>
@@ -501,7 +501,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Verleih <span class="anleitung-nur">(Standard: nur OGS Rapunzel, per Reiter-Verwaltung auch Privat/AWO – bereichsgetrennt, an das jeweilige Inventar gekoppelt)</span></summary>
+            <summary>Verleih <span class="anleitung-nur">(Standard: nur OGS Rapunzel, per Reiter-Verwaltung überall – bereichsgetrennt, an das jeweilige Inventar gekoppelt)</span></summary>
             <div class="anleitung-text">
               <p>Verleih-Historie für Inventar-Gegenstände: wer hat was wann bekommen, und ist es schon zurück?</p>
               <ul>
@@ -528,7 +528,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Links <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
+            <summary>Links <span class="anleitung-nur">(Standard: Privat und Business, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <ul>
                 <li>Titel + URL eintragen (fehlendes „https://" wird automatisch ergänzt), optional Notiz und Projekt</li>
@@ -539,7 +539,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Reflexion <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
+            <summary>Reflexion <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <p>Kurze, datierte Einträge – passend zu Einheiten, Ferienspiel-Tagen oder der Erlebnispädagogik-Weiterbildung.</p>
               <ul>
@@ -550,9 +550,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Spiele <span class="anleitung-nur">(nur Privat)</span></summary>
+            <summary>Spiele <span class="anleitung-nur">(Standard: nur Privat, eine gemeinsame Kartei)</span></summary>
             <div class="anleitung-text">
-              <p>Spielekartei für die Jugendarbeit – bewusst nur im Bereich Privat, damit sie unabhängig davon griffbereit ist, ob du gerade in der OGS, im Jugendwerk oder anderswo eine Spielidee brauchst.</p>
+              <p>Spielekartei für die Jugendarbeit – bewusst eine einzige, gemeinsame Kartei, damit sie unabhängig davon griffbereit ist, ob du gerade in der OGS, im Jugendwerk oder anderswo eine Spielidee brauchst.</p>
               <ul>
                 <li><strong>Neues Spiel:</strong> Titel, Kategorie (mit Autovervollständigung), optional Teilnehmerzahl, Altersgruppe, Dauer und Material, optional eine Beschreibung direkt im Feld und/oder eine Datei</li>
                 <li><strong>Beschreibung im Feld vs. Datei:</strong> die Freitext-Beschreibung ist sofort lesbar und durchsuchbar; eine zusätzliche Datei eignet sich für bereits ausformulierte Anleitungen (PDF/Word, max. 5 MB)</li>
@@ -563,7 +563,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Training <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
+            <summary>Training <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <p>Trainingsverlauf und -erfolg – bewusst offen für beliebige Sportarten und Orte, weil sich beides über die Zeit ändern soll.</p>
               <ul>
@@ -583,7 +583,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Wochenziel:</strong> oben "X von Y diese Woche" mit einem ✓ sobald erreicht. Ziel über „Ziel ändern" jederzeit anpassbar (Woche zählt Montag bis Sonntag). Darunter die längste je erreichte Serie von Wochen in Folge mit erreichtem Ziel</li>
                 <li><strong>Sportart-Ziele:</strong> zusätzlich zum Gesamtziel lässt sich pro Sportart ein eigenes Wochenziel festlegen (Auswahl + Zahl + „+ Sportart-Ziel"). Ist ein Sportart-Filter aktiv, bezieht sich die Wochenziel-/Serien-Anzeige oben auf diese Sportart und ihr eigenes Ziel (falls eines hinterlegt ist, sonst das Gesamtziel)</li>
                 <li><strong>Filter:</strong> Sportart, Ort und Zeitraum sind kombinierbar und wirken auf die Liste darunter sowie auf die Wochenziel-/Serien-Anzeige oben. „Filter zurücksetzen" hebt alle wieder auf</li>
-                <li><strong>Bestleistung:</strong> eine Übung bekommt bei neuer Bestmarke bei Gewicht oder Wiederholungen ein 🏆-Symbol (erst ab dem zweiten Eintrag dieser Übung möglich)</li>
+                <li><strong>Bestleistung:</strong> eine Übung bekommt bei neuer Bestmarke bei Gewicht, Wiederholungen oder Sekunden ein 🏆-Symbol (erst ab dem zweiten Eintrag dieser Übung möglich)</li>
                 <li><strong>Liste:</strong> nach Woche gruppiert, aktuelle Woche standardmäßig aufgeklappt, jede Wochen-Überschrift zeigt Anzahl und ob das Wochenziel erreicht wurde</li>
                 <li>Klick auf einen Eintrag öffnet die Inline-Bearbeitung inklusive der hinterlegten Übungen. Löschen eines Plans entfernt nur die Vorlage – bereits erfasste Trainings bleiben erhalten und verlieren lediglich die Verknüpfung</li>
               </ul>
@@ -591,7 +591,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Einkaufsliste <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung auch OGS/AWO – bereichsgetrennt)</span></summary>
+            <summary>Einkaufsliste <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
               <ul>
                 <li>Artikel eintragen, Enter oder „Hinzufügen"</li>
@@ -609,7 +609,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Export <span class="anleitung-nur">(nur Privat)</span></summary>
+            <summary>Export <span class="anleitung-nur">(Standard: nur Privat)</span></summary>
             <div class="anleitung-text">
               <p>Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen. Läuft komplett im Browser, ohne dass Daten an Dritte gehen. Bei „Alles" gibt es bei Excel ein Tabellenblatt pro Bereich, bei Word alle Tabellen untereinander in einem Dokument.</p>
             </div>
@@ -618,11 +618,11 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Reiter <span class="anleitung-nur">(nur Verwaltung)</span></summary>
             <div class="anleitung-text">
-              <p>Checkboxen-Übersicht, gruppiert nach Privat/OGS/AWO: legt für jeden Bereich einzeln und frei fest, welche Reiter sichtbar sein sollen – auch außerhalb der ursprünglichen Zuordnung (z.B. Finanzen auch in OGS einblenden).</p>
+              <p>Checkboxen-Übersicht, gruppiert nach Privat/OGS/AWO/Business: legt für jeden Bereich einzeln und frei fest, welche Reiter sichtbar sein sollen – auch außerhalb der ursprünglichen Zuordnung (z.B. Finanzen auch in OGS einblenden).</p>
               <ul>
                 <li>Ausblenden entfernt einen Reiter nur aus der Navigation – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen. Ein Thema (z.B. „Sammeln") erscheint in der Leiste unten nur, solange mindestens ein Reiter darin sichtbar ist</li>
                 <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
-                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital) sowie OGS-Inventar, -Projekte und -Verleih haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten.</li>
+                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital), Training sowie Inventar, Projekte und Verleih haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten.</li>
               </ul>
             </div>
           </details>
@@ -642,7 +642,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <ul>
                 <li><strong>„Verify JWT" bei der Edge Function:</strong> muss ausgeschaltet sein, sonst „Passwort falsch" obwohl es stimmt. Springt nach jedem Deploy wieder auf „an" zurück – nach jedem Deploy prüfen</li>
-                <li><strong>Icons im GitHub-Repo:</strong> müssen im Unterordner <code>icons/</code> liegen, sonst funktioniert die App-Installation nicht</li>
+                <li><strong>Icons und Logos im GitHub-Repo:</strong> müssen im Unterordner <code>icons/</code> liegen, Schriften in <code>fonts/</code> – sonst funktionieren App-Installation, Logo-Anzeige bzw. Schriften nicht</li>
+                <li><strong>Uploads über die GitHub-Weboberfläche</strong> landen immer im gerade geöffneten Ordner und lassen sich dort nicht verschieben. Ganze Ordner (z.B. <code>fonts/</code>) von der Repo-Startseite aus per Drag &amp; Drop hochladen. Danach den Pfad direkt im Browser aufrufen (z.B. <code>…/fonts/dm-sans.woff2</code>) – eine 404-Seite zeigt sofort, dass etwas falsch liegt</li>
+                <li><strong>Fehlende Schriften fallen nicht auf:</strong> liegt <code>fonts/</code> falsch, weicht die App still auf die Systemschrift aus. Erkennbar am Gruß „Moin Markus." – in Bricolage Grotesque wirkt er breiter</li>
                 <li><strong>Browser-Cache:</strong> nach dem Hochladen von index.html/app.js/style.css hilft ein privates/inkognito Fenster zuverlässiger als ein harter Reload; bei installierter PWA zusätzlich die App komplett schließen und neu öffnen</li>
                 <li><strong>Google-Sync und <code>google_kein_push</code>:</strong> mehrstufige Sync-Logik – jede Phase, die Termine zu Google schickt, muss den Filter einzeln berücksichtigen, sonst reicht eine vergessene Phase, um die Ausnahme wirkungslos zu machen</li>
                 <li><strong>Private Storage-Buckets:</strong> Dateien sind nie direkt über eine feste URL erreichbar, nur über kurz gültige (5 Min.) signierte URLs. Beim Löschen eines Datensatzes mit Datei-Anhang muss die Datei zusätzlich explizit aus dem Storage entfernt werden</li>
@@ -658,7 +660,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li>Supabase-Projekt läuft in der EU-Region (Frankfurt); Zugriff auf die Datenbank ausschließlich über die Edge Function mit Passwort-Schutz</li>
                 <li><strong>Schriften:</strong> Bricolage Grotesque und DM Sans liegen direkt im Dashboard (Ordner fonts/, Lizenz SIL OFL 1.1). Beim Öffnen wird keine Verbindung zu Google Fonts mehr aufgebaut, die IP-Adresse geht also nicht an Google</li>
                 <li>Aktuell werden nur eigene Daten gespeichert (keine Daten Dritter) – das fällt unter die private Haushaltsausnahme der DSGVO</li>
-                <li><strong>OGS Rapunzel &amp; AWO OV Liblar:</strong> beide Bereiche enthalten ausschließlich organisatorische Inhalte, keine personenbezogenen Daten über Kinder, Familien oder Kolleg:innen. Sollten künftig doch personenbezogene Daten Dritter hinzukommen, braucht es eine erneute Prüfung</li>
+                <li><strong>Wetter:</strong> die Abfrage läuft serverseitig über die Edge Function bei Open-Meteo (ohne API-Schlüssel). Open-Meteo bekommt nur den eingestellten Ort, nicht deine IP-Adresse</li>
+                <li><strong>OGS Rapunzel &amp; AWO OV Liblar:</strong> beide Bereiche sind für organisatorische Inhalte gedacht, keine personenbezogenen Daten über Kinder, Familien oder Kolleg:innen. Sollten künftig doch personenbezogene Daten Dritter hinzukommen, braucht es eine erneute Prüfung. <strong>Achtung Verleih:</strong> das Feld „An wen" nimmt Namen auf – dort möglichst Kürzel, Gruppen oder Funktionen statt vollständiger Namen eintragen</li>
                 <li><strong>Business (zwischenkaffeeundchaos):</strong> Für geschäftliche Tätigkeit gilt die private Haushaltsausnahme nicht. Solange dort nur eigene Planungsdaten liegen (Aufgaben, Ideen, Notizen), ist das unkritisch. Bitte <strong>keine Kundendaten</strong> (Namen, E-Mail-Adressen, Bestellungen) im Dashboard ablegen – dafür bräuchte es u.a. einen Auftragsverarbeitungsvertrag mit Supabase und einen Eintrag im Verzeichnis der Verarbeitungstätigkeiten</li>
                 <li><strong>Google-Kalender-Sync:</strong> Termindaten werden zwischen Supabase (EU) und Googles Servern übertragen, die auch außerhalb der EU liegen können. Rechtsgrundlage ist aktuell das EU-US Data Privacy Framework. Da es weiterhin nur um eigene Termine geht, ändert das nichts an der Haushaltsausnahme</li>
               </ul>
