@@ -303,7 +303,7 @@
       </div>
 
       <div id="view-rezepte" class="hidden">
-        <h1>Rezepte <button class="hilfe-icon" data-hilfe="Deine Rezeptsammlung. Antippen klappt ein Rezept auf, der Stern macht es zum Favoriten (Favoriten stehen oben). Die Suche durchsucht Titel, Kategorie, Zutaten und Notiz. Rezepte gehören zu dem Bereich, in dem du sie angelegt hast.">?</button></h1>
+        <h1>Rezepte <button class="hilfe-icon" data-hilfe="Deine Rezeptsammlung. Antippen klappt ein Rezept auf, der Stern macht es zum Favoriten (Favoriten stehen oben). Die Suche durchsucht Titel, Kategorie, Zutaten und Notiz. Im aufgeklappten Rezept: Portionen mit − / + umrechnen, fehlende Zutaten auf die Einkaufsliste übernehmen und „Heute gekocht“ vermerken. Rezepte gehören zu dem Bereich, in dem du sie angelegt hast.">?</button></h1>
         <p class="hero-text">Rezepte, die du öfter kochst – schnell gefunden statt lange gesucht.</p>
 
         <div class="row">
@@ -315,6 +315,11 @@
         <div class="row rezept-filter">
           <input type="search" id="rezept-suche" placeholder="Suchen, z.B. Linsen" aria-label="Rezepte durchsuchen">
           <select id="rezept-kategorie-filter" aria-label="Nach Kategorie filtern"></select>
+          <select id="rezept-sortierung" aria-label="Sortierung">
+            <option value="favorit">Favoriten, A–Z</option>
+            <option value="lange">Lange nicht gekocht</option>
+            <option value="zuletzt">Zuletzt gekocht</option>
+          </select>
         </div>
         <div id="rezept-liste-bereich"></div>
       </div>
@@ -630,6 +635,10 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Quelle:</strong> Ein Link wird anklickbar (öffnet in neuem Tab), sonst einfach Text wie „von Oma“</li>
                 <li><strong>Liste:</strong> Favoriten (★) oben, danach alphabetisch. Antippen klappt das Rezept auf, dort „✎ Bearbeiten“ und „Löschen“</li>
                 <li><strong>Suche</strong> durchsucht Titel, Kategorie, Zutaten und Notiz – „Linsen“ findet also auch Rezepte mit Linsen als Zutat. Dazu der Kategorie-Filter</li>
+                <li><strong>Portionen umrechnen:</strong> Ist beim Rezept eine Portionenzahl eingetragen, steht über den Zutaten − / +. Umgerechnet wird die Zahl am Zeilenanfang, auch Brüche (1/2, ½), Spannen (2–3) und „ca.“. Zeilen ohne Zahl („etwas Salz“) bleiben unverändert. Ab 10 wird auf ganze Zahlen gerundet, darunter auf eine Nachkommastelle. Die Umrechnung ist nur eine Anzeige, das Rezept selbst bleibt unverändert</li>
+                <li><strong>Einkaufsliste:</strong> „🛒 Zutaten auf die Einkaufsliste …“ zeigt die Zutaten mit Häkchen – in der gerade eingestellten Portionenzahl. Antippen, was fehlt, dann übernehmen. Was schon offen auf der Einkaufsliste steht, ist markiert und nicht wählbar</li>
+                <li><strong>„✓ Heute gekocht“</strong> vermerkt das heutige Datum. Versehentlich getippt? „zurücknehmen“ stellt das vorherige Datum wieder her (solange die App nicht neu geladen wurde, sonst wird das Datum geleert)</li>
+                <li><strong>Sortierung:</strong> „Favoriten, A–Z“, „Lange nicht gekocht“ (noch nie Gekochtes zuerst – gut als Ideengeber) oder „Zuletzt gekocht“. Die Wahl merkt sich das Gerät</li>
                 <li>Rezepte sind im Export (Excel/Word) enthalten – gut als Sicherung</li>
               </ul>
             </div>
