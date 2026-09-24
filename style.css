@@ -1,4 +1,4 @@
-/* ==========================================================
+  /* ==========================================================
      Schriften – selbst gehostet (fonts/), keine Verbindung zu Google.
      Lizenz: SIL Open Font License 1.1 (siehe fonts/OFL-*.txt)
      ========================================================== */
@@ -784,6 +784,21 @@
 
   .heute-abschnitt { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; margin: 1.4rem 0 0.7rem; }
   .zeitleiste { display: flex; flex-direction: column; gap: 0.6rem; }
+  .zl-gruppen { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+  .zl-gruppe > .zeitleiste, .zl-gruppe > .empty-text { margin: 0.2rem 0 0.8rem; }
+  .zl-gruppe-kopf {
+    display: flex; align-items: center; gap: 0.6rem; min-height: 44px; padding: 0 0.9rem;
+    border-radius: 14px; background: var(--panel); cursor: pointer; list-style: none;
+    font-family: var(--font-display); font-weight: 700; font-size: 1rem; color: var(--ink);
+  }
+  .zl-gruppe-kopf::-webkit-details-marker { display: none; }
+  .zl-gruppe-kopf::after { content: "▾"; margin-left: auto; color: var(--ink-dim); transition: transform 0.15s; }
+  .zl-gruppe:not([open]) > .zl-gruppe-kopf::after { transform: rotate(-90deg); }
+  .zl-gruppe-zahl {
+    min-width: 1.6rem; padding: 0.1rem 0.5rem; border-radius: 999px; text-align: center;
+    font-family: var(--font-text); font-size: 0.8rem; background: var(--bg); color: var(--ink-dim);
+  }
+  .zl-gruppe--ueberfaellig .zl-gruppe-zahl { background: var(--overdue-bg); color: var(--overdue-text); }
   .zl-eintrag { display: flex; gap: 0.75rem; align-items: stretch; width: 100%; color: var(--ink); }
   .zl-zeit { width: 3.2rem; flex-shrink: 0; padding-top: 1rem; font-size: 0.82rem; font-weight: 600; color: var(--ink-dim); }
   .zl-karte {
