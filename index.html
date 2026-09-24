@@ -302,10 +302,27 @@
         <div id="einkauf-bereich"></div>
       </div>
 
+      <div id="view-rezepte" class="hidden">
+        <h1>Rezepte <button class="hilfe-icon" data-hilfe="Deine Rezeptsammlung. Antippen klappt ein Rezept auf, der Stern macht es zum Favoriten (Favoriten stehen oben). Die Suche durchsucht Titel, Kategorie, Zutaten und Notiz. Rezepte gehören zu dem Bereich, in dem du sie angelegt hast.">?</button></h1>
+        <p class="hero-text">Rezepte, die du öfter kochst – schnell gefunden statt lange gesucht.</p>
+
+        <div class="row">
+          <button class="btn-primary" id="btn-rezept-neu">+ Neues Rezept</button>
+        </div>
+        <div id="rezept-form-bereich" class="rezept-form hidden"></div>
+        <datalist id="rezept-kategorie-liste"></datalist>
+
+        <div class="row rezept-filter">
+          <input type="search" id="rezept-suche" placeholder="Suchen, z.B. Linsen" aria-label="Rezepte durchsuchen">
+          <select id="rezept-kategorie-filter" aria-label="Nach Kategorie filtern"></select>
+        </div>
+        <div id="rezept-liste-bereich"></div>
+      </div>
+
       <div id="view-reiter-verwaltung" class="hidden">
         <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
-        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -352,8 +369,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Reiter-Leiste oben:</strong> hat das aktive Thema mehrere sichtbare Reiter, stehen sie als Knöpfe unter der Kopfzeile (seitlich wischbar). Thema mit nur einem Reiter (z.B. Heute): keine Reiter-Leiste</li>
                 <li><strong>Bereich wechseln:</strong> über den Bereichs-Knopf oben links (z.B. „Privat ▾") oder „↔ Bereich wechseln" im ⋮-Menü – beides führt zur Willkommensseite, ohne dich abzumelden</li>
               </ul>
-              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Finanzen, Training, Verlauf sowie Inventar, Projekte und Verleih haben ebenfalls ein eigenes bereich-Feld.</p>
-              <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS-, AWO- und Business-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Reflexion/Einkauf/Export sind standardmäßig nur im Privat-Bereich eingeblendet, Links in Privat und Business.</p>
+              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen, Training, Verlauf sowie Inventar, Projekte und Verleih haben ebenfalls ein eigenes bereich-Feld.</p>
+              <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS-, AWO- und Business-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Reflexion/Einkauf/Rezepte/Export sind standardmäßig nur im Privat-Bereich eingeblendet, Links in Privat und Business.</p>
               <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS, AWO oder Business bleiben grundsätzlich rein lokal im Dashboard.</p>
               <p><strong>Business:</strong> startet mit Start, Aufgaben, Kalender, Notizen, Links, Ideen, Verlauf und Anleitung. Weitere Reiter (z.B. Finanzen, Projekte) lassen sich in der Reiter-Verwaltung einblenden – wie in den anderen Bereichen bereichsgetrennt.</p>
               <p><strong>Farbwelt je Bereich:</strong> Jeder Bereich hat eigene Farben – Privat Blautöne, OGS Rapunzel Gelb/Blau aus dem Rapunzel-Logo, AWO OV Liblar Rottöne, Business Marineblau/Orange aus dem Markenkit von zwischenkaffeeundchaos. In Privat, OGS, AWO und Business steht oben in der Kopfzeile das jeweilige Logo statt des Dashboard-Namens. Login, Willkommensseite und Verwaltung sind neutral gehalten. So ist auf einen Blick klar, in welchem Bereich du gerade bist. In AWO sind überfällige Einträge orange statt rot markiert, damit sie sich vom AWO-Rot abheben.</p>
@@ -604,6 +621,21 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
+            <summary>Rezepte <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
+            <div class="anleitung-text">
+              <p>Sammlung deiner Rezepte im Thema „Sammeln“, neben der Einkaufsliste.</p>
+              <ul>
+                <li><strong>„+ Neues Rezept“</strong> öffnet das Formular: Titel (Pflicht), Kategorie (mit Vorschlägen, frei erweiterbar), Portionen, Zeit in Minuten, Zutaten, Zubereitung, Quelle, Notiz, Favorit</li>
+                <li><strong>Zutaten:</strong> eine Zutat pro Zeile, Menge vorne („200 g Mehl“). Eine Zeile, die auf Doppelpunkt endet („Für die Soße:“), wird als Zwischenüberschrift angezeigt</li>
+                <li><strong>Quelle:</strong> Ein Link wird anklickbar (öffnet in neuem Tab), sonst einfach Text wie „von Oma“</li>
+                <li><strong>Liste:</strong> Favoriten (★) oben, danach alphabetisch. Antippen klappt das Rezept auf, dort „✎ Bearbeiten“ und „Löschen“</li>
+                <li><strong>Suche</strong> durchsucht Titel, Kategorie, Zutaten und Notiz – „Linsen“ findet also auch Rezepte mit Linsen als Zutat. Dazu der Kategorie-Filter</li>
+                <li>Rezepte sind im Export (Excel/Word) enthalten – gut als Sicherung</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
             <summary>Verlauf</summary>
             <div class="anleitung-text">
               <p>Zeigt die letzten 50 Aktivitäten im gerade aktiven Bereich – was wurde wann hinzugefügt, erledigt oder gelöscht. Jeder Bereich hat seinen eigenen Verlauf: ein Eintrag landet in dem Bereich, in dem du die Aktion ausgeführt hast. Das gilt auch für die gemeinsamen Daten (Spiele, Blockzeiten). Google-Sync-Einträge stehen immer unter Privat, weil nur Privat-Termine synchronisiert werden. Einträge von vor der Trennung stehen alle unter Privat. Rein informativ, keine Aktionen möglich. Der automatische Google-Sync alle 15 Minuten wird hier bewusst nicht protokolliert.</p>
@@ -624,7 +656,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Ausblenden entfernt einen Reiter nur aus der Navigation – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen. Ein Thema (z.B. „Sammeln") erscheint in der Leiste unten nur, solange mindestens ein Reiter darin sichtbar ist</li>
                 <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
-                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital), Training, Verlauf sowie Inventar, Projekte und Verleih haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten.</li>
+                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital), Training, Verlauf sowie Inventar, Projekte und Verleih haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten.</li>
               </ul>
             </div>
           </details>
