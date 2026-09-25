@@ -932,3 +932,60 @@
   .koch-inhalt .session-fokus-bild { max-height: 24vh; object-fit: cover; flex-shrink: 0; }
   .rezept-import-hinweis { margin: -0.4rem 0 0.8rem; }
   #rezept-import-status:empty { display: none; }
+
+  /* ==========================================================
+     Ernährung (Kalorien-Tagebuch)
+     ========================================================== */
+  .ern-datum-leiste { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 1rem; flex-wrap: wrap; }
+  .ern-pfeil { min-width: 44px; min-height: 44px; font-size: 1.2rem; padding: 0.3rem 0.8rem; }
+  .ern-datum-text {
+    background: none; border: none; color: var(--ink); font-family: var(--font-display);
+    font-size: 1.05rem; font-weight: 600; cursor: pointer; padding: 0.4rem 0.3rem; min-height: 44px;
+  }
+  .ern-datum-text { flex: 1; text-align: center; }
+  /* Datumsfeld unsichtbar hinter dem 📅-Knopf, geöffnet per showPicker() */
+  .ern-kalender { position: relative; }
+  .ern-kalender input[type="date"] { position: absolute; inset: 0; opacity: 0; pointer-events: none; width: 100%; padding: 0; }
+  .ern-summe-karte {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1rem 1.1rem; margin-bottom: 1rem;
+  }
+  .ern-kcal-gross { font-size: 0.95rem; color: var(--ink-dim); margin-bottom: 0.7rem; }
+  .ern-kcal-gross span { font-family: var(--font-display); font-size: 2.1rem; font-weight: 700; color: var(--ink); }
+  .ern-makros { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.7rem 1rem; }
+  .ern-makro { display: flex; flex-direction: column; gap: 0.2rem; }
+  .ern-makro-label { font-size: 0.78rem; color: var(--ink-dim); }
+  .ern-makro-wert { font-weight: 600; }
+  .ern-makro-balken { display: block; height: 6px; border-radius: 3px; background: var(--bg); overflow: hidden; }
+  .ern-makro-balken span { display: block; height: 100%; border-radius: 3px; }
+  .ern-balken-eiweiss { background: var(--accent); }
+  .ern-balken-fett { background: var(--mod-finanzen); }
+  .ern-balken-kh { background: var(--mod-termine); }
+  .ern-hinzu-kopf { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+  .ern-hinzu-kopf strong { font-family: var(--font-display); font-size: 1.05rem; }
+  .ern-hinzu-kopf select { padding: 0.45rem 0.6rem; }
+  .ern-hinzu-kopf .link-btn { margin-left: auto; min-height: 44px; }
+  #ern-suche { width: 100%; box-sizing: border-box; }
+  .ern-treffer { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.6rem 0; }
+  .ern-liste-titel { font-size: 0.78rem; font-weight: 600; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.04em; margin: 0.2rem 0; }
+  .ern-treffer-zeile {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; text-align: left;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.55rem 0.7rem; cursor: pointer; color: var(--ink); min-height: 44px; width: 100%;
+  }
+  .ern-treffer-zeile:hover, .ern-treffer-zeile:focus-visible { border-color: var(--accent); }
+  .ern-treffer-name { font-size: 0.93rem; }
+  .ern-frei-link { margin: 0.2rem 0 0.4rem; min-height: 44px; text-align: left; }
+  .ern-quelle { font-size: 0.72rem; margin: 0.3rem 0 0; }
+  .ern-auswahl-name { font-weight: 600; margin: 0 0 0.2rem; }
+  .ern-chip { cursor: pointer; padding: 0.35rem 0.75rem; min-height: 36px; }
+  .ern-vorschau { margin: 0.8rem 0; }
+  .ern-feld { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.78rem; color: var(--ink-dim); flex: 1 1 90px; }
+  .ern-feld input, .ern-feld select { width: 100%; box-sizing: border-box; }
+  .ern-feld-breit { flex: 1 1 100%; }
+  .ern-mahlzeit { margin-bottom: 1.2rem; }
+  .ern-mahlzeit-kopf { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+  .ern-mahlzeit-kopf h3 { margin: 0; font-family: var(--font-display); font-size: 1.05rem; }
+  .ern-mahlzeit-kcal { color: var(--ink-dim); font-size: 0.85rem; }
+  .ern-plus { margin-left: auto; min-height: 40px; }
+  .ern-eintrag-kcal { font-weight: 600; white-space: nowrap; font-size: 0.9rem; }
