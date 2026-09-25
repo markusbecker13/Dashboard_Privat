@@ -455,12 +455,30 @@
                   <option value="35">35 %</option>
                 </select>
               </label>
+              <label class="ern-feld ern-feld-breit">Trainingskalorien aufs Tagesziel anrechnen
+                <select id="ern-p-anrechnung">
+                  <option value="100">voll (100 %)</option>
+                  <option value="75">zu 75 %</option>
+                  <option value="50">zur Hälfte (50 %) – vorsichtig, weil Schätzungen oft zu hoch liegen</option>
+                  <option value="0">gar nicht (nur anzeigen)</option>
+                </select>
+              </label>
             </div>
             <div id="ern-profil-rechnung" class="ern-rechnung"></div>
             <div class="row" style="margin-bottom:0.3rem;">
               <button class="btn-primary" id="btn-ern-profil-speichern">Speichern</button>
             </div>
             <p class="notiz-meta" id="ern-profil-status"></p>
+          </div>
+        </details>
+
+        <details class="anleitung-abschnitt ern-block" id="ern-met-block">
+          <summary>🏃 Trainingskalorien</summary>
+          <div class="anleitung-text">
+            <p class="notiz-meta" style="margin-top:0;">Trainings aus dem Reiter Training (Bereich Privat) zählen automatisch: <strong>(MET − 1) × Körpergewicht × Stunden</strong>. Dafür braucht jede Sportart einmal einen MET-Wert – wähle einen Vorschlag oder trag einen eigenen Wert ein. Hast du einen Wert von der Sportuhr, trag ihn direkt beim Training ein, der hat dann Vorrang.</p>
+            <div id="ern-met-liste"></div>
+            <p class="notiz-meta" id="ern-met-status"></p>
+            <p class="notiz-meta">Vorschläge: Richtwerte nach dem Compendium of Physical Activities (Ainsworth u. a.). Bei Kraft, Calisthenics und Rücken sind solche Schätzungen grob – im Zweifel lieber den kleineren Wert.</p>
           </div>
         </details>
 
@@ -746,6 +764,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <p>Trainingsverlauf und -erfolg – bewusst offen für beliebige Sportarten und Orte, weil sich beides über die Zeit ändern soll.</p>
               <ul>
                 <li><strong>Neuer Eintrag:</strong> Datum (leer = heute), Sportart und Ort als Freitext mit Autovervollständigung aus bisherigen Einträgen, Dauer in Minuten, optional Strecke (km) und Höhenmeter (für Laufen, Wandern, Radfahren), optional Notiz. Bei neuer Bestmarke in Strecke oder Höhenmeter für diese Sportart erscheint ein 🏆 (erst ab dem zweiten Eintrag dieser Sportart möglich)</li>
+                <li><strong>kcal (Uhr), nur für Privat relevant:</strong> optional der Kalorienwert deiner Sportuhr. Leer lassen = die App schätzt über den MET-Wert der Sportart (einmalig im Reiter Ernährung unter „🏃 Trainingskalorien“ festlegen). In der Liste steht dann „≈ … kcal“ (Schätzung) bzw. „… kcal“ (eigener Wert). Trainings aus Privat fließen ins Tagesziel im Reiter Ernährung ein</li>
                 <li><strong>Übungen (optional):</strong> „+ Übung hinzufügen" fügt beliebig viele Zeilen mit Name, Sätzen, Wiederholungen (oder alternativ Sekunden, z.B. für Plank/Halte-Übungen), Gewicht und optional einer Variante/Progression (Freitext, z.B. „Klimmzug unterstützt" – für Calisthenics, wo der Fortschritt oft eine andere Übungsvariante statt mehr Gewicht ist) hinzu – sinnvoll für Kraft-Training wie das Rücken-Training, bei anderen Sportarten einfach weglassen. Bestleistung (🏆) berücksichtigt Gewicht, Wiederholungen und Sekunden gleichermaßen (neues Maximum bei mindestens einem davon)</li>
                 <li><strong>Plan starten:</strong> bei einem Trainingsplan auf „▶ Starten" klicken – öffnet einen Vollbild-Fokus-Modus (deckt den ganzen Bildschirm ab, kein Scrollen nötig), dann Übung für Übung mit „Weiter"/"← Zurück" durchklicken, Werte bei Bedarf anpassen. „×" oben rechts bricht die Session ab (mit Rückfrage). Am Ende („Training speichern") wird automatisch ein neuer, mit dem Plan verlinkter Trainingseintrag mit heutigem Datum angelegt und der Fokus-Modus schließt sich</li>
                 <li><strong>Plan starten – Zeitmessung & Satz-Countdown:</strong> oben rechts im Fokus-Modus läuft ab dem Start die Gesamtzeit (⏱). Beim „Training speichern" wird sie automatisch als Dauer in Minuten in den Trainingseintrag übernommen (gerundet, mindestens 1 Minute) und lässt sich danach wie gewohnt bearbeiten. Hat eine Übung Sekunden hinterlegt (z.B. Plank 3×45s), erscheint ein Countdown: „▶ Satz 1 starten" lässt 45 Sekunden ablaufen, am Ende kommt ein kurzer Ton (plus Vibration, sofern vom Gerät unterstützt). Danach wartet der Countdown, bis der nächste Satz per Tipp gestartet wird – die Pause dazwischen bestimmst du selbst. Nach dem letzten Satz ertönt das Abschluss-Signal, weiter geht es mit „Weiter →". „⏸ Pause" hält einen laufenden Satz an, „↺ Nochmal" setzt den Countdown zurück. Werden Sätze oder Sekunden im Fokus-Modus geändert, passt sich der Countdown an, solange er noch nicht gestartet wurde. Das Display bleibt während der Session an</li>
@@ -819,12 +838,14 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Datenbank:</strong> Bundeslebensmittelschlüssel (BLS) 4.0 des Max Rubner-Instituts, rund 7.100 Grundlebensmittel und Gerichte mit laborbasierten Durchschnittswerten je 100 g essbarer Anteil. Markenprodukte stehen nicht drin – dafür kommt später der Barcode-Scan (Open Food Facts). Lizenz CC BY 4.0, Quelle wird im Eintragen-Feld genannt</li>
                 <li><strong>Datenschutz:</strong> Ernährungsdaten sind Gesundheitsdaten. Sie liegen nur in deiner Supabase-Datenbank (EU-Region), es gibt sie nur in Privat, und sie tauchen bewusst nicht im Verlauf auf</li>
                 <li><strong>⚙️ Profil &amp; Ziel</strong> (unten): Geschlecht (nur für die Formel), Geburtsdatum, Größe, Aktivität im Alltag, Ziel, Eiweiß je kg und Fettanteil. Darunter steht live die Rechnung: Grundumsatz nach Mifflin-St Jeor × Aktivität = Bedarf ohne Sport, dazu das Ziel (halten, −250/−500 oder +250/+500 kcal am Tag) und die Makroziele. Kohlenhydrate sind der Rest</li>
-                <li><strong>Aktivität ohne Sport wählen:</strong> Trainingskalorien kommen später einzeln dazu – steckt der Sport schon im Aktivitätswert, würde er doppelt gezählt</li>
+                <li><strong>Aktivität ohne Sport wählen:</strong> Trainingskalorien kommen einzeln dazu – steckt der Sport schon im Aktivitätswert, würde er doppelt gezählt</li>
                 <li><strong>Tagesziel:</strong> Mit Profil und Gewicht zeigt die Tagessumme „gegessen / Ziel“, was noch übrig ist, und Eiweiß/Fett/KH gegen ihr Ziel. Maßgeblich ist das letzte Gewicht bis zu diesem Tag</li>
                 <li><strong>Liegt das Ziel unter dem Grundumsatz</strong>, warnt die App – auf Dauer nicht empfehlenswert</li>
+                <li><strong>🏃 Trainingskalorien:</strong> Trainings aus dem Reiter Training (nur Bereich Privat) am selben Tag erhöhen das Tagesziel. Geschätzt wird netto: (MET − 1) × Körpergewicht × Stunden – das „− 1“ zieht den Ruheumsatz ab, der schon im Bedarf steckt. Jede Sportart braucht dafür einmal einen MET-Wert (Vorschläge nach dem Compendium of Physical Activities oder eigener Wert). Ein beim Training eingetragener Wert von der Sportuhr hat Vorrang. Fehlt MET-Wert, Dauer oder Gewicht, steht in der Tagessumme „?“ mit dem Grund</li>
+                <li><strong>Anrechnung</strong> (im Profil): voll, 75 %, 50 % oder gar nicht. 50 % ist die vorsichtige Wahl, weil Schätzungen und Uhren oft zu hoch liegen. Die Makroziele wachsen mit: Eiweiß bleibt, Fett anteilig, der Rest als Kohlenhydrate</li>
                 <li><strong>⚖️ Gewicht:</strong> ein Wert pro Tag (ein neuer Wert am selben Tag ersetzt den alten), Verlauf der letzten 90 Tage als Linie, Veränderung seit dem letzten Wert vor mindestens 7 bzw. 30 Tagen. Am besten morgens unter gleichen Bedingungen wiegen</li>
                 <li><strong>Ehrlich zur Genauigkeit:</strong> Die Formel ist eine Schätzung und liegt bei Einzelnen oft um rund 10 % daneben. Wirklich genau wird der Bedarf erst über ein paar Wochen Tracking und Wiegen</li>
-                <li><strong>In Planung:</strong> Trainingskalorien, Barcode-Scan, Wochenübersicht, Bedarf aus dem Gewichtstrend nachjustieren</li>
+                <li><strong>In Planung:</strong> Barcode-Scan und eigene Lebensmittel, Wochenübersicht, Bedarf aus dem Gewichtstrend nachjustieren</li>
               </ul>
             </div>
           </details>
@@ -1069,6 +1090,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <input type="number" id="training-dauer" placeholder="Minuten" min="0" style="width:6rem;">
           <input type="number" id="training-strecke" placeholder="km" min="0" step="0.1" style="width:5.5rem;" title="Strecke in km">
           <input type="number" id="training-hoehenmeter" placeholder="Höhenmeter" min="0" style="width:6.5rem;" title="Höhenmeter">
+          <input type="number" id="training-kcal" placeholder="kcal (Uhr)" min="0" max="5000" style="width:7rem;" title="Kalorien, z. B. von der Sportuhr – leer lassen, dann schätzt die App über den MET-Wert der Sportart">
           <input type="text" id="training-notiz" placeholder="Notiz (optional)" style="flex:1; min-width:150px;">
           <select id="training-plan-auswahl" title="Plan anwenden (füllt Übungen unten aus)" onchange="planAufTrainingAnwenden(this.value)">
             <option value="">Kein Plan</option>
