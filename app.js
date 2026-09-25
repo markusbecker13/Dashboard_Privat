@@ -8276,6 +8276,18 @@
     }
   }
 
+  // Zugeklappte Mahlzeiten (Schlüssel), bleibt im Browser gespeichert
+  let ernZugeklappt = new Set();
+  try { ernZugeklappt = new Set(JSON.parse(localStorage.getItem("ern-zugeklappt") || "[]")); } catch (_e) { /* leer lassen */ }
+  function ernZugeklapptSpeichern() {
+    try { localStorage.setItem("ern-zugeklappt", JSON.stringify([...ernZugeklappt])); } catch (_e) { /* egal */ }
+  }
+  window.ernMahlzeitKlappen = function(schluessel) {
+    if (ernZugeklappt.has(schluessel)) ernZugeklappt.delete(schluessel); else ernZugeklappt.add(schluessel);
+    ernZugeklapptSpeichern();
+    renderErnaehrung();
+  };
+
   function renderErnaehrung() {
     const kopfEl = document.getElementById("ern-summe");
     const listeEl = document.getElementById("ern-mahlzeiten");
@@ -8306,14 +8318,27 @@
     listeEl.innerHTML = ERN_MAHLZEITEN.map(([schluessel, name, icon]) => {
       const eintraege = ernEintraege.filter((e) => e.mahlzeit === schluessel);
       const summe = ernSumme(eintraege);
+      // Klappbar nur mit Einträgen; eine leere Mahlzeit zeigt ggf. „Wie gestern“
+      const zu = eintraege.length > 0 && ernZugeklappt.has(schluessel) && !eintraege.some((e) => e.id === ernBearbeitenId);
+      const kcalText = eintraege.length
+        ? ernZahl(summe.kcal, 0) + " kcal" + (zu ? ` · ${eintraege.length}×` : "")
+        : "";
+      const titel = eintraege.length
+        ? `<button class="ern-mahlzeit-toggle" onclick="ernMahlzeitKlappen('${schluessel}')" aria-expanded="${zu ? "false" : "true"}" aria-controls="ern-mz-${schluessel}">
+             <span class="ern-mahlzeit-pfeil${zu ? " zu" : ""}" aria-hidden="true">▾</span>
+             <span class="ern-mahlzeit-titel">${icon} ${name}</span>
+             <span class="ern-mahlzeit-kcal">${kcalText}</span>
+           </button>`
+        : `<h3>${icon} ${name}</h3>`;
       return `
-        <section class="ern-mahlzeit">
+        <section class="ern-mahlzeit${zu ? " zugeklappt" : ""}">
           <div class="ern-mahlzeit-kopf">
-            <h3>${icon} ${name}</h3>
-            <span class="ern-mahlzeit-kcal">${eintraege.length ? ernZahl(summe.kcal, 0) + " kcal" : ""}</span>
+            ${titel}
             <button class="btn-secondary ern-plus" onclick="ernHinzuOeffnen('${schluessel}')">+ Hinzufügen</button>
           </div>
-          ${eintraege.length ? `<div class="task-list">${eintraege.map(ernEintragHtml).join("")}</div>` : ernKopierenHtml(schluessel)}
+          ${eintraege.length
+            ? `<div class="task-list${zu ? " hidden" : ""}" id="ern-mz-${schluessel}">${eintraege.map(ernEintragHtml).join("")}</div>`
+            : ernKopierenHtml(schluessel)}
         </section>`;
     }).join("");
     ernWocheRendern();
@@ -8756,6 +8781,7 @@
 
   window.ernHinzuOeffnen = function(mahlzeit) {
     ernHinzuMahlzeit = mahlzeit || ernStandardMahlzeit();
+    if (mahlzeit && ernZugeklappt.delete(mahlzeit)) { ernZugeklapptSpeichern(); renderErnaehrung(); }
     const panel = document.getElementById("ern-hinzu");
     panel.classList.remove("hidden");
     ernHinzuTitelAktualisieren();
