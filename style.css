@@ -245,8 +245,7 @@
   .timer-phase-pause .timer-phase-label { color: var(--mod-termine); }
   .timer-phase-fertig .timer-phase-label { color: var(--accent); font-size: 1.8rem; }
   .empty-text { color: var(--ink-dim); }
-  #login-screen, #bereich-screen, #kategorie-screen, #unterkategorie-screen { max-width: 340px; margin: 3rem auto; padding: 0 1.4rem; text-align: center; }
-  .kachel-screen-top { display: flex; justify-content: flex-start; margin-bottom: 1rem; }
+  #login-screen, #bereich-screen { max-width: 340px; margin: 3rem auto; padding: 0 1.4rem; text-align: center; }
   .login-logo { width: 72px; height: 72px; margin-bottom: 1.2rem; border-radius: 18px; }
 
   .sync-karte {
@@ -267,17 +266,6 @@
   #login-screen button { width: 100%; }
   #login-error { color: var(--overdue-text); font-size: 0.85rem; margin-top: 0.6rem; min-height: 1.2rem; }
   .hidden { display: none !important; }
-
-  .bereich-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.7rem; margin-bottom: 1.6rem; }
-  .bereich-tile {
-    display: flex; flex-direction: column; align-items: center; gap: 0.3rem; text-align: center; cursor: pointer;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 1.1rem 1rem; color: var(--ink);
-    font-family: var(--font-text);
-  }
-  .bereich-tile:hover { border-color: var(--accent); }
-  .bereich-tile.active { border-color: var(--accent); border-width: 2px; }
-  .bereich-tile-icon { font-size: 1.6rem; }
-  .bereich-tile-label { font-size: 0.88rem; font-weight: 500; }
 
   @media (max-width: 640px) {
     .content-topbar { padding: 0.7rem 0.9rem; }
@@ -478,15 +466,7 @@
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
     padding: 1rem 1.2rem; margin-bottom: 1.4rem;
   }
-  .wetter-karte.wetter-laedt, .wetter-karte.wetter-fehler { color: var(--ink-dim); font-size: 0.9rem; }
-  .wetter-karte.wetter-fehler { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
-  .wetter-kopf { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; }
-  .wetter-jetzt { display: flex; align-items: baseline; gap: 0.5rem; }
-  .wetter-jetzt-icon { font-size: 1.8rem; }
-  .wetter-jetzt-temp { font-family: var(--font-display); font-size: 1.9rem; font-weight: 600; }
-  .wetter-jetzt-text { color: var(--ink-dim); font-size: 0.9rem; }
   .wetter-ort-zeile { display: flex; align-items: center; gap: 0.3rem; color: var(--ink-dim); font-size: 0.85rem; }
-  .wetter-tage { display: flex; gap: 0.6rem; margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
   .wetter-kachel-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 0.6rem;
     margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border);
@@ -500,11 +480,6 @@
   .wetter-kachel-icon { font-size: 1.5rem; margin: 0.1rem 0; }
   .wetter-kachel-max { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; line-height: 1; }
   .wetter-kachel-min { font-size: 0.78rem; color: var(--ink-dim); }
-  .wetter-tag { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; font-size: 0.8rem; }
-  .wetter-tag-name { color: var(--ink-dim); font-weight: 500; }
-  .wetter-tag-icon { font-size: 1.2rem; }
-  .wetter-tag-max { font-weight: 600; }
-  .wetter-tag-min { color: var(--ink-dim); }
 
   .start-kachel-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.7rem; margin-bottom: 1.8rem;
@@ -531,7 +506,6 @@
   .fin-tabelle th.fin-bez-th { text-align: left; position: sticky; left: 0; z-index: 2; }
   .fin-tabelle input[type="number"] { width: 4.6rem; padding: 0.3rem 0.35rem; text-align: right; font-size: 0.8rem; }
   .fin-tabelle-summe td { font-weight: 600; background: var(--bg); }
-  .fin-gruppe-titel { font-weight: 600; padding: 0.55rem 0.35rem !important; background: var(--bg) !important; text-align: left !important; color: var(--mod-finanzen); }
   .fin-loesch-btn { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 1.1rem; padding: 0 0.3rem; line-height: 1; }
   .fin-loesch-btn:hover { color: var(--overdue-text); }
   .fin-neu-form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.9rem 0 1.6rem; }
@@ -693,10 +667,8 @@
   .bereich-karte:active { transform: scale(0.98); }
   .bereich-karte:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
   .bereich-karte-name { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; }
-  .bereich-karte-farbe { width: 2.75rem; height: 2.75rem; border-radius: 14px; flex-shrink: 0; }
   .bereich-karte-logo { height: 3.5rem; width: auto; }
   .bereich-karte--privat { background: #10233f; color: #eaf0f7; }
-  .bereich-karte--privat .bereich-karte-farbe { background: #2a5bd7; }
   .bereich-karte--ogs { background: #fff4c7; color: #1e3a5c; }
   /* Bereichs-Titel rechtsbündig (letztes Element jeder Karte) */
   .bereich-karte > :last-child { margin-left: auto; text-align: right; }
@@ -708,7 +680,6 @@
   .bereich-karte-badge img { height: 100%; width: auto; display: block; }
   .bereich-karte-rund { width: 3.5rem; height: 3.5rem; border-radius: 50%; flex-shrink: 0; }
   .bereich-karte--business { background: #2a1d15; color: #f4ede3; }
-  .bereich-karte--business .bereich-karte-farbe { background: #e4572e; }
   .bereich-karte-zusatz { display: block; font-family: var(--font-text); font-size: 0.82rem; font-weight: 500; opacity: 0.8; }
   .bereich-karte--verwaltung {
     min-height: 4rem; background: transparent; color: var(--ink); border: 1.5px solid var(--border);
@@ -762,8 +733,8 @@
   /* ==========================================================
      Start-Screen (Heute)
      ========================================================== */
-  .heute-datum { font-size: 0.9rem; font-weight: 600; color: var(--ink-dim); }
-  .heute-gruss { font-size: 2.6rem; line-height: 1; margin: 0.35rem 0 1.2rem; }
+  .heute-datum { font-size: 0.9rem; font-weight: 600; color: var(--ink-dim); text-align: center; }
+  .heute-gruss { font-size: 2.6rem; line-height: 1; margin: 0.35rem 0 1.2rem; text-align: center; }
   .heute-gruss-akzent { color: var(--accent); }
   .tages-zitat { margin: -0.5rem 0 1.2rem; padding: 0.1rem 0 0.1rem 0.85rem; border-left: 3px solid var(--accent); }
   .tages-zitat-text { margin: 0; font-family: var(--font-text); font-size: 1rem; font-style: italic; line-height: 1.45; color: var(--ink); }
