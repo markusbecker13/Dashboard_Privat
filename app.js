@@ -8264,6 +8264,7 @@
     const listeEl = document.getElementById("ern-mahlzeiten");
     if (!kopfEl || !listeEl) return;
     const datum = ernAktDatum();
+    if (!ernProfilGeladen && !ernProfilLaedt) ernProfilLaden();
     if (ernGeladenFuer !== datum && !ernLaedt && !ernFehler) { ernTagLaden(); return; }
 
     document.getElementById("ern-datum-text").textContent = ernDatumLabel(datum);
@@ -8282,27 +8283,7 @@
     }
 
     const s = ernSumme(ernEintraege);
-    // Energieanteile der Makros (Atwater: Eiweiß/KH 4, Fett 9 kcal je g)
-    const kcalMakro = s.eiweiss * 4 + s.fett * 9 + s.kohlenhydrate * 4;
-    const anteil = (g, faktor) => (kcalMakro > 0 ? Math.round((g * faktor * 100) / kcalMakro) : 0);
-    const makro = (label, g, faktor, klasse) => `
-      <div class="ern-makro">
-        <span class="ern-makro-label">${label}</span>
-        <span class="ern-makro-wert">${ernZahl(g)} g</span>
-        ${faktor ? `<span class="ern-makro-balken"><span class="${klasse}" style="width:${anteil(g, faktor)}%"></span></span>
-        <span class="notiz-meta">${anteil(g, faktor)} % der Energie</span>` : ""}
-      </div>`;
-    kopfEl.innerHTML = `
-      <div class="ern-summe-karte">
-        <div class="ern-kcal-gross"><span>${ernZahl(s.kcal, 0)}</span> kcal</div>
-        <div class="ern-makros">
-          ${makro("Eiweiß", s.eiweiss, 4, "ern-balken-eiweiss")}
-          ${makro("Fett", s.fett, 9, "ern-balken-fett")}
-          ${makro("Kohlenhydrate", s.kohlenhydrate, 4, "ern-balken-kh")}
-          ${makro("Ballaststoffe", s.ballaststoffe, 0, "")}
-        </div>
-        ${s.luecken ? `<p class="notiz-meta" style="margin:0.5rem 0 0;">Bei einzelnen Einträgen fehlen Werte (–) – die Summe ist dort etwas zu niedrig.</p>` : ""}
-      </div>`;
+    kopfEl.innerHTML = ernSummeHtml(s, ernZiele(datum));
 
     listeEl.innerHTML = ERN_MAHLZEITEN.map(([schluessel, name, icon]) => {
       const eintraege = ernEintraege.filter((e) => e.mahlzeit === schluessel);
@@ -8623,3 +8604,279 @@
       knopf.disabled = false;
     }
   });
+
+  // ==========================================================
+  // Ernährung Etappe 2: Profil, Bedarf, Ziel, Gewicht
+  // Bedarf = Grundumsatz (Mifflin-St Jeor) × PAL für den Alltag OHNE
+  // Sport; Trainingskalorien kommen später einzeln dazu (sonst doppelt).
+  // ==========================================================
+  let ernProfil = null;
+  let ernGewichte = [];          // [{datum, gewicht_kg}] aufsteigend
+  let ernProfilGeladen = false;
+  let ernProfilLaedt = false;
+
+  async function ernProfilLaden() {
+    ernProfilLaedt = true;
+    try {
+      const res = await api("ernaehrung_profil");
+      ernProfil = res.profil;
+      ernGewichte = res.gewichte || [];
+      ernProfilGeladen = true;
+      ernProfilFormFuellen();
+      ernGewichtRendern();
+      // Ohne Profil das Formular gleich aufklappen
+      if (!ernProfil) document.getElementById("ern-profil-block").open = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") document.getElementById("ern-profil-status").textContent = "Profil konnte nicht geladen werden: " + e.message;
+    } finally {
+      ernProfilLaedt = false;
+      renderErnaehrung();
+    }
+  }
+
+  // Letztes Gewicht bis einschließlich "datum", sonst das früheste
+  function ernGewichtFuer(datum) {
+    if (!ernGewichte.length) return null;
+    let treffer = null;
+    for (const g of ernGewichte) { if (g.datum <= datum) treffer = g; }
+    return treffer || ernGewichte[0];
+  }
+
+  function ernAlterAm(geburt, datum) {
+    const [gj, gm, gt] = geburt.split("-").map(Number);
+    const [j, m, t] = datum.split("-").map(Number);
+    return j - gj - (m < gm || (m === gm && t < gt) ? 1 : 0);
+  }
+
+  // Reine Rechnung, damit Formular-Vorschau und Tagesansicht dieselbe nutzen
+  function ernBedarfRechnen(p, gewicht, datum) {
+    if (!p || !gewicht || !p.geburtsdatum || !p.geschlecht || !p.groesse_cm) return null;
+    const kg = Number(gewicht);
+    const alter = ernAlterAm(p.geburtsdatum, datum);
+    const grundumsatz = 10 * kg + 6.25 * Number(p.groesse_cm) - 5 * alter + (p.geschlecht === "m" ? 5 : -161);
+    const bedarf = grundumsatz * Number(p.pal);
+    const ziel = bedarf + Number(p.ziel_kcal_diff);
+    const eiweiss = kg * Number(p.eiweiss_g_pro_kg);
+    const fett = (ziel * Number(p.fett_prozent) / 100) / 9;
+    const kh = Math.max(0, (ziel - eiweiss * 4 - fett * 9) / 4);
+    return { kg, alter, grundumsatz, bedarf, ziel, eiweiss, fett, kh, unterGrundumsatz: ziel < grundumsatz };
+  }
+
+  function ernZiele(datum) {
+    const g = ernGewichtFuer(datum);
+    const r = ernBedarfRechnen(ernProfil, g && g.gewicht_kg, datum);
+    return r ? { ...r, gewichtDatum: g.datum } : null;
+  }
+
+  function ernSummeHtml(s, z) {
+    if (!z) {
+      const hinweis = !ernProfilGeladen ? ""
+        : !ernProfil ? "Für ein Tagesziel unten „⚙️ Profil &amp; Ziel“ ausfüllen."
+        : "Für ein Tagesziel unten unter „⚖️ Gewicht“ dein Gewicht eintragen.";
+      return `
+        <div class="ern-summe-karte">
+          <div class="ern-kcal-gross"><span>${ernZahl(s.kcal, 0)}</span> kcal</div>
+          <div class="ern-makros">
+            ${ernMakroHtml("Eiweiß", s.eiweiss, null, "ern-balken-eiweiss")}
+            ${ernMakroHtml("Fett", s.fett, null, "ern-balken-fett")}
+            ${ernMakroHtml("Kohlenhydrate", s.kohlenhydrate, null, "ern-balken-kh")}
+            ${ernMakroHtml("Ballaststoffe", s.ballaststoffe, null, "")}
+          </div>
+          ${hinweis ? `<p class="notiz-meta" style="margin:0.6rem 0 0;">${hinweis}</p>` : ""}
+          ${s.luecken ? `<p class="notiz-meta" style="margin:0.5rem 0 0;">Bei einzelnen Einträgen fehlen Werte (–) – die Summe ist dort etwas zu niedrig.</p>` : ""}
+        </div>`;
+    }
+    const rest = z.ziel - s.kcal;
+    const prozent = Math.min(100, Math.round((s.kcal / z.ziel) * 100));
+    const restText = rest >= 0
+      ? `noch <strong>${ernZahl(rest, 0)} kcal</strong>`
+      : `<strong>${ernZahl(-rest, 0)} kcal</strong> über dem Ziel`;
+    return `
+      <div class="ern-summe-karte">
+        <div class="ern-kcal-gross"><span>${ernZahl(s.kcal, 0)}</span> / ${ernZahl(z.ziel, 0)} kcal</div>
+        <div class="ern-kcal-balken${rest < 0 ? " ueber" : ""}"><span style="width:${prozent}%"></span></div>
+        <p class="ern-rest">${restText}</p>
+        <div class="ern-makros">
+          ${ernMakroHtml("Eiweiß", s.eiweiss, z.eiweiss, "ern-balken-eiweiss")}
+          ${ernMakroHtml("Fett", s.fett, z.fett, "ern-balken-fett")}
+          ${ernMakroHtml("Kohlenhydrate", s.kohlenhydrate, z.kh, "ern-balken-kh")}
+          ${ernMakroHtml("Ballaststoffe", s.ballaststoffe, null, "")}
+        </div>
+        ${s.luecken ? `<p class="notiz-meta" style="margin:0.5rem 0 0;">Bei einzelnen Einträgen fehlen Werte (–) – die Summe ist dort etwas zu niedrig.</p>` : ""}
+        <p class="notiz-meta" style="margin:0.5rem 0 0;">Ziel ohne Training (Trainingskalorien kommen noch) · Gewicht ${ernZahl(z.kg)} kg vom ${datumDe(z.gewichtDatum)}</p>
+      </div>`;
+  }
+
+  function ernMakroHtml(label, g, ziel, klasse) {
+    const mitZiel = ziel !== null && ziel > 0;
+    const breite = mitZiel ? Math.min(100, Math.round((g / ziel) * 100)) : 0;
+    return `
+      <div class="ern-makro">
+        <span class="ern-makro-label">${label}</span>
+        <span class="ern-makro-wert">${ernZahl(g)} g${mitZiel ? ` <span class="ern-makro-ziel">/ ${ernZahl(ziel, 0)} g</span>` : ""}</span>
+        ${mitZiel ? `<span class="ern-makro-balken"><span class="${klasse}" style="width:${breite}%"></span></span>` : ""}
+      </div>`;
+  }
+
+  // ---- Profil-Formular ----
+  function ernProfilAusFormular() {
+    const [ziel, diff] = document.getElementById("ern-p-ziel").value.split(":");
+    return {
+      geschlecht: document.getElementById("ern-p-geschlecht").value,
+      geburtsdatum: document.getElementById("ern-p-geburt").value,
+      groesse_cm: document.getElementById("ern-p-groesse").value,
+      pal: Number(document.getElementById("ern-p-pal").value),
+      ziel, ziel_kcal_diff: Number(diff),
+      eiweiss_g_pro_kg: Number(document.getElementById("ern-p-eiweiss").value),
+      fett_prozent: Number(document.getElementById("ern-p-fett").value),
+    };
+  }
+
+  function ernProfilFormFuellen() {
+    const p = ernProfil;
+    document.getElementById("ern-p-geschlecht").value = p ? p.geschlecht : "";
+    document.getElementById("ern-p-geburt").value = p ? p.geburtsdatum : "";
+    document.getElementById("ern-p-groesse").value = p ? Number(p.groesse_cm) : "";
+    document.getElementById("ern-p-pal").value = p ? Number(p.pal).toFixed(1) : "1.6";
+    document.getElementById("ern-p-ziel").value = p ? `${p.ziel}:${p.ziel_kcal_diff}` : "halten:0";
+    document.getElementById("ern-p-eiweiss").value = p ? Number(p.eiweiss_g_pro_kg).toFixed(1) : "1.2";
+    document.getElementById("ern-p-fett").value = p ? String(p.fett_prozent) : "30";
+    ernProfilRechnungZeigen();
+  }
+
+  // Live-Rechnung unter dem Formular (mit den gerade eingestellten Werten)
+  function ernProfilRechnungZeigen() {
+    const el = document.getElementById("ern-profil-rechnung");
+    const heute = heuteISO();
+    const g = ernGewichtFuer(heute);
+    const p = ernProfilAusFormular();
+    if (!g) { el.innerHTML = `<p class="notiz-meta">Trag unter „⚖️ Gewicht“ dein aktuelles Gewicht ein, dann steht hier die Rechnung.</p>`; return; }
+    const r = ernBedarfRechnen(p, g.gewicht_kg, heute);
+    if (!r) { el.innerHTML = `<p class="notiz-meta">Geschlecht, Geburtsdatum und Größe ausfüllen, dann steht hier die Rechnung.</p>`; return; }
+    const diff = Number(p.ziel_kcal_diff);
+    el.innerHTML = `
+      <table class="ern-rechnung-tabelle">
+        <tr><td>Grundumsatz (Mifflin-St Jeor, ${r.alter} J., ${ernZahl(r.kg)} kg)</td><td>${ernZahl(r.grundumsatz, 0)} kcal</td></tr>
+        <tr><td>× Aktivität ${ernZahl(p.pal)} = Bedarf ohne Sport</td><td>${ernZahl(r.bedarf, 0)} kcal</td></tr>
+        <tr><td>${diff === 0 ? "Ziel: halten" : (diff < 0 ? `Ziel: abnehmen −${ernZahl(-diff, 0)} kcal` : `Ziel: aufbauen +${ernZahl(diff, 0)} kcal`)}</td><td><strong>${ernZahl(r.ziel, 0)} kcal</strong></td></tr>
+        <tr><td>Eiweiß ${ernZahl(p.eiweiss_g_pro_kg)} g × ${ernZahl(r.kg)} kg</td><td>${ernZahl(r.eiweiss, 0)} g</td></tr>
+        <tr><td>Fett ${p.fett_prozent} % der Energie</td><td>${ernZahl(r.fett, 0)} g</td></tr>
+        <tr><td>Kohlenhydrate (Rest)</td><td>${ernZahl(r.kh, 0)} g</td></tr>
+      </table>
+      ${r.unterGrundumsatz ? `<p class="ern-warnung">Das Ziel liegt unter deinem Grundumsatz. Auf Dauer ist das nicht zu empfehlen – wähle lieber ein langsameres Tempo oder sprich es mit ärztlicher oder ernährungsfachlicher Begleitung ab.</p>` : ""}
+      <p class="notiz-meta">Das ist eine Schätzung: Formeln liegen bei Einzelnen oft um rund 10 % daneben. Genauer wird es, wenn du ein paar Wochen isst, trackst und wiegst – dein Gewichtstrend zeigt dann, wo dein echter Bedarf liegt.</p>`;
+  }
+  ["ern-p-geschlecht", "ern-p-geburt", "ern-p-groesse", "ern-p-pal", "ern-p-ziel", "ern-p-eiweiss", "ern-p-fett"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", ernProfilRechnungZeigen);
+    document.getElementById(id).addEventListener("change", ernProfilRechnungZeigen);
+  });
+
+  document.getElementById("btn-ern-profil-speichern").addEventListener("click", async (ev) => {
+    const knopf = ev.currentTarget;
+    const status = document.getElementById("ern-profil-status");
+    knopf.disabled = true;
+    try {
+      const res = await api("ernaehrung_profil_speichern", ernProfilAusFormular());
+      ernProfil = res.profil;
+      status.textContent = "✓ Gespeichert";
+      renderErnaehrung();
+    } catch (e) {
+      if (e.message !== "unauthorized") status.textContent = e.message;
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+
+  // ---- Gewicht ----
+  document.getElementById("btn-ern-gewicht").addEventListener("click", async (ev) => {
+    const knopf = ev.currentTarget;
+    const status = document.getElementById("ern-gewicht-status");
+    const datum = document.getElementById("ern-g-datum").value || heuteISO();
+    const kg = document.getElementById("ern-g-kg").value;
+    if (!kg) { status.textContent = "Bitte ein Gewicht eingeben."; return; }
+    knopf.disabled = true;
+    try {
+      const res = await api("gewicht_speichern", { datum, gewicht_kg: kg });
+      ernGewichte = ernGewichte.filter((g) => g.datum !== datum).concat([res.gewicht])
+        .sort((a, b) => a.datum.localeCompare(b.datum));
+      document.getElementById("ern-g-kg").value = "";
+      status.textContent = `✓ ${ernZahl(res.gewicht.gewicht_kg)} kg am ${datumDe(datum)} gespeichert`;
+      ernGewichtRendern();
+      ernProfilRechnungZeigen();
+      renderErnaehrung();
+    } catch (e) {
+      if (e.message !== "unauthorized") status.textContent = e.message;
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+  document.getElementById("ern-g-kg").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btn-ern-gewicht").click();
+  });
+
+  window.ernGewichtLoeschen = async function(datum) {
+    if (!confirm(`Gewicht vom ${datumDe(datum)} löschen?`)) return;
+    try {
+      await api("gewicht_loeschen", { datum });
+      ernGewichte = ernGewichte.filter((g) => g.datum !== datum);
+      ernGewichtRendern();
+      ernProfilRechnungZeigen();
+      renderErnaehrung();
+    } catch (e) {
+      if (e.message !== "unauthorized") alert(e.message);
+    }
+  };
+
+  // Veränderung gegenüber dem letzten Wert, der mindestens "tage" zurückliegt
+  function ernGewichtVeraenderung(tage) {
+    if (ernGewichte.length < 2) return null;
+    const letzter = ernGewichte[ernGewichte.length - 1];
+    const grenze = addTage(letzter.datum, -tage);
+    const vorher = ernGewichte.filter((g) => g.datum <= grenze).pop();
+    if (!vorher) return null;
+    return { kg: Number(letzter.gewicht_kg) - Number(vorher.gewicht_kg), datum: vorher.datum };
+  }
+
+  function ernGewichtRendern() {
+    document.getElementById("ern-g-datum").value = heuteISO();
+    const el = document.getElementById("ern-gewicht-verlauf");
+    if (!ernGewichte.length) { el.innerHTML = `<p class="notiz-meta">Noch kein Gewicht eingetragen.</p>`; return; }
+    const letzter = ernGewichte[ernGewichte.length - 1];
+    // Vergleich mit dem letzten Wert, der mind. 7 bzw. 30 Tage zurückliegt –
+    // mit dem echten Vergleichsdatum, weil nicht jeden Tag gewogen wird
+    const vergleiche = [ernGewichtVeraenderung(7), ernGewichtVeraenderung(30)]
+      .filter((x, i, a) => x && (i === 0 || !a[0] || a[0].datum !== x.datum));
+    const vText = vergleiche.map((x) => ` · seit ${datumDe(x.datum)}: ${x.kg > 0 ? "+" : x.kg < 0 ? "−" : "±"}${ernZahl(Math.abs(x.kg))} kg`).join("");
+    // Diagramm: letzte 90 Tage
+    const grenze = addTage(heuteISO(), -90);
+    const punkte = ernGewichte.filter((g) => g.datum >= grenze);
+    let svg = "";
+    if (punkte.length >= 2) {
+      const tag = (iso) => tageSeitIso(punkte[0].datum, iso);
+      const spanne = Math.max(1, tag(punkte[punkte.length - 1].datum));
+      const werte = punkte.map((p) => Number(p.gewicht_kg));
+      const min = Math.min(...werte) - 0.5, max = Math.max(...werte) + 0.5;
+      const B = 320, H = 120, R = 8;
+      const x = (iso) => R + (tag(iso) / spanne) * (B - 2 * R);
+      const y = (kg) => R + (1 - (kg - min) / (max - min)) * (H - 2 * R);
+      const linie = punkte.map((p) => `${x(p.datum).toFixed(1)},${y(Number(p.gewicht_kg)).toFixed(1)}`).join(" ");
+      svg = `<svg class="ern-gewicht-svg" viewBox="0 0 ${B} ${H + 22}" role="img" aria-label="Gewichtsverlauf der letzten 90 Tage">
+        <polyline points="${linie}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"></polyline>
+        ${punkte.map((p) => `<circle cx="${x(p.datum).toFixed(1)}" cy="${y(Number(p.gewicht_kg)).toFixed(1)}" r="2.5" fill="var(--accent)"></circle>`).join("")}
+        <text x="${R}" y="${H + 18}" font-size="10" fill="var(--ink-dim)">${datumDe(punkte[0].datum)}</text>
+        <text x="${B - R}" y="${H + 18}" font-size="10" fill="var(--ink-dim)" text-anchor="end">${datumDe(punkte[punkte.length - 1].datum)}</text>
+        <text x="${R}" y="${R + 4}" font-size="10" fill="var(--ink-dim)">${ernZahl(max - 0.5)} kg</text>
+        <text x="${R}" y="${H - 2}" font-size="10" fill="var(--ink-dim)">${ernZahl(min + 0.5)} kg</text>
+      </svg>`;
+    }
+    const liste = ernGewichte.slice(-8).reverse().map((g) => `
+      <div class="ern-gewicht-zeile">
+        <span>${datumDe(g.datum)}</span><strong>${ernZahl(g.gewicht_kg)} kg</strong>
+        <button class="task-delete" onclick="ernGewichtLoeschen('${g.datum}')" aria-label="Gewicht vom ${datumDe(g.datum)} löschen">×</button>
+      </div>`).join("");
+    el.innerHTML = `
+      <p class="ern-gewicht-aktuell">Zuletzt <strong>${ernZahl(letzter.gewicht_kg)} kg</strong> am ${datumDe(letzter.datum)}${vText}</p>
+      ${svg}
+      <div class="ern-gewicht-liste">${liste}</div>
+      <p class="notiz-meta">Tipp: morgens nach dem Aufstehen wiegen, gleiche Bedingungen. Einzelwerte schwanken um 1–2 kg (Wasser, Salz, Verdauung) – aussagekräftig ist der Trend über Wochen.</p>`;
+  }
