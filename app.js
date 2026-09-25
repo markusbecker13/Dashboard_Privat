@@ -82,7 +82,7 @@
     verlauf: "view-verlauf", anleitung: "view-anleitung", ogsideen: "view-ogs-ideen",
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training",
-    rezepte: "view-rezepte",
+    rezepte: "view-rezepte", ernaehrung: "view-ernaehrung",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -94,9 +94,13 @@
     ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["einkauf", "Einkauf"], ["export", "Export"],
     ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
-    ["training", "Training"], ["rezepte", "Rezepte"],
+    ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
   ];
-  const BEREICH_TABS = { privat: ALLE_REITER, ogs: ALLE_REITER, awo: ALLE_REITER, business: ALLE_REITER };
+  // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
+  // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
+  const NUR_PRIVAT_REITER = ["ernaehrung"];
+  const REITER_OHNE_PRIVATE = ALLE_REITER.filter(([k]) => !NUR_PRIVAT_REITER.includes(k));
+  const BEREICH_TABS = { privat: ALLE_REITER, ogs: REITER_OHNE_PRIVATE, awo: REITER_OHNE_PRIVATE, business: REITER_OHNE_PRIVATE };
   const BEREICH_TITEL_VERWALTUNG = { privat: "🏠 Privat", ogs: "🏫 OGS Rapunzel", awo: "🤝 AWO OV Liblar", business: "☕ Business" };
 
   // Vorbelegung, solange in tab_einstellungen noch kein expliziter Eintrag
@@ -104,7 +108,7 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte"],
+      "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen"],
@@ -112,6 +116,7 @@
   };
 
   function reiterIstSichtbar(bereich, schluessel) {
+    if (NUR_PRIVAT_REITER.includes(schluessel) && bereich !== "privat") return false;
     const eintrag = tabEinstellungen.find((e) => e.bereich === bereich && e.tab_id === schluessel);
     if (eintrag) return eintrag.sichtbar !== false;
     return (STANDARD_SICHTBAR[bereich] || []).includes(schluessel);
@@ -126,7 +131,7 @@
     return [
       { schluessel: "heute", label: "Heute", icon: "☀️", tabs: ["heute"] },
       { schluessel: "planen", label: "Planen", icon: "🗓️", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
-      { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf", "rezepte", "training"] },
+      { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf", "rezepte", "training", "ernaehrung"] },
       { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", icon: BEREICH_ARBEIT_ICON[aktiverBereich] || "📌", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih"] },
       { schluessel: "verwalten", label: "Verwalten", icon: "🛠️", tabs: ["export", "verlauf", "anleitung"] },
     ];
@@ -1100,6 +1105,7 @@
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "training") renderTraining();
     if (aktiv === "rezepte") renderRezepte();
+    if (aktiv === "ernaehrung") renderErnaehrung();
     if (aktiv === "verlauf") renderVerlauf();
     if (aktiv === "reiterverwaltung") renderReiterVerwaltung();
     kontoMenuSchliessen();
@@ -8165,3 +8171,455 @@
 
     return `<svg viewBox="0 0 ${breite} ${hoehe}" style="width:100%; height:auto; display:block;">${balken}</svg>`;
   }
+
+
+  // ==========================================================
+  // Ernährung (Kalorien-Tagebuch) – nur Bereich Privat
+  // Tagesdaten kommen NICHT mit "liste", sondern je Tag über
+  // "ernaehrung_tag" (das Tagebuch wächst jeden Tag).
+  // Aufbau: Kopf (Datum, Summen) und Mahlzeiten-Liste werden neu
+  // gezeichnet, das Hinzufügen-Feld (#ern-hinzu) steht fest im HTML
+  // und wird nie mitgezeichnet – sonst ginge Getipptes verloren.
+  // ==========================================================
+  const ERN_MAHLZEITEN = [
+    ["fruehstueck", "Frühstück", "🌅"],
+    ["mittag", "Mittag", "🍽️"],
+    ["abend", "Abend", "🌙"],
+    ["snack", "Snacks", "🍎"],
+  ];
+  const ERN_MAHLZEIT_NAME = Object.fromEntries(ERN_MAHLZEITEN.map(([k, n]) => [k, n]));
+
+  let ernDatum = null;            // "YYYY-MM-DD"; null = heute
+  let ernGeladenFuer = null;      // für welches Datum ernEintraege gilt
+  let ernEintraege = [];
+  let ernZuletzt = [];            // zuletzt verwendete Lebensmittel (mit letzte_menge, mahlzeiten)
+  let ernLaedt = false;
+  let ernFehler = "";
+  let ernHinzuMahlzeit = null;    // offenes Hinzufügen-Feld für diese Mahlzeit
+  let ernListe = [];              // gerade angezeigte Treffer/Zuletzt-Liste (Auswahl per Index)
+  let ernAuswahl = null;          // gewähltes Lebensmittel für die Mengeneingabe
+  let ernSucheTimer = null;
+  let ernSucheNr = 0;             // verhindert, dass alte Antworten neue überschreiben
+  let ernBearbeitenId = null;
+
+  function ernAktDatum() { return ernDatum || heuteISO(); }
+
+  function ernZahl(v, stellen = 1) {
+    if (v === null || v === undefined || v === "") return "–";
+    return Number(v).toLocaleString("de-DE", { maximumFractionDigits: stellen });
+  }
+
+  function ernDatumLabel(iso) {
+    const diff = tageSeitIso(iso, heuteISO());
+    const wochentag = new Date(iso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" });
+    if (diff === 0) return `Heute, ${datumDe(iso)}`;
+    if (diff === 1) return `Gestern, ${datumDe(iso)}`;
+    if (diff === -1) return `Morgen, ${datumDe(iso)}`;
+    return `${wochentag}, ${datumDe(iso)}`;
+  }
+
+  // Vorschlag nach Uhrzeit, wenn oben "+ Essen eintragen" getippt wird
+  function ernStandardMahlzeit() {
+    const d = new Date();
+    const min = d.getHours() * 60 + d.getMinutes();
+    if (min < 10 * 60 + 30) return "fruehstueck";
+    if (min < 14 * 60 + 30) return "mittag";
+    if (min >= 17 * 60 + 30 && min < 21 * 60 + 30) return "abend";
+    return "snack";
+  }
+
+  function ernSumme(liste) {
+    const s = { kcal: 0, eiweiss: 0, fett: 0, kohlenhydrate: 0, ballaststoffe: 0, luecken: false };
+    for (const e of liste) {
+      s.kcal += Number(e.kcal) || 0;
+      for (const f of ["eiweiss", "fett", "kohlenhydrate", "ballaststoffe"]) {
+        if (e[f] === null || e[f] === undefined) s.luecken = true;
+        else s[f] += Number(e[f]);
+      }
+    }
+    return s;
+  }
+
+  async function ernTagLaden() {
+    const datum = ernAktDatum();
+    ernLaedt = true;
+    ernFehler = "";
+    renderErnaehrung();
+    try {
+      const res = await api("ernaehrung_tag", { datum });
+      if (datum !== ernAktDatum()) return; // inzwischen anderer Tag gewählt
+      ernEintraege = res.eintraege || [];
+      ernZuletzt = res.zuletzt || [];
+      ernGeladenFuer = datum;
+    } catch (e) {
+      ernFehler = e.message === "unauthorized" ? "" : "Konnte den Tag nicht laden: " + e.message;
+    } finally {
+      ernLaedt = false;
+      renderErnaehrung();
+    }
+  }
+
+  function renderErnaehrung() {
+    const kopfEl = document.getElementById("ern-summe");
+    const listeEl = document.getElementById("ern-mahlzeiten");
+    if (!kopfEl || !listeEl) return;
+    const datum = ernAktDatum();
+    if (ernGeladenFuer !== datum && !ernLaedt && !ernFehler) { ernTagLaden(); return; }
+
+    document.getElementById("ern-datum-text").textContent = ernDatumLabel(datum);
+    document.getElementById("ern-datum-wahl").value = datum;
+    ernHinzuTitelAktualisieren();
+
+    if (ernFehler) {
+      kopfEl.innerHTML = `<p class="empty-text">${escapeHtml(ernFehler)} <button class="link-btn" onclick="ernNeuLaden()">Nochmal versuchen</button></p>`;
+      listeEl.innerHTML = "";
+      return;
+    }
+    if (ernGeladenFuer !== datum) {
+      kopfEl.innerHTML = `<p class="empty-text">Lädt …</p>`;
+      listeEl.innerHTML = "";
+      return;
+    }
+
+    const s = ernSumme(ernEintraege);
+    // Energieanteile der Makros (Atwater: Eiweiß/KH 4, Fett 9 kcal je g)
+    const kcalMakro = s.eiweiss * 4 + s.fett * 9 + s.kohlenhydrate * 4;
+    const anteil = (g, faktor) => (kcalMakro > 0 ? Math.round((g * faktor * 100) / kcalMakro) : 0);
+    const makro = (label, g, faktor, klasse) => `
+      <div class="ern-makro">
+        <span class="ern-makro-label">${label}</span>
+        <span class="ern-makro-wert">${ernZahl(g)} g</span>
+        ${faktor ? `<span class="ern-makro-balken"><span class="${klasse}" style="width:${anteil(g, faktor)}%"></span></span>
+        <span class="notiz-meta">${anteil(g, faktor)} % der Energie</span>` : ""}
+      </div>`;
+    kopfEl.innerHTML = `
+      <div class="ern-summe-karte">
+        <div class="ern-kcal-gross"><span>${ernZahl(s.kcal, 0)}</span> kcal</div>
+        <div class="ern-makros">
+          ${makro("Eiweiß", s.eiweiss, 4, "ern-balken-eiweiss")}
+          ${makro("Fett", s.fett, 9, "ern-balken-fett")}
+          ${makro("Kohlenhydrate", s.kohlenhydrate, 4, "ern-balken-kh")}
+          ${makro("Ballaststoffe", s.ballaststoffe, 0, "")}
+        </div>
+        ${s.luecken ? `<p class="notiz-meta" style="margin:0.5rem 0 0;">Bei einzelnen Einträgen fehlen Werte (–) – die Summe ist dort etwas zu niedrig.</p>` : ""}
+      </div>`;
+
+    listeEl.innerHTML = ERN_MAHLZEITEN.map(([schluessel, name, icon]) => {
+      const eintraege = ernEintraege.filter((e) => e.mahlzeit === schluessel);
+      const summe = ernSumme(eintraege);
+      return `
+        <section class="ern-mahlzeit">
+          <div class="ern-mahlzeit-kopf">
+            <h3>${icon} ${name}</h3>
+            <span class="ern-mahlzeit-kcal">${eintraege.length ? ernZahl(summe.kcal, 0) + " kcal" : ""}</span>
+            <button class="btn-secondary ern-plus" onclick="ernHinzuOeffnen('${schluessel}')">+ Hinzufügen</button>
+          </div>
+          ${eintraege.length ? `<div class="task-list">${eintraege.map(ernEintragHtml).join("")}</div>` : ""}
+        </section>`;
+    }).join("");
+  }
+
+  function ernEintragHtml(e) {
+    if (e.id === ernBearbeitenId) return ernBearbeitenHtml(e);
+    const teile = [];
+    if (e.menge_g !== null && e.menge_g !== undefined) teile.push(`${ernZahl(e.menge_g)} g`);
+    teile.push(`E ${ernZahl(e.eiweiss)} · F ${ernZahl(e.fett)} · KH ${ernZahl(e.kohlenhydrate)}`);
+    if (!e.lebensmittel_id && (e.menge_g === null || e.menge_g === undefined)) teile.push("freier Eintrag");
+    return `
+      <div class="task ern-eintrag">
+        <div class="task-info">
+          <span class="task-titel">${escapeHtml(e.name)}</span>
+          <span class="notiz-meta">${teile.join(" · ")}</span>
+        </div>
+        <span class="ern-eintrag-kcal">${ernZahl(e.kcal, 0)} kcal</span>
+        <button class="task-edit-btn" onclick="ernBearbeiten('${e.id}')" aria-label="Bearbeiten">✎</button>
+        <button class="task-delete" onclick="ernLoeschen('${e.id}')" aria-label="Löschen">×</button>
+      </div>`;
+  }
+
+  function ernBearbeitenHtml(e) {
+    const mahlzeitSelect = `<select id="ern-edit-mahlzeit" aria-label="Mahlzeit">${ERN_MAHLZEITEN.map(([k, n]) =>
+      `<option value="${k}" ${k === e.mahlzeit ? "selected" : ""}>${n}</option>`).join("")}</select>`;
+    const mitMenge = e.menge_g !== null && e.menge_g !== undefined;
+    const felder = mitMenge
+      ? `<label class="ern-feld">Menge (g)<input type="number" id="ern-edit-menge" min="1" max="5000" step="any" inputmode="decimal" value="${Number(e.menge_g)}"></label>`
+      : `<label class="ern-feld ern-feld-breit">Bezeichnung<input type="text" id="ern-edit-name" maxlength="120" value="${escapeHtml(e.name)}"></label>
+         <label class="ern-feld">kcal<input type="number" id="ern-edit-kcal" min="0" max="20000" step="any" inputmode="decimal" value="${e.kcal ?? ""}"></label>
+         <label class="ern-feld">Eiweiß g<input type="number" id="ern-edit-eiweiss" min="0" step="any" inputmode="decimal" value="${e.eiweiss ?? ""}"></label>
+         <label class="ern-feld">Fett g<input type="number" id="ern-edit-fett" min="0" step="any" inputmode="decimal" value="${e.fett ?? ""}"></label>
+         <label class="ern-feld">KH g<input type="number" id="ern-edit-kh" min="0" step="any" inputmode="decimal" value="${e.kohlenhydrate ?? ""}"></label>`;
+    return `
+      <div class="task task-edit ern-eintrag">
+        <div class="task-info">
+          ${mitMenge ? `<span class="task-titel">${escapeHtml(e.name)}</span>` : ""}
+          <div class="task-edit-felder">
+            ${felder}
+            <label class="ern-feld">Mahlzeit${mahlzeitSelect}</label>
+          </div>
+          <div class="row" style="margin-bottom:0;">
+            <button class="btn-primary" onclick="ernBearbeitenSpeichern('${e.id}')">Speichern</button>
+            <button class="btn-secondary" onclick="ernBearbeitenAbbrechen()">Abbrechen</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  window.ernNeuLaden = function() { ernGeladenFuer = null; ernFehler = ""; ernTagLaden(); };
+
+  window.ernBearbeiten = function(id) { ernBearbeitenId = id; renderErnaehrung(); };
+  window.ernBearbeitenAbbrechen = function() { ernBearbeitenId = null; renderErnaehrung(); };
+
+  window.ernBearbeitenSpeichern = async function(id) {
+    const e = ernEintraege.find((x) => x.id === id);
+    if (!e) return;
+    const daten = { id, mahlzeit: document.getElementById("ern-edit-mahlzeit").value };
+    const mengeEl = document.getElementById("ern-edit-menge");
+    if (mengeEl) {
+      daten.menge_g = mengeEl.value;
+    } else {
+      daten.name = document.getElementById("ern-edit-name").value;
+      daten.kcal = document.getElementById("ern-edit-kcal").value;
+      daten.eiweiss = document.getElementById("ern-edit-eiweiss").value;
+      daten.fett = document.getElementById("ern-edit-fett").value;
+      daten.kohlenhydrate = document.getElementById("ern-edit-kh").value;
+    }
+    try {
+      const res = await api("ernaehrung_eintrag_aktualisieren", daten);
+      const idx = ernEintraege.findIndex((x) => x.id === id);
+      if (idx >= 0 && res.eintrag) ernEintraege[idx] = res.eintrag;
+      ernBearbeitenId = null;
+      renderErnaehrung();
+    } catch (err) {
+      if (err.message !== "unauthorized") alert(err.message);
+    }
+  };
+
+  window.ernLoeschen = async function(id) {
+    const e = ernEintraege.find((x) => x.id === id);
+    if (!e || !confirm(`„${e.name}“ aus dem Tagebuch löschen?`)) return;
+    try {
+      await api("ernaehrung_eintrag_loeschen", { id });
+      ernEintraege = ernEintraege.filter((x) => x.id !== id);
+      renderErnaehrung();
+    } catch (err) {
+      if (err.message !== "unauthorized") alert(err.message);
+    }
+  };
+
+  // ---- Datum wechseln ----
+  function ernDatumSetzen(iso) {
+    ernDatum = iso === heuteISO() ? null : iso;
+    ernBearbeitenId = null;
+    ernFehler = "";
+    renderErnaehrung();
+  }
+  document.getElementById("ern-tag-zurueck").addEventListener("click", () => ernDatumSetzen(addTage(ernAktDatum(), -1)));
+  document.getElementById("ern-tag-vor").addEventListener("click", () => ernDatumSetzen(addTage(ernAktDatum(), 1)));
+  document.getElementById("ern-datum-text").addEventListener("click", () => ernDatumSetzen(heuteISO()));
+  document.getElementById("ern-kalender-btn").addEventListener("click", () => {
+    const feld = document.getElementById("ern-datum-wahl");
+    try { feld.showPicker(); } catch (e) { feld.focus(); feld.click(); }
+  });
+  document.getElementById("ern-datum-wahl").addEventListener("change", (e) => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) ernDatumSetzen(e.target.value);
+  });
+
+  // ---- Hinzufügen-Feld ----
+  function ernHinzuTitelAktualisieren() {
+    const titel = document.getElementById("ern-hinzu-titel");
+    if (titel && ernHinzuMahlzeit) {
+      titel.textContent = `Eintragen · ${ernDatumLabel(ernAktDatum()).split(",")[0]}`;
+      document.getElementById("ern-hinzu-mahlzeit").value = ernHinzuMahlzeit;
+    }
+  }
+
+  function ernAnsicht(welche) {
+    // "suche" | "menge" | "frei"
+    document.getElementById("ern-such-bereich").classList.toggle("hidden", welche !== "suche");
+    document.getElementById("ern-menge-bereich").classList.toggle("hidden", welche !== "menge");
+    document.getElementById("ern-frei-bereich").classList.toggle("hidden", welche !== "frei");
+  }
+
+  window.ernHinzuOeffnen = function(mahlzeit) {
+    ernHinzuMahlzeit = mahlzeit || ernStandardMahlzeit();
+    const panel = document.getElementById("ern-hinzu");
+    panel.classList.remove("hidden");
+    ernHinzuTitelAktualisieren();
+    ernAuswahl = null;
+    ernAnsicht("suche");
+    document.getElementById("ern-hinzu-status").textContent = "";
+    const suche = document.getElementById("ern-suche");
+    suche.value = "";
+    ernZuletztZeigen();
+    panel.scrollIntoView({ block: "start", behavior: "smooth" });
+    suche.focus({ preventScroll: true });
+  };
+
+  function ernHinzuSchliessen() {
+    document.getElementById("ern-hinzu").classList.add("hidden");
+    ernHinzuMahlzeit = null;
+    ernAuswahl = null;
+  }
+
+  document.getElementById("btn-ern-eintragen-oben").addEventListener("click", () => window.ernHinzuOeffnen(null));
+  document.getElementById("ern-hinzu-schliessen").addEventListener("click", ernHinzuSchliessen);
+  document.getElementById("ern-hinzu-mahlzeit").addEventListener("change", (e) => {
+    ernHinzuMahlzeit = e.target.value;
+    ernHinzuTitelAktualisieren();
+    if (!document.getElementById("ern-suche").value.trim()) ernZuletztZeigen();
+  });
+
+  function ernTrefferZeile(l, i) {
+    const marke = l.marke ? ` <span class="notiz-meta">(${escapeHtml(l.marke)})</span>` : "";
+    return `
+      <button class="ern-treffer-zeile" onclick="ernAuswaehlen(${i})">
+        <span class="ern-treffer-name">${escapeHtml(l.name)}${marke}</span>
+        <span class="notiz-meta">${ernZahl(l.kcal, 0)} kcal · E ${ernZahl(l.eiweiss)} · F ${ernZahl(l.fett)} · KH ${ernZahl(l.kohlenhydrate)} je 100 g${l.letzte_menge ? ` · zuletzt ${ernZahl(l.letzte_menge)} g` : ""}</span>
+      </button>`;
+  }
+
+  function ernZuletztZeigen() {
+    const el = document.getElementById("ern-treffer");
+    // Was in dieser Mahlzeit schon gegessen wurde, zuerst
+    ernListe = ernZuletzt.slice().sort((a, b) =>
+      (b.mahlzeiten.includes(ernHinzuMahlzeit) ? 1 : 0) - (a.mahlzeiten.includes(ernHinzuMahlzeit) ? 1 : 0)).slice(0, 12);
+    el.innerHTML = ernListe.length
+      ? `<p class="ern-liste-titel">Zuletzt verwendet</p>${ernListe.map(ernTrefferZeile).join("")}`
+      : `<p class="notiz-meta">Tippe mindestens 2 Buchstaben, z. B. „Haferflocken“ oder „Apfel roh“.</p>`;
+  }
+
+  document.getElementById("ern-suche").addEventListener("input", (e) => {
+    clearTimeout(ernSucheTimer);
+    const q = e.target.value.trim();
+    if (q.length < 2) { ernSucheNr++; ernZuletztZeigen(); return; }
+    ernSucheTimer = setTimeout(() => ernSuchen(q), 250);
+  });
+
+  async function ernSuchen(q) {
+    const nr = ++ernSucheNr;
+    const el = document.getElementById("ern-treffer");
+    try {
+      const res = await api("lebensmittel_suche", { q });
+      if (nr !== ernSucheNr) return;
+      // Letzte Menge aus "zuletzt verwendet" übernehmen, falls bekannt
+      const letzte = new Map(ernZuletzt.map((z) => [z.id, z.letzte_menge]));
+      ernListe = (res.treffer || []).map((t) => ({ ...t, letzte_menge: letzte.get(t.id) || null }));
+      el.innerHTML = ernListe.length
+        ? ernListe.map(ernTrefferZeile).join("")
+        : `<p class="notiz-meta">Nichts gefunden. Tipp: kürzer oder anders suchen (z. B. „Quark“ statt „Magerquark“) – oder unten einen freien Eintrag machen.</p>`;
+    } catch (err) {
+      if (nr === ernSucheNr && err.message !== "unauthorized") el.innerHTML = `<p class="notiz-meta">Suche fehlgeschlagen: ${escapeHtml(err.message)}</p>`;
+    }
+  }
+
+  window.ernAuswaehlen = function(i) {
+    const l = ernListe[i];
+    if (!l) return;
+    ernAuswahl = l;
+    document.getElementById("ern-auswahl-name").textContent = l.marke ? `${l.name} (${l.marke})` : l.name;
+    document.getElementById("ern-auswahl-info").textContent =
+      `je 100 g: ${ernZahl(l.kcal, 0)} kcal · Eiweiß ${ernZahl(l.eiweiss)} g · Fett ${ernZahl(l.fett)} g · KH ${ernZahl(l.kohlenhydrate)} g`;
+    const menge = document.getElementById("ern-menge");
+    menge.value = l.letzte_menge ? Number(l.letzte_menge) : (l.portion_g ? Number(l.portion_g) : 100);
+    const schnell = [50, 100, 150, 200, 250];
+    document.getElementById("ern-menge-schnell").innerHTML =
+      (l.portion_g ? `<button class="chip ern-chip" onclick="ernMengeSetzen(${Number(l.portion_g)})">${escapeHtml(l.portion_name || "1 Portion")} (${ernZahl(l.portion_g)} g)</button>` : "") +
+      schnell.map((g) => `<button class="chip ern-chip" onclick="ernMengeSetzen(${g})">${g} g</button>`).join("");
+    ernAnsicht("menge");
+    ernVorschau();
+    menge.focus();
+    menge.select();
+  };
+
+  window.ernMengeSetzen = function(g) {
+    document.getElementById("ern-menge").value = g;
+    ernVorschau();
+  };
+
+  function ernVorschau() {
+    const el = document.getElementById("ern-vorschau");
+    const g = Number(String(document.getElementById("ern-menge").value).replace(",", "."));
+    if (!ernAuswahl || !(g > 0)) { el.textContent = ""; return; }
+    const f = g / 100;
+    const w = (v) => (v === null || v === undefined ? "–" : ernZahl(Number(v) * f));
+    el.innerHTML = `<strong>${ernZahl(Number(ernAuswahl.kcal) * f, 0)} kcal</strong> · Eiweiß ${w(ernAuswahl.eiweiss)} g · Fett ${w(ernAuswahl.fett)} g · KH ${w(ernAuswahl.kohlenhydrate)} g`;
+  }
+  document.getElementById("ern-menge").addEventListener("input", ernVorschau);
+  document.getElementById("ern-menge").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btn-ern-eintragen").click();
+  });
+  document.getElementById("btn-ern-menge-zurueck").addEventListener("click", () => {
+    ernAuswahl = null;
+    ernAnsicht("suche");
+    document.getElementById("ern-suche").focus();
+  });
+
+  // Nach dem Eintragen bleibt das Feld offen (für das nächste Lebensmittel
+  // derselben Mahlzeit), die Suche wird geleert.
+  function ernNachEintragen(eintrag, text) {
+    if (ernGeladenFuer === eintrag.datum) ernEintraege.push(eintrag);
+    renderErnaehrung();
+    document.getElementById("ern-hinzu-status").textContent = text;
+    ernAuswahl = null;
+    ernAnsicht("suche");
+    const suche = document.getElementById("ern-suche");
+    suche.value = "";
+    ernZuletztZeigen();
+    suche.focus({ preventScroll: true });
+  }
+
+  document.getElementById("btn-ern-eintragen").addEventListener("click", async (ev) => {
+    const knopf = ev.currentTarget;
+    const g = Number(String(document.getElementById("ern-menge").value).replace(",", "."));
+    if (!ernAuswahl) return;
+    if (!(g > 0 && g <= 5000)) { document.getElementById("ern-hinzu-status").textContent = "Bitte eine Menge zwischen 1 und 5000 g eingeben."; return; }
+    knopf.disabled = true;
+    try {
+      const res = await api("ernaehrung_eintrag_hinzufuegen", {
+        datum: ernAktDatum(), mahlzeit: ernHinzuMahlzeit, lebensmittel_id: ernAuswahl.id, menge_g: g,
+      });
+      // "Zuletzt verwendet" lokal nachziehen (Menge + Mahlzeit merken)
+      const gewaehlt = ernAuswahl;
+      const alt = ernZuletzt.find((z) => z.id === gewaehlt.id);
+      const mahlzeiten = alt ? Array.from(new Set([ernHinzuMahlzeit, ...alt.mahlzeiten])) : [ernHinzuMahlzeit];
+      ernZuletzt = [{ ...gewaehlt, letzte_menge: g, mahlzeiten }, ...ernZuletzt.filter((z) => z.id !== gewaehlt.id)].slice(0, 30);
+      ernNachEintragen(res.eintrag, `✓ ${res.eintrag.name} (${ernZahl(g)} g) eingetragen`);
+    } catch (err) {
+      if (err.message !== "unauthorized") document.getElementById("ern-hinzu-status").textContent = err.message;
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+
+  // ---- Freier Eintrag ----
+  document.getElementById("btn-ern-frei-oeffnen").addEventListener("click", () => {
+    ["ern-frei-name", "ern-frei-kcal", "ern-frei-eiweiss", "ern-frei-fett", "ern-frei-kh"].forEach((id) => { document.getElementById(id).value = ""; });
+    const q = document.getElementById("ern-suche").value.trim();
+    if (q) document.getElementById("ern-frei-name").value = q;
+    ernAnsicht("frei");
+    document.getElementById(q ? "ern-frei-kcal" : "ern-frei-name").focus();
+  });
+  document.getElementById("btn-ern-frei-zurueck").addEventListener("click", () => {
+    ernAnsicht("suche");
+    document.getElementById("ern-suche").focus();
+  });
+  document.getElementById("btn-ern-frei-speichern").addEventListener("click", async (ev) => {
+    const knopf = ev.currentTarget;
+    const name = document.getElementById("ern-frei-name").value.trim();
+    const kcal = document.getElementById("ern-frei-kcal").value;
+    if (!name || kcal === "") { document.getElementById("ern-hinzu-status").textContent = "Bitte mindestens Bezeichnung und Kalorien angeben."; return; }
+    knopf.disabled = true;
+    try {
+      const res = await api("ernaehrung_eintrag_hinzufuegen", {
+        datum: ernAktDatum(), mahlzeit: ernHinzuMahlzeit, name, kcal,
+        eiweiss: document.getElementById("ern-frei-eiweiss").value,
+        fett: document.getElementById("ern-frei-fett").value,
+        kohlenhydrate: document.getElementById("ern-frei-kh").value,
+      });
+      ernNachEintragen(res.eintrag, `✓ ${res.eintrag.name} eingetragen`);
+    } catch (err) {
+      if (err.message !== "unauthorized") document.getElementById("ern-hinzu-status").textContent = err.message;
+    } finally {
+      knopf.disabled = false;
+    }
+  });
