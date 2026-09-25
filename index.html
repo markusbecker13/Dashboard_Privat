@@ -409,6 +409,73 @@
         </div>
 
         <div id="ern-mahlzeiten"></div>
+
+        <details class="anleitung-abschnitt ern-block" id="ern-profil-block">
+          <summary>⚙️ Profil &amp; Ziel</summary>
+          <div class="anleitung-text">
+            <p class="notiz-meta" style="margin-top:0;">Daraus berechnet die App deinen Tagesbedarf. Sport kommt später einzeln dazu – wähle die Aktivität deshalb für deinen Alltag <strong>ohne</strong> Training.</p>
+            <div class="task-edit-felder">
+              <label class="ern-feld">Geschlecht (für die Formel)
+                <select id="ern-p-geschlecht"><option value="">bitte wählen</option><option value="m">männlich</option><option value="w">weiblich</option></select>
+              </label>
+              <label class="ern-feld">Geburtsdatum<input type="date" id="ern-p-geburt"></label>
+              <label class="ern-feld">Größe (cm)<input type="number" id="ern-p-groesse" min="120" max="230" step="1" inputmode="numeric"></label>
+              <label class="ern-feld ern-feld-breit">Aktivität im Alltag (ohne Sport)
+                <select id="ern-p-pal">
+                  <option value="1.4">1,4 – überwiegend sitzend, kaum Bewegung (Büro, Homeoffice)</option>
+                  <option value="1.5">1,5 – überwiegend sitzend, etwas Bewegung</option>
+                  <option value="1.6">1,6 – sitzend, zeitweise gehend/stehend</option>
+                  <option value="1.7">1,7 – zwischen 1,6 und 1,8</option>
+                  <option value="1.8">1,8 – überwiegend gehend/stehend (z. B. Arbeit mit Kindern, Verkauf)</option>
+                  <option value="1.9">1,9 – zwischen 1,8 und 2,0</option>
+                  <option value="2.0">2,0 – körperlich anstrengende Arbeit (Bau, Landwirtschaft)</option>
+                </select>
+              </label>
+              <label class="ern-feld ern-feld-breit">Ziel
+                <select id="ern-p-ziel">
+                  <option value="halten:0">Gewicht halten</option>
+                  <option value="abnehmen:-250">Abnehmen – langsam (−250 kcal/Tag)</option>
+                  <option value="abnehmen:-500">Abnehmen – moderat (−500 kcal/Tag, grob 0,5 kg/Woche)</option>
+                  <option value="aufbauen:250">Aufbauen – langsam (+250 kcal/Tag)</option>
+                  <option value="aufbauen:500">Aufbauen – zügiger (+500 kcal/Tag)</option>
+                </select>
+              </label>
+              <label class="ern-feld">Eiweiß je kg Körpergewicht
+                <select id="ern-p-eiweiss">
+                  <option value="0.8">0,8 g – DGE-Referenzwert</option>
+                  <option value="1.2">1,2 g</option>
+                  <option value="1.6">1,6 g – Krafttraining</option>
+                  <option value="2.0">2,0 g – obere Empfehlung</option>
+                </select>
+              </label>
+              <label class="ern-feld">Fettanteil an der Energie
+                <select id="ern-p-fett">
+                  <option value="25">25 %</option>
+                  <option value="30">30 % (DGE-Richtwert)</option>
+                  <option value="35">35 %</option>
+                </select>
+              </label>
+            </div>
+            <div id="ern-profil-rechnung" class="ern-rechnung"></div>
+            <div class="row" style="margin-bottom:0.3rem;">
+              <button class="btn-primary" id="btn-ern-profil-speichern">Speichern</button>
+            </div>
+            <p class="notiz-meta" id="ern-profil-status"></p>
+          </div>
+        </details>
+
+        <details class="anleitung-abschnitt ern-block" id="ern-gewicht-block">
+          <summary>⚖️ Gewicht</summary>
+          <div class="anleitung-text">
+            <div class="row" style="align-items:flex-end;">
+              <label class="ern-feld">Datum<input type="date" id="ern-g-datum"></label>
+              <label class="ern-feld">Gewicht (kg)<input type="number" id="ern-g-kg" min="30" max="300" step="0.1" inputmode="decimal" placeholder="z. B. 80,4"></label>
+              <button class="btn-primary" id="btn-ern-gewicht">Eintragen</button>
+            </div>
+            <p class="notiz-meta" id="ern-gewicht-status" style="margin-top:-0.5rem;"></p>
+            <div id="ern-gewicht-verlauf"></div>
+          </div>
+        </details>
       </div>
 
       <div id="view-reiter-verwaltung" class="hidden">
@@ -751,7 +818,13 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>„–“</strong> heißt: für dieses Lebensmittel liegt im BLS kein Wert vor (das ist nicht dasselbe wie 0). Die Tagessumme weist dann darauf hin</li>
                 <li><strong>Datenbank:</strong> Bundeslebensmittelschlüssel (BLS) 4.0 des Max Rubner-Instituts, rund 7.100 Grundlebensmittel und Gerichte mit laborbasierten Durchschnittswerten je 100 g essbarer Anteil. Markenprodukte stehen nicht drin – dafür kommt später der Barcode-Scan (Open Food Facts). Lizenz CC BY 4.0, Quelle wird im Eintragen-Feld genannt</li>
                 <li><strong>Datenschutz:</strong> Ernährungsdaten sind Gesundheitsdaten. Sie liegen nur in deiner Supabase-Datenbank (EU-Region), es gibt sie nur in Privat, und sie tauchen bewusst nicht im Verlauf auf</li>
-                <li><strong>In Planung:</strong> Kalorienbedarf und Ziel (halten/abnehmen/aufbauen), Trainingskalorien, Barcode-Scan, Wochenübersicht</li>
+                <li><strong>⚙️ Profil &amp; Ziel</strong> (unten): Geschlecht (nur für die Formel), Geburtsdatum, Größe, Aktivität im Alltag, Ziel, Eiweiß je kg und Fettanteil. Darunter steht live die Rechnung: Grundumsatz nach Mifflin-St Jeor × Aktivität = Bedarf ohne Sport, dazu das Ziel (halten, −250/−500 oder +250/+500 kcal am Tag) und die Makroziele. Kohlenhydrate sind der Rest</li>
+                <li><strong>Aktivität ohne Sport wählen:</strong> Trainingskalorien kommen später einzeln dazu – steckt der Sport schon im Aktivitätswert, würde er doppelt gezählt</li>
+                <li><strong>Tagesziel:</strong> Mit Profil und Gewicht zeigt die Tagessumme „gegessen / Ziel“, was noch übrig ist, und Eiweiß/Fett/KH gegen ihr Ziel. Maßgeblich ist das letzte Gewicht bis zu diesem Tag</li>
+                <li><strong>Liegt das Ziel unter dem Grundumsatz</strong>, warnt die App – auf Dauer nicht empfehlenswert</li>
+                <li><strong>⚖️ Gewicht:</strong> ein Wert pro Tag (ein neuer Wert am selben Tag ersetzt den alten), Verlauf der letzten 90 Tage als Linie, Veränderung seit dem letzten Wert vor mindestens 7 bzw. 30 Tagen. Am besten morgens unter gleichen Bedingungen wiegen</li>
+                <li><strong>Ehrlich zur Genauigkeit:</strong> Die Formel ist eine Schätzung und liegt bei Einzelnen oft um rund 10 % daneben. Wirklich genau wird der Bedarf erst über ein paar Wochen Tracking und Wiegen</li>
+                <li><strong>In Planung:</strong> Trainingskalorien, Barcode-Scan, Wochenübersicht, Bedarf aus dem Gewichtstrend nachjustieren</li>
               </ul>
             </div>
           </details>
