@@ -336,10 +336,85 @@
         <div id="rezept-liste-bereich"></div>
       </div>
 
+      <div id="view-ernaehrung" class="hidden">
+        <h1>Ernährung <button class="hilfe-icon" data-hilfe="Dein Ernährungstagebuch: Was du isst, nach Mahlzeiten – mit Kalorien, Eiweiß, Fett, Kohlenhydraten und Ballaststoffen pro Tag. Die Werte kommen aus dem Bundeslebensmittelschlüssel (BLS 4.0). Menge in Gramm eingeben, die App rechnet um. Nur im Bereich Privat.">?</button></h1>
+        <p class="hero-text">Was du isst – Kalorien, Eiweiß, Fett und Kohlenhydrate pro Tag.</p>
+
+        <div class="ern-datum-leiste">
+          <button class="btn-secondary ern-pfeil" id="ern-tag-zurueck" aria-label="Vortag">‹</button>
+          <button class="ern-datum-text" id="ern-datum-text" title="Zu heute springen">Heute</button>
+          <button class="btn-secondary ern-pfeil" id="ern-tag-vor" aria-label="Folgetag">›</button>
+          <span class="ern-kalender">
+            <button class="btn-secondary ern-pfeil" id="ern-kalender-btn" aria-label="Datum wählen" title="Datum wählen">📅</button>
+            <input type="date" id="ern-datum-wahl" tabindex="-1" aria-hidden="true">
+          </span>
+        </div>
+
+        <div id="ern-summe"></div>
+
+        <div class="row">
+          <button class="btn-primary" id="btn-ern-eintragen-oben">+ Essen eintragen</button>
+        </div>
+
+        <div id="ern-hinzu" class="rezept-form hidden">
+          <div class="ern-hinzu-kopf">
+            <strong id="ern-hinzu-titel">Hinzufügen</strong>
+            <select id="ern-hinzu-mahlzeit" aria-label="Mahlzeit">
+              <option value="fruehstueck">Frühstück</option>
+              <option value="mittag">Mittag</option>
+              <option value="abend">Abend</option>
+              <option value="snack">Snacks</option>
+            </select>
+            <button class="link-btn" id="ern-hinzu-schliessen">Schließen</button>
+          </div>
+
+          <div id="ern-such-bereich">
+            <input type="search" id="ern-suche" placeholder="Lebensmittel suchen, z. B. Haferflocken" autocomplete="off" aria-label="Lebensmittel suchen">
+            <div id="ern-treffer" class="ern-treffer"></div>
+            <button class="link-btn ern-frei-link" id="btn-ern-frei-oeffnen">✏️ Nicht dabei? Freier Eintrag mit eigenen Werten</button>
+            <p class="notiz-meta ern-quelle">Nährwerte je 100 g essbarer Anteil: Max Rubner-Institut (2025), Bundeslebensmittelschlüssel (BLS) 4.0, Lizenz CC BY 4.0.</p>
+          </div>
+
+          <div id="ern-menge-bereich" class="hidden">
+            <p class="ern-auswahl-name" id="ern-auswahl-name"></p>
+            <p class="notiz-meta" id="ern-auswahl-info"></p>
+            <label class="rezept-label" for="ern-menge">Menge in Gramm</label>
+            <div class="row" style="margin-bottom:0.5rem; align-items:center;">
+              <input type="number" id="ern-menge" min="1" max="5000" step="any" inputmode="decimal"> <span>g</span>
+            </div>
+            <div class="chip-liste" id="ern-menge-schnell"></div>
+            <p class="ern-vorschau" id="ern-vorschau"></p>
+            <div class="row">
+              <button class="btn-primary" id="btn-ern-eintragen">Eintragen</button>
+              <button class="btn-secondary" id="btn-ern-menge-zurueck">Zurück zur Suche</button>
+            </div>
+          </div>
+
+          <div id="ern-frei-bereich" class="hidden">
+            <p class="notiz-meta" style="margin-top:0;">Werte für die ganze gegessene Portion, z. B. vom Etikett oder aus der Kantine.</p>
+            <div class="task-edit-felder">
+              <label class="ern-feld ern-feld-breit">Bezeichnung<input type="text" id="ern-frei-name" maxlength="120" placeholder="z. B. Kantine: Gemüselasagne"></label>
+              <label class="ern-feld">kcal<input type="number" id="ern-frei-kcal" min="0" max="20000" step="any" inputmode="decimal"></label>
+              <label class="ern-feld">Eiweiß g<input type="number" id="ern-frei-eiweiss" min="0" step="any" inputmode="decimal"></label>
+              <label class="ern-feld">Fett g<input type="number" id="ern-frei-fett" min="0" step="any" inputmode="decimal"></label>
+              <label class="ern-feld">KH g<input type="number" id="ern-frei-kh" min="0" step="any" inputmode="decimal"></label>
+            </div>
+            <div class="row">
+              <button class="btn-primary" id="btn-ern-frei-speichern">Eintragen</button>
+              <button class="btn-secondary" id="btn-ern-frei-zurueck">Zurück zur Suche</button>
+            </div>
+          </div>
+
+          <p class="notiz-meta" id="ern-hinzu-status"></p>
+        </div>
+
+        <div id="ern-mahlzeiten"></div>
+      </div>
+
       <div id="view-reiter-verwaltung" class="hidden">
         <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
-        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Ernährung gibt es nur in Privat und taucht hier bei den anderen Bereichen deshalb nicht auf.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -386,8 +461,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Reiter-Leiste oben:</strong> hat das aktive Thema mehrere sichtbare Reiter, stehen sie als Knöpfe unter der Kopfzeile (seitlich wischbar). Thema mit nur einem Reiter (z.B. Heute): keine Reiter-Leiste</li>
                 <li><strong>Bereich wechseln:</strong> über den Bereichs-Knopf oben links (z.B. „Privat ▾") oder „↔ Bereich wechseln" im ⋮-Menü – beides führt zur Willkommensseite, ohne dich abzumelden</li>
               </ul>
-              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen, Training, Verlauf sowie Inventar, Projekte und Verleih haben ebenfalls ein eigenes bereich-Feld.</p>
-              <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS-, AWO- und Business-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Reflexion/Einkauf/Rezepte/Export sind standardmäßig nur im Privat-Bereich eingeblendet, Links in Privat und Business.</p>
+              <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen, Training, Verlauf sowie Inventar, Projekte und Verleih haben ebenfalls ein eigenes bereich-Feld. <strong>Ernährung</strong> gibt es nur in Privat (keine bereich-Spalte, in anderen Bereichen nicht einschaltbar).</p>
+              <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS-, AWO- und Business-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Reflexion/Einkauf/Rezepte/Ernährung/Export sind standardmäßig nur im Privat-Bereich eingeblendet, Links in Privat und Business.</p>
               <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS, AWO oder Business bleiben grundsätzlich rein lokal im Dashboard.</p>
               <p><strong>Business:</strong> startet mit Start, Aufgaben, Kalender, Notizen, Links, Ideen, Verlauf und Anleitung. Weitere Reiter (z.B. Finanzen, Projekte) lassen sich in der Reiter-Verwaltung einblenden – wie in den anderen Bereichen bereichsgetrennt.</p>
               <p><strong>Farbwelt je Bereich:</strong> Jeder Bereich hat eigene Farben – Privat Blautöne, OGS Rapunzel Gelb/Blau aus dem Rapunzel-Logo, AWO OV Liblar Rottöne, Business Marineblau/Orange aus dem Markenkit von zwischenkaffeeundchaos. In Privat, OGS, AWO und Business steht oben in der Kopfzeile das jeweilige Logo statt des Dashboard-Namens. Login, Willkommensseite und Verwaltung sind neutral gehalten. So ist auf einen Blick klar, in welchem Bereich du gerade bist. In AWO sind überfällige Einträge orange statt rot markiert, damit sie sich vom AWO-Rot abheben.</p>
@@ -662,6 +737,26 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
+            <summary>Ernährung <span class="anleitung-nur">(nur Privat – in anderen Bereichen nicht einschaltbar)</span></summary>
+            <div class="anleitung-text">
+              <p>Ernährungstagebuch im Thema „Sammeln“, neben Training. Pro Tag vier Mahlzeiten: Frühstück, Mittag, Abend, Snacks.</p>
+              <ul>
+                <li><strong>Tag wählen:</strong> ‹ und › blättern tageweise, 📅 öffnet einen Kalender, Tippen auf das Datum springt zurück zu heute. Nachtragen für vergangene Tage geht also problemlos</li>
+                <li><strong>Oben die Tagessumme:</strong> Kalorien, dazu Eiweiß, Fett, Kohlenhydrate (je mit Anteil an der Energie) und Ballaststoffe</li>
+                <li><strong>„+ Hinzufügen“</strong> bei einer Mahlzeit (oder „+ Essen eintragen“ oben, dann schlägt die App die Mahlzeit nach Uhrzeit vor – oben im Feld umstellbar): Lebensmittel suchen, antippen, Menge in Gramm eingeben (oder 50/100/150 … g antippen), „Eintragen“. Die Vorschau zeigt die Werte für genau diese Menge. Das Feld bleibt danach offen für das nächste Lebensmittel</li>
+                <li><strong>Suche:</strong> jedes Wort muss vorkommen, Groß-/Kleinschreibung und Leerzeichen sind egal („haferflocken“ findet „Hafer Flocken“). Die Namen folgen dem BLS, oft mit Zusatz wie „roh“, „gekocht“ oder „getrocknet“ – für gekochte Nudeln also „Nudeln gekocht“ suchen, nicht die rohen</li>
+                <li><strong>Zuletzt verwendet:</strong> Ist das Suchfeld leer, stehen dort deine letzten Lebensmittel – was du schon in dieser Mahlzeit hattest, zuerst – samt zuletzt gegessener Menge, die beim Antippen vorbelegt wird</li>
+                <li><strong>✏️ Freier Eintrag:</strong> für Dinge, die nicht in der Datenbank stehen (Kantine, Fertigprodukt): Bezeichnung und Kalorien, Eiweiß/Fett/KH optional – als Werte für die ganze Portion</li>
+                <li><strong>✎ Bearbeiten:</strong> Menge und Mahlzeit ändern (die Werte werden neu berechnet); bei freien Einträgen alle Werte. <strong>×</strong> löscht</li>
+                <li><strong>„–“</strong> heißt: für dieses Lebensmittel liegt im BLS kein Wert vor (das ist nicht dasselbe wie 0). Die Tagessumme weist dann darauf hin</li>
+                <li><strong>Datenbank:</strong> Bundeslebensmittelschlüssel (BLS) 4.0 des Max Rubner-Instituts, rund 7.100 Grundlebensmittel und Gerichte mit laborbasierten Durchschnittswerten je 100 g essbarer Anteil. Markenprodukte stehen nicht drin – dafür kommt später der Barcode-Scan (Open Food Facts). Lizenz CC BY 4.0, Quelle wird im Eintragen-Feld genannt</li>
+                <li><strong>Datenschutz:</strong> Ernährungsdaten sind Gesundheitsdaten. Sie liegen nur in deiner Supabase-Datenbank (EU-Region), es gibt sie nur in Privat, und sie tauchen bewusst nicht im Verlauf auf</li>
+                <li><strong>In Planung:</strong> Kalorienbedarf und Ziel (halten/abnehmen/aufbauen), Trainingskalorien, Barcode-Scan, Wochenübersicht</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
             <summary>Verlauf</summary>
             <div class="anleitung-text">
               <p>Zeigt die letzten 50 Aktivitäten im gerade aktiven Bereich – was wurde wann hinzugefügt, erledigt oder gelöscht. Jeder Bereich hat seinen eigenen Verlauf: ein Eintrag landet in dem Bereich, in dem du die Aktion ausgeführt hast. Das gilt auch für die gemeinsamen Daten (Spiele, Blockzeiten). Google-Sync-Einträge stehen immer unter Privat, weil nur Privat-Termine synchronisiert werden. Einträge von vor der Trennung stehen alle unter Privat. Rein informativ, keine Aktionen möglich. Der automatische Google-Sync alle 15 Minuten wird hier bewusst nicht protokolliert.</p>
@@ -682,7 +777,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Ausblenden entfernt einen Reiter nur aus der Navigation – die dahinterliegenden Daten bleiben unverändert erhalten und lassen sich durch erneutes Einblenden jederzeit zurückholen. Ein Thema (z.B. „Sammeln") erscheint in der Leiste unten nur, solange mindestens ein Reiter darin sichtbar ist</li>
                 <li>Die Einstellung wird serverseitig gespeichert (Tabelle <code>tab_einstellungen</code>) und gilt deshalb geräteübergreifend – Handy-PWA und Desktop zeigen denselben Stand</li>
-                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital), Training, Verlauf sowie Inventar, Projekte und Verleih haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten.</li>
+                <li><strong>Stand der Datentrennung:</strong> Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen (Fixkosten, Sonderausgaben, Buchungen, Startkapital), Training, Verlauf sowie Inventar, Projekte und Verleih haben ein eigenes <code>bereich</code>-Feld – neue Einträge bleiben getrennt, egal wo der Reiter sonst noch eingeblendet ist. <strong>Bewusst weiterhin gemeinsam (keine Trennung vorgesehen):</strong> Tagesrahmen/Blockzeiten (Planung/Frei) und Spiele. <strong>Export</strong> hat als reines Werkzeug keine eigenen Daten. <strong>Nur Privat:</strong> Ernährung (ohne bereich-Feld).</li>
               </ul>
             </div>
           </details>
