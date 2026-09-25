@@ -306,8 +306,20 @@
         <h1>Rezepte <button class="hilfe-icon" data-hilfe="Deine Rezeptsammlung. Antippen klappt ein Rezept auf, der Stern macht es zum Favoriten (Favoriten stehen oben). Die Suche durchsucht Titel, Kategorie, Zutaten und Notiz. Im aufgeklappten Rezept: Portionen mit − / + umrechnen, fehlende Zutaten auf die Einkaufsliste übernehmen und „Heute gekocht“ vermerken. Rezepte gehören zu dem Bereich, in dem du sie angelegt hast.">?</button></h1>
         <p class="hero-text">Rezepte, die du öfter kochst – schnell gefunden statt lange gesucht.</p>
 
-        <div class="row">
+        <div class="row" id="rezept-knoepfe">
           <button class="btn-primary" id="btn-rezept-neu">+ Neues Rezept</button>
+          <button class="btn-secondary" id="btn-rezept-import">🔗 Aus Link importieren</button>
+        </div>
+        <div id="rezept-import-bereich" class="rezept-form hidden">
+          <label class="rezept-label" for="rezept-import-url" style="margin-top:0;">Link zu einer Rezeptseite</label>
+          <div class="row">
+            <input type="url" id="rezept-import-url" placeholder="https://…" inputmode="url" autocomplete="off">
+          </div>
+          <div class="row">
+            <button class="btn-primary" id="btn-rezept-import-laden">Rezept laden</button>
+            <button class="btn-secondary" id="btn-rezept-import-abbrechen">Abbrechen</button>
+          </div>
+          <p class="notiz-meta" id="rezept-import-status"></p>
         </div>
         <div id="rezept-form-bereich" class="rezept-form hidden"></div>
         <datalist id="rezept-kategorie-liste"></datalist>
@@ -639,6 +651,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Einkaufsliste:</strong> „🛒 Zutaten auf die Einkaufsliste …“ zeigt die Zutaten mit Häkchen – in der gerade eingestellten Portionenzahl. Antippen, was fehlt, dann übernehmen. Was schon offen auf der Einkaufsliste steht, ist markiert und nicht wählbar</li>
                 <li><strong>„✓ Heute gekocht“</strong> vermerkt das heutige Datum. Versehentlich getippt? „zurücknehmen“ stellt das vorherige Datum wieder her (solange die App nicht neu geladen wurde, sonst wird das Datum geleert)</li>
                 <li><strong>Sortierung:</strong> „Favoriten, A–Z“, „Lange nicht gekocht“ (noch nie Gekochtes zuerst – gut als Ideengeber) oder „Zuletzt gekocht“. Die Wahl merkt sich das Gerät</li>
+                <li><strong>🔗 Aus Link importieren:</strong> Link einer Rezeptseite einfügen (geteilter Text mit Link geht auch), „Rezept laden“ füllt das Formular mit Titel, Kategorie, Portionen, Zeit, Zutaten, Zubereitung und Quelle vor – erst prüfen, dann speichern. Klappt bei Seiten, die ihre Rezepte maschinenlesbar mitliefern (die meisten großen Rezeptseiten); manche Seiten blockieren automatische Abrufe. Fotos werden nicht übernommen. Nur für den eigenen Gebrauch</li>
                 <li><strong>Foto:</strong> im Formular „📷 Foto wählen“ (Kamera oder Galerie). Das Foto wird vor dem Hochladen im Browser auf max. 1600 px verkleinert und als JPG gespeichert. „Foto entfernen“ löscht es beim Speichern. In der Liste zeigt 📷, dass ein Foto da ist</li>
                 <li><strong>👨‍🍳 Kochmodus:</strong> Vollbild mit großer Schrift, der Bildschirm bleibt an (in Chrome/Android; zeigt oben an, ob es klappt). Zutaten und Schritte antippen zum Abhaken, der nächste offene Schritt ist umrandet. Portionen lassen sich auch hier umrechnen. „Fertig – heute gekocht“ schließt und vermerkt das Datum. Die Zurück-Taste schließt nur den Kochmodus</li>
                 <li><strong>Zubereitung:</strong> Im Kochmodus wird jede Zeile ein eigener Schritt – also am besten einen Schritt pro Zeile schreiben</li>
