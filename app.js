@@ -427,14 +427,22 @@
     }
   }
 
+  // Datum als "YYYY-MM-DD" in LOKALER Zeit. Nie toISOString() dafür
+  // nehmen: das rechnet in UTC, dann ist "heute" nachts bis 1 bzw. 2 Uhr
+  // noch gestern, und ein lokales Mitternachts-Datum rutscht auf den
+  // Vortag (siehe ANLEITUNG.md, Stolperfallen).
+  function datumLokalISO(d = new Date()) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
   function heuteISO() {
-    return new Date().toISOString().slice(0, 10);
+    return datumLokalISO();
   }
 
   function addTage(datumISO, tage) {
     const d = new Date(datumISO + "T00:00:00");
     d.setDate(d.getDate() + tage);
-    return d.toISOString().slice(0, 10);
+    return datumLokalISO(d);
   }
 
   function enrich(a) {
@@ -2550,15 +2558,9 @@
   let kochmodus = null;              // { id, zutatenErledigt:Set, schritteErledigt:Set, wakeLock, wach }
   let rezeptVorlage = null;          // per Link importierte Daten, füllen das Formular "neu" vor
 
-  function rezeptHeuteIso() {
-    // lokales Datum, nicht UTC – sonst wäre "heute" nachts bis 2 Uhr noch gestern
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }
-
   function rezeptGekochtText(iso) {
     if (!iso) return "noch nie gekocht";
-    const tage = tageSeitIso(iso, rezeptHeuteIso());
+    const tage = tageSeitIso(iso, heuteISO());
     if (tage <= 0) return "heute gekocht";
     if (tage === 1) return "gestern gekocht";
     return `vor ${tage} Tagen gekocht`;
@@ -2876,7 +2878,7 @@
     const id = kochmodus.id;
     const r = rezepte.find((x) => x.id === id);
     window.kochmodusSchliessen();
-    if (r && r.zuletzt_gekocht !== rezeptHeuteIso()) await window.rezeptHeuteGekocht(id);
+    if (r && r.zuletzt_gekocht !== heuteISO()) await window.rezeptHeuteGekocht(id);
   };
 
   function renderKochmodus() {
@@ -2995,7 +2997,7 @@
         const einkaufModus = rezeptEinkaufId === r.id;
         const zutaten = einkaufModus ? rezeptEinkaufHtml(r, faktor) : rezeptZutatenHtml(r.zutaten, faktor);
         const hatZutaten = rezeptZutatenZeilen(r.zutaten, 1).some((z) => z.typ === "zutat");
-        const heute = rezeptHeuteIso();
+        const heute = heuteISO();
         const heuteGekocht = r.zuletzt_gekocht === heute;
         const portionenLeiste = basis ? `
             <div class="rezept-portionen">
@@ -3266,7 +3268,7 @@
     if (!r) return;
     rezeptGekochtVorher[id] = r.zuletzt_gekocht || null;
     try {
-      await api("rezept_gekocht", { id, datum: rezeptHeuteIso() });
+      await api("rezept_gekocht", { id, datum: heuteISO() });
     } catch (e) {
       alert("Speichern fehlgeschlagen: " + e.message);
       return;
@@ -3949,7 +3951,7 @@
     const tag = d.getDay(); // 0 = So, 1 = Mo, ...
     const diffZuMontag = tag === 0 ? -6 : 1 - tag;
     d.setDate(d.getDate() + diffZuMontag);
-    return d.toISOString().slice(0, 10);
+    return datumLokalISO(d);
   }
 
   function trainingWochenziel(sportart) {
@@ -3979,7 +3981,7 @@
     const ende = new Date(letzte + "T00:00:00");
     let laengste = 0, aktuell = 0;
     while (cursor <= ende) {
-      const iso = cursor.toISOString().slice(0, 10);
+      const iso = datumLokalISO(cursor);
       const anzahl = (gruppen[iso] || []).length;
       if (anzahl >= zielWoche) {
         aktuell++;
@@ -7349,7 +7351,7 @@
   const MONATSNAMEN_FIN = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
   function heuteISOFin() {
-    return new Date().toISOString().slice(0, 10);
+    return heuteISO();
   }
 
   window.buchungTypWaehlen = function (typ) {
