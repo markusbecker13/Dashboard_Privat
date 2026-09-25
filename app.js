@@ -416,7 +416,12 @@
       token = daten.token;
       localStorage.setItem("aufgaben-token", token);
       await ladeDaten();
-      zeigeBereichAuswahl();
+      if (geteiltAnstehend()) {
+        appDirektOeffnen();
+        geteiltenInhaltVerarbeiten();
+      } else {
+        zeigeBereichAuswahl();
+      }
     } catch (e) {
       zeigeLogin("Verbindung fehlgeschlagen.");
     }
@@ -767,6 +772,78 @@
   }
   initHilfeSystem();
 
+  // ==========================================================
+  // Teilen-Ziel (Web Share Target, siehe manifest.json)
+  // Android „Teilen“ → Dashboard öffnet index.html?url=…&text=…&title=…
+  // Bei GET ersetzt der Browser die Query der action-URL, deshalb geht
+  // kein ?tab=rezepte – erkannt wird der Aufruf an url/text/title.
+  // Der geteilte Inhalt wird in sessionStorage geparkt, damit er einen
+  // nötigen Login übersteht, und danach sofort wieder entfernt.
+  // ==========================================================
+  const GETEILT_SCHLUESSEL = "geteilter-rezept-inhalt";
+
+  // Link aus beliebigem Text ziehen; Satzzeichen am Ende („…/rezept).“)
+  // gehören fast nie zur Adresse und werden abgeschnitten.
+  function linkAusText(text) {
+    const treffer = String(text || "").match(/https?:\/\/\S+/i);
+    if (!treffer) return null;
+    return treffer[0].replace(/[)\]}>.,;:!?"'»«“”„]+$/, "");
+  }
+
+  (function geteiltenInhaltParken() {
+    const p = new URLSearchParams(location.search);
+    if (!p.has("url") && !p.has("text") && !p.has("title")) return;
+    const roh = [p.get("url"), p.get("text"), p.get("title")].filter(Boolean).join(" ");
+    try { sessionStorage.setItem(GETEILT_SCHLUESSEL, roh.slice(0, 2000)); } catch (e) { /* ohne Speicher: dann eben nicht */ }
+    history.replaceState({}, "", location.pathname);
+  })();
+
+  function geteiltAnstehend() {
+    try { return sessionStorage.getItem(GETEILT_SCHLUESSEL) !== null; } catch (e) { return false; }
+  }
+
+  // Direkt in die App (letzter Bereich), ohne Willkommensseite
+  function appDirektOeffnen() {
+    zeigeApp();
+    bereichAnwenden();
+    render();
+    renderNotizen();
+    renderKalender();
+    renderHeute();
+    renderOgsIdeen();
+  }
+
+  function geteiltenInhaltVerarbeiten() {
+    let roh = null;
+    try {
+      roh = sessionStorage.getItem(GETEILT_SCHLUESSEL);
+      sessionStorage.removeItem(GETEILT_SCHLUESSEL);
+    } catch (e) { return; }
+    if (roh === null) return;
+
+    // Rezepte in einem Bereich öffnen, in dem der Reiter sichtbar ist:
+    // erst der aktuelle, sonst Privat, Business, OGS, AWO. Ist er
+    // nirgends an, trotzdem Privat (Reiter öffnet sich, nur ohne Chip).
+    if (aktiverBereich === "verwaltung" || !reiterIstSichtbar(aktiverBereich, "rezepte")) {
+      const ziel = ["privat", "business", "ogs", "awo"].find((b) => reiterIstSichtbar(b, "rezepte")) || "privat";
+      window.bereichAuswaehlen(ziel);
+    }
+    tabWechseln("rezepte");
+
+    document.getElementById("rezept-import-bereich").classList.remove("hidden");
+    const feld = document.getElementById("rezept-import-url");
+    const status = document.getElementById("rezept-import-status");
+    const link = linkAusText(roh);
+    if (!link) {
+      feld.value = "";
+      status.textContent = "Im geteilten Inhalt war kein Link. Bitte den Link zur Rezeptseite von Hand einfügen.";
+      feld.focus();
+      return;
+    }
+    feld.value = link;
+    document.getElementById("btn-rezept-import-laden").click();
+  }
+
   // Beim Start: automatisch anmelden, falls Token schon gespeichert
   (async function init() {
     if (token) {
@@ -780,14 +857,8 @@
         const googleCode = urlParams.get("code");
         const gewuenschterTab = urlParams.get("tab");
 
-        if (googleCode || gewuenschterTab) {
-          zeigeApp();
-          bereichAnwenden();
-          render();
-          renderNotizen();
-          renderKalender();
-          renderHeute();
-          renderOgsIdeen();
+        if (googleCode || gewuenschterTab || geteiltAnstehend()) {
+          appDirektOeffnen();
         } else {
           zeigeBereichAuswahl();
         }
@@ -806,6 +877,7 @@
         if (gewuenschterTab && VIEW_ELEMENTE[gewuenschterTab]) {
           tabWechseln(gewuenschterTab);
         }
+        geteiltenInhaltVerarbeiten();
         return;
       } catch (e) {
         // Passwort ungültig geworden -> Login zeigen
@@ -3088,9 +3160,8 @@
     const status = document.getElementById("rezept-import-status");
     const knopf = document.getElementById("btn-rezept-import-laden");
     // Aus geteiltem Text ("Schau mal: https://…") den Link herausziehen
-    const treffer = feld.value.match(/https?:\/\/\S+/i);
-    if (!treffer) { status.textContent = "Bitte einen Link mit https:// einfügen."; feld.focus(); return; }
-    const link = treffer[0];
+    const link = linkAusText(feld.value);
+    if (!link) { status.textContent = "Bitte einen Link mit https:// einfügen."; feld.focus(); return; }
     const vorhanden = rezepteAktuell().find((r) => r.quelle && r.quelle.split(/[?#]/)[0] === link.split(/[?#]/)[0]);
     if (vorhanden && !confirm(`Dieses Rezept gibt es schon: „${vorhanden.titel}“. Trotzdem noch einmal importieren?`)) return;
     knopf.disabled = true;
