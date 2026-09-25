@@ -930,3 +930,5 @@
   .koch-hinweis { text-transform: none; letter-spacing: 0; font-weight: 400; }
   .koch-text { white-space: pre-wrap; margin: 0; line-height: 1.5; }
   .koch-inhalt .session-fokus-bild { max-height: 24vh; object-fit: cover; flex-shrink: 0; }
+  .rezept-import-hinweis { margin: -0.4rem 0 0.8rem; }
+  #rezept-import-status:empty { display: none; }
