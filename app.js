@@ -1654,6 +1654,7 @@
           <span class="start-kachel-zahl">${einkaufOffen.length}</span>
           <span class="start-kachel-label">${einkaufOffen.length === 1 ? "Artikel offen" : "Artikel offen"}</span>
         </button>
+        ${ernStartKachelHtml()}
       </div>`;
     } else {
       const ideenOffen = ogsIdeen.filter((i) => bereichVon(i) === aktiverBereich && (i.status === "offen" || i.status === "in_arbeit")).length;
@@ -4065,7 +4066,7 @@
 
   function renderTraining() {
     // Für die kcal-Anzeige in Privat: Gewicht und MET-Werte einmal laden
-    if (aktiverBereich === "privat" && !ernProfilGeladen && !ernProfilLaedt) ernProfilLaden();
+    if (aktiverBereich === "privat" && !ernProfilGeladen && !ernProfilLaedt && !ernProfilFehlgeschlagen) ernProfilLaden();
     const bereichEl = document.getElementById("training-liste-bereich");
     if (!bereichEl) return;
 
@@ -8208,6 +8209,10 @@
   let ernSucheTimer = null;
   let ernSucheNr = 0;             // verhindert, dass alte Antworten neue überschreiben
   let ernBearbeitenId = null;
+  let ernVortag = {};             // { mahlzeit: {anzahl, kcal} } für den Tag vor ernGeladenFuer
+  let ernKopiertGerade = false;   // Doppeltippen beim Kopieren verhindern
+  let ernStartStand = null;       // { datum, kcal } oder { datum, fehler } für die Start-Kachel
+  let ernStartLaedt = false;
 
   function ernAktDatum() { return ernDatum || heuteISO(); }
   function ernGramm(v) { return v === null || v === undefined ? "–" : ernZahl(v) + " g"; }
@@ -8258,6 +8263,7 @@
       if (datum !== ernAktDatum()) return; // inzwischen anderer Tag gewählt
       ernEintraege = res.eintraege || [];
       ernZuletzt = res.zuletzt || [];
+      ernVortag = res.vortag || {};
       ernGeladenFuer = datum;
     } catch (e) {
       ernFehler = e.message === "unauthorized" ? "" : "Konnte den Tag nicht laden: " + e.message;
@@ -8272,7 +8278,7 @@
     const listeEl = document.getElementById("ern-mahlzeiten");
     if (!kopfEl || !listeEl) return;
     const datum = ernAktDatum();
-    if (!ernProfilGeladen && !ernProfilLaedt) ernProfilLaden();
+    if (!ernProfilGeladen && !ernProfilLaedt && !ernProfilFehlgeschlagen) ernProfilLaden();
     if (ernGeladenFuer !== datum && !ernLaedt && !ernFehler) { ernTagLaden(); return; }
 
     document.getElementById("ern-datum-text").textContent = ernDatumLabel(datum);
@@ -8292,6 +8298,7 @@
 
     const s = ernSumme(ernEintraege);
     kopfEl.innerHTML = ernSummeHtml(s, ernZiele(datum));
+    if (datum === heuteISO()) ernStartStand = { datum, kcal: s.kcal };
 
     listeEl.innerHTML = ERN_MAHLZEITEN.map(([schluessel, name, icon]) => {
       const eintraege = ernEintraege.filter((e) => e.mahlzeit === schluessel);
@@ -8303,7 +8310,7 @@
             <span class="ern-mahlzeit-kcal">${eintraege.length ? ernZahl(summe.kcal, 0) + " kcal" : ""}</span>
             <button class="btn-secondary ern-plus" onclick="ernHinzuOeffnen('${schluessel}')">+ Hinzufügen</button>
           </div>
-          ${eintraege.length ? `<div class="task-list">${eintraege.map(ernEintragHtml).join("")}</div>` : ""}
+          ${eintraege.length ? `<div class="task-list">${eintraege.map(ernEintragHtml).join("")}</div>` : ernKopierenHtml(schluessel)}
         </section>`;
     }).join("");
   }
@@ -8353,7 +8360,86 @@
       </div>`;
   }
 
-  window.ernNeuLaden = function() { ernGeladenFuer = null; ernFehler = ""; ernTagLaden(); };
+  // "Wie gestern": nur bei leerer Mahlzeit, wenn der Vortag dort Einträge hat
+  function ernKopierenHtml(mahlzeit) {
+    const v = ernVortag[mahlzeit];
+    if (!v || !v.anzahl) return "";
+    const tag = ernAktDatum() === heuteISO() ? "gestern" : "am Vortag";
+    return `
+      <button class="ern-kopieren" onclick="ernKopieren('${mahlzeit}', this)">
+        ⧉ Wie ${tag} <span class="notiz-meta">· ${v.anzahl} ${v.anzahl === 1 ? "Eintrag" : "Einträge"} · ${ernZahl(v.kcal, 0)} kcal</span>
+      </button>`;
+  }
+
+  window.ernKopieren = async function(mahlzeit, btn) {
+    if (ernKopiertGerade) return;
+    const nach = ernAktDatum();
+    ernKopiertGerade = true;
+    if (btn) btn.disabled = true;
+    try {
+      const res = await api("ernaehrung_kopieren", { von: addTage(nach, -1), nach, mahlzeit });
+      if (nach === ernAktDatum()) {
+        ernEintraege = ernEintraege.concat(res.eintraege || []);
+      }
+    } catch (err) {
+      if (err.message !== "unauthorized") alert(err.message);
+      // Stand vom Server holen (z.B. wenn schon kopiert war)
+      ernGeladenFuer = null;
+    } finally {
+      ernKopiertGerade = false;
+      renderErnaehrung();
+    }
+  };
+
+  // ---- Start-Kachel "noch X kcal" (nur Privat) ----
+  async function ernStartLaden() {
+    const datum = heuteISO();
+    ernStartLaedt = true;
+    try {
+      const res = await api("ernaehrung_tag", { datum });
+      ernStartStand = { datum, kcal: ernSumme(res.eintraege || []).kcal };
+    } catch (e) {
+      ernStartStand = { datum, fehler: true };
+    } finally {
+      ernStartLaedt = false;
+      if (aktiverTab === "heute") renderHeute();
+    }
+  }
+
+  function ernStartKachelHtml() {
+    if (aktiverBereich !== "privat" || !reiterIstSichtbar("privat", "ernaehrung")) return "";
+    const datum = heuteISO();
+    if (!ernProfilGeladen && !ernProfilLaedt && !ernProfilFehlgeschlagen) ernProfilLaden();
+    let kcal = null;
+    if (ernGeladenFuer === datum) kcal = ernSumme(ernEintraege).kcal;
+    else if (ernStartStand && ernStartStand.datum === datum) kcal = ernStartStand.fehler ? null : ernStartStand.kcal;
+    else if (!ernStartLaedt) ernStartLaden();
+
+    let zahl = "…", label = "kcal heute";
+    const z = ernProfilGeladen ? ernZiele(datum) : null;
+    if (ernStartStand && ernStartStand.datum === datum && ernStartStand.fehler && kcal === null) {
+      zahl = "–"; label = "Ernährung nicht geladen";
+    } else if (kcal !== null && z) {
+      const rest = Math.round(z.ziel - kcal);
+      zahl = ernZahl(Math.abs(rest), 0);
+      label = rest >= 0 ? "kcal übrig" : "kcal über Ziel";
+    } else if (kcal !== null) {
+      zahl = ernZahl(kcal, 0);
+    }
+    return `
+      <button class="start-kachel mod-ernaehrung" onclick="ernStartKachelKlick()">
+        <span class="start-kachel-zahl">${zahl}</span>
+        <span class="start-kachel-label">${label}</span>
+      </button>`;
+  }
+
+  window.ernStartKachelKlick = function() {
+    ernDatum = null;
+    ernBearbeitenId = null;
+    tabWechseln("ernaehrung");
+  };
+
+  window.ernNeuLaden = function() { ernGeladenFuer = null; ernFehler = ""; ernProfilFehlgeschlagen = false; ernTagLaden(); };
 
   window.ernBearbeiten = function(id) { ernBearbeitenId = id; renderErnaehrung(); };
   window.ernBearbeitenAbbrechen = function() { ernBearbeitenId = null; renderErnaehrung(); };
@@ -8627,6 +8713,7 @@
   let ernGewichte = [];          // [{datum, gewicht_kg}] aufsteigend
   let ernProfilGeladen = false;
   let ernProfilLaedt = false;
+  let ernProfilFehlgeschlagen = false; // kein automatisches Neuladen nach Fehler (sonst Endlosschleife)
   let ernMet = [];               // [{sportart_key, sportart, met}]
 
   async function ernProfilLaden() {
@@ -8643,11 +8730,13 @@
       // Ohne Profil das Formular gleich aufklappen
       if (!ernProfil) document.getElementById("ern-profil-block").open = true;
     } catch (e) {
+      ernProfilFehlgeschlagen = true;
       if (e.message !== "unauthorized") document.getElementById("ern-profil-status").textContent = "Profil konnte nicht geladen werden: " + e.message;
     } finally {
       ernProfilLaedt = false;
       if (aktiverTab === "ernaehrung") renderErnaehrung();
       if (aktiverTab === "training") renderTraining();
+      if (aktiverTab === "heute") renderHeute();
     }
   }
 
