@@ -1105,7 +1105,7 @@
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "training") renderTraining();
     if (aktiv === "rezepte") renderRezepte();
-    if (aktiv === "ernaehrung") renderErnaehrung();
+    if (aktiv === "ernaehrung") { renderErnaehrung(); if (ernProfilGeladen) ernMetRendern(); }
     if (aktiv === "verlauf") renderVerlauf();
     if (aktiv === "reiterverwaltung") renderReiterVerwaltung();
     kontoMenuSchliessen();
@@ -4064,6 +4064,8 @@
   };
 
   function renderTraining() {
+    // Für die kcal-Anzeige in Privat: Gewicht und MET-Werte einmal laden
+    if (aktiverBereich === "privat" && !ernProfilGeladen && !ernProfilLaedt) ernProfilLaden();
     const bereichEl = document.getElementById("training-liste-bereich");
     if (!bereichEl) return;
 
@@ -4267,6 +4269,7 @@
               <input type="number" id="training-edit-dauer-${t.id}" value="${t.dauer_minuten ?? ""}" placeholder="Minuten" min="0" style="width:6rem;">
               <input type="number" id="training-edit-strecke-${t.id}" value="${t.strecke_km ?? ""}" placeholder="km" min="0" step="0.1" style="width:5.5rem;" title="Strecke in km">
               <input type="number" id="training-edit-hoehenmeter-${t.id}" value="${t.hoehenmeter ?? ""}" placeholder="Höhenmeter" min="0" style="width:6.5rem;" title="Höhenmeter">
+              <input type="number" id="training-edit-kcal-${t.id}" value="${t.kcal ?? ""}" placeholder="kcal (Uhr)" min="0" max="5000" style="width:7rem;" title="Kalorien, z. B. von der Sportuhr – leer lassen, dann schätzt die App">
               <input type="text" id="training-edit-notiz-${t.id}" value="${escapeAttr(t.notiz || "")}" placeholder="Notiz" style="flex:1; min-width:150px;">
               <select id="training-edit-plan-${t.id}" title="Verknüpfter Trainingsplan">
                 <option value="">Kein Plan</option>
@@ -4290,6 +4293,7 @@
               ${datumDe(t.datum)}${t.dauer_minuten ? " · " + t.dauer_minuten + " Min." : ""}
               ${t.strecke_km ? " · " + t.strecke_km + " km" : ""}
               ${t.hoehenmeter ? " · " + t.hoehenmeter + " Hm" : ""}
+              ${trainingKcalAnzeige(t)}
               ${t.notiz ? " · " + escapeHtml(t.notiz) : ""}
               ${t.plan_id ? " · Plan: " + escapeHtml(planName(t.plan_id) || "?") : ""}
             </span>
@@ -4338,9 +4342,11 @@
     const strecke_km = document.getElementById("training-strecke").value || null;
     const hoehenmeter = document.getElementById("training-hoehenmeter").value || null;
     const notiz = document.getElementById("training-notiz").value.trim() || null;
+    const kcal = document.getElementById("training-kcal").value || null;
     const uebungen = trainingUebungenAusDom("neu", trainingFormUebungen.length);
 
-    await api("training_hinzufuegen", { bereich: aktiverBereich, datum, sportart, ort, dauer_minuten, strecke_km, hoehenmeter, notiz, uebungen, plan_id: trainingFormPlanId });
+    await api("training_hinzufuegen", { bereich: aktiverBereich, datum, sportart, ort, dauer_minuten, strecke_km, hoehenmeter, kcal, notiz, uebungen, plan_id: trainingFormPlanId });
+    document.getElementById("training-kcal").value = "";
 
     document.getElementById("training-sportart").value = "";
     document.getElementById("training-ort").value = "";
@@ -4387,9 +4393,10 @@
     const hoehenmeter = document.getElementById(`training-edit-hoehenmeter-${id}`).value || null;
     const notiz = document.getElementById(`training-edit-notiz-${id}`).value.trim() || null;
     const plan_id = document.getElementById(`training-edit-plan-${id}`).value || null;
+    const kcal = document.getElementById(`training-edit-kcal-${id}`).value || null;
     const uebungen = trainingUebungenAusDom(`edit-${id}`, trainingBearbeitenUebungen.length);
 
-    await api("training_aktualisieren", { id, datum, sportart, ort, dauer_minuten, strecke_km, hoehenmeter, notiz, plan_id, uebungen });
+    await api("training_aktualisieren", { id, datum, sportart, ort, dauer_minuten, strecke_km, hoehenmeter, kcal, notiz, plan_id, uebungen });
     trainingBearbeitenId = null;
     trainingBearbeitenUebungen = [];
     await ladeDaten();
@@ -8614,6 +8621,7 @@
   let ernGewichte = [];          // [{datum, gewicht_kg}] aufsteigend
   let ernProfilGeladen = false;
   let ernProfilLaedt = false;
+  let ernMet = [];               // [{sportart_key, sportart, met}]
 
   async function ernProfilLaden() {
     ernProfilLaedt = true;
@@ -8621,16 +8629,19 @@
       const res = await api("ernaehrung_profil");
       ernProfil = res.profil;
       ernGewichte = res.gewichte || [];
+      ernMet = res.met || [];
       ernProfilGeladen = true;
       ernProfilFormFuellen();
       ernGewichtRendern();
+      ernMetRendern();
       // Ohne Profil das Formular gleich aufklappen
       if (!ernProfil) document.getElementById("ern-profil-block").open = true;
     } catch (e) {
       if (e.message !== "unauthorized") document.getElementById("ern-profil-status").textContent = "Profil konnte nicht geladen werden: " + e.message;
     } finally {
       ernProfilLaedt = false;
-      renderErnaehrung();
+      if (aktiverTab === "ernaehrung") renderErnaehrung();
+      if (aktiverTab === "training") renderTraining();
     }
   }
 
@@ -8649,23 +8660,56 @@
   }
 
   // Reine Rechnung, damit Formular-Vorschau und Tagesansicht dieselbe nutzen
-  function ernBedarfRechnen(p, gewicht, datum) {
+  function ernBedarfRechnen(p, gewicht, datum, trainingKcal = 0) {
     if (!p || !gewicht || !p.geburtsdatum || !p.geschlecht || !p.groesse_cm) return null;
     const kg = Number(gewicht);
     const alter = ernAlterAm(p.geburtsdatum, datum);
     const grundumsatz = 10 * kg + 6.25 * Number(p.groesse_cm) - 5 * alter + (p.geschlecht === "m" ? 5 : -161);
     const bedarf = grundumsatz * Number(p.pal);
-    const ziel = bedarf + Number(p.ziel_kcal_diff);
+    // Trainingskalorien anteilig aufschlagen (Profil: 0/50/75/100 %)
+    const anrechnung = p.training_anrechnung === undefined || p.training_anrechnung === null ? 100 : Number(p.training_anrechnung);
+    const trainingZuschlag = trainingKcal * anrechnung / 100;
+    const ziel = bedarf + Number(p.ziel_kcal_diff) + trainingZuschlag;
     const eiweiss = kg * Number(p.eiweiss_g_pro_kg);
     const fett = (ziel * Number(p.fett_prozent) / 100) / 9;
     const kh = Math.max(0, (ziel - eiweiss * 4 - fett * 9) / 4);
-    return { kg, alter, grundumsatz, bedarf, ziel, eiweiss, fett, kh, unterGrundumsatz: ziel < grundumsatz };
+    return { kg, alter, grundumsatz, bedarf, ziel, eiweiss, fett, kh, trainingZuschlag, anrechnung,
+      unterGrundumsatz: ziel - trainingZuschlag < grundumsatz };
   }
 
   function ernZiele(datum) {
     const g = ernGewichtFuer(datum);
-    const r = ernBedarfRechnen(ernProfil, g && g.gewicht_kg, datum);
-    return r ? { ...r, gewichtDatum: g.datum } : null;
+    const trainings = ernTrainingsAm(datum);
+    const summe = trainings.reduce((a, t) => a + (t.kcal || 0), 0);
+    const r = ernBedarfRechnen(ernProfil, g && g.gewicht_kg, datum, summe);
+    return r ? { ...r, gewichtDatum: g.datum, trainings, trainingSumme: summe } : null;
+  }
+
+  // ---- Trainingskalorien ----
+  // Netto-Schätzung: (MET − 1) × kg × Stunden. Das "− 1" zieht den
+  // Ruheumsatz ab, der im Grundumsatz schon steckt.
+  function ernMetFuer(sportart) {
+    const key = String(sportart || "").trim().toLowerCase();
+    const e = ernMet.find((m) => m.sportart_key === key);
+    return e ? Number(e.met) : null;
+  }
+
+  function ernTrainingKcal(t) {
+    if (t.kcal !== null && t.kcal !== undefined) return { kcal: Number(t.kcal), art: "eigen" };
+    const met = ernMetFuer(t.sportart);
+    if (met === null) return { kcal: null, grund: "kein MET-Wert für diese Sportart" };
+    if (!t.dauer_minuten) return { kcal: null, grund: "keine Dauer eingetragen" };
+    const g = ernGewichtFuer(t.datum);
+    if (!g) return { kcal: null, grund: "kein Gewicht eingetragen" };
+    const kcal = Math.max(0, (met - 1) * Number(g.gewicht_kg) * (Number(t.dauer_minuten) / 60));
+    return { kcal: Math.round(kcal), art: "schaetzung", met };
+  }
+
+  // Nur Trainings aus Privat zählen – Ernährung gibt es nur dort
+  function ernTrainingsAm(datum) {
+    return (training || [])
+      .filter((t) => t.bereich === "privat" && t.datum === datum)
+      .map((t) => ({ t, ...ernTrainingKcal(t) }));
   }
 
   function ernSummeHtml(s, z) {
@@ -8696,6 +8740,7 @@
         <div class="ern-kcal-gross"><span>${ernZahl(s.kcal, 0)}</span> / ${ernZahl(z.ziel, 0)} kcal</div>
         <div class="ern-kcal-balken${rest < 0 ? " ueber" : ""}"><span style="width:${prozent}%"></span></div>
         <p class="ern-rest">${restText}</p>
+        ${ernTrainingZeileHtml(z)}
         <div class="ern-makros">
           ${ernMakroHtml("Eiweiß", s.eiweiss, z.eiweiss, "ern-balken-eiweiss")}
           ${ernMakroHtml("Fett", s.fett, z.fett, "ern-balken-fett")}
@@ -8703,7 +8748,7 @@
           ${ernMakroHtml("Ballaststoffe", s.ballaststoffe, null, "")}
         </div>
         ${s.luecken ? `<p class="notiz-meta" style="margin:0.5rem 0 0;">Bei einzelnen Einträgen fehlen Werte (–) – die Summe ist dort etwas zu niedrig.</p>` : ""}
-        <p class="notiz-meta" style="margin:0.5rem 0 0;">Ziel ohne Training (Trainingskalorien kommen noch) · Gewicht ${ernZahl(z.kg)} kg vom ${datumDe(z.gewichtDatum)}</p>
+        <p class="notiz-meta" style="margin:0.5rem 0 0;">Gewicht ${ernZahl(z.kg)} kg vom ${datumDe(z.gewichtDatum)}</p>
       </div>`;
   }
 
@@ -8729,6 +8774,7 @@
       ziel, ziel_kcal_diff: Number(diff),
       eiweiss_g_pro_kg: Number(document.getElementById("ern-p-eiweiss").value),
       fett_prozent: Number(document.getElementById("ern-p-fett").value),
+      training_anrechnung: Number(document.getElementById("ern-p-anrechnung").value),
     };
   }
 
@@ -8741,6 +8787,7 @@
     document.getElementById("ern-p-ziel").value = p ? `${p.ziel}:${p.ziel_kcal_diff}` : "halten:0";
     document.getElementById("ern-p-eiweiss").value = p ? Number(p.eiweiss_g_pro_kg).toFixed(1) : "1.2";
     document.getElementById("ern-p-fett").value = p ? String(p.fett_prozent) : "30";
+    document.getElementById("ern-p-anrechnung").value = p && p.training_anrechnung !== undefined && p.training_anrechnung !== null ? String(p.training_anrechnung) : "100";
     ernProfilRechnungZeigen();
   }
 
@@ -8763,10 +8810,11 @@
         <tr><td>Fett ${p.fett_prozent} % der Energie</td><td>${ernZahl(r.fett, 0)} g</td></tr>
         <tr><td>Kohlenhydrate (Rest)</td><td>${ernZahl(r.kh, 0)} g</td></tr>
       </table>
+      <p class="notiz-meta">An Trainingstagen kommen ${p.training_anrechnung === 0 ? "keine Trainingskalorien dazu (nur Anzeige)" : `${p.training_anrechnung === 100 ? "die" : p.training_anrechnung + " % der"} Trainingskalorien dazu – die Makroziele wachsen mit (Fett anteilig, der Rest als Kohlenhydrate)`}.</p>
       ${r.unterGrundumsatz ? `<p class="ern-warnung">Das Ziel liegt unter deinem Grundumsatz. Auf Dauer ist das nicht zu empfehlen – wähle lieber ein langsameres Tempo oder sprich es mit ärztlicher oder ernährungsfachlicher Begleitung ab.</p>` : ""}
       <p class="notiz-meta">Das ist eine Schätzung: Formeln liegen bei Einzelnen oft um rund 10 % daneben. Genauer wird es, wenn du ein paar Wochen isst, trackst und wiegst – dein Gewichtstrend zeigt dann, wo dein echter Bedarf liegt.</p>`;
   }
-  ["ern-p-geschlecht", "ern-p-geburt", "ern-p-groesse", "ern-p-pal", "ern-p-ziel", "ern-p-eiweiss", "ern-p-fett"].forEach((id) => {
+  ["ern-p-geschlecht", "ern-p-geburt", "ern-p-groesse", "ern-p-pal", "ern-p-ziel", "ern-p-eiweiss", "ern-p-fett", "ern-p-anrechnung"].forEach((id) => {
     document.getElementById(id).addEventListener("input", ernProfilRechnungZeigen);
     document.getElementById(id).addEventListener("change", ernProfilRechnungZeigen);
   });
@@ -8879,4 +8927,108 @@
       ${svg}
       <div class="ern-gewicht-liste">${liste}</div>
       <p class="notiz-meta">Tipp: morgens nach dem Aufstehen wiegen, gleiche Bedingungen. Einzelwerte schwanken um 1–2 kg (Wasser, Salz, Verdauung) – aussagekräftig ist der Trend über Wochen.</p>`;
+  }
+
+  function ernTrainingZeileHtml(z) {
+    if (!z.trainings.length) return "";
+    const teile = z.trainings.map(({ t, kcal, art, grund }) => {
+      const name = escapeHtml(t.sportart) + (t.dauer_minuten ? ` ${t.dauer_minuten} Min.` : "");
+      if (kcal === null) return `${name}: <span class="ern-ohne-wert">? (${grund})</span>`;
+      return `${name}: ${art === "eigen" ? "" : "≈ "}${ernZahl(kcal, 0)} kcal${art === "eigen" ? " (eigener Wert)" : ""}`;
+    });
+    const zuschlag = z.anrechnung === 100
+      ? `+${ernZahl(z.trainingZuschlag, 0)} kcal aufs Ziel`
+      : `davon ${z.anrechnung} % = +${ernZahl(z.trainingZuschlag, 0)} kcal aufs Ziel`;
+    return `<p class="ern-training-zeile">🏃 ${teile.join(" · ")}${z.trainingSumme > 0 ? ` → ${zuschlag}` : ""}</p>`;
+  }
+
+  // ---- MET-Werte je Sportart (Block „🏃 Trainingskalorien“) ----
+  // Richtwerte nach dem Compendium of Physical Activities (Brutto-METs)
+  const ERN_MET_VORSCHLAEGE = [
+    [3.5, "Rücken/Gymnastik, leicht bis moderat"],
+    [8.0, "Calisthenics/Bodyweight, kräftig"],
+    [3.5, "Krafttraining, moderat"],
+    [6.0, "Krafttraining, kräftig"],
+    [4.8, "Zügiges Gehen (ca. 5,6–6,3 km/h)"],
+    [6.0, "Wandern im Gelände"],
+    [7.0, "Joggen, allgemein"],
+    [9.3, "Laufen, ca. 10 km/h"],
+    [4.0, "Radfahren gemütlich (unter 16 km/h)"],
+    [8.0, "Radfahren zügig (ca. 19–22 km/h)"],
+  ];
+
+  function ernSportartenFuerMet() {
+    const namen = new Map();
+    const merken = (n) => {
+      const name = String(n || "").trim();
+      if (name && !namen.has(name.toLowerCase())) namen.set(name.toLowerCase(), name);
+    };
+    (training || []).filter((t) => t.bereich === "privat").forEach((t) => merken(t.sportart));
+    if (typeof trainingStammdatenAktuell === "function" && aktiverBereich === "privat") {
+      trainingStammdatenAktuell("sportart").forEach((s) => merken(s.name));
+    }
+    ernMet.forEach((m) => merken(m.sportart));
+    return [...namen.values()].sort((a, b) => a.localeCompare(b, "de"));
+  }
+
+  function ernMetRendern() {
+    const el = document.getElementById("ern-met-liste");
+    if (!el) return;
+    const sportarten = ernSportartenFuerMet();
+    const g = ernGewichtFuer(heuteISO());
+    if (!sportarten.length) {
+      el.innerHTML = `<p class="notiz-meta">Noch keine Sportarten – sobald du im Reiter Training (Privat) etwas einträgst, erscheint die Sportart hier.</p>`;
+      return;
+    }
+    el.innerHTML = sportarten.map((name, i) => {
+      const met = ernMetFuer(name);
+      const optionen = ERN_MET_VORSCHLAEGE.map(([wert, label], j) =>
+        `<option value="${j}">${escapeHtml(label)} – ${ernZahl(wert)}</option>`).join("");
+      const proStunde = met !== null && g ? `≈ ${ernZahl((met - 1) * Number(g.gewicht_kg), 0)} kcal pro Stunde bei ${ernZahl(g.gewicht_kg)} kg` : (met === null ? "noch kein Wert – Trainings zählen dann nicht" : "");
+      return `
+        <div class="ern-met-zeile">
+          <div class="ern-met-kopf"><strong>${escapeHtml(name)}</strong><span class="notiz-meta">${proStunde}</span></div>
+          <div class="row" style="margin-bottom:0;">
+            <select aria-label="Vorschlag für ${escapeAttr(name)}" onchange="ernMetVorschlag(${i}, this.value)">
+              <option value="">Vorschlag wählen …</option>${optionen}
+            </select>
+            <input type="number" id="ern-met-wert-${i}" min="1" max="25" step="0.1" inputmode="decimal" placeholder="MET" value="${met !== null ? met : ""}" aria-label="MET-Wert für ${escapeAttr(name)}">
+            <button class="btn-secondary" onclick="ernMetSpeichern(${i})">Speichern</button>
+          </div>
+        </div>`;
+    }).join("");
+    el.dataset.sportarten = JSON.stringify(sportarten);
+  }
+
+  window.ernMetVorschlag = function(i, index) {
+    if (index === "") return;
+    document.getElementById(`ern-met-wert-${i}`).value = ERN_MET_VORSCHLAEGE[Number(index)][0];
+  };
+
+  window.ernMetSpeichern = async function(i) {
+    const el = document.getElementById("ern-met-liste");
+    const sportart = JSON.parse(el.dataset.sportarten || "[]")[i];
+    if (!sportart) return;
+    const wert = document.getElementById(`ern-met-wert-${i}`).value;
+    const status = document.getElementById("ern-met-status");
+    try {
+      const res = await api("training_met_speichern", { sportart, met: wert });
+      const key = sportart.toLowerCase();
+      ernMet = ernMet.filter((m) => m.sportart_key !== key);
+      if (res.met) ernMet.push(res.met);
+      status.textContent = res.met ? `✓ ${sportart}: MET ${ernZahl(res.met.met)} gespeichert` : `✓ MET-Wert für ${sportart} entfernt`;
+      ernMetRendern();
+      if (aktiverTab === "ernaehrung") renderErnaehrung();
+    } catch (e) {
+      if (e.message !== "unauthorized") status.textContent = e.message;
+    }
+  };
+
+  // Kalorien in der Trainingsliste (nur Privat – Ernährung gibt es nur dort)
+  function trainingKcalAnzeige(t) {
+    if (t.bereich !== "privat") return "";
+    if (t.kcal !== null && t.kcal !== undefined) return ` · ${t.kcal} kcal`;
+    if (!ernProfilGeladen) return "";
+    const r = ernTrainingKcal(t);
+    return r.kcal === null ? "" : ` · ≈ ${r.kcal} kcal`;
   }
