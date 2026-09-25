@@ -370,14 +370,20 @@
 
           <div id="ern-such-bereich">
             <input type="search" id="ern-suche" placeholder="Lebensmittel suchen, z. B. Haferflocken" autocomplete="off" aria-label="Lebensmittel suchen">
+            <div class="ern-werkzeuge">
+              <button class="btn-secondary" id="btn-ern-scan">📷 Barcode</button>
+              <button class="btn-secondary" id="btn-ern-off-suche">🔎 Markenprodukt suchen</button>
+              <button class="btn-secondary" id="btn-ern-eigen-neu">➕ Eigenes Lebensmittel</button>
+            </div>
             <div id="ern-treffer" class="ern-treffer"></div>
             <button class="link-btn ern-frei-link" id="btn-ern-frei-oeffnen">✏️ Nicht dabei? Freier Eintrag mit eigenen Werten</button>
-            <p class="notiz-meta ern-quelle">Nährwerte je 100 g essbarer Anteil: Max Rubner-Institut (2025), Bundeslebensmittelschlüssel (BLS) 4.0, Lizenz CC BY 4.0.</p>
+            <p class="notiz-meta ern-quelle">Nährwerte je 100 g essbarer Anteil: Max Rubner-Institut (2025), Bundeslebensmittelschlüssel (BLS) 4.0, Lizenz CC BY 4.0. Markenprodukte: Open Food Facts (ODbL), von Freiwilligen gepflegt – Werte mit der Packung vergleichen.</p>
           </div>
 
           <div id="ern-menge-bereich" class="hidden">
             <p class="ern-auswahl-name" id="ern-auswahl-name"></p>
             <p class="notiz-meta" id="ern-auswahl-info"></p>
+            <button class="link-btn hidden" id="btn-ern-lm-bearbeiten">✎ Werte dieses Lebensmittels korrigieren</button>
             <label class="rezept-label" for="ern-menge">Menge in Gramm</label>
             <div class="row" style="margin-bottom:0.5rem; align-items:center;">
               <input type="number" id="ern-menge" min="1" max="5000" step="any" inputmode="decimal"> <span>g</span>
@@ -405,7 +411,43 @@
             </div>
           </div>
 
+          <div id="ern-eigen-bereich" class="hidden">
+            <p class="notiz-meta" style="margin-top:0;" id="ern-eigen-hinweis">Werte je 100 g, z. B. von der Nährwerttabelle auf der Packung. Das Lebensmittel steht danach in der Suche.</p>
+            <div class="task-edit-felder">
+              <label class="ern-feld ern-feld-breit">Bezeichnung<input type="text" id="ern-eigen-name" maxlength="120" placeholder="z. B. Proteinriegel Schoko"></label>
+              <label class="ern-feld ern-feld-breit">Marke (optional)<input type="text" id="ern-eigen-marke" maxlength="80"></label>
+              <label class="ern-feld">kcal/100 g<input type="number" id="ern-eigen-kcal" min="0" max="1000" step="any" inputmode="decimal"></label>
+              <label class="ern-feld">Eiweiß g<input type="number" id="ern-eigen-eiweiss" min="0" max="100" step="any" inputmode="decimal"></label>
+              <label class="ern-feld">Fett g<input type="number" id="ern-eigen-fett" min="0" max="100" step="any" inputmode="decimal"></label>
+              <label class="ern-feld">KH g<input type="number" id="ern-eigen-kh" min="0" max="100" step="any" inputmode="decimal"></label>
+              <label class="ern-feld">Ballastst. g<input type="number" id="ern-eigen-bal" min="0" max="100" step="any" inputmode="decimal"></label>
+              <label class="ern-feld">Portion (Name)<input type="text" id="ern-eigen-portion-name" maxlength="40" placeholder="z. B. 1 Riegel"></label>
+              <label class="ern-feld">Portion (g)<input type="number" id="ern-eigen-portion-g" min="1" max="5000" step="any" inputmode="decimal"></label>
+            </div>
+            <div class="row">
+              <button class="btn-primary" id="btn-ern-eigen-speichern">Speichern und auswählen</button>
+              <button class="btn-secondary" id="btn-ern-eigen-zurueck">Zurück</button>
+              <button class="link-btn hidden" id="btn-ern-eigen-loeschen">Lebensmittel löschen</button>
+            </div>
+          </div>
+
           <p class="notiz-meta" id="ern-hinzu-status"></p>
+        </div>
+
+        <div id="ern-scanner" class="session-fokus-overlay hidden" role="dialog" aria-modal="true" aria-label="Barcode scannen">
+          <div class="session-fokus-kopf">
+            <span class="session-fokus-titel">Barcode scannen</span>
+            <button class="session-fokus-schliessen" id="btn-ern-scanner-zu" aria-label="Schließen">✕</button>
+          </div>
+          <div class="ern-scanner-inhalt">
+            <video id="ern-scanner-video" class="ern-scanner-video" playsinline muted></video>
+            <p class="notiz-meta" id="ern-scanner-status">Kamera wird gestartet …</p>
+            <label class="rezept-label" for="ern-scanner-code">Oder Barcode abtippen (Ziffern unter den Strichen)</label>
+            <div class="row">
+              <input type="text" id="ern-scanner-code" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="z. B. 4001234567890">
+              <button class="btn-primary" id="btn-ern-scanner-suchen">Suchen</button>
+            </div>
+          </div>
         </div>
 
         <div id="ern-mahlzeiten"></div>
@@ -835,7 +877,11 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>✏️ Freier Eintrag:</strong> für Dinge, die nicht in der Datenbank stehen (Kantine, Fertigprodukt): Bezeichnung und Kalorien, Eiweiß/Fett/KH optional – als Werte für die ganze Portion</li>
                 <li><strong>✎ Bearbeiten:</strong> Menge und Mahlzeit ändern (die Werte werden neu berechnet); bei freien Einträgen alle Werte. <strong>×</strong> löscht</li>
                 <li><strong>„–“</strong> heißt: für dieses Lebensmittel liegt im BLS kein Wert vor (das ist nicht dasselbe wie 0). Die Tagessumme weist dann darauf hin</li>
-                <li><strong>Datenbank:</strong> Bundeslebensmittelschlüssel (BLS) 4.0 des Max Rubner-Instituts, rund 7.100 Grundlebensmittel und Gerichte mit laborbasierten Durchschnittswerten je 100 g essbarer Anteil. Markenprodukte stehen nicht drin – dafür kommt später der Barcode-Scan (Open Food Facts). Lizenz CC BY 4.0, Quelle wird im Eintragen-Feld genannt</li>
+                <li><strong>Datenbank:</strong> Bundeslebensmittelschlüssel (BLS) 4.0 des Max Rubner-Instituts, rund 7.100 Grundlebensmittel und Gerichte mit laborbasierten Durchschnittswerten je 100 g essbarer Anteil. Markenprodukte stehen nicht drin – dafür gibt es Barcode und Markensuche (unten). Lizenz CC BY 4.0, Quelle wird im Eintragen-Feld genannt</li>
+                <li><strong>📷 Barcode:</strong> öffnet die Kamera und erkennt den Strichcode automatisch (Chrome auf Android; am Laptop gibt es meist keine Erkennung). Alternativ die Ziffern unter dem Barcode abtippen. Das Produkt kommt aus Open Food Facts und wird in deiner Datenbank gespeichert – beim nächsten Mal findest du es auch über die normale Suche. Unbekannt oder ohne Kalorien? Dann öffnet sich direkt das Formular für ein eigenes Lebensmittel</li>
+                <li><strong>🔎 Markenprodukt suchen:</strong> erst oben Produkt/Marke eintippen (z. B. „skyr natur“), dann den Knopf – sucht bei Open Food Facts. Bewusst nur auf Knopfdruck, weil Open Food Facts Anfragen begrenzt. Antippen lädt die Nährwerte und speichert das Produkt</li>
+                <li><strong>Open Food Facts</strong> wird von Freiwilligen gepflegt (Lizenz ODbL) – Werte lohnen einen kurzen Blick auf die Packung. Falsche Werte korrigierst du nach dem Antippen über „✎ Werte dieses Lebensmittels korrigieren“</li>
+                <li><strong>➕ Eigenes Lebensmittel:</strong> Name, optional Marke, Werte je 100 g und eine Portion (z. B. „1 Riegel“ = 45 g, erscheint dann als Schnellwahl). Steht danach in der Suche. Eigene und Open-Food-Facts-Lebensmittel lassen sich korrigieren und löschen – schon eingetragene Tage bleiben dabei unverändert. BLS-Einträge bleiben fest</li>
                 <li><strong>Datenschutz:</strong> Ernährungsdaten sind Gesundheitsdaten. Sie liegen nur in deiner Supabase-Datenbank (EU-Region), es gibt sie nur in Privat, und sie tauchen bewusst nicht im Verlauf auf</li>
                 <li><strong>⚙️ Profil &amp; Ziel</strong> (unten): Geschlecht (nur für die Formel), Geburtsdatum, Größe, Aktivität im Alltag, Ziel, Eiweiß je kg und Fettanteil. Darunter steht live die Rechnung: Grundumsatz nach Mifflin-St Jeor × Aktivität = Bedarf ohne Sport, dazu das Ziel (halten, −250/−500 oder +250/+500 kcal am Tag) und die Makroziele. Kohlenhydrate sind der Rest</li>
                 <li><strong>Aktivität ohne Sport wählen:</strong> Trainingskalorien kommen einzeln dazu – steckt der Sport schon im Aktivitätswert, würde er doppelt gezählt</li>
@@ -845,7 +891,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Anrechnung</strong> (im Profil): voll, 75 %, 50 % oder gar nicht. 50 % ist die vorsichtige Wahl, weil Schätzungen und Uhren oft zu hoch liegen. Die Makroziele wachsen mit: Eiweiß bleibt, Fett anteilig, der Rest als Kohlenhydrate</li>
                 <li><strong>⚖️ Gewicht:</strong> ein Wert pro Tag (ein neuer Wert am selben Tag ersetzt den alten), Verlauf der letzten 90 Tage als Linie, Veränderung seit dem letzten Wert vor mindestens 7 bzw. 30 Tagen. Am besten morgens unter gleichen Bedingungen wiegen</li>
                 <li><strong>Ehrlich zur Genauigkeit:</strong> Die Formel ist eine Schätzung und liegt bei Einzelnen oft um rund 10 % daneben. Wirklich genau wird der Bedarf erst über ein paar Wochen Tracking und Wiegen</li>
-                <li><strong>In Planung:</strong> Barcode-Scan und eigene Lebensmittel, Wochenübersicht, Bedarf aus dem Gewichtstrend nachjustieren</li>
+                <li><strong>In Planung:</strong> Mahlzeit kopieren, Wochenübersicht, Start-Kachel, Export, Bedarf aus dem Gewichtstrend nachjustieren</li>
               </ul>
             </div>
           </details>
