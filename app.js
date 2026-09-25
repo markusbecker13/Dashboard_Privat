@@ -8558,6 +8558,125 @@
   document.getElementById("ern-woche-zurueck").addEventListener("click", () => ernDatumSetzen(addTage(ernAktDatum(), -7)));
   document.getElementById("ern-woche-vor").addEventListener("click", () => ernDatumSetzen(addTage(ernAktDatum(), 7)));
 
+  // ---- Export (⬇️ Export): Excel mit Einträgen, Tagessummen, Gewicht ----
+  const ERN_QUELLE_TEXT = { bls: "BLS 4.0", off: "Open Food Facts", eigen: "eigen", frei: "freier Eintrag" };
+
+  function ernExportZeitraumSetzen(art) {
+    const bis = heuteISO();
+    let von;
+    if (art === "jahr") von = bis.slice(0, 4) + "-01-01";
+    else von = addTage(bis, -(Number(art) - 1));
+    document.getElementById("ern-export-von").value = von;
+    document.getElementById("ern-export-bis").value = bis;
+  }
+
+  function ernWert(v) {
+    // leer statt 0, wenn kein Wert vorliegt; sonst echte Zahl (für Excel)
+    return v === null || v === undefined || v === "" ? "" : Math.round(Number(v) * 10) / 10;
+  }
+
+  function ernExportMappe(von, bis, eintraege, gewichte) {
+    const zeilenEintraege = eintraege.map((e) => ({
+      Datum: e.datum,
+      Mahlzeit: ERN_MAHLZEIT_NAME[e.mahlzeit] || e.mahlzeit,
+      Lebensmittel: e.name,
+      "Menge (g)": ernWert(e.menge_g),
+      kcal: ernWert(e.kcal),
+      "Eiweiß (g)": ernWert(e.eiweiss),
+      "Fett (g)": ernWert(e.fett),
+      "Kohlenhydrate (g)": ernWert(e.kohlenhydrate),
+      "Ballaststoffe (g)": ernWert(e.ballaststoffe),
+      Quelle: e.quelle ? (ERN_QUELLE_TEXT[e.quelle] || e.quelle) : "Lebensmittel gelöscht",
+    }));
+
+    // Tagessummen – nur Tage mit Einträgen
+    const jeTag = new Map();
+    for (const e of eintraege) {
+      if (!jeTag.has(e.datum)) jeTag.set(e.datum, []);
+      jeTag.get(e.datum).push(e);
+    }
+    const zeilenTage = [...jeTag.keys()].sort().map((d) => {
+      const s = ernSumme(jeTag.get(d));
+      const z = ernZiele(d);
+      return {
+        Datum: d,
+        Wochentag: new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", ""),
+        "Einträge": jeTag.get(d).length,
+        kcal: ernWert(s.kcal),
+        "Ziel kcal": z ? Math.round(z.ziel) : "",
+        "Differenz kcal": z ? Math.round(s.kcal - z.ziel) : "",
+        "davon Training (angerechnet)": z ? Math.round(z.trainingZuschlag) : "",
+        "Eiweiß (g)": ernWert(s.eiweiss),
+        "Ziel Eiweiß (g)": z ? Math.round(z.eiweiss) : "",
+        "Fett (g)": ernWert(s.fett),
+        "Kohlenhydrate (g)": ernWert(s.kohlenhydrate),
+        "Ballaststoffe (g)": ernWert(s.ballaststoffe),
+        "Werte unvollständig": s.luecken ? "ja" : "",
+      };
+    });
+
+    const zeilenGewicht = gewichte.map((g) => ({ Datum: g.datum, "Gewicht (kg)": ernWert(g.gewicht_kg) }));
+
+    const info = [
+      { Punkt: "Zeitraum", Wert: `${datumDe(von)} bis ${datumDe(bis)}` },
+      { Punkt: "Erstellt", Wert: new Date().toLocaleString("de-DE") },
+      { Punkt: "Werte", Wert: "Je Eintrag für die gegessene Menge, so wie beim Eintragen gespeichert. Leere Zelle = kein Wert vorhanden (nicht 0)." },
+      { Punkt: "Ziele", Wert: ernProfil ? "Berechnet mit dem aktuellen Profil (Mifflin-St Jeor × Aktivität ± Ziel, Gewicht bis zum jeweiligen Tag, Trainings eingerechnet). Frühere Profil-Stände werden nicht gespeichert." : "Kein Profil hinterlegt – daher keine Ziele." },
+      { Punkt: "Nährwerte", Wert: "Max Rubner-Institut (2025), Bundeslebensmittelschlüssel (BLS) 4.0, Lizenz CC BY 4.0" },
+      { Punkt: "Markenprodukte", Wert: "Open Food Facts, Lizenz ODbL (Datenbank) / DbCL (Inhalte)" },
+      { Punkt: "Datenschutz", Wert: "Enthält Gesundheitsdaten – Datei nicht unverschlüsselt weitergeben oder in fremden Clouds ablegen." },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const blatt = (zeilen, name, breiten) => {
+      const ws = XLSX.utils.json_to_sheet(zeilen.length ? zeilen : [{ Hinweis: "Keine Einträge im Zeitraum" }]);
+      if (zeilen.length && breiten) ws["!cols"] = breiten.map((w) => ({ wch: w }));
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+    blatt(zeilenEintraege, "Einträge", [11, 11, 40, 10, 8, 10, 8, 16, 16, 18]);
+    blatt(zeilenTage, "Tage", [11, 9, 9, 8, 9, 13, 14, 10, 14, 8, 16, 16, 18]);
+    blatt(zeilenGewicht, "Gewicht", [11, 12]);
+    blatt(info, "Info", [16, 110]);
+    return wb;
+  }
+
+  document.getElementById("ern-export-schnell").addEventListener("click", (e) => {
+    const knopf = e.target.closest("[data-zeitraum]");
+    if (knopf) ernExportZeitraumSetzen(knopf.dataset.zeitraum);
+  });
+  document.getElementById("ern-export-block").addEventListener("toggle", (e) => {
+    if (e.target.open && !document.getElementById("ern-export-von").value) ernExportZeitraumSetzen("30");
+  });
+
+  document.getElementById("btn-ern-export").addEventListener("click", async () => {
+    const status = document.getElementById("ern-export-status");
+    const knopf = document.getElementById("btn-ern-export");
+    const von = document.getElementById("ern-export-von").value;
+    const bis = document.getElementById("ern-export-bis").value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(von) || !/^\d{4}-\d{2}-\d{2}$/.test(bis)) { status.textContent = "Bitte Von und Bis wählen."; return; }
+    if (von > bis) { status.textContent = "„Von“ liegt nach „Bis“."; return; }
+    if (typeof XLSX === "undefined") { status.textContent = "Export-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen."; return; }
+    knopf.disabled = true;
+    status.textContent = "Wird erstellt …";
+    try {
+      if (!ernProfilGeladen && !ernProfilFehlgeschlagen) await ernProfilLaden();
+      const res = await api("ernaehrung_export", { von, bis });
+      const eintraege = res.eintraege || [];
+      const wb = ernExportMappe(von, bis, eintraege, res.gewichte || []);
+      XLSX.writeFile(wb, `ernaehrung_${von}_bis_${bis}.xlsx`);
+      status.textContent = eintraege.length
+        ? (() => {
+          const tage = new Set(eintraege.map((e) => e.datum)).size;
+          return `Fertig: ${eintraege.length} ${eintraege.length === 1 ? "Eintrag" : "Einträge"} an ${tage} ${tage === 1 ? "Tag" : "Tagen"}.`;
+        })()
+        : "Fertig – im Zeitraum gibt es keine Einträge.";
+    } catch (err) {
+      status.textContent = err.message === "unauthorized" ? "" : "Export fehlgeschlagen: " + err.message;
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+
   window.ernNeuLaden = function() { ernGeladenFuer = null; ernFehler = ""; ernProfilFehlgeschlagen = false; ernTagLaden(); };
 
   window.ernBearbeiten = function(id) { ernBearbeitenId = id; renderErnaehrung(); };
