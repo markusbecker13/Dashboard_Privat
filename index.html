@@ -452,6 +452,18 @@
 
         <div id="ern-mahlzeiten"></div>
 
+        <details class="anleitung-abschnitt ern-block" id="ern-woche-block">
+          <summary>📊 Woche</summary>
+          <div class="anleitung-text">
+            <div class="ern-woche-nav">
+              <button class="btn-secondary ern-pfeil" id="ern-woche-zurueck" aria-label="Vorwoche">‹</button>
+              <strong id="ern-woche-titel">Woche</strong>
+              <button class="btn-secondary ern-pfeil" id="ern-woche-vor" aria-label="Nächste Woche">›</button>
+            </div>
+            <div id="ern-woche"></div>
+          </div>
+        </details>
+
         <details class="anleitung-abschnitt ern-block" id="ern-profil-block">
           <summary>⚙️ Profil &amp; Ziel</summary>
           <div class="anleitung-text">
@@ -893,7 +905,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>⚖️ Gewicht:</strong> ein Wert pro Tag (ein neuer Wert am selben Tag ersetzt den alten), Verlauf der letzten 90 Tage als Linie, Veränderung seit dem letzten Wert vor mindestens 7 bzw. 30 Tagen. Am besten morgens unter gleichen Bedingungen wiegen</li>
                 <li><strong>Ehrlich zur Genauigkeit:</strong> Die Formel ist eine Schätzung und liegt bei Einzelnen oft um rund 10 % daneben. Wirklich genau wird der Bedarf erst über ein paar Wochen Tracking und Wiegen</li>
                 <li><strong>Start-Kachel:</strong> Im Bereich Privat zeigt Start eine vierte Kachel mit den heute noch übrigen Kalorien („kcal übrig“ bzw. „kcal über Ziel“, Trainings schon eingerechnet). Ohne Profil oder Gewicht steht dort nur, was du heute gegessen hast. Antippen öffnet Ernährung beim heutigen Tag. Ist der Reiter ausgeblendet, fehlt auch die Kachel</li>
-                <li><strong>In Planung:</strong> Wochenübersicht, Export, Bedarf aus dem Gewichtstrend nachjustieren</li>
+                <li><strong>📊 Woche</strong> (unter den Mahlzeiten, aufklappen): Montag bis Sonntag der gewählten Woche, je Tag gegessen / Ziel mit Balken, Abweichung (grün darunter, rot darüber) und Eiweiß/Fett/KH. Oben der Schnitt: Ø kcal, Ø Ziel, Summe über/unter Ziel und Ø Eiweiß gegen das Ziel. Tage ohne Einträge zählen nicht mit – ein vergessener Tag verfälscht also nicht den Schnitt. Einen Tag antippen öffnet ihn, ‹ › blättern wochenweise</li>
+                <li><strong>In Planung:</strong> Export, Bedarf aus dem Gewichtstrend nachjustieren</li>
               </ul>
             </div>
           </details>
