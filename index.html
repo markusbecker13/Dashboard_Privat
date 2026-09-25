@@ -464,6 +464,27 @@
           </div>
         </details>
 
+        <details class="anleitung-abschnitt ern-block" id="ern-export-block">
+          <summary>⬇️ Export</summary>
+          <div class="anleitung-text">
+            <p class="notiz-meta" style="margin-top:0;">Excel-Datei (öffnet auch in LibreOffice Calc) mit den Blättern Einträge, Tage, Gewicht und Info.</p>
+            <div class="chip-liste" id="ern-export-schnell" style="margin-bottom:0.6rem;">
+              <button class="chip ern-chip" data-zeitraum="7">7 Tage</button>
+              <button class="chip ern-chip" data-zeitraum="30">30 Tage</button>
+              <button class="chip ern-chip" data-zeitraum="90">90 Tage</button>
+              <button class="chip ern-chip" data-zeitraum="jahr">Dieses Jahr</button>
+            </div>
+            <div class="task-edit-felder">
+              <label class="ern-feld">Von<input type="date" id="ern-export-von"></label>
+              <label class="ern-feld">Bis<input type="date" id="ern-export-bis"></label>
+            </div>
+            <div class="row">
+              <button class="btn-primary" id="btn-ern-export">Excel herunterladen</button>
+            </div>
+            <p class="notiz-meta" id="ern-export-status"></p>
+          </div>
+        </details>
+
         <details class="anleitung-abschnitt ern-block" id="ern-profil-block">
           <summary>⚙️ Profil &amp; Ziel</summary>
           <div class="anleitung-text">
@@ -906,7 +927,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Ehrlich zur Genauigkeit:</strong> Die Formel ist eine Schätzung und liegt bei Einzelnen oft um rund 10 % daneben. Wirklich genau wird der Bedarf erst über ein paar Wochen Tracking und Wiegen</li>
                 <li><strong>Start-Kachel:</strong> Im Bereich Privat zeigt Start eine vierte Kachel mit den heute noch übrigen Kalorien („kcal übrig“ bzw. „kcal über Ziel“, Trainings schon eingerechnet). Ohne Profil oder Gewicht steht dort nur, was du heute gegessen hast. Antippen öffnet Ernährung beim heutigen Tag. Ist der Reiter ausgeblendet, fehlt auch die Kachel</li>
                 <li><strong>📊 Woche</strong> (unter den Mahlzeiten, aufklappen): Montag bis Sonntag der gewählten Woche, je Tag gegessen / Ziel mit Balken, Abweichung (grün darunter, rot darüber) und Eiweiß/Fett/KH. Oben der Schnitt: Ø kcal, Ø Ziel, Summe über/unter Ziel und Ø Eiweiß gegen das Ziel. Tage ohne Einträge zählen nicht mit – ein vergessener Tag verfälscht also nicht den Schnitt. Einen Tag antippen öffnet ihn, ‹ › blättern wochenweise</li>
-                <li><strong>In Planung:</strong> Export, Bedarf aus dem Gewichtstrend nachjustieren</li>
+                <li><strong>⬇️ Export</strong> (ganz unten, aufklappen): Zeitraum per 7/30/90 Tage, „Dieses Jahr“ oder Von/Bis wählen, dann „Excel herunterladen“. Die Datei öffnet auch in LibreOffice Calc und hat vier Blätter: <em>Einträge</em> (jede Zeile ein Eintrag mit Mahlzeit, Menge, Werten und Quelle), <em>Tage</em> (Summen je Tag gegen das Ziel, nur Tage mit Einträgen), <em>Gewicht</em> und <em>Info</em> (Quellen, Lizenzen, Hinweise). Leere Zelle heißt „kein Wert“, nicht 0. Die Ziele rechnet die App mit dem <strong>aktuellen</strong> Profil – alte Profil-Stände werden nicht gespeichert. Die Datei enthält Gesundheitsdaten: nicht unverschlüsselt weitergeben. Ernährung steht bewusst nicht im Reiter Export, weil die Daten erst für den Zeitraum geladen werden</li>
+                <li><strong>In Planung:</strong> Bedarf aus dem Gewichtstrend nachjustieren (sinnvoll erst nach 2–4 Wochen mit Einträgen und Gewicht)</li>
               </ul>
             </div>
           </details>
