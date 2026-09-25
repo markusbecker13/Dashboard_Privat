@@ -8210,6 +8210,7 @@
   let ernBearbeitenId = null;
 
   function ernAktDatum() { return ernDatum || heuteISO(); }
+  function ernGramm(v) { return v === null || v === undefined ? "–" : ernZahl(v) + " g"; }
 
   function ernZahl(v, stellen = 1) {
     if (v === null || v === undefined || v === "") return "–";
@@ -8426,6 +8427,7 @@
     document.getElementById("ern-such-bereich").classList.toggle("hidden", welche !== "suche");
     document.getElementById("ern-menge-bereich").classList.toggle("hidden", welche !== "menge");
     document.getElementById("ern-frei-bereich").classList.toggle("hidden", welche !== "frei");
+    document.getElementById("ern-eigen-bereich").classList.toggle("hidden", welche !== "eigen");
   }
 
   window.ernHinzuOeffnen = function(mahlzeit) {
@@ -8458,7 +8460,8 @@
   });
 
   function ernTrefferZeile(l, i) {
-    const marke = l.marke ? ` <span class="notiz-meta">(${escapeHtml(l.marke)})</span>` : "";
+    const zusatz = [l.marke, ernQuelleLabel(l)].filter(Boolean).join(" · ");
+    const marke = zusatz ? ` <span class="notiz-meta">(${escapeHtml(zusatz)})</span>` : "";
     return `
       <button class="ern-treffer-zeile" onclick="ernAuswaehlen(${i})">
         <span class="ern-treffer-name">${escapeHtml(l.name)}${marke}</span>
@@ -8505,13 +8508,16 @@
     if (!l) return;
     ernAuswahl = l;
     document.getElementById("ern-auswahl-name").textContent = l.marke ? `${l.name} (${l.marke})` : l.name;
+    const quelle = ernQuelleLabel(l);
     document.getElementById("ern-auswahl-info").textContent =
-      `je 100 g: ${ernZahl(l.kcal, 0)} kcal · Eiweiß ${ernZahl(l.eiweiss)} g · Fett ${ernZahl(l.fett)} g · KH ${ernZahl(l.kohlenhydrate)} g`;
+      `je 100 g: ${ernZahl(l.kcal, 0)} kcal · Eiweiß ${ernGramm(l.eiweiss)} · Fett ${ernGramm(l.fett)} · KH ${ernGramm(l.kohlenhydrate)}${quelle ? ` · Quelle: ${quelle}` : ""}`;
+    // Korrigieren nur bei eigenen/OFF-Lebensmitteln (BLS bleibt unverändert)
+    document.getElementById("btn-ern-lm-bearbeiten").classList.toggle("hidden", !l.quelle || l.quelle === "bls");
     const menge = document.getElementById("ern-menge");
     menge.value = l.letzte_menge ? Number(l.letzte_menge) : (l.portion_g ? Number(l.portion_g) : 100);
     const schnell = [50, 100, 150, 200, 250];
     document.getElementById("ern-menge-schnell").innerHTML =
-      (l.portion_g ? `<button class="chip ern-chip" onclick="ernMengeSetzen(${Number(l.portion_g)})">${escapeHtml(l.portion_name || "1 Portion")} (${ernZahl(l.portion_g)} g)</button>` : "") +
+      (l.portion_g ? `<button class="chip ern-chip" onclick="ernMengeSetzen(${Number(l.portion_g)})">${escapeHtml(l.portion_name && !/^\s*[\d.,]+\s*g\s*$/i.test(l.portion_name) ? l.portion_name : "1 Portion")} (${ernZahl(l.portion_g)} g)</button>` : "") +
       schnell.map((g) => `<button class="chip ern-chip" onclick="ernMengeSetzen(${g})">${g} g</button>`).join("");
     ernAnsicht("menge");
     ernVorschau();
@@ -8529,8 +8535,8 @@
     const g = Number(String(document.getElementById("ern-menge").value).replace(",", "."));
     if (!ernAuswahl || !(g > 0)) { el.textContent = ""; return; }
     const f = g / 100;
-    const w = (v) => (v === null || v === undefined ? "–" : ernZahl(Number(v) * f));
-    el.innerHTML = `<strong>${ernZahl(Number(ernAuswahl.kcal) * f, 0)} kcal</strong> · Eiweiß ${w(ernAuswahl.eiweiss)} g · Fett ${w(ernAuswahl.fett)} g · KH ${w(ernAuswahl.kohlenhydrate)} g`;
+    const w = (v) => (v === null || v === undefined ? "–" : ernZahl(Number(v) * f) + " g");
+    el.innerHTML = `<strong>${ernZahl(Number(ernAuswahl.kcal) * f, 0)} kcal</strong> · Eiweiß ${w(ernAuswahl.eiweiss)} · Fett ${w(ernAuswahl.fett)} · KH ${w(ernAuswahl.kohlenhydrate)}`;
   }
   document.getElementById("ern-menge").addEventListener("input", ernVorschau);
   document.getElementById("ern-menge").addEventListener("keydown", (e) => {
@@ -9031,4 +9037,249 @@
     if (!ernProfilGeladen) return "";
     const r = ernTrainingKcal(t);
     return r.kcal === null ? "" : ` · ≈ ${r.kcal} kcal`;
+  }
+
+  // ==========================================================
+  // Ernährung Etappe 4: Barcode (Open Food Facts), Markensuche,
+  // eigene Lebensmittel. OFF läuft über die Edge Function (eigener
+  // User-Agent, Cache in "lebensmittel"); gescannt wird im Browser mit
+  // BarcodeDetector (Chrome auf Android), sonst Barcode abtippen.
+  // ==========================================================
+  let ernLmBearbeiten = null;     // Lebensmittel, das im Eigen-Formular bearbeitet wird
+  let ernScanStream = null;
+  let ernScanLaeuft = false;
+  let ernScanHistorie = false;
+
+  function ernQuelleLabel(l) {
+    return l.quelle === "off" ? "Open Food Facts" : l.quelle === "eigen" ? "eigenes" : "";
+  }
+
+  // Ein Lebensmittel (z. B. frisch gescannt) direkt zur Mengeneingabe öffnen
+  function ernLebensmittelWaehlen(l) {
+    const letzte = ernZuletzt.find((z) => z.id === l.id);
+    ernListe = [{ ...l, letzte_menge: letzte ? letzte.letzte_menge : null }];
+    window.ernAuswaehlen(0);
+  }
+
+  // ---- Open Food Facts: Barcode ----
+  async function ernBarcodeSuchen(code) {
+    const status = document.getElementById("ern-hinzu-status");
+    const ziffern = String(code || "").replace(/\D/g, "");
+    if (ziffern.length < 8 || ziffern.length > 14) { status.textContent = "Ein Barcode hat 8 bis 14 Ziffern."; return; }
+    status.textContent = "Suche Barcode " + ziffern + " …";
+    try {
+      const res = await api("off_barcode", { code: ziffern });
+      if (res.gefunden) {
+        status.textContent = res.aus_cache ? "" : "✓ Bei Open Food Facts gefunden und gespeichert – Werte kurz mit der Packung vergleichen.";
+        ernLebensmittelWaehlen(res.lebensmittel);
+        return;
+      }
+      // Nicht (vollständig) gefunden: eigenes Lebensmittel anbieten
+      status.textContent = res.grund === "keine_naehrwerte"
+        ? `„${res.name}“ steht bei Open Food Facts, aber ohne Kalorien je 100 g. Trag die Werte von der Packung ein:`
+        : `Barcode ${ziffern} ist bei Open Food Facts nicht bekannt. Trag die Werte von der Packung ein:`;
+      ernEigenOeffnen(null, res.name || "");
+    } catch (e) {
+      if (e.message !== "unauthorized") status.textContent = e.message;
+    }
+  }
+
+  // ---- Open Food Facts: Textsuche (nur auf Knopfdruck) ----
+  document.getElementById("btn-ern-off-suche").addEventListener("click", async (ev) => {
+    const knopf = ev.currentTarget;
+    const q = document.getElementById("ern-suche").value.trim();
+    const el = document.getElementById("ern-treffer");
+    if (q.length < 2) {
+      document.getElementById("ern-hinzu-status").textContent = "Erst oben Produkt oder Marke eintippen, z. B. „skyr natur“, dann hier suchen.";
+      document.getElementById("ern-suche").focus();
+      return;
+    }
+    clearTimeout(ernSucheTimer);
+    ernSucheNr++;
+    knopf.disabled = true;
+    el.innerHTML = `<p class="notiz-meta">Suche bei Open Food Facts …</p>`;
+    try {
+      const res = await api("off_suche", { q });
+      const treffer = res.treffer || [];
+      el.innerHTML = treffer.length
+        ? `<p class="ern-liste-titel">Open Food Facts</p>` + treffer.map((t) => `
+            <button class="ern-treffer-zeile" onclick="ernOffTrefferWaehlen('${escapeAttr(t.code)}')">
+              <span class="ern-treffer-name">${escapeHtml(t.name)}${t.marke ? ` <span class="notiz-meta">(${escapeHtml(t.marke)})</span>` : ""}</span>
+              <span class="notiz-meta">${t.kcal !== null && t.kcal !== undefined ? ernZahl(t.kcal, 0) + " kcal je 100 g · " : ""}Barcode ${escapeHtml(t.code)}</span>
+            </button>`).join("")
+        : `<p class="notiz-meta">Bei Open Food Facts nichts gefunden. Tipp: Barcode scannen oder ein eigenes Lebensmittel anlegen.</p>`;
+    } catch (e) {
+      if (e.message !== "unauthorized") el.innerHTML = `<p class="notiz-meta">${escapeHtml(e.message)}</p>`;
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+
+  window.ernOffTrefferWaehlen = function(code) { ernBarcodeSuchen(code); };
+
+  // ---- Eigenes Lebensmittel anlegen / korrigieren ----
+  const ERN_EIGEN_FELDER = ["name", "marke", "kcal", "eiweiss", "fett", "kh", "bal", "portion-name", "portion-g"];
+  function ernEigenOeffnen(l, vorschlagName) {
+    ernLmBearbeiten = l;
+    const werte = l ? {
+      name: l.name, marke: l.marke || "", kcal: l.kcal, eiweiss: l.eiweiss, fett: l.fett, kh: l.kohlenhydrate,
+      bal: l.ballaststoffe, "portion-name": l.portion_name || "", "portion-g": l.portion_g,
+    } : { name: vorschlagName || "" };
+    ERN_EIGEN_FELDER.forEach((f) => {
+      const v = werte[f];
+      document.getElementById(`ern-eigen-${f}`).value = v === null || v === undefined ? "" : v;
+    });
+    document.getElementById("ern-eigen-hinweis").textContent = l
+      ? `Werte je 100 g korrigieren (Quelle: ${ernQuelleLabel(l)}). Bereits eingetragene Tage bleiben unverändert.`
+      : "Werte je 100 g, z. B. von der Nährwerttabelle auf der Packung. Das Lebensmittel steht danach in der Suche.";
+    document.getElementById("btn-ern-eigen-loeschen").classList.toggle("hidden", !l);
+    ernAnsicht("eigen");
+    document.getElementById(werte.name ? "ern-eigen-kcal" : "ern-eigen-name").focus();
+  }
+
+  document.getElementById("btn-ern-eigen-neu").addEventListener("click", () => {
+    document.getElementById("ern-hinzu-status").textContent = "";
+    ernEigenOeffnen(null, document.getElementById("ern-suche").value.trim());
+  });
+  document.getElementById("btn-ern-lm-bearbeiten").addEventListener("click", () => {
+    if (ernAuswahl) ernEigenOeffnen(ernAuswahl);
+  });
+  document.getElementById("btn-ern-eigen-zurueck").addEventListener("click", () => {
+    if (ernLmBearbeiten && ernAuswahl) { ernAnsicht("menge"); return; }
+    ernLmBearbeiten = null;
+    ernAnsicht("suche");
+    document.getElementById("ern-suche").focus();
+  });
+
+  document.getElementById("btn-ern-eigen-speichern").addEventListener("click", async (ev) => {
+    const knopf = ev.currentTarget;
+    const wert = (f) => document.getElementById(`ern-eigen-${f}`).value;
+    const status = document.getElementById("ern-hinzu-status");
+    if (!wert("name").trim() || wert("kcal") === "") { status.textContent = "Bitte mindestens Bezeichnung und kcal je 100 g angeben."; return; }
+    knopf.disabled = true;
+    try {
+      const res = await api("lebensmittel_speichern", {
+        id: ernLmBearbeiten ? ernLmBearbeiten.id : undefined,
+        name: wert("name"), marke: wert("marke"), kcal: wert("kcal"),
+        eiweiss: wert("eiweiss"), fett: wert("fett"), kohlenhydrate: wert("kh"), ballaststoffe: wert("bal"),
+        portion_name: wert("portion-name"), portion_g: wert("portion-g"),
+      });
+      const l = res.lebensmittel;
+      // Zuletzt-Liste mit den korrigierten Werten aktualisieren
+      ernZuletzt = ernZuletzt.map((z) => (z.id === l.id ? { ...z, ...l } : z));
+      status.textContent = ernLmBearbeiten ? "✓ Werte korrigiert" : "✓ Lebensmittel angelegt";
+      ernLmBearbeiten = null;
+      ernLebensmittelWaehlen(l);
+    } catch (e) {
+      if (e.message !== "unauthorized") status.textContent = e.message;
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+
+  document.getElementById("btn-ern-eigen-loeschen").addEventListener("click", async () => {
+    const l = ernLmBearbeiten;
+    if (!l || !confirm(`„${l.name}“ aus deinen Lebensmitteln löschen? Bereits eingetragene Tage bleiben erhalten.`)) return;
+    try {
+      await api("lebensmittel_loeschen", { id: l.id });
+      ernZuletzt = ernZuletzt.filter((z) => z.id !== l.id);
+      ernLmBearbeiten = null;
+      ernAuswahl = null;
+      document.getElementById("ern-hinzu-status").textContent = `✓ „${l.name}“ gelöscht`;
+      ernAnsicht("suche");
+      document.getElementById("ern-suche").value = "";
+      ernZuletztZeigen();
+    } catch (e) {
+      if (e.message !== "unauthorized") alert(e.message);
+    }
+  });
+
+  // ---- Scanner ----
+  document.getElementById("btn-ern-scan").addEventListener("click", ernScannerOeffnen);
+  document.getElementById("btn-ern-scanner-zu").addEventListener("click", () => ernScannerSchliessen());
+  document.getElementById("btn-ern-scanner-suchen").addEventListener("click", () => {
+    const code = document.getElementById("ern-scanner-code").value;
+    ernScannerSchliessen();
+    ernBarcodeSuchen(code);
+  });
+  document.getElementById("ern-scanner-code").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btn-ern-scanner-suchen").click();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !document.getElementById("ern-scanner").classList.contains("hidden")) ernScannerSchliessen();
+  });
+  // Zurück-Taste des Handys schließt nur den Scanner
+  window.addEventListener("popstate", () => {
+    if (ernScanHistorie) { ernScanHistorie = false; ernScannerSchliessen(true); }
+  });
+
+  async function ernScannerOeffnen() {
+    const overlay = document.getElementById("ern-scanner");
+    const status = document.getElementById("ern-scanner-status");
+    const video = document.getElementById("ern-scanner-video");
+    document.getElementById("ern-scanner-code").value = "";
+    overlay.classList.remove("hidden");
+    history.pushState({ ernScanner: true }, "");
+    ernScanHistorie = true;
+
+    const kannErkennen = "BarcodeDetector" in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+    if (!kannErkennen) {
+      video.classList.add("hidden");
+      status.textContent = "Dieser Browser kann keine Barcodes erkennen (klappt in Chrome auf Android). Tipp die Ziffern unter dem Barcode einfach ab.";
+      document.getElementById("ern-scanner-code").focus();
+      return;
+    }
+    let detektor;
+    try {
+      const formate = await BarcodeDetector.getSupportedFormats();
+      const gewuenscht = ["ean_13", "ean_8", "upc_a", "upc_e"].filter((f) => formate.includes(f));
+      detektor = new BarcodeDetector({ formats: gewuenscht.length ? gewuenscht : undefined });
+    } catch (e) {
+      video.classList.add("hidden");
+      status.textContent = "Barcode-Erkennung nicht verfügbar – bitte Ziffern abtippen.";
+      return;
+    }
+    try {
+      ernScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+    } catch (e) {
+      video.classList.add("hidden");
+      status.textContent = "Kein Kamerazugriff (erlaubt?). Du kannst die Ziffern auch abtippen.";
+      return;
+    }
+    if (overlay.classList.contains("hidden")) { ernKameraStoppen(); return; } // inzwischen geschlossen
+    video.classList.remove("hidden");
+    video.srcObject = ernScanStream;
+    await video.play().catch(() => {});
+    status.textContent = "Barcode ins Bild halten – ruhig und nicht zu nah.";
+    ernScanLaeuft = true;
+    const pruefen = async () => {
+      if (!ernScanLaeuft) return;
+      try {
+        if (video.readyState >= 2) {
+          const codes = await detektor.detect(video);
+          const treffer = codes.find((c) => /^\d{8,14}$/.test(c.rawValue));
+          if (treffer) {
+            if (navigator.vibrate) navigator.vibrate(80);
+            ernScannerSchliessen();
+            ernBarcodeSuchen(treffer.rawValue);
+            return;
+          }
+        }
+      } catch (e) { /* einzelnes Bild nicht auswertbar – weiter */ }
+      setTimeout(pruefen, 250);
+    };
+    pruefen();
+  }
+
+  function ernKameraStoppen() {
+    ernScanLaeuft = false;
+    if (ernScanStream) { ernScanStream.getTracks().forEach((t) => t.stop()); ernScanStream = null; }
+    const video = document.getElementById("ern-scanner-video");
+    video.srcObject = null;
+  }
+
+  function ernScannerSchliessen(ausPopstate) {
+    ernKameraStoppen();
+    document.getElementById("ern-scanner").classList.add("hidden");
+    if (!ausPopstate && ernScanHistorie) { ernScanHistorie = false; history.back(); }
   }
