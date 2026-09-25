@@ -996,6 +996,23 @@
   }
   .ern-kopieren:hover { border-color: var(--accent); }
   .ern-kopieren:disabled { opacity: 0.5; cursor: wait; }
+  .ern-woche-nav { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.7rem; }
+  .ern-woche-kopf { margin: 0 0 0.3rem; font-size: 0.9rem; line-height: 1.5; }
+  .ern-woche-liste { display: flex; flex-direction: column; gap: 0.4rem; }
+  .ern-woche-tag {
+    display: flex; align-items: center; gap: 0.7rem; width: 100%; text-align: left; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.55rem 0.75rem; font: inherit; color: var(--ink); min-height: 48px;
+  }
+  .ern-woche-tag:hover { border-color: var(--accent); }
+  .ern-woche-tag.gewaehlt { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+  .ern-woche-tag.zukunft { opacity: 0.55; }
+  .ern-woche-datum { flex: 0 0 4.6rem; font-size: 0.85rem; }
+  .ern-woche-mitte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+  .ern-woche-mitte .ern-kcal-balken { height: 6px; }
+  .ern-woche-kcal { font-size: 0.9rem; font-weight: 600; }
+  .ern-woche-diff { flex: 0 0 auto; font-size: 0.85rem; font-weight: 600; color: var(--mod-termine); }
+  .ern-woche-diff.ueber { color: var(--overdue-text); }
   .ern-eintrag-kcal { font-weight: 600; white-space: nowrap; font-size: 0.9rem; }
   .ern-kcal-balken { height: 10px; border-radius: 5px; background: var(--bg); overflow: hidden; }
   .ern-kcal-balken span { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
