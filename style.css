@@ -518,6 +518,7 @@
   .start-kachel.mod-aufgaben { border-left-color: var(--mod-aufgaben); }
   .start-kachel.mod-planung { border-left-color: var(--mod-planung); }
   .start-kachel.mod-einkauf { border-left-color: var(--mod-finanzen); }
+  .start-kachel.mod-ernaehrung { border-left-color: var(--mod-termine); }
   .start-kachel-zahl { font-family: var(--font-display); font-size: 1.7rem; font-weight: 600; line-height: 1; }
   .start-kachel-label { font-size: 0.8rem; color: var(--ink-dim); }
 
@@ -988,6 +989,13 @@
   .ern-mahlzeit-kopf h3 { margin: 0; font-family: var(--font-display); font-size: 1.05rem; }
   .ern-mahlzeit-kcal { color: var(--ink-dim); font-size: 0.85rem; }
   .ern-plus { margin-left: auto; min-height: 40px; }
+  .ern-kopieren {
+    display: block; width: 100%; text-align: left; cursor: pointer; min-height: 44px;
+    background: none; border: 1px dashed var(--border); border-radius: 8px;
+    padding: 0.55rem 0.8rem; font: inherit; color: var(--ink);
+  }
+  .ern-kopieren:hover { border-color: var(--accent); }
+  .ern-kopieren:disabled { opacity: 0.5; cursor: wait; }
   .ern-eintrag-kcal { font-weight: 600; white-space: nowrap; font-size: 0.9rem; }
   .ern-kcal-balken { height: 10px; border-radius: 5px; background: var(--bg); overflow: hidden; }
   .ern-kcal-balken span { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
