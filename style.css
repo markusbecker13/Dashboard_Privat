@@ -981,7 +981,7 @@
   .ern-chip { cursor: pointer; padding: 0.35rem 0.75rem; min-height: 36px; }
   .ern-vorschau { margin: 0.8rem 0; }
   .ern-feld { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.78rem; color: var(--ink-dim); flex: 1 1 90px; }
-  .ern-feld input, .ern-feld select { width: 100%; box-sizing: border-box; }
+  .ern-feld input, .ern-feld select { width: 100%; box-sizing: border-box; flex: 0 0 auto; }
   .ern-feld-breit { flex: 1 1 100%; }
   .ern-mahlzeit { margin-bottom: 1.2rem; }
   .ern-mahlzeit-kopf { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
@@ -989,3 +989,22 @@
   .ern-mahlzeit-kcal { color: var(--ink-dim); font-size: 0.85rem; }
   .ern-plus { margin-left: auto; min-height: 40px; }
   .ern-eintrag-kcal { font-weight: 600; white-space: nowrap; font-size: 0.9rem; }
+  .ern-kcal-balken { height: 10px; border-radius: 5px; background: var(--bg); overflow: hidden; }
+  .ern-kcal-balken span { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
+  .ern-kcal-balken.ueber span { background: var(--overdue-text); }
+  .ern-rest { margin: 0.4rem 0 0.9rem; font-size: 0.9rem; }
+  .ern-makro-ziel { font-weight: 400; color: var(--ink-dim); font-size: 0.85rem; }
+  .ern-block { margin-top: 0.8rem; }
+  .ern-rechnung { margin: 0.2rem 0 0.8rem; }
+  .ern-rechnung-tabelle { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .ern-rechnung-tabelle td { padding: 0.35rem 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .ern-rechnung-tabelle td:last-child { text-align: right; white-space: nowrap; padding-left: 0.8rem; }
+  .ern-warnung {
+    background: var(--overdue-bg); color: var(--overdue-text); border: 1px solid var(--overdue-border);
+    border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.88rem;
+  }
+  .ern-gewicht-aktuell { margin: 0.2rem 0 0.6rem; }
+  .ern-gewicht-svg { width: 100%; height: auto; display: block; margin-bottom: 0.6rem; }
+  .ern-gewicht-liste { display: flex; flex-direction: column; }
+  .ern-gewicht-zeile { display: flex; align-items: center; gap: 0.8rem; border-bottom: 1px solid var(--border); min-height: 44px; }
+  .ern-gewicht-zeile strong { margin-left: auto; }
