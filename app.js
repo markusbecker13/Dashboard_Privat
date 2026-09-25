@@ -8213,6 +8213,9 @@
   let ernKopiertGerade = false;   // Doppeltippen beim Kopieren verhindern
   let ernStartStand = null;       // { datum, kcal } oder { datum, fehler } für die Start-Kachel
   let ernStartLaedt = false;
+  let ernWoche = null;            // { start, tage: { datum: {anzahl, kcal, eiweiss, …} } }
+  let ernWocheLaedt = false;
+  let ernWocheFehler = "";
 
   function ernAktDatum() { return ernDatum || heuteISO(); }
   function ernGramm(v) { return v === null || v === undefined ? "–" : ernZahl(v) + " g"; }
@@ -8313,6 +8316,7 @@
           ${eintraege.length ? `<div class="task-list">${eintraege.map(ernEintragHtml).join("")}</div>` : ernKopierenHtml(schluessel)}
         </section>`;
     }).join("");
+    ernWocheRendern();
   }
 
   function ernEintragHtml(e) {
@@ -8438,6 +8442,121 @@
     ernBearbeitenId = null;
     tabWechseln("ernaehrung");
   };
+
+  // ---- Wochenübersicht (📊 Woche, Mo–So der gewählten Woche) ----
+  function ernKw(iso) {
+    // ISO-Kalenderwoche: Donnerstag der Woche bestimmt das Jahr
+    const [j, m, t] = iso.split("-").map(Number);
+    const d = new Date(Date.UTC(j, m - 1, t));
+    const wt = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - wt);
+    const jahrStart = Date.UTC(d.getUTCFullYear(), 0, 1);
+    return Math.ceil(((d - jahrStart) / 86400000 + 1) / 7);
+  }
+
+  async function ernWocheLaden(start) {
+    ernWocheLaedt = true;
+    ernWocheFehler = "";
+    try {
+      const res = await api("ernaehrung_woche", { von: start, bis: addTage(start, 6) });
+      ernWoche = { start, tage: res.tage || {} };
+    } catch (e) {
+      ernWocheFehler = e.message === "unauthorized" ? "" : "Konnte die Woche nicht laden: " + e.message;
+    } finally {
+      ernWocheLaedt = false;
+      if (wochenstartISO(ernAktDatum()) === start) ernWocheRendern();
+    }
+  }
+
+  function ernWocheRendern() {
+    const block = document.getElementById("ern-woche-block");
+    const el = document.getElementById("ern-woche");
+    if (!block || !el || !block.open) return;
+    const gewaehlt = ernAktDatum();
+    const start = wochenstartISO(gewaehlt);
+    const ende = addTage(start, 6);
+    document.getElementById("ern-woche-titel").textContent =
+      `KW ${ernKw(start)} · ${datumDe(start).slice(0, 6)}–${datumDe(ende).slice(0, 6)}`;
+
+    if (ernWocheFehler) {
+      el.innerHTML = `<p class="empty-text">${escapeHtml(ernWocheFehler)} <button class="link-btn" onclick="ernWocheNeu()">Nochmal versuchen</button></p>`;
+      return;
+    }
+    if (!ernWoche || ernWoche.start !== start) {
+      el.innerHTML = `<p class="empty-text">Lädt …</p>`;
+      if (!ernWocheLaedt) ernWocheLaden(start);
+      return;
+    }
+    // Den gerade geladenen Tag aus dem Tagebuch übernehmen – der ist aktueller
+    if (ernGeladenFuer && ernGeladenFuer >= start && ernGeladenFuer <= ende) {
+      if (ernEintraege.length) ernWoche.tage[ernGeladenFuer] = { anzahl: ernEintraege.length, ...ernSumme(ernEintraege) };
+      else delete ernWoche.tage[ernGeladenFuer];
+    }
+
+    const heute = heuteISO();
+    let tageMit = 0, kcalSumme = 0, eiweissSumme = 0, zielSumme = 0, eiweissZielSumme = 0, tageMitZiel = 0, luecken = false;
+    const zeilen = [];
+    for (let i = 0; i < 7; i++) {
+      const d = addTage(start, i);
+      const t = ernWoche.tage[d];
+      const z = ernProfilGeladen ? ernZiele(d) : null;
+      const wt = new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
+      const klassen = ["ern-woche-tag"];
+      if (d === gewaehlt) klassen.push("gewaehlt");
+      if (d > heute) klassen.push("zukunft");
+      let mitte, rechts = "";
+      if (t && t.anzahl) {
+        tageMit++; kcalSumme += t.kcal; eiweissSumme += t.eiweiss;
+        if (t.luecken) luecken = true;
+        if (z) { tageMitZiel++; zielSumme += z.ziel; eiweissZielSumme += z.eiweiss; }
+        const prozent = z ? Math.min(100, Math.round((t.kcal / z.ziel) * 100)) : 0;
+        const diff = z ? Math.round(t.kcal - z.ziel) : null;
+        mitte = `
+          <span class="ern-woche-kcal">${ernZahl(t.kcal, 0)}${z ? ` <span class="ern-makro-ziel">/ ${ernZahl(z.ziel, 0)}</span>` : ""} kcal</span>
+          ${z ? `<span class="ern-kcal-balken${diff > 0 ? " ueber" : ""}"><span style="width:${prozent}%"></span></span>` : ""}
+          <span class="notiz-meta">E ${ernZahl(t.eiweiss, 0)} · F ${ernZahl(t.fett, 0)} · KH ${ernZahl(t.kohlenhydrate, 0)} g</span>`;
+        if (diff !== null) rechts = `<span class="ern-woche-diff${diff > 0 ? " ueber" : ""}">${diff > 0 ? "+" : diff < 0 ? "−" : "±"}${ernZahl(Math.abs(diff), 0)}</span>`;
+      } else {
+        mitte = `<span class="notiz-meta">${d > heute ? "" : "nichts eingetragen"}</span>`;
+      }
+      zeilen.push(`
+        <button class="${klassen.join(" ")}" onclick="ernWocheTag('${d}')" aria-label="${wt} ${datumDe(d)} öffnen">
+          <span class="ern-woche-datum"><strong>${wt}</strong> ${datumDe(d).slice(0, 6)}</span>
+          <span class="ern-woche-mitte">${mitte}</span>
+          ${rechts}
+        </button>`);
+    }
+
+    let kopf;
+    if (!tageMit) {
+      kopf = `<p class="notiz-meta" style="margin-top:0;">In dieser Woche ist noch nichts eingetragen.</p>`;
+    } else {
+      const teile = [`Ø <strong>${ernZahl(kcalSumme / tageMit, 0)} kcal</strong> an ${tageMit} ${tageMit === 1 ? "Tag" : "Tagen"}`];
+      if (tageMitZiel) {
+        const bilanz = Math.round(kcalSumme - zielSumme);
+        teile.push(`Ziel Ø ${ernZahl(zielSumme / tageMitZiel, 0)} kcal`);
+        teile.push(bilanz === 0 ? "Summe genau im Ziel"
+          : `Summe ${ernZahl(Math.abs(bilanz), 0)} kcal ${bilanz > 0 ? "über" : "unter"} Ziel`);
+        teile.push(`Eiweiß Ø ${ernZahl(eiweissSumme / tageMit, 0)} / ${ernZahl(eiweissZielSumme / tageMitZiel, 0)} g`);
+      } else {
+        teile.push(`Eiweiß Ø ${ernZahl(eiweissSumme / tageMit, 0)} g`);
+      }
+      kopf = `<p class="ern-woche-kopf">${teile.join(" · ")}</p>
+        <p class="notiz-meta" style="margin:0 0 0.6rem;">Tage ohne Einträge zählen nicht mit.${luecken ? " Bei einzelnen Einträgen fehlen Werte – Makros dort etwas zu niedrig." : ""}</p>`;
+    }
+    el.innerHTML = kopf + `<div class="ern-woche-liste">${zeilen.join("")}</div>`;
+  }
+
+  window.ernWocheTag = function(iso) {
+    ernDatumSetzen(iso);
+    document.getElementById("ern-summe").scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  window.ernWocheNeu = function() { ernWoche = null; ernWocheFehler = ""; ernWocheRendern(); };
+  document.getElementById("ern-woche-block").addEventListener("toggle", (e) => {
+    if (e.target.open) { ernWoche = null; ernWocheFehler = ""; ernWocheRendern(); }
+  });
+  document.getElementById("ern-woche-zurueck").addEventListener("click", () => ernDatumSetzen(addTage(ernAktDatum(), -7)));
+  document.getElementById("ern-woche-vor").addEventListener("click", () => ernDatumSetzen(addTage(ernAktDatum(), 7)));
 
   window.ernNeuLaden = function() { ernGeladenFuer = null; ernFehler = ""; ernProfilFehlgeschlagen = false; ernTagLaden(); };
 
