@@ -1008,3 +1008,9 @@
   .ern-gewicht-liste { display: flex; flex-direction: column; }
   .ern-gewicht-zeile { display: flex; align-items: center; gap: 0.8rem; border-bottom: 1px solid var(--border); min-height: 44px; }
   .ern-gewicht-zeile strong { margin-left: auto; }
+  .ern-training-zeile { font-size: 0.85rem; margin: -0.4rem 0 0.9rem; color: var(--ink-dim); }
+  .ern-ohne-wert { color: var(--overdue-text); }
+  .ern-met-zeile { border-bottom: 1px solid var(--border); padding: 0.6rem 0; }
+  .ern-met-kopf { display: flex; flex-direction: column; gap: 0.1rem; margin-bottom: 0.4rem; }
+  .ern-met-zeile select { flex: 1 1 180px; min-width: 0; }
+  .ern-met-zeile input[type="number"] { width: 5.5rem; }
