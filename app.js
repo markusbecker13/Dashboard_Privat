@@ -5,6 +5,17 @@
   // ==========================================================
   const API_URL = "https://juxoxltaeugsmtvirfcm.supabase.co/functions/v1/bright-endpoint";
 
+  // Name für den Gruß („Moin Markus.“) – nur hier ändern.
+  // Leer lassen ("") ergibt einfach „Moin.“
+  const ANZEIGE_NAME = "Markus";
+  const GRUSS = ANZEIGE_NAME ? `Moin ${ANZEIGE_NAME}.` : "Moin.";
+  (() => {
+    const w = document.querySelector("#bereich-screen .willkommen-titel");
+    if (w) { w.textContent = GRUSS; w.append(document.createElement("br"), "Wohin heute?"); }
+    const h = document.getElementById("heute-gruss");
+    if (h) h.textContent = GRUSS;
+  })();
+
   let token = localStorage.getItem("aufgaben-token") || "";
   let projekte = [];
   let aufgaben = [];
@@ -1540,8 +1551,8 @@
     const grussEl = document.getElementById("heute-gruss");
     if (grussEl) {
       grussEl.innerHTML = offeneDinge > 0
-        ? `Moin Markus.<br><span class="heute-gruss-akzent">${offeneDinge} ${offeneDinge === 1 ? "Ding" : "Dinge"}</span> heute.`
-        : `Moin Markus.<br>Freie Bahn heute.`;
+        ? `${escapeHtml(GRUSS)}<br><span class="heute-gruss-akzent">${offeneDinge} ${offeneDinge === 1 ? "Ding" : "Dinge"}</span> heute.`
+        : `${escapeHtml(GRUSS)}<br>Freie Bahn heute.`;
     }
     renderTagesZitat();
 
