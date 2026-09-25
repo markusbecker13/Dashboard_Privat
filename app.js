@@ -9405,7 +9405,7 @@
       status.textContent = res.grund === "keine_naehrwerte"
         ? `„${res.name}“ steht bei Open Food Facts, aber ohne Kalorien je 100 g. Trag die Werte von der Packung ein:`
         : `Barcode ${ziffern} ist bei Open Food Facts nicht bekannt. Trag die Werte von der Packung ein:`;
-      ernEigenOeffnen(null, res.name || "");
+      ernEigenOeffnen(null, res.name || "", ziffern);
     } catch (e) {
       if (e.message !== "unauthorized") status.textContent = e.message;
     }
@@ -9446,8 +9446,11 @@
 
   // ---- Eigenes Lebensmittel anlegen / korrigieren ----
   const ERN_EIGEN_FELDER = ["name", "marke", "kcal", "eiweiss", "fett", "kh", "bal", "portion-name", "portion-g"];
-  function ernEigenOeffnen(l, vorschlagName) {
+  // Barcode aus einem erfolglosen Scan: wird beim Anlegen mitgespeichert
+  let ernEigenBarcode = null;
+  function ernEigenOeffnen(l, vorschlagName, barcode) {
     ernLmBearbeiten = l;
+    ernEigenBarcode = !l && barcode ? barcode : null;
     const werte = l ? {
       name: l.name, marke: l.marke || "", kcal: l.kcal, eiweiss: l.eiweiss, fett: l.fett, kh: l.kohlenhydrate,
       bal: l.ballaststoffe, "portion-name": l.portion_name || "", "portion-g": l.portion_g,
@@ -9458,7 +9461,9 @@
     });
     document.getElementById("ern-eigen-hinweis").textContent = l
       ? `Werte je 100 g korrigieren (Quelle: ${ernQuelleLabel(l)}). Bereits eingetragene Tage bleiben unverändert.`
-      : "Werte je 100 g, z. B. von der Nährwerttabelle auf der Packung. Das Lebensmittel steht danach in der Suche.";
+      : ernEigenBarcode
+        ? `Werte je 100 g von der Nährwerttabelle der Packung. Barcode ${ernEigenBarcode} wird mitgespeichert – beim nächsten Scan kommt das Produkt direkt aus deinen Lebensmitteln.`
+        : "Werte je 100 g, z. B. von der Nährwerttabelle auf der Packung. Das Lebensmittel steht danach in der Suche.";
     document.getElementById("btn-ern-eigen-loeschen").classList.toggle("hidden", !l);
     ernAnsicht("eigen");
     document.getElementById(werte.name ? "ern-eigen-kcal" : "ern-eigen-name").focus();
@@ -9474,6 +9479,7 @@
   document.getElementById("btn-ern-eigen-zurueck").addEventListener("click", () => {
     if (ernLmBearbeiten && ernAuswahl) { ernAnsicht("menge"); return; }
     ernLmBearbeiten = null;
+    ernEigenBarcode = null;
     ernAnsicht("suche");
     document.getElementById("ern-suche").focus();
   });
@@ -9490,12 +9496,15 @@
         name: wert("name"), marke: wert("marke"), kcal: wert("kcal"),
         eiweiss: wert("eiweiss"), fett: wert("fett"), kohlenhydrate: wert("kh"), ballaststoffe: wert("bal"),
         portion_name: wert("portion-name"), portion_g: wert("portion-g"),
+        barcode: ernLmBearbeiten ? undefined : (ernEigenBarcode || undefined),
       });
       const l = res.lebensmittel;
       // Zuletzt-Liste mit den korrigierten Werten aktualisieren
       ernZuletzt = ernZuletzt.map((z) => (z.id === l.id ? { ...z, ...l } : z));
-      status.textContent = ernLmBearbeiten ? "✓ Werte korrigiert" : "✓ Lebensmittel angelegt";
+      status.textContent = ernLmBearbeiten ? "✓ Werte korrigiert"
+        : ernEigenBarcode ? "✓ Lebensmittel mit Barcode angelegt" : "✓ Lebensmittel angelegt";
       ernLmBearbeiten = null;
+      ernEigenBarcode = null;
       ernLebensmittelWaehlen(l);
     } catch (e) {
       if (e.message !== "unauthorized") status.textContent = e.message;
