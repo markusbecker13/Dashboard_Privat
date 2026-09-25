@@ -2476,6 +2476,7 @@
   let rezeptFotoNeu = null;          // { base64, typ, vorschau } – im Formular gewähltes, verkleinertes Foto
   let rezeptFotoEntfernen = false;   // im Formular "Foto entfernen" gewählt
   let kochmodus = null;              // { id, zutatenErledigt:Set, schritteErledigt:Set, wakeLock, wach }
+  let rezeptVorlage = null;          // per Link importierte Daten, füllen das Formular "neu" vor
 
   function rezeptHeuteIso() {
     // lokales Datum, nicht UTC – sonst wäre "heute" nachts bis 2 Uhr noch gestern
@@ -2981,13 +2982,19 @@
       formBereich.innerHTML = "";
       formBereich.classList.add("hidden");
       if (neuBtn) neuBtn.classList.remove("hidden");
+      const knoepfe = document.getElementById("rezept-knoepfe");
+      if (knoepfe) knoepfe.classList.remove("hidden");
+      rezeptVorlage = null;
       return;
     }
-    const r = rezeptFormId === "neu" ? {} : (rezepte.find((x) => x.id === rezeptFormId) || {});
+    const r = rezeptFormId === "neu" ? (rezeptVorlage || {}) : (rezepte.find((x) => x.id === rezeptFormId) || {});
+    const knoepfe = document.getElementById("rezept-knoepfe");
+    if (knoepfe) knoepfe.classList.add("hidden");
     if (neuBtn) neuBtn.classList.add("hidden");
     formBereich.classList.remove("hidden");
     formBereich.innerHTML = `
-      <h2 class="rezept-form-titel">${rezeptFormId === "neu" ? "Neues Rezept" : "Rezept bearbeiten"}</h2>
+      <h2 class="rezept-form-titel">${rezeptFormId !== "neu" ? "Rezept bearbeiten" : (rezeptVorlage ? "Importiertes Rezept" : "Neues Rezept")}</h2>
+      ${rezeptVorlage ? '<p class="notiz-meta rezept-import-hinweis">Aus dem Link übernommen – bitte kurz prüfen (v.a. Zutaten und Schritte), dann speichern. Nur für den eigenen Gebrauch.</p>' : ""}
       <div class="row">
         <input type="text" id="rezept-f-titel" placeholder="Titel, z.B. Linsensuppe" value="${escapeAttr(r.titel || "")}">
       </div>
@@ -3049,8 +3056,56 @@
     renderRezepte();
   });
   document.getElementById("btn-rezept-neu").addEventListener("click", () => {
+    rezeptVorlage = null;
+    rezeptImportSchliessen();
     rezeptFormId = "neu";
     rezeptFormRendern();
+  });
+
+  // ---- Import per Link ----
+  function rezeptImportSchliessen() {
+    const bereich = document.getElementById("rezept-import-bereich");
+    if (bereich) bereich.classList.add("hidden");
+    const status = document.getElementById("rezept-import-status");
+    if (status) status.textContent = "";
+  }
+
+  document.getElementById("btn-rezept-import").addEventListener("click", () => {
+    const bereich = document.getElementById("rezept-import-bereich");
+    bereich.classList.remove("hidden");
+    const feld = document.getElementById("rezept-import-url");
+    feld.value = "";
+    feld.focus();
+  });
+
+  document.getElementById("btn-rezept-import-abbrechen").addEventListener("click", rezeptImportSchliessen);
+  document.getElementById("rezept-import-url").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btn-rezept-import-laden").click();
+  });
+
+  document.getElementById("btn-rezept-import-laden").addEventListener("click", async () => {
+    const feld = document.getElementById("rezept-import-url");
+    const status = document.getElementById("rezept-import-status");
+    const knopf = document.getElementById("btn-rezept-import-laden");
+    // Aus geteiltem Text ("Schau mal: https://…") den Link herausziehen
+    const treffer = feld.value.match(/https?:\/\/\S+/i);
+    if (!treffer) { status.textContent = "Bitte einen Link mit https:// einfügen."; feld.focus(); return; }
+    const link = treffer[0];
+    const vorhanden = rezepteAktuell().find((r) => r.quelle && r.quelle.split(/[?#]/)[0] === link.split(/[?#]/)[0]);
+    if (vorhanden && !confirm(`Dieses Rezept gibt es schon: „${vorhanden.titel}“. Trotzdem noch einmal importieren?`)) return;
+    knopf.disabled = true;
+    status.textContent = "Rezept wird geladen …";
+    try {
+      const res = await api("rezept_import", { url: link });
+      rezeptVorlage = res.rezept;
+      rezeptImportSchliessen();
+      rezeptFormId = "neu";
+      rezeptFormRendern();
+    } catch (e) {
+      status.textContent = e.message || "Import fehlgeschlagen.";
+    } finally {
+      knopf.disabled = false;
+    }
   });
 
   window.rezeptUmschalten = function(id) {
@@ -3205,6 +3260,7 @@
       return; // Formular bleibt offen, nichts geht verloren
     }
     if (payload.id) rezeptOffenId = payload.id;
+    rezeptVorlage = null;
     if (payload.id && (rezeptFotoNeu || rezeptFotoEntfernen)) delete rezeptBildUrls[payload.id];
     rezeptFotoNeu = null;
     rezeptFotoEntfernen = false;
