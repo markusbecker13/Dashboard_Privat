@@ -986,9 +986,21 @@
   .ern-feld-breit { flex: 1 1 100%; }
   .ern-mahlzeit { margin-bottom: 1.2rem; }
   .ern-mahlzeit-kopf { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
-  .ern-mahlzeit-kopf h3 { margin: 0; font-family: var(--font-display); font-size: 1.05rem; }
+  .ern-mahlzeit-kopf h3, .ern-mahlzeit-titel { margin: 0; font-family: var(--font-display); font-size: 1.05rem; }
   .ern-mahlzeit-kcal { color: var(--ink-dim); font-size: 0.85rem; }
-  .ern-plus { margin-left: auto; min-height: 40px; }
+  .ern-mahlzeit-toggle {
+    display: grid; grid-template-columns: 1rem minmax(0, 1fr); column-gap: 0.5rem; align-items: center;
+    flex: 1 1 auto; min-width: 0; min-height: 44px;
+    background: none; border: none; padding: 0; font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+  }
+  .ern-mahlzeit-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .ern-mahlzeit-titel { font-weight: 700; white-space: nowrap; }
+  .ern-mahlzeit-toggle .ern-mahlzeit-kcal { grid-column: 2; line-height: 1.2; }
+  .ern-mahlzeit-pfeil { grid-row: 1 / span 2; display: inline-block; width: 1rem; text-align: center; font-size: 1.1rem; color: var(--ink-dim); transition: transform 0.15s; }
+  .ern-mahlzeit-pfeil.zu { transform: rotate(-90deg); }
+  .ern-mahlzeit.zugeklappt { margin-bottom: 0.6rem; }
+  .ern-mahlzeit.zugeklappt .ern-mahlzeit-kopf { margin-bottom: 0; }
+  .ern-plus { margin-left: auto; min-height: 40px; white-space: nowrap; flex: 0 0 auto; }
   .ern-kopieren {
     display: block; width: 100%; text-align: left; cursor: pointer; min-height: 44px;
     background: none; border: 1px dashed var(--border); border-radius: 8px;
