@@ -1043,3 +1043,8 @@
   .ern-ziel-stand-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.88rem; }
   .ern-ziel-stand-text .badge { margin-left: 0.4rem; vertical-align: middle; }
   .ern-ziel-stand-text .notiz-meta { margin: 0; }
+  /* Ernährung: Barcode-Feld im eigenen Lebensmittel */
+  .ern-barcode-zeile { display: flex; gap: 0.4rem; align-items: stretch; }
+  .ern-barcode-zeile input { flex: 1 1 auto; min-width: 0; }
+  .ern-barcode-zeile .btn-secondary { flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 0.3rem 0.8rem; }
+  #ern-zuordnen-filter { width: 100%; box-sizing: border-box; margin-bottom: 0.2rem; }
