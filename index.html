@@ -570,12 +570,17 @@
                   <option value="0">gar nicht (nur anzeigen)</option>
                 </select>
               </label>
+              <label class="ern-feld ern-feld-breit" id="ern-p-gueltig-feld">Ziel-Einstellungen gelten ab
+                <input type="date" id="ern-p-gueltig">
+                <span class="ern-feld-hinweis">Aktivität, Ziel, Eiweiß, Fett und Anrechnung gelten ab diesem Tag, frühere Tage behalten ihren Stand. Geschlecht, Geburtsdatum und Größe gelten immer für alle Tage.</span>
+              </label>
             </div>
             <div id="ern-profil-rechnung" class="ern-rechnung"></div>
             <div class="row" style="margin-bottom:0.3rem;">
               <button class="btn-primary" id="btn-ern-profil-speichern">Speichern</button>
             </div>
             <p class="notiz-meta" id="ern-profil-status"></p>
+            <div id="ern-ziel-verlauf"></div>
           </div>
         </details>
 
@@ -952,6 +957,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>➕ Eigenes Lebensmittel:</strong> Name, optional Marke, Werte je 100 g und eine Portion (z. B. „1 Riegel“ = 45 g, erscheint dann als Schnellwahl). Steht danach in der Suche. Eigene und Open-Food-Facts-Lebensmittel lassen sich korrigieren und löschen – schon eingetragene Tage bleiben dabei unverändert. BLS-Einträge bleiben fest</li>
                 <li><strong>Datenschutz:</strong> Ernährungsdaten sind Gesundheitsdaten. Sie liegen nur in deiner Supabase-Datenbank (EU-Region), es gibt sie nur in Privat, und sie tauchen bewusst nicht im Verlauf auf</li>
                 <li><strong>⚙️ Profil &amp; Ziel</strong> (unten): Geschlecht (nur für die Formel), Geburtsdatum, Größe, Aktivität im Alltag, Ziel, Eiweiß je kg und Fettanteil. Darunter steht live die Rechnung: Grundumsatz nach Mifflin-St Jeor × Aktivität = Bedarf ohne Sport, dazu das Ziel (halten, −250/−500 oder +250/+500 kcal am Tag) und die Makroziele. Kohlenhydrate sind der Rest</li>
+                <li><strong>Gilt ab</strong> (im Profil): Aktivität, Ziel, Eiweiß, Fett und Anrechnung gelten ab dem gewählten Tag (vorbelegt: heute). Frühere Tage behalten ihr Ziel – stellst du z. B. von „halten“ auf „abnehmen“ um, stehen alte Tage nicht plötzlich 500 kcal über dem Ziel. Ein Datum in der Vergangenheit rechnet ab dann neu, eines in der Zukunft plant eine Umstellung („geplant“). Geschlecht, Geburtsdatum und Größe gelten immer für alle Tage – eine Korrektur der Größe wirkt also rückwirkend. Ein Stand pro Tag: nochmal speichern mit demselben Datum ersetzt ihn</li>
+                <li><strong>Verlauf der Ziel-Einstellungen</strong> (unter „Speichern“): alle Stände mit Zeitraum, der heute gültige ist markiert. × löscht einen Stand – ab dann gilt wieder der vorherige. Der erste Stand gilt „von Anfang an“, also auch für Tage vor seinem Datum</li>
                 <li><strong>Aktivität ohne Sport wählen:</strong> Trainingskalorien kommen einzeln dazu – steckt der Sport schon im Aktivitätswert, würde er doppelt gezählt</li>
                 <li><strong>Tagesziel:</strong> Mit Profil und Gewicht zeigt die Tagessumme „gegessen / Ziel“, was noch übrig ist, und Eiweiß/Fett/KH gegen ihr Ziel. Maßgeblich ist das letzte Gewicht bis zu diesem Tag</li>
                 <li><strong>Liegt das Ziel unter dem Grundumsatz</strong>, warnt die App – auf Dauer nicht empfehlenswert</li>
@@ -961,7 +968,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Ehrlich zur Genauigkeit:</strong> Die Formel ist eine Schätzung und liegt bei Einzelnen oft um rund 10 % daneben. Wirklich genau wird der Bedarf erst über ein paar Wochen Tracking und Wiegen</li>
                 <li><strong>Start-Kachel:</strong> Im Bereich Privat zeigt Start eine vierte Kachel mit den heute noch übrigen Kalorien („kcal übrig“ bzw. „kcal über Ziel“, Trainings schon eingerechnet). Ohne Profil oder Gewicht steht dort nur, was du heute gegessen hast. Antippen öffnet Ernährung beim heutigen Tag. Ist der Reiter ausgeblendet, fehlt auch die Kachel</li>
                 <li><strong>📊 Woche</strong> (unter den Mahlzeiten, aufklappen): Montag bis Sonntag der gewählten Woche, je Tag gegessen / Ziel mit Balken, Abweichung (grün darunter, rot darüber) und Eiweiß/Fett/KH. Oben der Schnitt: Ø kcal, Ø Ziel, Summe über/unter Ziel und Ø Eiweiß gegen das Ziel. Tage ohne Einträge zählen nicht mit – ein vergessener Tag verfälscht also nicht den Schnitt. Einen Tag antippen öffnet ihn, ‹ › blättern wochenweise</li>
-                <li><strong>⬇️ Export</strong> (ganz unten, aufklappen): Zeitraum per 7/30/90 Tage, „Dieses Jahr“ oder Von/Bis wählen, dann „Excel herunterladen“. Die Datei öffnet auch in LibreOffice Calc und hat vier Blätter: <em>Einträge</em> (jede Zeile ein Eintrag mit Mahlzeit, Menge, Werten und Quelle), <em>Tage</em> (Summen je Tag gegen das Ziel, nur Tage mit Einträgen), <em>Gewicht</em> und <em>Info</em> (Quellen, Lizenzen, Hinweise). Leere Zelle heißt „kein Wert“, nicht 0. Die Ziele rechnet die App mit dem <strong>aktuellen</strong> Profil – alte Profil-Stände werden nicht gespeichert. Die Datei enthält Gesundheitsdaten: nicht unverschlüsselt weitergeben. Ernährung steht bewusst nicht im Reiter Export, weil die Daten erst für den Zeitraum geladen werden</li>
+                <li><strong>⬇️ Export</strong> (ganz unten, aufklappen): Zeitraum per 7/30/90 Tage, „Dieses Jahr“ oder Von/Bis wählen, dann „Excel herunterladen“. Die Datei öffnet auch in LibreOffice Calc und hat vier Blätter: <em>Einträge</em> (jede Zeile ein Eintrag mit Mahlzeit, Menge, Werten und Quelle), <em>Tage</em> (Summen je Tag gegen das Ziel, nur Tage mit Einträgen), <em>Gewicht</em> und <em>Info</em> (Quellen, Lizenzen, Hinweise). Leere Zelle heißt „kein Wert“, nicht 0. Die Ziele stehen je Tag mit dem Stand, der an diesem Tag galt (Spalte „Ziel-Einstellung“). Die Datei enthält Gesundheitsdaten: nicht unverschlüsselt weitergeben. Ernährung steht bewusst nicht im Reiter Export, weil die Daten erst für den Zeitraum geladen werden</li>
                 <li><strong>In Planung:</strong> Bedarf aus dem Gewichtstrend nachjustieren (sinnvoll erst nach 2–4 Wochen mit Einträgen und Gewicht)</li>
               </ul>
             </div>
