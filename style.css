@@ -1036,3 +1036,10 @@
     background: #000; display: block; margin-bottom: 0.6rem;
   }
   #ern-scanner-code { flex: 1 1 180px; }
+  /* Ernährung: Profil-Historie (Ziel-Stände) */
+  .ern-feld-hinweis { font-size: 0.75rem; line-height: 1.4; color: var(--ink-dim); }
+  .ern-ziel-verlauf-liste { display: flex; flex-direction: column; }
+  .ern-ziel-stand { display: flex; align-items: center; gap: 0.6rem; border-bottom: 1px solid var(--border); padding: 0.45rem 0; min-height: 44px; }
+  .ern-ziel-stand-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.88rem; }
+  .ern-ziel-stand-text .badge { margin-left: 0.4rem; vertical-align: middle; }
+  .ern-ziel-stand-text .notiz-meta { margin: 0; }
