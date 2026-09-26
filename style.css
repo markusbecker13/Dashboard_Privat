@@ -1052,3 +1052,14 @@
   .ern-meine-kopf .btn-secondary { min-height: 44px; }
   #ern-meine-status:empty { display: none; }
   #ern-zuordnen-filter { width: 100%; box-sizing: border-box; margin-bottom: 0.2rem; }
+  /* Ernährung: Zucker, gesättigte Fettsäuren, Salz (Session 22) */
+  .ern-zusatz { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px solid var(--border); }
+  .ern-makro-wert.ern-ueber { color: var(--overdue-text); }
+  .ern-balken-salz { background: var(--ink-dim); }
+  .ern-balken-ueber { background: var(--overdue-text); }
+  .ern-teilweise { color: var(--ink-dim); font-weight: 600; margin-left: 0.05rem; }
+  .ern-mehr { margin: -0.2rem 0 0.8rem; }
+  .ern-mehr > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 0.85rem; color: var(--ink-dim); }
+  .ern-mehr[open] > summary { margin-bottom: 0.4rem; }
+  /* Eingabefelder unten bündig, auch wenn ein Label zweizeilig umbricht */
+  .task-edit-felder .ern-feld { justify-content: space-between; }
