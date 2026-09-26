@@ -8310,6 +8310,7 @@
     document.getElementById("ern-datum-text").textContent = ernDatumLabel(datum);
     document.getElementById("ern-datum-wahl").value = datum;
     ernHinzuTitelAktualisieren();
+    ernKopRendern();
 
     if (ernFehler) {
       kopfEl.innerHTML = `<p class="empty-text">${escapeHtml(ernFehler)} <button class="link-btn" onclick="ernNeuLaden()">Nochmal versuchen</button></p>`;
@@ -8431,6 +8432,175 @@
     }
   };
 
+  // ---- ⧉ Kopieren: ganzer Tag oder eine Mahlzeit, auch in gefüllte ----
+  // Ziel ist immer der oben gewählte Tag. Die Vorschau für den Quelltag
+  // kommt aus ernaehrung_uebersicht; ist Quelle = gewählter Tag, direkt aus
+  // ernEintraege (immer aktuell).
+  let ernKopZielTag = null;       // Tag, für den "Von" zuletzt vorbelegt wurde
+  let ernKopCache = {};           // { datum: { mahlzeit: {anzahl, kcal} } }
+  let ernKopLaedt = null;         // Datum, das gerade geladen wird
+  let ernKopFehler = "";
+  let ernKopStatus = "";
+  let ernKopLaeuft = false;
+
+  function ernKopAuswahl() {
+    const mahlzeit = document.getElementById("ern-kop-mahlzeit").value;
+    return {
+      von: document.getElementById("ern-kop-von").value,
+      nach: ernAktDatum(),
+      mahlzeit,
+      zielMahlzeit: mahlzeit === "alle" ? null : document.getElementById("ern-kop-ziel").value,
+    };
+  }
+
+  // Anzahl/kcal je Mahlzeit für ein Datum, oder null (noch nicht geladen)
+  function ernKopUebersicht(datum) {
+    if (datum === ernGeladenFuer) {
+      const u = {};
+      for (const e of ernEintraege) {
+        const m = u[e.mahlzeit] || (u[e.mahlzeit] = { anzahl: 0, kcal: 0 });
+        m.anzahl += 1;
+        m.kcal += Number(e.kcal) || 0;
+      }
+      return u;
+    }
+    return ernKopCache[datum] || null;
+  }
+
+  async function ernKopLaden(datum) {
+    ernKopLaedt = datum;
+    ernKopFehler = "";
+    try {
+      const res = await api("ernaehrung_uebersicht", { datum });
+      ernKopCache[datum] = res.mahlzeiten || {};
+    } catch (e) {
+      if (datum === ernKopAuswahl().von) {
+        ernKopFehler = e.message === "unauthorized" ? "" : "Konnte den Tag nicht laden: " + e.message;
+      }
+    } finally {
+      if (ernKopLaedt === datum) ernKopLaedt = null;
+      ernKopRendern();
+    }
+  }
+
+  function ernKopRendern() {
+    const block = document.getElementById("ern-kopieren-block");
+    if (!block || !block.open) return;
+    const vonFeld = document.getElementById("ern-kop-von");
+    const nach = ernAktDatum();
+    if (ernKopZielTag !== nach) {
+      // Anderer Zieltag: Vortag vorschlagen, Zwischenstände verwerfen
+      ernKopZielTag = nach;
+      vonFeld.value = addTage(nach, -1);
+      ernKopCache = {};
+      ernKopFehler = "";
+      ernKopStatus = "";
+    }
+    const { von, mahlzeit, zielMahlzeit } = ernKopAuswahl();
+    document.getElementById("ern-kop-ziel-feld").classList.toggle("hidden", mahlzeit === "alle");
+    document.getElementById("ern-kop-ziel-text").innerHTML =
+      `Kopiert Einträge in: <strong>${escapeHtml(ernDatumLabel(nach))}</strong> (oben gewählter Tag).`;
+    const vorschauEl = document.getElementById("ern-kop-vorschau");
+    const btn = document.getElementById("btn-ern-kop");
+    document.getElementById("ern-kop-status").textContent = ernKopStatus;
+    const aus = (text, klasse = "notiz-meta") => {
+      vorschauEl.innerHTML = text ? `<p class="${klasse}">${text}</p>` : "";
+      btn.disabled = true;
+      btn.textContent = "Kopieren";
+    };
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(von)) return aus("Bitte einen Tag wählen.");
+    if (von === nach && (mahlzeit === "alle" || mahlzeit === zielMahlzeit)) {
+      return aus("Quelle und Ziel sind gleich – anderen Tag oder andere Ziel-Mahlzeit wählen.");
+    }
+    if (ernKopFehler) {
+      vorschauEl.innerHTML = `<p class="empty-text">${escapeHtml(ernKopFehler)} <button class="link-btn" onclick="ernKopNeu()">Nochmal versuchen</button></p>`;
+      btn.disabled = true;
+      return;
+    }
+    const quelle = ernKopUebersicht(von);
+    if (!quelle) {
+      if (ernKopLaedt !== von) ernKopLaden(von);
+      return aus("Lädt …");
+    }
+    const zielGeladen = ernGeladenFuer === nach;
+    const ziel = zielGeladen ? ernKopUebersicht(nach) : {};
+    const wt = new Date(von + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
+    const vonText = `${wt} ${datumDe(von).slice(0, 6)}`;
+
+    // Welche Mahlzeiten gehen wohin
+    const paare = (mahlzeit === "alle" ? ERN_MAHLZEITEN.map(([k]) => k) : [mahlzeit])
+      .filter((k) => quelle[k] && quelle[k].anzahl)
+      .map((k) => ({ von: k, nach: mahlzeit === "alle" ? k : zielMahlzeit, ...quelle[k] }));
+    if (!paare.length) {
+      return aus(`${vonText}${mahlzeit === "alle" ? "" : " · " + ERN_MAHLZEIT_NAME[mahlzeit]}: nichts eingetragen.`);
+    }
+    const anzahl = paare.reduce((a, p) => a + p.anzahl, 0);
+    const kcal = paare.reduce((a, p) => a + p.kcal, 0);
+    const zeilen = paare.map((p) =>
+      `${ERN_MAHLZEIT_NAME[p.von]}${p.von !== p.nach ? " → " + ERN_MAHLZEIT_NAME[p.nach] : ""}: ${p.anzahl}× · ${ernZahl(p.kcal, 0)} kcal`);
+    const gefuellt = [...new Set(paare.map((p) => p.nach))].filter((k) => ziel[k] && ziel[k].anzahl);
+    let html = `<p class="notiz-meta">Aus ${vonText}:<br>${zeilen.join("<br>")}${paare.length > 1 ? `<br>Zusammen ${ernZahl(kcal, 0)} kcal` : ""}</p>`;
+    if (gefuellt.length) {
+      html += `<p class="ern-kop-hinweis">⚠️ ${gefuellt.map((k) => ERN_MAHLZEIT_NAME[k]).join(", ")} ${gefuellt.length === 1 ? "hat" : "haben"} schon Einträge – die kopierten kommen dazu.</p>`;
+    }
+    vorschauEl.innerHTML = html;
+    btn.disabled = !zielGeladen || ernKopLaeuft;
+    btn.textContent = `${anzahl} ${anzahl === 1 ? "Eintrag" : "Einträge"} kopieren`;
+  }
+
+  window.ernKopNeu = function() { ernKopCache = {}; ernKopFehler = ""; ernKopRendern(); };
+
+  async function ernKopAusfuehren() {
+    if (ernKopLaeuft) return;
+    const { von, nach, mahlzeit, zielMahlzeit } = ernKopAuswahl();
+    if (ernGeladenFuer !== nach) return;
+    const quelle = ernKopUebersicht(von) || {};
+    const ziel = ernKopUebersicht(nach) || {};
+    const zielMahlzeiten = mahlzeit === "alle"
+      ? ERN_MAHLZEITEN.map(([k]) => k).filter((k) => quelle[k] && quelle[k].anzahl)
+      : [zielMahlzeit];
+    const gefuellt = zielMahlzeiten.filter((k) => ziel[k] && ziel[k].anzahl);
+    if (gefuellt.length && !confirm(
+      `${gefuellt.map((k) => ERN_MAHLZEIT_NAME[k]).join(", ")} ${gefuellt.length === 1 ? "hat" : "haben"} am Zieltag schon Einträge. Kopierte Einträge dazulegen?`)) return;
+
+    ernKopLaeuft = true;
+    ernKopStatus = "Kopiert …";
+    ernKopRendern();
+    try {
+      const res = await api("ernaehrung_kopieren", {
+        von, nach, mahlzeit,
+        ...(mahlzeit === "alle" ? {} : { ziel_mahlzeit: zielMahlzeit }),
+        ergaenzen: gefuellt.length > 0,
+      });
+      const neu = res.eintraege || [];
+      if (nach === ernGeladenFuer) ernEintraege = ernEintraege.concat(neu);
+      // Kopierte Mahlzeiten aufklappen, damit man sieht, was dazukam
+      for (const k of new Set(neu.map((e) => e.mahlzeit))) ernZugeklappt.delete(k);
+      ernZugeklapptSpeichern();
+      ernKopStatus = `✓ ${neu.length} ${neu.length === 1 ? "Eintrag" : "Einträge"} kopiert`;
+    } catch (err) {
+      ernKopStatus = "";
+      if (err.message !== "unauthorized") alert(err.message);
+      ernGeladenFuer = null; // Stand vom Server holen
+    } finally {
+      ernKopLaeuft = false;
+      renderErnaehrung();
+    }
+  }
+
+  document.getElementById("ern-kopieren-block").addEventListener("toggle", (e) => {
+    if (e.target.open) { ernKopZielTag = null; ernKopRendern(); }
+  });
+  document.getElementById("ern-kop-von").addEventListener("change", () => { ernKopStatus = ""; ernKopFehler = ""; ernKopRendern(); });
+  document.getElementById("ern-kop-mahlzeit").addEventListener("change", (e) => {
+    if (e.target.value !== "alle") document.getElementById("ern-kop-ziel").value = e.target.value;
+    ernKopStatus = "";
+    ernKopRendern();
+  });
+  document.getElementById("ern-kop-ziel").addEventListener("change", () => { ernKopStatus = ""; ernKopRendern(); });
+  document.getElementById("btn-ern-kop").addEventListener("click", ernKopAusfuehren);
+
   // ---- Start-Kachel "noch X kcal" (nur Privat) ----
   async function ernStartLaden() {
     const datum = heuteISO();
@@ -8438,6 +8608,15 @@
     try {
       const res = await api("ernaehrung_tag", { datum });
       ernStartStand = { datum, kcal: ernSumme(res.eintraege || []).kcal };
+      // Gleich ans Tagebuch übergeben – sonst lädt ein Tipp auf die Kachel
+      // denselben Tag ein zweites Mal. Nur wenn dort gerade nichts anderes läuft.
+      if (!ernLaedt && ernGeladenFuer !== datum && ernAktDatum() === datum) {
+        ernEintraege = res.eintraege || [];
+        ernZuletzt = res.zuletzt || [];
+        ernVortag = res.vortag || {};
+        ernGeladenFuer = datum;
+        ernFehler = "";
+      }
     } catch (e) {
       ernStartStand = { datum, fehler: true };
     } finally {
