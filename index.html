@@ -452,6 +452,38 @@
 
         <div id="ern-mahlzeiten"></div>
 
+        <details class="anleitung-abschnitt ern-block" id="ern-kopieren-block">
+          <summary>⧉ Kopieren</summary>
+          <div class="anleitung-text">
+            <p class="notiz-meta" style="margin-top:0;" id="ern-kop-ziel-text">Kopiert Einträge von einem anderen Tag in den gewählten Tag.</p>
+            <div class="task-edit-felder">
+              <label class="ern-feld">Von Tag<input type="date" id="ern-kop-von"></label>
+              <label class="ern-feld">Was
+                <select id="ern-kop-mahlzeit">
+                  <option value="alle">Ganzer Tag</option>
+                  <option value="fruehstueck">Frühstück</option>
+                  <option value="mittag">Mittag</option>
+                  <option value="abend">Abend</option>
+                  <option value="snack">Snacks</option>
+                </select>
+              </label>
+              <label class="ern-feld" id="ern-kop-ziel-feld">In Mahlzeit
+                <select id="ern-kop-ziel">
+                  <option value="fruehstueck">Frühstück</option>
+                  <option value="mittag">Mittag</option>
+                  <option value="abend">Abend</option>
+                  <option value="snack">Snacks</option>
+                </select>
+              </label>
+            </div>
+            <div id="ern-kop-vorschau" class="ern-kop-vorschau"></div>
+            <div class="row" style="margin-bottom:0;">
+              <button class="btn-primary" id="btn-ern-kop">Kopieren</button>
+            </div>
+            <p class="notiz-meta" id="ern-kop-status" role="status"></p>
+          </div>
+        </details>
+
         <details class="anleitung-abschnitt ern-block" id="ern-woche-block">
           <summary>📊 Woche</summary>
           <div class="anleitung-text">
@@ -911,6 +943,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>✎ Bearbeiten:</strong> Menge und Mahlzeit ändern (die Werte werden neu berechnet); bei freien Einträgen alle Werte. <strong>×</strong> löscht</li>
                 <li><strong>▾ Auf- und zuklappen:</strong> Den Namen einer Mahlzeit antippen klappt ihre Einträge zu – im Kopf bleiben Kalorien und Anzahl stehen. Die App merkt sich das (auch für andere Tage). „+ Hinzufügen“ klappt die Mahlzeit automatisch wieder auf. Leere Mahlzeiten lassen sich nicht zuklappen</li>
                 <li><strong>⧉ Wie gestern:</strong> Ist eine Mahlzeit leer und hattest du am Vortag dort etwas, erscheint der Knopf mit Anzahl und Kalorien. Antippen übernimmt alle Einträge dieser Mahlzeit vom Vortag – mit den Werten, wie sie damals eingetragen waren. Danach einzeln anpassen oder löschen. Beim Blättern in die Vergangenheit heißt er „Wie am Vortag“</li>
+                <li><strong>⧉ Kopieren</strong> (unter den Mahlzeiten): für alles, was „Wie gestern“ nicht abdeckt. Tag wählen (vorbelegt: Vortag), dann „Ganzer Tag“ oder eine Mahlzeit. Bei einer Mahlzeit kannst du das Ziel ändern – z. B. die Reste vom Abend als Mittag. Die Vorschau zeigt, was kopiert wird. Ziel ist immer der oben gewählte Tag. Hat das Ziel schon Einträge, werden die kopierten ergänzt (die App fragt vorher nach). Auch innerhalb eines Tages möglich, z. B. Frühstück als Snack</li>
                 <li><strong>„–“</strong> heißt: für dieses Lebensmittel liegt im BLS kein Wert vor (das ist nicht dasselbe wie 0). Die Tagessumme weist dann darauf hin</li>
                 <li><strong>Datenbank:</strong> Bundeslebensmittelschlüssel (BLS) 4.0 des Max Rubner-Instituts, rund 7.100 Grundlebensmittel und Gerichte mit laborbasierten Durchschnittswerten je 100 g essbarer Anteil. Markenprodukte stehen nicht drin – dafür gibt es Barcode und Markensuche (unten). Lizenz CC BY 4.0, Quelle wird im Eintragen-Feld genannt</li>
                 <li><strong>📷 Barcode:</strong> öffnet die Kamera und erkennt den Strichcode automatisch (Chrome auf Android; am Laptop gibt es meist keine Erkennung). Alternativ die Ziffern unter dem Barcode abtippen. Das Produkt kommt aus Open Food Facts und wird in deiner Datenbank gespeichert – beim nächsten Mal findest du es auch über die normale Suche. Unbekannt oder ohne Kalorien? Dann öffnet sich direkt das Formular für ein eigenes Lebensmittel. Der Barcode wird dabei mitgespeichert – beim nächsten Scan kommt das Produkt sofort aus deinen eigenen Lebensmitteln, ohne erneutes Abtippen</li>
