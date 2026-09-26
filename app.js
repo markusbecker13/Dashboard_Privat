@@ -8361,6 +8361,7 @@
 
     const s = ernSumme(ernEintraege);
     kopfEl.innerHTML = ernSummeHtml(s, ernZiele(datum));
+    ernSchritteRendern();
     if (datum === heuteISO()) ernStartStand = { datum, kcal: s.kcal };
 
     listeEl.innerHTML = ERN_MAHLZEITEN.map(([schluessel, name, icon]) => {
@@ -8864,6 +8865,8 @@
         "Ziel kcal": z ? Math.round(z.ziel) : "",
         "Differenz kcal": z ? Math.round(s.kcal - z.ziel) : "",
         "davon Training (angerechnet)": z ? Math.round(z.trainingZuschlag) : "",
+        Schritte: ernSchritteAm(d) === null ? "" : ernSchritteAm(d),
+        "davon Schritte (angerechnet)": z && z.schritte && z.schritte.kcal !== null ? Math.round(z.schritteZuschlag) : "",
         "Eiweiß (g)": ernWert(s.eiweiss),
         "Ziel Eiweiß (g)": z ? Math.round(z.eiweiss) : "",
         "Fett (g)": ernWert(s.fett),
@@ -8888,8 +8891,9 @@
       { Punkt: "Zucker, ges. Fett, Salz", Wert: "Erst ab Session 22 (September 2026) erfasst. Der BLS liefert Zucker, aber kein Salz und keine gesättigten Fettsäuren; ältere Einträge sind leer. Tagessummen zählen nur Einträge mit Wert. Salz: DGE-Orientierungswert höchstens 6 g am Tag." },
       { Punkt: "Ziele", Wert: !ernProfil ? "Kein Profil hinterlegt – daher keine Ziele."
         : ernZielVersionen && ernZielVersionen.length
-          ? "Je Tag mit den Ziel-Einstellungen, die an diesem Tag galten (Spalte „Ziel-Einstellung“ im Blatt Tage), Mifflin-St Jeor × Aktivität ± Ziel, Gewicht bis zum jeweiligen Tag, Trainings eingerechnet. Geschlecht, Geburtsdatum und Größe: aktueller Stand."
+          ? "Je Tag mit den Ziel-Einstellungen, die an diesem Tag galten (Spalte „Ziel-Einstellung“ im Blatt Tage), Mifflin-St Jeor × Aktivität ± Ziel, Gewicht bis zum jeweiligen Tag, Trainings und Schritte über dem Sockel eingerechnet. Geschlecht, Geburtsdatum und Größe: aktueller Stand."
           : "Berechnet mit dem aktuellen Profil (Mifflin-St Jeor × Aktivität ± Ziel, Gewicht bis zum jeweiligen Tag, Trainings eingerechnet). Profil-Historie noch nicht eingerichtet." },
+      { Punkt: "Schritte", Wert: "Manuell eingetragen. Nur Schritte über dem Sockel zählen: Schrittlänge ≈ 0,415 × Körpergröße, ≈ 0,5 kcal je kg Körpergewicht und km (Schätzung, etwa ±20 %), angerechnet wie Trainings. An Tagen mit Lauf- oder Wander-Training können Schritte doppelt zählen." },
       { Punkt: "Nährwerte", Wert: "Max Rubner-Institut (2025), Bundeslebensmittelschlüssel (BLS) 4.0, Lizenz CC BY 4.0" },
       { Punkt: "Markenprodukte", Wert: "Open Food Facts, Lizenz ODbL (Datenbank) / DbCL (Inhalte)" },
       { Punkt: "Datenschutz", Wert: "Enthält Gesundheitsdaten – Datei nicht unverschlüsselt weitergeben oder in fremden Clouds ablegen." },
@@ -8902,7 +8906,7 @@
       XLSX.utils.book_append_sheet(wb, ws, name);
     };
     blatt(zeilenEintraege, "Einträge", [11, 11, 40, 10, 8, 10, 8, 16, 16, 10, 18, 8, 18]);
-    blatt(zeilenTage, "Tage", [11, 9, 9, 8, 9, 13, 14, 10, 14, 8, 16, 16, 10, 18, 8, 18, 30, 70]);
+    blatt(zeilenTage, "Tage", [11, 9, 9, 8, 9, 13, 14, 9, 14, 10, 14, 8, 16, 16, 10, 18, 8, 18, 30, 80]);
     blatt(zeilenGewicht, "Gewicht", [11, 12]);
     blatt(info, "Info", [16, 110]);
     return wb;
@@ -9283,6 +9287,10 @@
   // null = Tabelle fehlt noch (Migration nicht eingespielt) → wie bisher
   // mit dem aktuellen Profil rechnen.
   let ernZielVersionen = null;
+  // Schritte je Tag [{datum, schritte}] aufsteigend; null = Tabelle fehlt
+  // noch (schritte_setup.sql nicht eingespielt)
+  let ernSchritte = null;
+  const ERN_SCHRITTE_SOCKEL_STANDARD = 5000;
 
   async function ernProfilLaden() {
     ernProfilLaedt = true;
@@ -9292,6 +9300,7 @@
       ernGewichte = res.gewichte || [];
       ernMet = res.met || [];
       ernZielVersionen = Array.isArray(res.versionen) ? res.versionen : null;
+      ernSchritte = Array.isArray(res.schritte) ? res.schritte : null;
       ernProfilGeladen = true;
       ernProfilFormFuellen();
       ernGewichtRendern();
@@ -9324,7 +9333,7 @@
   }
 
   // Reine Rechnung, damit Formular-Vorschau und Tagesansicht dieselbe nutzen
-  function ernBedarfRechnen(p, gewicht, datum, trainingKcal = 0) {
+  function ernBedarfRechnen(p, gewicht, datum, trainingKcal = 0, schritteKcal = 0) {
     if (!p || !gewicht || !p.geburtsdatum || !p.geschlecht || !p.groesse_cm) return null;
     const kg = Number(gewicht);
     const alter = ernAlterAm(p.geburtsdatum, datum);
@@ -9333,12 +9342,14 @@
     // Trainingskalorien anteilig aufschlagen (Profil: 0/50/75/100 %)
     const anrechnung = p.training_anrechnung === undefined || p.training_anrechnung === null ? 100 : Number(p.training_anrechnung);
     const trainingZuschlag = trainingKcal * anrechnung / 100;
-    const ziel = bedarf + Number(p.ziel_kcal_diff) + trainingZuschlag;
+    // Schritte über dem Sockel: gleiche Anrechnung wie Trainings (auch eine Schätzung)
+    const schritteZuschlag = schritteKcal * anrechnung / 100;
+    const ziel = bedarf + Number(p.ziel_kcal_diff) + trainingZuschlag + schritteZuschlag;
     const eiweiss = kg * Number(p.eiweiss_g_pro_kg);
     const fett = (ziel * Number(p.fett_prozent) / 100) / 9;
     const kh = Math.max(0, (ziel - eiweiss * 4 - fett * 9) / 4);
-    return { kg, alter, grundumsatz, bedarf, ziel, eiweiss, fett, kh, trainingZuschlag, anrechnung,
-      unterGrundumsatz: ziel - trainingZuschlag < grundumsatz };
+    return { kg, alter, grundumsatz, bedarf, ziel, eiweiss, fett, kh, trainingZuschlag, schritteZuschlag, anrechnung,
+      unterGrundumsatz: ziel - trainingZuschlag - schritteZuschlag < grundumsatz };
   }
 
   // Ziel-Stand, der an einem Tag gilt: größtes gueltig_ab <= Tag, sonst der
@@ -9361,6 +9372,7 @@
       pal: v.pal, ziel: v.ziel, ziel_kcal_diff: v.ziel_kcal_diff,
       eiweiss_g_pro_kg: v.eiweiss_g_pro_kg, fett_prozent: v.fett_prozent,
       training_anrechnung: v.training_anrechnung,
+      schritte_sockel: v.schritte_sockel,
       gueltig_ab: v.gueltig_ab,
     };
   }
@@ -9370,16 +9382,144 @@
     const trainings = ernTrainingsAm(datum);
     const summe = trainings.reduce((a, t) => a + (t.kcal || 0), 0);
     const p = ernProfilFuer(datum);
-    const r = ernBedarfRechnen(p, g && g.gewicht_kg, datum, summe);
-    return r ? { ...r, gewichtDatum: g.datum, trainings, trainingSumme: summe, profil: p } : null;
+    const schritte = ernSchritteKcal(datum, p);
+    const r = ernBedarfRechnen(p, g && g.gewicht_kg, datum, summe, schritte && schritte.kcal ? schritte.kcal : 0);
+    return r ? { ...r, datum, gewichtDatum: g.datum, trainings, trainingSumme: summe, schritte, profil: p } : null;
   }
+
+  // ---- Schritte ----
+  // Manuell eingetragen (eine PWA kommt nicht an Health Connect). Nur die
+  // Schritte über dem Sockel zählen – darunter steckt die Bewegung schon im
+  // Aktivitätswert (PAL). Schätzung: Schrittlänge ≈ 0,415 × Körpergröße,
+  // netto ≈ 0,5 kcal je kg und km Gehen. Grob, etwa ±20 %.
+  const ERN_SCHRITT_FAKTOR = 0.415;
+  const ERN_KCAL_JE_KG_KM = 0.5;
+
+  function ernSchritteAm(datum) {
+    if (!ernSchritte) return null;
+    const e = ernSchritte.find((x) => x.datum === datum);
+    return e ? Number(e.schritte) : null;
+  }
+
+  function ernSockelVon(p) {
+    return p && p.schritte_sockel !== undefined && p.schritte_sockel !== null ? Number(p.schritte_sockel) : ERN_SCHRITTE_SOCKEL_STANDARD;
+  }
+
+  // null = an dem Tag keine Schritte eingetragen
+  function ernSchritteKcal(datum, p) {
+    const schritte = ernSchritteAm(datum);
+    if (schritte === null) return null;
+    const sockel = ernSockelVon(p);
+    const ueber = Math.max(0, schritte - sockel);
+    const g = ernGewichtFuer(datum);
+    if (!p || !p.groesse_cm) return { schritte, sockel, ueber, kcal: null, grund: "keine Größe im Profil" };
+    if (!g) return { schritte, sockel, ueber, kcal: null, grund: "kein Gewicht eingetragen" };
+    const schrittM = ERN_SCHRITT_FAKTOR * Number(p.groesse_cm) / 100;
+    const km = ueber * schrittM / 1000;
+    const kcal = Math.round(ERN_KCAL_JE_KG_KM * Number(g.gewicht_kg) * km);
+    return { schritte, sockel, ueber, km, schrittM, kcal };
+  }
+
+  // Lauf-, Wander- und Geh-Trainings am Tag: deren Schritte zählt die
+  // Handy-/Uhr-App meist mit → möglicherweise doppelt. Nur Hinweis, keine Kürzung.
+  const ERN_GEH_SPORT = /lauf|jogg|renn|run|wander|hik|trail|geh|walk|spazier|marsch|hindernis|mud/i;
+  function ernGehTrainingsAm(datum) {
+    return (training || []).filter((t) => t.bereich === "privat" && t.datum === datum && ERN_GEH_SPORT.test(String(t.sportart || "")));
+  }
+
+  function ernSchritteZeileHtml(z) {
+    const sc = z.schritte;
+    if (!sc) return "";
+    const basis = `👣 ${ernZahl(sc.schritte, 0)} Schritte`;
+    if (!sc.ueber) return `<p class="ern-training-zeile">${basis} – nicht über dem Sockel von ${ernZahl(sc.sockel, 0)}, zählt nichts extra</p>`;
+    if (sc.kcal === null) return `<p class="ern-training-zeile">${basis}: <span class="ern-ohne-wert">? (${sc.grund})</span></p>`;
+    const zuschlag = z.anrechnung === 100
+      ? `+${ernZahl(z.schritteZuschlag, 0)} kcal aufs Ziel`
+      : `davon ${z.anrechnung} % = +${ernZahl(z.schritteZuschlag, 0)} kcal aufs Ziel`;
+    const doppelt = ernGehTrainingsAm(z.datum).length
+      ? ` <span class="ern-ohne-wert">· Lauf/Wanderung am Tag: evtl. doppelt gezählt</span>` : "";
+    return `<p class="ern-training-zeile">${basis}, davon ${ernZahl(sc.ueber, 0)} über dem Sockel ≈ ${ernZahl(sc.km)} km: ≈ ${ernZahl(sc.kcal, 0)} kcal → ${zuschlag}${doppelt}</p>`;
+  }
+
+  // Eingabe unter der Tagessumme. Das Feld wird nur beim Tageswechsel
+  // (oder nach dem Laden) neu gefüllt – sonst ginge Getipptes verloren.
+  function ernSchritteRendern() {
+    const block = document.getElementById("ern-schritte-block");
+    if (!block) return;
+    const datum = ernAktDatum();
+    const feld = document.getElementById("ern-schritte-wert");
+    const knopf = document.getElementById("btn-ern-schritte");
+    const info = document.getElementById("ern-schritte-info");
+    if (!ernProfilGeladen) { block.classList.add("hidden"); return; }
+    block.classList.remove("hidden");
+    if (ernSchritte === null) {
+      feld.disabled = true; knopf.disabled = true;
+      info.textContent = "Für Schritte bitte einmal schritte_setup.sql im Supabase SQL-Editor ausführen.";
+      return;
+    }
+    const zukunft = datum > heuteISO();
+    feld.disabled = zukunft; knopf.disabled = zukunft;
+    const wert = ernSchritteAm(datum);
+    if (feld.dataset.datum !== datum) {
+      feld.value = wert === null ? "" : String(wert);
+      feld.dataset.datum = datum;
+    }
+    if (zukunft) { info.textContent = "Schritte gehen nur bis heute."; return; }
+    const p = ernProfilFuer(datum);
+    const sockel = ernSockelVon(p);
+    const teile = [];
+    const sc = ernSchritteKcal(datum, p);
+    if (!sc) {
+      teile.push(`Von der Handy- oder Uhr-App ablesen und eintragen. Zählt ab ${ernZahl(sockel, 0)} Schritten (Sockel, im Profil einstellbar).`);
+    } else if (!sc.ueber) {
+      teile.push(`Unter dem Sockel von ${ernZahl(sockel, 0)} – steckt schon im Aktivitätswert, zählt nichts extra.`);
+    } else if (sc.kcal === null) {
+      teile.push(`${ernZahl(sc.ueber, 0)} über dem Sockel – für die Umrechnung fehlt: ${sc.grund}.`);
+    } else {
+      teile.push(`${ernZahl(sc.ueber, 0)} über dem Sockel von ${ernZahl(sockel, 0)} ≈ ${ernZahl(sc.km)} km ≈ ${ernZahl(sc.kcal, 0)} kcal (Schätzung, etwa ±20 %).`);
+    }
+    const geh = ernGehTrainingsAm(datum);
+    if (geh.length && sc && sc.ueber) {
+      const namen = [...new Set(geh.map((t) => t.sportart))].join(", ");
+      teile.push(`Achtung: An dem Tag steht auch ${namen} im Training. Zählt deine Schritt-App die Einheit mit, werden diese Schritte doppelt gerechnet – dann am besten die Schritte ohne die Einheit eintragen.`);
+    }
+    info.textContent = teile.join(" ");
+  }
+
+  async function ernSchritteSpeichern() {
+    const feld = document.getElementById("ern-schritte-wert");
+    const knopf = document.getElementById("btn-ern-schritte");
+    const info = document.getElementById("ern-schritte-info");
+    const datum = ernAktDatum();
+    const roh = feld.value.trim();
+    if (roh === "" && ernSchritteAm(datum) === null) { info.textContent = "Bitte eine Zahl eingeben."; return; }
+    knopf.disabled = true;
+    try {
+      const res = await api("schritte_speichern", { datum, schritte: roh === "" ? null : roh });
+      ernSchritte = (ernSchritte || []).filter((x) => x.datum !== datum);
+      if (res.schritte) ernSchritte = ernSchritte.concat([res.schritte]).sort((a, b) => a.datum.localeCompare(b.datum));
+      feld.dataset.datum = "";
+      renderErnaehrung();
+      const text = info.textContent;
+      info.textContent = (res.schritte ? `✓ ${ernZahl(res.schritte.schritte, 0)} Schritte gespeichert. ` : "✓ Schritte für den Tag entfernt. ") + text;
+      if (aktiverTab === "heute") renderHeute();
+    } catch (e) {
+      if (e.message !== "unauthorized") info.textContent = e.message;
+    } finally {
+      knopf.disabled = ernAktDatum() > heuteISO();
+    }
+  }
+  document.getElementById("btn-ern-schritte").addEventListener("click", ernSchritteSpeichern);
+  document.getElementById("ern-schritte-wert").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") ernSchritteSpeichern();
+  });
 
   // Kurzbeschreibung eines Ziel-Stands, z. B. „Abnehmen −500 · Aktivität 1,6 · …“
   function ernZielKurz(v) {
     const diff = Number(v.ziel_kcal_diff);
     const ziel = diff === 0 ? "Halten" : diff < 0 ? `Abnehmen −${ernZahl(-diff, 0)}` : `Aufbauen +${ernZahl(diff, 0)}`;
     const anr = v.training_anrechnung === null || v.training_anrechnung === undefined ? 100 : Number(v.training_anrechnung);
-    return `${ziel} · Aktivität ${ernZahl(v.pal)} · Eiweiß ${ernZahl(v.eiweiss_g_pro_kg)} g/kg · Fett ${v.fett_prozent} % · Training ${anr} %`;
+    return `${ziel} · Aktivität ${ernZahl(v.pal)} · Eiweiß ${ernZahl(v.eiweiss_g_pro_kg)} g/kg · Fett ${v.fett_prozent} % · Training ${anr} % · Schritte ab ${ernZahl(ernSockelVon(v), 0)}`;
   }
 
   // ---- Trainingskalorien ----
@@ -9439,6 +9579,7 @@
         <div class="ern-kcal-balken${rest < 0 ? " ueber" : ""}"><span style="width:${prozent}%"></span></div>
         <p class="ern-rest">${restText}</p>
         ${ernTrainingZeileHtml(z)}
+        ${ernSchritteZeileHtml(z)}
         <div class="ern-makros">
           ${ernMakroHtml("Eiweiß", s.eiweiss, z.eiweiss, "ern-balken-eiweiss")}
           ${ernMakroHtml("Fett", s.fett, z.fett, "ern-balken-fett")}
@@ -9474,6 +9615,7 @@
       eiweiss_g_pro_kg: Number(document.getElementById("ern-p-eiweiss").value),
       fett_prozent: Number(document.getElementById("ern-p-fett").value),
       training_anrechnung: Number(document.getElementById("ern-p-anrechnung").value),
+      schritte_sockel: document.getElementById("ern-p-sockel").value === "" ? ERN_SCHRITTE_SOCKEL_STANDARD : Number(document.getElementById("ern-p-sockel").value),
     };
   }
 
@@ -9491,6 +9633,7 @@
     document.getElementById("ern-p-eiweiss").value = p ? Number(p.eiweiss_g_pro_kg).toFixed(1) : "1.2";
     document.getElementById("ern-p-fett").value = p ? String(p.fett_prozent) : "30";
     document.getElementById("ern-p-anrechnung").value = p && p.training_anrechnung !== undefined && p.training_anrechnung !== null ? String(p.training_anrechnung) : "100";
+    document.getElementById("ern-p-sockel").value = String(ernSockelVon(p));
     ernProfilRechnungZeigen();
   }
 
@@ -9513,11 +9656,16 @@
         <tr><td>Fett ${p.fett_prozent} % der Energie</td><td>${ernZahl(r.fett, 0)} g</td></tr>
         <tr><td>Kohlenhydrate (Rest)</td><td>${ernZahl(r.kh, 0)} g</td></tr>
       </table>
+      <p class="notiz-meta">Schritte: ${(() => {
+        const sm = ERN_SCHRITT_FAKTOR * Number(p.groesse_cm) / 100;
+        const je1000 = ERN_KCAL_JE_KG_KM * r.kg * sm;
+        return `ab ${ernZahl(p.schritte_sockel, 0)} Schritten zählt jeder weitere mit – Schrittlänge ≈ ${ernZahl(sm * 100, 0)} cm, je 1.000 Schritte ≈ ${ernZahl(je1000, 0)} kcal (grob, etwa ±20 %). Angerechnet wie Trainings`;
+      })()}.</p>
       <p class="notiz-meta">An Trainingstagen kommen ${p.training_anrechnung === 0 ? "keine Trainingskalorien dazu (nur Anzeige)" : `${p.training_anrechnung === 100 ? "die" : p.training_anrechnung + " % der"} Trainingskalorien dazu – die Makroziele wachsen mit (Fett anteilig, der Rest als Kohlenhydrate)`}.</p>
       ${r.unterGrundumsatz ? `<p class="ern-warnung">Das Ziel liegt unter deinem Grundumsatz. Auf Dauer ist das nicht zu empfehlen – wähle lieber ein langsameres Tempo oder sprich es mit ärztlicher oder ernährungsfachlicher Begleitung ab.</p>` : ""}
       <p class="notiz-meta">Das ist eine Schätzung: Formeln liegen bei Einzelnen oft um rund 10 % daneben. Genauer wird es, wenn du ein paar Wochen isst, trackst und wiegst – dein Gewichtstrend zeigt dann, wo dein echter Bedarf liegt.</p>`;
   }
-  ["ern-p-geschlecht", "ern-p-geburt", "ern-p-groesse", "ern-p-pal", "ern-p-ziel", "ern-p-eiweiss", "ern-p-fett", "ern-p-anrechnung"].forEach((id) => {
+  ["ern-p-geschlecht", "ern-p-geburt", "ern-p-groesse", "ern-p-pal", "ern-p-ziel", "ern-p-eiweiss", "ern-p-fett", "ern-p-anrechnung", "ern-p-sockel"].forEach((id) => {
     document.getElementById(id).addEventListener("input", ernProfilRechnungZeigen);
     document.getElementById(id).addEventListener("change", ernProfilRechnungZeigen);
   });
