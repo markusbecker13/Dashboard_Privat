@@ -413,6 +413,7 @@
 
           <div id="ern-eigen-bereich" class="hidden">
             <p class="notiz-meta" style="margin-top:0;" id="ern-eigen-hinweis">Werte je 100 g, z. B. von der Nährwerttabelle auf der Packung. Das Lebensmittel steht danach in der Suche.</p>
+            <button class="link-btn ern-frei-link hidden" id="btn-ern-eigen-zuordnen">🔗 Gibt es schon als eigenes Lebensmittel? Barcode dort zuordnen</button>
             <div class="task-edit-felder">
               <label class="ern-feld ern-feld-breit">Bezeichnung<input type="text" id="ern-eigen-name" maxlength="120" placeholder="z. B. Proteinriegel Schoko"></label>
               <label class="ern-feld ern-feld-breit">Marke (optional)<input type="text" id="ern-eigen-marke" maxlength="80"></label>
@@ -423,11 +424,28 @@
               <label class="ern-feld">Ballastst. g<input type="number" id="ern-eigen-bal" min="0" max="100" step="any" inputmode="decimal"></label>
               <label class="ern-feld">Portion (Name)<input type="text" id="ern-eigen-portion-name" maxlength="40" placeholder="z. B. 1 Riegel"></label>
               <label class="ern-feld">Portion (g)<input type="number" id="ern-eigen-portion-g" min="1" max="5000" step="any" inputmode="decimal"></label>
+              <div class="ern-feld ern-feld-breit" id="ern-eigen-barcode-feld">
+                <label for="ern-eigen-barcode">Barcode (optional)</label>
+                <div class="ern-barcode-zeile">
+                  <input type="text" id="ern-eigen-barcode" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="Ziffern unter den Strichen">
+                  <button type="button" class="btn-secondary" id="btn-ern-eigen-barcode-scan" aria-label="Barcode scannen">📷</button>
+                </div>
+                <span class="ern-feld-hinweis">Mit Barcode findet der nächste Scan dieses Lebensmittel direkt. Feld leeren entfernt den Barcode.</span>
+              </div>
             </div>
             <div class="row">
               <button class="btn-primary" id="btn-ern-eigen-speichern">Speichern und auswählen</button>
               <button class="btn-secondary" id="btn-ern-eigen-zurueck">Zurück</button>
               <button class="link-btn hidden" id="btn-ern-eigen-loeschen">Lebensmittel löschen</button>
+            </div>
+          </div>
+
+          <div id="ern-zuordnen-bereich" class="hidden">
+            <p class="notiz-meta" style="margin-top:0;" id="ern-zuordnen-hinweis"></p>
+            <input type="search" id="ern-zuordnen-filter" placeholder="Eigene Lebensmittel filtern" autocomplete="off" aria-label="Eigene Lebensmittel filtern">
+            <div id="ern-zuordnen-liste" class="ern-treffer"></div>
+            <div class="row">
+              <button class="btn-secondary" id="btn-ern-zuordnen-zurueck">Zurück</button>
             </div>
           </div>
 
@@ -951,7 +969,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>⧉ Kopieren</strong> (unter den Mahlzeiten): für alles, was „Wie gestern“ nicht abdeckt. Tag wählen (vorbelegt: Vortag), dann „Ganzer Tag“ oder eine Mahlzeit. Bei einer Mahlzeit kannst du das Ziel ändern – z. B. die Reste vom Abend als Mittag. Die Vorschau zeigt, was kopiert wird. Ziel ist immer der oben gewählte Tag. Hat das Ziel schon Einträge, werden die kopierten ergänzt (die App fragt vorher nach). Auch innerhalb eines Tages möglich, z. B. Frühstück als Snack</li>
                 <li><strong>„–“</strong> heißt: für dieses Lebensmittel liegt im BLS kein Wert vor (das ist nicht dasselbe wie 0). Die Tagessumme weist dann darauf hin</li>
                 <li><strong>Datenbank:</strong> Bundeslebensmittelschlüssel (BLS) 4.0 des Max Rubner-Instituts, rund 7.100 Grundlebensmittel und Gerichte mit laborbasierten Durchschnittswerten je 100 g essbarer Anteil. Markenprodukte stehen nicht drin – dafür gibt es Barcode und Markensuche (unten). Lizenz CC BY 4.0, Quelle wird im Eintragen-Feld genannt</li>
-                <li><strong>📷 Barcode:</strong> öffnet die Kamera und erkennt den Strichcode automatisch (Chrome auf Android; am Laptop gibt es meist keine Erkennung). Alternativ die Ziffern unter dem Barcode abtippen. Das Produkt kommt aus Open Food Facts und wird in deiner Datenbank gespeichert – beim nächsten Mal findest du es auch über die normale Suche. Unbekannt oder ohne Kalorien? Dann öffnet sich direkt das Formular für ein eigenes Lebensmittel. Der Barcode wird dabei mitgespeichert – beim nächsten Scan kommt das Produkt sofort aus deinen eigenen Lebensmitteln, ohne erneutes Abtippen</li>
+                <li><strong>📷 Barcode:</strong> öffnet die Kamera und erkennt den Strichcode automatisch (Chrome auf Android; am Laptop gibt es meist keine Erkennung). Alternativ die Ziffern unter dem Barcode abtippen. Das Produkt kommt aus Open Food Facts und wird in deiner Datenbank gespeichert – beim nächsten Mal findest du es auch über die normale Suche. Unbekannt oder ohne Kalorien? Dann öffnet sich direkt das Formular für ein eigenes Lebensmittel. Der Barcode wird dabei mitgespeichert – beim nächsten Scan kommt das Produkt sofort aus deinen eigenen Lebensmitteln, ohne erneutes Abtippen. Hast du das Produkt schon als eigenes Lebensmittel (ohne Barcode), tipp stattdessen „🔗 … Barcode dort zuordnen“ und wähl es aus der Liste</li>
+                <li><strong>Barcode nachträglich:</strong> Eigenes Lebensmittel suchen, antippen, „✎ Werte dieses Lebensmittels korrigieren“ – dort steht das Feld „Barcode“ (mit 📷 zum Scannen). Ändern oder leeren geht genauso. Ein Barcode gehört immer nur zu einem deiner Lebensmittel. Bei Open-Food-Facts-Produkten ist der Barcode fest</li>
                 <li><strong>🔎 Markenprodukt suchen:</strong> erst oben Produkt/Marke eintippen (z. B. „skyr natur“), dann den Knopf – sucht bei Open Food Facts. Bewusst nur auf Knopfdruck, weil Open Food Facts Anfragen begrenzt. Antippen lädt die Nährwerte und speichert das Produkt</li>
                 <li><strong>Open Food Facts</strong> wird von Freiwilligen gepflegt (Lizenz ODbL) – Werte lohnen einen kurzen Blick auf die Packung. Falsche Werte korrigierst du nach dem Antippen über „✎ Werte dieses Lebensmittels korrigieren“</li>
                 <li><strong>➕ Eigenes Lebensmittel:</strong> Name, optional Marke, Werte je 100 g und eine Portion (z. B. „1 Riegel“ = 45 g, erscheint dann als Schnellwahl). Steht danach in der Suche. Eigene und Open-Food-Facts-Lebensmittel lassen sich korrigieren und löschen – schon eingetragene Tage bleiben dabei unverändert. BLS-Einträge bleiben fest</li>
