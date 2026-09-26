@@ -337,7 +337,7 @@
       </div>
 
       <div id="view-ernaehrung" class="hidden">
-        <h1>Ernährung <button class="hilfe-icon" data-hilfe="Dein Ernährungstagebuch: Was du isst, nach Mahlzeiten – mit Kalorien, Eiweiß, Fett, Kohlenhydraten und Ballaststoffen pro Tag, dazu Zucker, gesättigte Fettsäuren und Salz, soweit bekannt. Die Werte kommen aus dem Bundeslebensmittelschlüssel (BLS 4.0). Menge in Gramm eingeben, die App rechnet um. Nur im Bereich Privat.">?</button></h1>
+        <h1>Ernährung <button class="hilfe-icon" data-hilfe="Dein Ernährungstagebuch: Was du isst, nach Mahlzeiten – mit Kalorien, Eiweiß, Fett, Kohlenhydraten und Ballaststoffen pro Tag, dazu Zucker, gesättigte Fettsäuren und Salz, soweit bekannt. Schritte trägst du unter der Tagessumme ein; was über dem Sockel liegt, erhöht das Tagesziel. Die Werte kommen aus dem Bundeslebensmittelschlüssel (BLS 4.0). Menge in Gramm eingeben, die App rechnet um. Nur im Bereich Privat.">?</button></h1>
         <p class="hero-text">Was du isst – Kalorien, Eiweiß, Fett und Kohlenhydrate pro Tag.</p>
 
         <div class="ern-datum-leiste">
@@ -351,6 +351,15 @@
         </div>
 
         <div id="ern-summe"></div>
+
+        <div id="ern-schritte-block" class="ern-schritte-karte hidden">
+          <div class="ern-schritte-zeile">
+            <label class="ern-schritte-label" for="ern-schritte-wert">👣 Schritte</label>
+            <input type="number" id="ern-schritte-wert" min="0" max="100000" step="1" inputmode="numeric" placeholder="z. B. 8500" aria-describedby="ern-schritte-info">
+            <button class="btn-secondary" id="btn-ern-schritte">Speichern</button>
+          </div>
+          <p class="notiz-meta" id="ern-schritte-info" role="status"></p>
+        </div>
 
         <div class="row">
           <button class="btn-primary" id="btn-ern-eintragen-oben">+ Essen eintragen</button>
@@ -615,9 +624,13 @@
                   <option value="0">gar nicht (nur anzeigen)</option>
                 </select>
               </label>
+              <label class="ern-feld ern-feld-breit">Schritte-Sockel (stecken schon in der Aktivität)
+                <input type="number" id="ern-p-sockel" min="0" max="30000" step="500" inputmode="numeric">
+                <span class="ern-feld-hinweis">Nur Schritte darüber zählen extra aufs Tagesziel. Grobe Orientierung (Einschätzung): Aktivität 1,4–1,5 etwa 3.000–5.000, 1,6–1,7 etwa 5.000–7.500, ab 1,8 eher 8.000 und mehr. Zu niedrig gewählt, zählt Alltagsbewegung doppelt.</span>
+              </label>
               <label class="ern-feld ern-feld-breit" id="ern-p-gueltig-feld">Ziel-Einstellungen gelten ab
                 <input type="date" id="ern-p-gueltig">
-                <span class="ern-feld-hinweis">Aktivität, Ziel, Eiweiß, Fett und Anrechnung gelten ab diesem Tag, frühere Tage behalten ihren Stand. Geschlecht, Geburtsdatum und Größe gelten immer für alle Tage.</span>
+                <span class="ern-feld-hinweis">Aktivität, Ziel, Eiweiß, Fett, Anrechnung und Schritte-Sockel gelten ab diesem Tag, frühere Tage behalten ihren Stand. Geschlecht, Geburtsdatum und Größe gelten immer für alle Tage.</span>
               </label>
             </div>
             <div id="ern-profil-rechnung" class="ern-rechnung"></div>
@@ -1005,18 +1018,19 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>➕ Eigenes Lebensmittel:</strong> Name, optional Marke, Werte je 100 g in der Reihenfolge der Packung (kcal, Fett, davon gesättigte, Kohlenhydrate, davon Zucker, Ballaststoffe, Eiweiß, Salz; nur kcal ist Pflicht) und eine Portion (z. B. „1 Riegel“ = 45 g, erscheint dann als Schnellwahl). Steht danach in der Suche. Eigene und Open-Food-Facts-Lebensmittel lassen sich korrigieren und löschen – schon eingetragene Tage bleiben dabei unverändert. BLS-Einträge bleiben fest</li>
                 <li><strong>Datenschutz:</strong> Ernährungsdaten sind Gesundheitsdaten. Sie liegen nur in deiner Supabase-Datenbank (EU-Region), es gibt sie nur in Privat, und sie tauchen bewusst nicht im Verlauf auf</li>
                 <li><strong>⚙️ Profil &amp; Ziel</strong> (unten): Geschlecht (nur für die Formel), Geburtsdatum, Größe, Aktivität im Alltag, Ziel, Eiweiß je kg und Fettanteil. Darunter steht live die Rechnung: Grundumsatz nach Mifflin-St Jeor × Aktivität = Bedarf ohne Sport, dazu das Ziel (halten, −250/−500 oder +250/+500 kcal am Tag) und die Makroziele. Kohlenhydrate sind der Rest</li>
-                <li><strong>Gilt ab</strong> (im Profil): Aktivität, Ziel, Eiweiß, Fett und Anrechnung gelten ab dem gewählten Tag (vorbelegt: heute). Frühere Tage behalten ihr Ziel – stellst du z. B. von „halten“ auf „abnehmen“ um, stehen alte Tage nicht plötzlich 500 kcal über dem Ziel. Ein Datum in der Vergangenheit rechnet ab dann neu, eines in der Zukunft plant eine Umstellung („geplant“). Geschlecht, Geburtsdatum und Größe gelten immer für alle Tage – eine Korrektur der Größe wirkt also rückwirkend. Ein Stand pro Tag: nochmal speichern mit demselben Datum ersetzt ihn</li>
+                <li><strong>Gilt ab</strong> (im Profil): Aktivität, Ziel, Eiweiß, Fett, Anrechnung und Schritte-Sockel gelten ab dem gewählten Tag (vorbelegt: heute). Frühere Tage behalten ihr Ziel – stellst du z. B. von „halten“ auf „abnehmen“ um, stehen alte Tage nicht plötzlich 500 kcal über dem Ziel. Ein Datum in der Vergangenheit rechnet ab dann neu, eines in der Zukunft plant eine Umstellung („geplant“). Geschlecht, Geburtsdatum und Größe gelten immer für alle Tage – eine Korrektur der Größe wirkt also rückwirkend. Ein Stand pro Tag: nochmal speichern mit demselben Datum ersetzt ihn</li>
                 <li><strong>Verlauf der Ziel-Einstellungen</strong> (unter „Speichern“): alle Stände mit Zeitraum, der heute gültige ist markiert. × löscht einen Stand – ab dann gilt wieder der vorherige. Der erste Stand gilt „von Anfang an“, also auch für Tage vor seinem Datum</li>
                 <li><strong>Aktivität ohne Sport wählen:</strong> Trainingskalorien kommen einzeln dazu – steckt der Sport schon im Aktivitätswert, würde er doppelt gezählt</li>
                 <li><strong>Tagesziel:</strong> Mit Profil und Gewicht zeigt die Tagessumme „gegessen / Ziel“, was noch übrig ist, und Eiweiß/Fett/KH gegen ihr Ziel. Maßgeblich ist das letzte Gewicht bis zu diesem Tag</li>
                 <li><strong>Liegt das Ziel unter dem Grundumsatz</strong>, warnt die App – auf Dauer nicht empfehlenswert</li>
                 <li><strong>🏃 Trainingskalorien:</strong> Trainings aus dem Reiter Training (nur Bereich Privat) am selben Tag erhöhen das Tagesziel. Geschätzt wird netto: (MET − 1) × Körpergewicht × Stunden – das „− 1“ zieht den Ruheumsatz ab, der schon im Bedarf steckt. Jede Sportart braucht dafür einmal einen MET-Wert (Vorschläge nach dem Compendium of Physical Activities oder eigener Wert). Ein beim Training eingetragener Wert von der Sportuhr hat Vorrang. Fehlt MET-Wert, Dauer oder Gewicht, steht in der Tagessumme „?“ mit dem Grund</li>
+                <li><strong>👣 Schritte</strong> (unter der Tagessumme): die Zahl des Tages von der Handy- oder Uhr-App ablesen, eintragen, „Speichern“ (Enter geht auch). Automatisch geht es nicht – eine Web-App kommt an Health Connect bzw. Google Fit nicht heran. Feld leeren und speichern entfernt den Wert. Es zählen nur Schritte über dem <strong>Sockel</strong> (im Profil, Standard 5.000): Die Bewegung darunter steckt schon im Aktivitätswert. Umrechnung: Schrittlänge ≈ 0,415 × Körpergröße, rund 0,5 kcal je kg Körpergewicht und km – eine grobe Schätzung (etwa ±20 %), angerechnet wie Trainings (gleicher Prozentsatz). Steht am selben Tag ein Lauf oder eine Wanderung im Training, weist die App auf mögliche Doppelzählung hin, kürzt aber nichts – dann am besten die Schritte ohne die Einheit eintragen. Der Sockel gehört zu den Ziel-Einstellungen und gilt wie die Aktivität „ab“ einem Tag</li>
                 <li><strong>Anrechnung</strong> (im Profil): voll, 75 %, 50 % oder gar nicht. 50 % ist die vorsichtige Wahl, weil Schätzungen und Uhren oft zu hoch liegen. Die Makroziele wachsen mit: Eiweiß bleibt, Fett anteilig, der Rest als Kohlenhydrate</li>
                 <li><strong>⚖️ Gewicht:</strong> ein Wert pro Tag (ein neuer Wert am selben Tag ersetzt den alten), Verlauf der letzten 90 Tage als Linie, Veränderung seit dem letzten Wert vor mindestens 7 bzw. 30 Tagen. Am besten morgens unter gleichen Bedingungen wiegen</li>
                 <li><strong>Ehrlich zur Genauigkeit:</strong> Die Formel ist eine Schätzung und liegt bei Einzelnen oft um rund 10 % daneben. Wirklich genau wird der Bedarf erst über ein paar Wochen Tracking und Wiegen</li>
                 <li><strong>Start-Kachel:</strong> Im Bereich Privat zeigt Start eine vierte Kachel mit den heute noch übrigen Kalorien („kcal übrig“ bzw. „kcal über Ziel“, Trainings schon eingerechnet). Ohne Profil oder Gewicht steht dort nur, was du heute gegessen hast. Antippen öffnet Ernährung beim heutigen Tag. Ist der Reiter ausgeblendet, fehlt auch die Kachel</li>
                 <li><strong>📊 Woche</strong> (unter den Mahlzeiten, aufklappen): Montag bis Sonntag der gewählten Woche, je Tag gegessen / Ziel mit Balken, Abweichung (grün darunter, rot darüber) und Eiweiß/Fett/KH. Oben der Schnitt: Ø kcal, Ø Ziel, Summe über/unter Ziel und Ø Eiweiß gegen das Ziel. Tage ohne Einträge zählen nicht mit – ein vergessener Tag verfälscht also nicht den Schnitt. Einen Tag antippen öffnet ihn, ‹ › blättern wochenweise</li>
-                <li><strong>⬇️ Export</strong> (ganz unten, aufklappen): Zeitraum per 7/30/90 Tage, „Dieses Jahr“ oder Von/Bis wählen, dann „Excel herunterladen“. Die Datei öffnet auch in LibreOffice Calc und hat vier Blätter: <em>Einträge</em> (jede Zeile ein Eintrag mit Mahlzeit, Menge, Werten inkl. Zucker, gesättigten Fettsäuren und Salz, und Quelle), <em>Tage</em> (Summen je Tag gegen das Ziel, nur Tage mit Einträgen), <em>Gewicht</em> und <em>Info</em> (Quellen, Lizenzen, Hinweise). Leere Zelle heißt „kein Wert“, nicht 0. Die Ziele stehen je Tag mit dem Stand, der an diesem Tag galt (Spalte „Ziel-Einstellung“). Die Datei enthält Gesundheitsdaten: nicht unverschlüsselt weitergeben. Ernährung steht bewusst nicht im Reiter Export, weil die Daten erst für den Zeitraum geladen werden</li>
+                <li><strong>⬇️ Export</strong> (ganz unten, aufklappen): Zeitraum per 7/30/90 Tage, „Dieses Jahr“ oder Von/Bis wählen, dann „Excel herunterladen“. Die Datei öffnet auch in LibreOffice Calc und hat vier Blätter: <em>Einträge</em> (jede Zeile ein Eintrag mit Mahlzeit, Menge, Werten inkl. Zucker, gesättigten Fettsäuren und Salz, und Quelle), <em>Tage</em> (Summen je Tag gegen das Ziel, dazu Schritte und ihr angerechneter Zuschlag, nur Tage mit Einträgen), <em>Gewicht</em> und <em>Info</em> (Quellen, Lizenzen, Hinweise). Leere Zelle heißt „kein Wert“, nicht 0. Die Ziele stehen je Tag mit dem Stand, der an diesem Tag galt (Spalte „Ziel-Einstellung“). Die Datei enthält Gesundheitsdaten: nicht unverschlüsselt weitergeben. Ernährung steht bewusst nicht im Reiter Export, weil die Daten erst für den Zeitraum geladen werden</li>
                 <li><strong>In Planung:</strong> Bedarf aus dem Gewichtstrend nachjustieren (sinnvoll erst nach 2–4 Wochen mit Einträgen und Gewicht)</li>
               </ul>
             </div>
