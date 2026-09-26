@@ -1047,4 +1047,8 @@
   .ern-barcode-zeile { display: flex; gap: 0.4rem; align-items: stretch; }
   .ern-barcode-zeile input { flex: 1 1 auto; min-width: 0; }
   .ern-barcode-zeile .btn-secondary { flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 0.3rem 0.8rem; }
+  .ern-meine-kopf { margin-bottom: 0.3rem; }
+  .ern-meine-kopf input[type="search"] { flex: 1 1 180px; min-width: 0; }
+  .ern-meine-kopf .btn-secondary { min-height: 44px; }
+  #ern-meine-status:empty { display: none; }
   #ern-zuordnen-filter { width: 100%; box-sizing: border-box; margin-bottom: 0.2rem; }
