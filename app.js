@@ -8971,6 +8971,7 @@
     document.getElementById("ern-menge-bereich").classList.toggle("hidden", welche !== "menge");
     document.getElementById("ern-frei-bereich").classList.toggle("hidden", welche !== "frei");
     document.getElementById("ern-eigen-bereich").classList.toggle("hidden", welche !== "eigen");
+    document.getElementById("ern-zuordnen-bereich").classList.toggle("hidden", welche !== "zuordnen");
   }
 
   window.ernHinzuOeffnen = function(mahlzeit) {
@@ -9054,7 +9055,7 @@
     document.getElementById("ern-auswahl-name").textContent = l.marke ? `${l.name} (${l.marke})` : l.name;
     const quelle = ernQuelleLabel(l);
     document.getElementById("ern-auswahl-info").textContent =
-      `je 100 g: ${ernZahl(l.kcal, 0)} kcal · Eiweiß ${ernGramm(l.eiweiss)} · Fett ${ernGramm(l.fett)} · KH ${ernGramm(l.kohlenhydrate)}${quelle ? ` · Quelle: ${quelle}` : ""}`;
+      `je 100 g: ${ernZahl(l.kcal, 0)} kcal · Eiweiß ${ernGramm(l.eiweiss)} · Fett ${ernGramm(l.fett)} · KH ${ernGramm(l.kohlenhydrate)}${quelle ? ` · Quelle: ${quelle}` : ""}${l.quelle === "eigen" && l.quell_code ? ` · Barcode ${l.quell_code}` : ""}`;
     // Korrigieren nur bei eigenen/OFF-Lebensmitteln (BLS bleibt unverändert)
     document.getElementById("btn-ern-lm-bearbeiten").classList.toggle("hidden", !l.quelle || l.quelle === "bls");
     const menge = document.getElementById("ern-menge");
@@ -9698,6 +9699,7 @@
   let ernScanStream = null;
   let ernScanLaeuft = false;
   let ernScanHistorie = false;
+  let ernScanZiel = null;         // "feld" = Scan füllt das Barcode-Feld im Eigen-Formular
 
   function ernQuelleLabel(l) {
     return l.quelle === "off" ? "Open Food Facts" : l.quelle === "eigen" ? "eigenes" : "";
@@ -9708,6 +9710,17 @@
     const letzte = ernZuletzt.find((z) => z.id === l.id);
     ernListe = [{ ...l, letzte_menge: letzte ? letzte.letzte_menge : null }];
     window.ernAuswaehlen(0);
+  }
+
+  // Ergebnis von Scanner/Abtippen: ins Barcode-Feld oder als Suche
+  function ernScanErgebnis(code, ziel) {
+    if (ziel === "feld") {
+      const feld = document.getElementById("ern-eigen-barcode");
+      feld.value = String(code || "").replace(/\D/g, "");
+      feld.focus();
+      return;
+    }
+    ernBarcodeSuchen(code);
   }
 
   // ---- Open Food Facts: Barcode ----
@@ -9787,6 +9800,13 @@
         ? `Werte je 100 g von der Nährwerttabelle der Packung. Barcode ${ernEigenBarcode} wird mitgespeichert – beim nächsten Scan kommt das Produkt direkt aus deinen Lebensmitteln.`
         : "Werte je 100 g, z. B. von der Nährwerttabelle auf der Packung. Das Lebensmittel steht danach in der Suche.";
     document.getElementById("btn-ern-eigen-loeschen").classList.toggle("hidden", !l);
+    // Barcode: bei neuen und eigenen Lebensmitteln änderbar, bei Open Food
+    // Facts fest (dort ist der Code der OFF-Barcode)
+    const barcodeFeld = document.getElementById("ern-eigen-barcode");
+    const barcodeAn = !l || l.quelle === "eigen";
+    document.getElementById("ern-eigen-barcode-feld").classList.toggle("hidden", !barcodeAn);
+    barcodeFeld.value = l ? (l.quelle === "eigen" && l.quell_code ? l.quell_code : "") : (ernEigenBarcode || "");
+    document.getElementById("btn-ern-eigen-zuordnen").classList.toggle("hidden", !ernEigenBarcode);
     ernAnsicht("eigen");
     document.getElementById(werte.name ? "ern-eigen-kcal" : "ern-eigen-name").focus();
   }
@@ -9818,13 +9838,15 @@
         name: wert("name"), marke: wert("marke"), kcal: wert("kcal"),
         eiweiss: wert("eiweiss"), fett: wert("fett"), kohlenhydrate: wert("kh"), ballaststoffe: wert("bal"),
         portion_name: wert("portion-name"), portion_g: wert("portion-g"),
-        barcode: ernLmBearbeiten ? undefined : (ernEigenBarcode || undefined),
+        // Neu: leer = ohne Barcode. Eigenes bearbeiten: leer = Barcode entfernen.
+        // Open Food Facts: nicht mitschicken (Feld ist ausgeblendet).
+        barcode: ernLmBearbeiten && ernLmBearbeiten.quelle !== "eigen" ? undefined : wert("barcode").trim(),
       });
       const l = res.lebensmittel;
       // Zuletzt-Liste mit den korrigierten Werten aktualisieren
       ernZuletzt = ernZuletzt.map((z) => (z.id === l.id ? { ...z, ...l } : z));
       status.textContent = ernLmBearbeiten ? "✓ Werte korrigiert"
-        : ernEigenBarcode ? "✓ Lebensmittel mit Barcode angelegt" : "✓ Lebensmittel angelegt";
+        : l.quell_code ? "✓ Lebensmittel mit Barcode angelegt" : "✓ Lebensmittel angelegt";
       ernLmBearbeiten = null;
       ernEigenBarcode = null;
       ernLebensmittelWaehlen(l);
@@ -9834,6 +9856,79 @@
       knopf.disabled = false;
     }
   });
+
+  // ---- Barcode einem vorhandenen eigenen Lebensmittel zuordnen ----
+  let ernZuordnenListe = [];
+  let ernZuordnenCode = null;
+
+  function ernZuordnenRendern() {
+    const el = document.getElementById("ern-zuordnen-liste");
+    const q = document.getElementById("ern-zuordnen-filter").value.trim().toLowerCase();
+    const woerter = q.split(/\s+/).filter(Boolean);
+    const treffer = ernZuordnenListe.filter((l) => {
+      const text = `${l.name} ${l.marke || ""}`.toLowerCase();
+      return woerter.every((w) => text.includes(w));
+    });
+    if (!ernZuordnenListe.length) {
+      el.innerHTML = `<p class="notiz-meta">Du hast noch keine eigenen Lebensmittel. Geh zurück und leg es mit den Werten von der Packung an.</p>`;
+      return;
+    }
+    el.innerHTML = treffer.length
+      ? treffer.slice(0, 60).map((l) => `
+          <button class="ern-treffer-zeile" onclick="ernBarcodeZuordnen('${escapeAttr(l.id)}')">
+            <span class="ern-treffer-name">${escapeHtml(l.name)}${l.marke ? ` <span class="notiz-meta">(${escapeHtml(l.marke)})</span>` : ""}</span>
+            <span class="notiz-meta">${ernZahl(l.kcal, 0)} kcal je 100 g · ${l.quell_code ? `hat schon Barcode ${escapeHtml(l.quell_code)}` : "noch ohne Barcode"}</span>
+          </button>`).join("")
+      : `<p class="notiz-meta">Kein eigenes Lebensmittel passt zum Filter.</p>`;
+  }
+
+  document.getElementById("btn-ern-eigen-zuordnen").addEventListener("click", async () => {
+    const code = document.getElementById("ern-eigen-barcode").value.replace(/\D/g, "") || ernEigenBarcode;
+    const status = document.getElementById("ern-hinzu-status");
+    if (!code) return;
+    ernZuordnenCode = code;
+    document.getElementById("ern-zuordnen-hinweis").textContent =
+      `Barcode ${code}: Tipp das eigene Lebensmittel an, zu dem er gehört. Beim nächsten Scan kommt es dann direkt.`;
+    document.getElementById("ern-zuordnen-filter").value = "";
+    document.getElementById("ern-zuordnen-liste").innerHTML = `<p class="notiz-meta">Lade deine eigenen Lebensmittel …</p>`;
+    status.textContent = "";
+    ernAnsicht("zuordnen");
+    try {
+      const res = await api("lebensmittel_eigene");
+      ernZuordnenListe = res.lebensmittel || [];
+      // Ohne Barcode zuerst – das sind die Kandidaten
+      ernZuordnenListe.sort((a, b) => (a.quell_code ? 1 : 0) - (b.quell_code ? 1 : 0) || a.name.localeCompare(b.name, "de"));
+      ernZuordnenRendern();
+      document.getElementById("ern-zuordnen-filter").focus();
+    } catch (e) {
+      if (e.message !== "unauthorized") document.getElementById("ern-zuordnen-liste").innerHTML = `<p class="notiz-meta">${escapeHtml(e.message)}</p>`;
+    }
+  });
+
+  document.getElementById("ern-zuordnen-filter").addEventListener("input", ernZuordnenRendern);
+  document.getElementById("btn-ern-zuordnen-zurueck").addEventListener("click", () => {
+    document.getElementById("ern-hinzu-status").textContent = "";
+    ernAnsicht("eigen");
+  });
+
+  window.ernBarcodeZuordnen = async function(id) {
+    const l = ernZuordnenListe.find((x) => x.id === id);
+    const status = document.getElementById("ern-hinzu-status");
+    if (!l || !ernZuordnenCode) return;
+    if (l.quell_code && l.quell_code !== ernZuordnenCode
+      && !confirm(`„${l.name}“ hat schon den Barcode ${l.quell_code}. Durch ${ernZuordnenCode} ersetzen?`)) return;
+    try {
+      const res = await api("lebensmittel_barcode_zuordnen", { id, barcode: ernZuordnenCode });
+      const neu = res.lebensmittel;
+      ernZuletzt = ernZuletzt.map((z) => (z.id === neu.id ? { ...z, ...neu } : z));
+      ernEigenBarcode = null;
+      ernZuordnenCode = null;
+      status.textContent = `✓ Barcode ${neu.quell_code} gehört jetzt zu „${neu.name}“`;
+      ernLebensmittelWaehlen(neu);
+    } catch (e) {
+      if (e.message !== "unauthorized") status.textContent = e.message;
+    }
+  };
 
   document.getElementById("btn-ern-eigen-loeschen").addEventListener("click", async () => {
     const l = ernLmBearbeiten;
@@ -9853,12 +9948,18 @@
   });
 
   // ---- Scanner ----
-  document.getElementById("btn-ern-scan").addEventListener("click", ernScannerOeffnen);
+  document.getElementById("btn-ern-scan").addEventListener("click", () => { ernScanZiel = null; ernScannerOeffnen(); });
+  document.getElementById("btn-ern-eigen-barcode-scan").addEventListener("click", () => {
+    ernScanZiel = "feld";
+    document.getElementById("btn-ern-scanner-suchen").textContent = "Übernehmen";
+    ernScannerOeffnen();
+  });
   document.getElementById("btn-ern-scanner-zu").addEventListener("click", () => ernScannerSchliessen());
   document.getElementById("btn-ern-scanner-suchen").addEventListener("click", () => {
     const code = document.getElementById("ern-scanner-code").value;
+    const ziel = ernScanZiel;
     ernScannerSchliessen();
-    ernBarcodeSuchen(code);
+    ernScanErgebnis(code, ziel);
   });
   document.getElementById("ern-scanner-code").addEventListener("keydown", (e) => {
     if (e.key === "Enter") document.getElementById("btn-ern-scanner-suchen").click();
@@ -9918,8 +10019,9 @@
           const treffer = codes.find((c) => /^\d{8,14}$/.test(c.rawValue));
           if (treffer) {
             if (navigator.vibrate) navigator.vibrate(80);
+            const ziel = ernScanZiel;
             ernScannerSchliessen();
-            ernBarcodeSuchen(treffer.rawValue);
+            ernScanErgebnis(treffer.rawValue, ziel);
             return;
           }
         }
@@ -9938,6 +10040,8 @@
 
   function ernScannerSchliessen(ausPopstate) {
     ernKameraStoppen();
+    ernScanZiel = null;
+    document.getElementById("btn-ern-scanner-suchen").textContent = "Suchen";
     document.getElementById("ern-scanner").classList.add("hidden");
     if (!ausPopstate && ernScanHistorie) { ernScanHistorie = false; history.back(); }
   }
