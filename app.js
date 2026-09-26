@@ -8981,6 +8981,8 @@
     panel.classList.remove("hidden");
     ernHinzuTitelAktualisieren();
     ernAuswahl = null;
+    ernMeineModus = false;
+    document.getElementById("ern-hinzu-mahlzeit").classList.remove("hidden");
     ernAnsicht("suche");
     document.getElementById("ern-hinzu-status").textContent = "";
     const suche = document.getElementById("ern-suche");
@@ -8994,6 +8996,7 @@
     document.getElementById("ern-hinzu").classList.add("hidden");
     ernHinzuMahlzeit = null;
     ernAuswahl = null;
+    ernMeineModus = false;
   }
 
   document.getElementById("btn-ern-eintragen-oben").addEventListener("click", () => window.ernHinzuOeffnen(null));
@@ -9696,6 +9699,9 @@
   // BarcodeDetector (Chrome auf Android), sonst Barcode abtippen.
   // ==========================================================
   let ernLmBearbeiten = null;     // Lebensmittel, das im Eigen-Formular bearbeitet wird
+  let ernMeineModus = false;      // Formular aus „Meine Lebensmittel“ geöffnet: danach schließen statt eintragen
+  let ernMeineListe = [];
+  let ernMeineLaedt = false;
   let ernScanStream = null;
   let ernScanLaeuft = false;
   let ernScanHistorie = false;
@@ -9819,6 +9825,7 @@
     if (ernAuswahl) ernEigenOeffnen(ernAuswahl);
   });
   document.getElementById("btn-ern-eigen-zurueck").addEventListener("click", () => {
+    if (ernMeineModus) { ernLmBearbeiten = null; ernEigenBarcode = null; ernHinzuSchliessen(); ernMeineZeigen(); return; }
     if (ernLmBearbeiten && ernAuswahl) { ernAnsicht("menge"); return; }
     ernLmBearbeiten = null;
     ernEigenBarcode = null;
@@ -9849,6 +9856,14 @@
         : l.quell_code ? "✓ Lebensmittel mit Barcode angelegt" : "✓ Lebensmittel angelegt";
       ernLmBearbeiten = null;
       ernEigenBarcode = null;
+      if (ernMeineBlockOffen()) ernMeineLaden();
+      if (ernMeineModus) {
+        const text = status.textContent + ` („${l.name}“)`;
+        status.textContent = "";
+        ernHinzuSchliessen();
+        ernMeineZeigen(text);
+        return;
+      }
       ernLebensmittelWaehlen(l);
     } catch (e) {
       if (e.message !== "unauthorized") status.textContent = e.message;
@@ -9938,6 +9953,12 @@
       ernZuletzt = ernZuletzt.filter((z) => z.id !== l.id);
       ernLmBearbeiten = null;
       ernAuswahl = null;
+      if (ernMeineBlockOffen()) ernMeineLaden();
+      if (ernMeineModus) {
+        ernHinzuSchliessen();
+        ernMeineZeigen(`✓ „${l.name}“ gelöscht`);
+        return;
+      }
       document.getElementById("ern-hinzu-status").textContent = `✓ „${l.name}“ gelöscht`;
       ernAnsicht("suche");
       document.getElementById("ern-suche").value = "";
@@ -9946,6 +9967,79 @@
       if (e.message !== "unauthorized") alert(e.message);
     }
   });
+
+  // ---- Meine Lebensmittel (Übersicht der eigenen) ----
+  function ernMeineBlockOffen() {
+    const b = document.getElementById("ern-meine-block");
+    return !!(b && b.open);
+  }
+
+  async function ernMeineLaden() {
+    const el = document.getElementById("ern-meine-liste");
+    if (ernMeineLaedt) return;
+    ernMeineLaedt = true;
+    if (!ernMeineListe.length) el.innerHTML = `<p class="notiz-meta">Lade deine Lebensmittel …</p>`;
+    try {
+      const res = await api("lebensmittel_eigene");
+      ernMeineListe = res.lebensmittel || [];
+      ernMeineRendern();
+    } catch (e) {
+      if (e.message !== "unauthorized") el.innerHTML = `<p class="notiz-meta">${escapeHtml(e.message)}</p>`;
+    } finally {
+      ernMeineLaedt = false;
+    }
+  }
+
+  function ernMeineRendern() {
+    const el = document.getElementById("ern-meine-liste");
+    if (!ernMeineListe.length) {
+      el.innerHTML = `<p class="notiz-meta">Noch keine eigenen Lebensmittel. „➕ Neu“ legt eins an – oder scann ein Produkt, das Open Food Facts nicht kennt.</p>`;
+      return;
+    }
+    const woerter = document.getElementById("ern-meine-filter").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const treffer = ernMeineListe.filter((l) => {
+      const text = `${l.name} ${l.marke || ""} ${l.quell_code || ""}`.toLowerCase();
+      return woerter.every((w) => text.includes(w));
+    });
+    const mitBarcode = ernMeineListe.filter((l) => l.quell_code).length;
+    const kopf = `<p class="ern-liste-titel">${ernMeineListe.length} eigene${woerter.length ? ` · ${treffer.length} passend` : ""} · ${mitBarcode} mit Barcode</p>`;
+    el.innerHTML = kopf + (treffer.length
+      ? treffer.slice(0, 100).map((l) => `
+          <button class="ern-treffer-zeile" onclick="ernMeineBearbeiten('${escapeAttr(l.id)}')">
+            <span class="ern-treffer-name">${escapeHtml(l.name)}${l.marke ? ` <span class="notiz-meta">(${escapeHtml(l.marke)})</span>` : ""}</span>
+            <span class="notiz-meta">${ernZahl(l.kcal, 0)} kcal · E ${ernZahl(l.eiweiss)} · F ${ernZahl(l.fett)} · KH ${ernZahl(l.kohlenhydrate)} je 100 g · ${l.quell_code ? `Barcode ${escapeHtml(l.quell_code)}` : "ohne Barcode"}</span>
+          </button>`).join("") + (treffer.length > 100 ? `<p class="notiz-meta">… und ${treffer.length - 100} weitere – Filter nutzen.</p>` : "")
+      : `<p class="notiz-meta">Nichts passt zum Filter.</p>`);
+  }
+
+  // Block wieder zeigen (nach Speichern/Löschen/Zurück), optional mit Meldung
+  function ernMeineZeigen(meldung) {
+    const block = document.getElementById("ern-meine-block");
+    document.getElementById("ern-meine-status").textContent = meldung || "";
+    if (!block.open) block.open = true; else ernMeineRendern();
+    block.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  function ernMeineFormOeffnen(l) {
+    window.ernHinzuOeffnen(null);
+    ernMeineModus = true;
+    document.getElementById("ern-meine-status").textContent = "";
+    ernEigenOeffnen(l, "");
+    document.getElementById("ern-hinzu-titel").textContent = l ? "Lebensmittel bearbeiten" : "Neues Lebensmittel";
+    document.getElementById("ern-hinzu-mahlzeit").classList.add("hidden");
+    document.getElementById("ern-hinzu").scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  window.ernMeineBearbeiten = function(id) {
+    const l = ernMeineListe.find((x) => x.id === id);
+    if (l) ernMeineFormOeffnen(l);
+  };
+
+  document.getElementById("ern-meine-block").addEventListener("toggle", (e) => {
+    if (e.target.open) ernMeineLaden();
+  });
+  document.getElementById("ern-meine-filter").addEventListener("input", ernMeineRendern);
+  document.getElementById("btn-ern-meine-neu").addEventListener("click", () => ernMeineFormOeffnen(null));
 
   // ---- Scanner ----
   document.getElementById("btn-ern-scan").addEventListener("click", () => { ernScanZiel = null; ernScannerOeffnen(); });
