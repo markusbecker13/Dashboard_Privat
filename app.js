@@ -8255,16 +8255,52 @@
     return "snack";
   }
 
+  // Zusatzwerte (Session 22): bei älteren Einträgen und BLS oft leer, daher
+  // eigene Zählung statt „luecken“ – sonst stünde fast jeder Tag als lückenhaft da
+  const ERN_ZUSATZ = [["zucker", "Zucker", 1], ["ges_fett", "Ges. Fettsäuren", 1], ["salz", "Salz", 2]];
+
   function ernSumme(liste) {
-    const s = { kcal: 0, eiweiss: 0, fett: 0, kohlenhydrate: 0, ballaststoffe: 0, luecken: false };
+    const s = { kcal: 0, eiweiss: 0, fett: 0, kohlenhydrate: 0, ballaststoffe: 0, luecken: false, anzahl: liste.length, zusatz: {} };
+    for (const [f] of ERN_ZUSATZ) s.zusatz[f] = { summe: 0, mit: 0 };
     for (const e of liste) {
       s.kcal += Number(e.kcal) || 0;
       for (const f of ["eiweiss", "fett", "kohlenhydrate", "ballaststoffe"]) {
         if (e[f] === null || e[f] === undefined) s.luecken = true;
         else s[f] += Number(e[f]);
       }
+      for (const [f] of ERN_ZUSATZ) {
+        if (e[f] !== null && e[f] !== undefined && e[f] !== "") { s.zusatz[f].summe += Number(e[f]); s.zusatz[f].mit += 1; }
+      }
     }
     return s;
+  }
+
+  // Zeile unter den Makros: Zucker · gesättigte Fettsäuren · Salz (mit
+  // DGE-Orientierungswert höchstens 6 g Salz am Tag). Nur, wenn überhaupt
+  // ein Wert vorliegt.
+  const ERN_SALZ_RICHTWERT = 6;
+  function ernZusatzHtml(s) {
+    if (!s.anzahl || !ERN_ZUSATZ.some(([f]) => s.zusatz[f].mit > 0)) return "";
+    const kacheln = ERN_ZUSATZ.map(([f, label, stellen]) => {
+      const z = s.zusatz[f];
+      const teilweise = z.mit && z.mit < s.anzahl
+        ? `<sup class="ern-teilweise" title="nur aus ${z.mit} von ${s.anzahl} Einträgen">*</sup>` : "";
+      const wert = z.mit ? `${ernZahl(z.summe, stellen)} g${teilweise}` : "–";
+      if (f !== "salz") {
+        return `<div class="ern-makro"><span class="ern-makro-label">${label}</span><span class="ern-makro-wert">${wert}</span></div>`;
+      }
+      const ueber = z.summe > ERN_SALZ_RICHTWERT;
+      const breite = Math.min(100, Math.round((z.summe / ERN_SALZ_RICHTWERT) * 100));
+      return `
+        <div class="ern-makro">
+          <span class="ern-makro-label">${label}</span>
+          <span class="ern-makro-wert${ueber ? " ern-ueber" : ""}">${wert}${z.mit ? ` <span class="ern-makro-ziel">/ max. ${ERN_SALZ_RICHTWERT} g</span>` : ""}</span>
+          ${z.mit ? `<span class="ern-makro-balken"><span class="${ueber ? "ern-balken-ueber" : "ern-balken-salz"}" style="width:${breite}%"></span></span>` : ""}
+        </div>`;
+    });
+    const unvollstaendig = ERN_ZUSATZ.some(([f]) => s.zusatz[f].mit > 0 && s.zusatz[f].mit < s.anzahl);
+    return `<div class="ern-makros ern-zusatz">${kacheln.join("")}</div>
+      ${unvollstaendig ? `<p class="notiz-meta" style="margin:0.4rem 0 0;">* nur aus den Einträgen mit Wert (der BLS hat z. B. kein Salz und keine gesättigten Fettsäuren) – die echte Menge liegt eher höher.</p>` : ""}`;
   }
 
   async function ernTagLaden() {
@@ -8384,7 +8420,11 @@
          <label class="ern-feld">kcal<input type="number" id="ern-edit-kcal" min="0" max="20000" step="any" inputmode="decimal" value="${e.kcal ?? ""}"></label>
          <label class="ern-feld">Eiweiß g<input type="number" id="ern-edit-eiweiss" min="0" step="any" inputmode="decimal" value="${e.eiweiss ?? ""}"></label>
          <label class="ern-feld">Fett g<input type="number" id="ern-edit-fett" min="0" step="any" inputmode="decimal" value="${e.fett ?? ""}"></label>
-         <label class="ern-feld">KH g<input type="number" id="ern-edit-kh" min="0" step="any" inputmode="decimal" value="${e.kohlenhydrate ?? ""}"></label>`;
+         <label class="ern-feld">KH g<input type="number" id="ern-edit-kh" min="0" step="any" inputmode="decimal" value="${e.kohlenhydrate ?? ""}"></label>
+         <label class="ern-feld">davon gesättigte g<input type="number" id="ern-edit-gesfett" min="0" step="any" inputmode="decimal" value="${e.ges_fett ?? ""}"></label>
+         <label class="ern-feld">davon Zucker g<input type="number" id="ern-edit-zucker" min="0" step="any" inputmode="decimal" value="${e.zucker ?? ""}"></label>
+         <label class="ern-feld">Ballastst. g<input type="number" id="ern-edit-bal" min="0" step="any" inputmode="decimal" value="${e.ballaststoffe ?? ""}"></label>
+         <label class="ern-feld">Salz g<input type="number" id="ern-edit-salz" min="0" step="any" inputmode="decimal" value="${e.salz ?? ""}"></label>`;
     return `
       <div class="task task-edit ern-eintrag">
         <div class="task-info">
@@ -8801,6 +8841,9 @@
       "Fett (g)": ernWert(e.fett),
       "Kohlenhydrate (g)": ernWert(e.kohlenhydrate),
       "Ballaststoffe (g)": ernWert(e.ballaststoffe),
+      "Zucker (g)": ernWert(e.zucker),
+      "ges. Fettsäuren (g)": ernWert(e.ges_fett),
+      "Salz (g)": e.salz === null || e.salz === undefined || e.salz === "" ? "" : Math.round(Number(e.salz) * 100) / 100,
       Quelle: e.quelle ? (ERN_QUELLE_TEXT[e.quelle] || e.quelle) : "Lebensmittel gelöscht",
     }));
 
@@ -8826,7 +8869,12 @@
         "Fett (g)": ernWert(s.fett),
         "Kohlenhydrate (g)": ernWert(s.kohlenhydrate),
         "Ballaststoffe (g)": ernWert(s.ballaststoffe),
+        "Zucker (g)": s.zusatz.zucker.mit ? ernWert(s.zusatz.zucker.summe) : "",
+        "ges. Fettsäuren (g)": s.zusatz.ges_fett.mit ? ernWert(s.zusatz.ges_fett.summe) : "",
+        "Salz (g)": s.zusatz.salz.mit ? Math.round(s.zusatz.salz.summe * 100) / 100 : "",
         "Werte unvollständig": s.luecken ? "ja" : "",
+        "Zucker/ges. Fett/Salz aus": ERN_ZUSATZ.some(([f]) => s.zusatz[f].mit > 0 && s.zusatz[f].mit < s.anzahl)
+          ? `nur teilweise (${Math.max(...ERN_ZUSATZ.map(([f]) => s.zusatz[f].mit))} von ${s.anzahl} Einträgen)` : "",
         "Ziel-Einstellung": z && z.profil ? ernZielKurz(z.profil) : "",
       };
     });
@@ -8837,6 +8885,7 @@
       { Punkt: "Zeitraum", Wert: `${datumDe(von)} bis ${datumDe(bis)}` },
       { Punkt: "Erstellt", Wert: new Date().toLocaleString("de-DE") },
       { Punkt: "Werte", Wert: "Je Eintrag für die gegessene Menge, so wie beim Eintragen gespeichert. Leere Zelle = kein Wert vorhanden (nicht 0)." },
+      { Punkt: "Zucker, ges. Fett, Salz", Wert: "Erst ab Session 22 (September 2026) erfasst. Der BLS liefert Zucker, aber kein Salz und keine gesättigten Fettsäuren; ältere Einträge sind leer. Tagessummen zählen nur Einträge mit Wert. Salz: DGE-Orientierungswert höchstens 6 g am Tag." },
       { Punkt: "Ziele", Wert: !ernProfil ? "Kein Profil hinterlegt – daher keine Ziele."
         : ernZielVersionen && ernZielVersionen.length
           ? "Je Tag mit den Ziel-Einstellungen, die an diesem Tag galten (Spalte „Ziel-Einstellung“ im Blatt Tage), Mifflin-St Jeor × Aktivität ± Ziel, Gewicht bis zum jeweiligen Tag, Trainings eingerechnet. Geschlecht, Geburtsdatum und Größe: aktueller Stand."
@@ -8852,8 +8901,8 @@
       if (zeilen.length && breiten) ws["!cols"] = breiten.map((w) => ({ wch: w }));
       XLSX.utils.book_append_sheet(wb, ws, name);
     };
-    blatt(zeilenEintraege, "Einträge", [11, 11, 40, 10, 8, 10, 8, 16, 16, 18]);
-    blatt(zeilenTage, "Tage", [11, 9, 9, 8, 9, 13, 14, 10, 14, 8, 16, 16, 18, 70]);
+    blatt(zeilenEintraege, "Einträge", [11, 11, 40, 10, 8, 10, 8, 16, 16, 10, 18, 8, 18]);
+    blatt(zeilenTage, "Tage", [11, 9, 9, 8, 9, 13, 14, 10, 14, 8, 16, 16, 10, 18, 8, 18, 30, 70]);
     blatt(zeilenGewicht, "Gewicht", [11, 12]);
     blatt(info, "Info", [16, 110]);
     return wb;
@@ -8914,6 +8963,10 @@
       daten.eiweiss = document.getElementById("ern-edit-eiweiss").value;
       daten.fett = document.getElementById("ern-edit-fett").value;
       daten.kohlenhydrate = document.getElementById("ern-edit-kh").value;
+      daten.ges_fett = document.getElementById("ern-edit-gesfett").value;
+      daten.zucker = document.getElementById("ern-edit-zucker").value;
+      daten.ballaststoffe = document.getElementById("ern-edit-bal").value;
+      daten.salz = document.getElementById("ern-edit-salz").value;
     }
     try {
       const res = await api("ernaehrung_eintrag_aktualisieren", daten);
@@ -9057,8 +9110,7 @@
     ernAuswahl = l;
     document.getElementById("ern-auswahl-name").textContent = l.marke ? `${l.name} (${l.marke})` : l.name;
     const quelle = ernQuelleLabel(l);
-    document.getElementById("ern-auswahl-info").textContent =
-      `je 100 g: ${ernZahl(l.kcal, 0)} kcal · Eiweiß ${ernGramm(l.eiweiss)} · Fett ${ernGramm(l.fett)} · KH ${ernGramm(l.kohlenhydrate)}${quelle ? ` · Quelle: ${quelle}` : ""}${l.quelle === "eigen" && l.quell_code ? ` · Barcode ${l.quell_code}` : ""}`;
+    ernAuswahlInfoZeigen();
     // Korrigieren nur bei eigenen/OFF-Lebensmitteln (BLS bleibt unverändert)
     document.getElementById("btn-ern-lm-bearbeiten").classList.toggle("hidden", !l.quelle || l.quelle === "bls");
     const menge = document.getElementById("ern-menge");
@@ -9073,6 +9125,47 @@
     menge.select();
   };
 
+  function ernAuswahlInfoZeigen() {
+    const l = ernAuswahl;
+    if (!l) return;
+    const quelle = ernQuelleLabel(l);
+    const hat = (v) => v !== null && v !== undefined;
+    const fett = `Fett ${ernGramm(l.fett)}${hat(l.ges_fett) ? ` (davon gesättigte ${ernGramm(l.ges_fett)})` : ""}`;
+    const kh = `KH ${ernGramm(l.kohlenhydrate)}${hat(l.zucker) ? ` (davon Zucker ${ernGramm(l.zucker)})` : ""}`;
+    const salz = hat(l.salz) ? ` · Salz ${ernZahl(l.salz, 2)} g` : "";
+    document.getElementById("ern-auswahl-info").textContent =
+      `je 100 g: ${ernZahl(l.kcal, 0)} kcal · Eiweiß ${ernGramm(l.eiweiss)} · ${fett} · ${kh}${salz}${quelle ? ` · Quelle: ${quelle}` : ""}${l.quelle === "eigen" && l.quell_code ? ` · Barcode ${l.quell_code}` : ""}`;
+    // Open-Food-Facts-Produkte von vor Session 22: Salz/ges. Fett fehlen noch
+    const fehlt = l.quelle === "off" && l.quell_code && (l.salz === null || l.salz === undefined) && (l.ges_fett === null || l.ges_fett === undefined);
+    document.getElementById("btn-ern-off-nachladen").classList.toggle("hidden", !fehlt);
+  }
+
+  document.getElementById("btn-ern-off-nachladen").addEventListener("click", async (ev) => {
+    const knopf = ev.currentTarget;
+    const status = document.getElementById("ern-hinzu-status");
+    if (!ernAuswahl) return;
+    knopf.disabled = true;
+    status.textContent = "Frage Open Food Facts …";
+    try {
+      const res = await api("off_nachladen", { id: ernAuswahl.id });
+      const neu = res.lebensmittel;
+      ernAuswahl = { ...ernAuswahl, ...neu };
+      ernZuletzt = ernZuletzt.map((z) => (z.id === neu.id ? { ...z, ...neu } : z));
+      ernListe = ernListe.map((z) => (z.id === neu.id ? { ...z, ...neu } : z));
+      const namen = { ballaststoffe: "Ballaststoffe", zucker: "Zucker", ges_fett: "gesättigte Fettsäuren", salz: "Salz" };
+      status.textContent = res.ergaenzt && res.ergaenzt.length
+        ? `✓ Ergänzt: ${res.ergaenzt.map((f) => namen[f] || f).join(", ")}`
+        : "Open Food Facts hat für dieses Produkt keine weiteren Werte. Du kannst sie über „✎ Werte … korrigieren“ selbst eintragen.";
+      ernAuswahlInfoZeigen();
+      if (!res.ergaenzt || !res.ergaenzt.length) knopf.classList.add("hidden");
+      ernVorschau();
+    } catch (e) {
+      if (e.message !== "unauthorized") status.textContent = e.message;
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+
   window.ernMengeSetzen = function(g) {
     document.getElementById("ern-menge").value = g;
     ernVorschau();
@@ -9084,7 +9177,10 @@
     if (!ernAuswahl || !(g > 0)) { el.textContent = ""; return; }
     const f = g / 100;
     const w = (v) => (v === null || v === undefined ? "–" : ernZahl(Number(v) * f) + " g");
-    el.innerHTML = `<strong>${ernZahl(Number(ernAuswahl.kcal) * f, 0)} kcal</strong> · Eiweiß ${w(ernAuswahl.eiweiss)} · Fett ${w(ernAuswahl.fett)} · KH ${w(ernAuswahl.kohlenhydrate)}`;
+    const extra = [["zucker", "Zucker", 1], ["salz", "Salz", 2]]
+      .filter(([k]) => ernAuswahl[k] !== null && ernAuswahl[k] !== undefined)
+      .map(([k, label, stellen]) => ` · ${label} ${ernZahl(Number(ernAuswahl[k]) * f, stellen)} g`).join("");
+    el.innerHTML = `<strong>${ernZahl(Number(ernAuswahl.kcal) * f, 0)} kcal</strong> · Eiweiß ${w(ernAuswahl.eiweiss)} · Fett ${w(ernAuswahl.fett)} · KH ${w(ernAuswahl.kohlenhydrate)}${extra}`;
   }
   document.getElementById("ern-menge").addEventListener("input", ernVorschau);
   document.getElementById("ern-menge").addEventListener("keydown", (e) => {
@@ -9135,7 +9231,9 @@
 
   // ---- Freier Eintrag ----
   document.getElementById("btn-ern-frei-oeffnen").addEventListener("click", () => {
-    ["ern-frei-name", "ern-frei-kcal", "ern-frei-eiweiss", "ern-frei-fett", "ern-frei-kh"].forEach((id) => { document.getElementById(id).value = ""; });
+    ["ern-frei-name", "ern-frei-kcal", "ern-frei-eiweiss", "ern-frei-fett", "ern-frei-kh",
+      "ern-frei-gesfett", "ern-frei-zucker", "ern-frei-bal", "ern-frei-salz"].forEach((id) => { document.getElementById(id).value = ""; });
+    document.getElementById("ern-frei-mehr").open = false;
     const q = document.getElementById("ern-suche").value.trim();
     if (q) document.getElementById("ern-frei-name").value = q;
     ernAnsicht("frei");
@@ -9157,6 +9255,10 @@
         eiweiss: document.getElementById("ern-frei-eiweiss").value,
         fett: document.getElementById("ern-frei-fett").value,
         kohlenhydrate: document.getElementById("ern-frei-kh").value,
+        ges_fett: document.getElementById("ern-frei-gesfett").value,
+        zucker: document.getElementById("ern-frei-zucker").value,
+        ballaststoffe: document.getElementById("ern-frei-bal").value,
+        salz: document.getElementById("ern-frei-salz").value,
       });
       ernNachEintragen(res.eintrag, `✓ ${res.eintrag.name} eingetragen`);
     } catch (err) {
@@ -9321,6 +9423,7 @@
             ${ernMakroHtml("Kohlenhydrate", s.kohlenhydrate, null, "ern-balken-kh")}
             ${ernMakroHtml("Ballaststoffe", s.ballaststoffe, null, "")}
           </div>
+          ${ernZusatzHtml(s)}
           ${hinweis ? `<p class="notiz-meta" style="margin:0.6rem 0 0;">${hinweis}</p>` : ""}
           ${s.luecken ? `<p class="notiz-meta" style="margin:0.5rem 0 0;">Bei einzelnen Einträgen fehlen Werte (–) – die Summe ist dort etwas zu niedrig.</p>` : ""}
         </div>`;
@@ -9342,6 +9445,7 @@
           ${ernMakroHtml("Kohlenhydrate", s.kohlenhydrate, z.kh, "ern-balken-kh")}
           ${ernMakroHtml("Ballaststoffe", s.ballaststoffe, null, "")}
         </div>
+        ${ernZusatzHtml(s)}
         ${s.luecken ? `<p class="notiz-meta" style="margin:0.5rem 0 0;">Bei einzelnen Einträgen fehlen Werte (–) – die Summe ist dort etwas zu niedrig.</p>` : ""}
         <p class="notiz-meta" style="margin:0.5rem 0 0;">Gewicht ${ernZahl(z.kg)} kg vom ${datumDe(z.gewichtDatum)}</p>
       </div>`;
@@ -9786,7 +9890,7 @@
   window.ernOffTrefferWaehlen = function(code) { ernBarcodeSuchen(code); };
 
   // ---- Eigenes Lebensmittel anlegen / korrigieren ----
-  const ERN_EIGEN_FELDER = ["name", "marke", "kcal", "eiweiss", "fett", "kh", "bal", "portion-name", "portion-g"];
+  const ERN_EIGEN_FELDER = ["name", "marke", "kcal", "fett", "gesfett", "kh", "zucker", "bal", "eiweiss", "salz", "portion-name", "portion-g"];
   // Barcode aus einem erfolglosen Scan: wird beim Anlegen mitgespeichert
   let ernEigenBarcode = null;
   function ernEigenOeffnen(l, vorschlagName, barcode) {
@@ -9794,7 +9898,8 @@
     ernEigenBarcode = !l && barcode ? barcode : null;
     const werte = l ? {
       name: l.name, marke: l.marke || "", kcal: l.kcal, eiweiss: l.eiweiss, fett: l.fett, kh: l.kohlenhydrate,
-      bal: l.ballaststoffe, "portion-name": l.portion_name || "", "portion-g": l.portion_g,
+      bal: l.ballaststoffe, gesfett: l.ges_fett, zucker: l.zucker, salz: l.salz,
+      "portion-name": l.portion_name || "", "portion-g": l.portion_g,
     } : { name: vorschlagName || "" };
     ERN_EIGEN_FELDER.forEach((f) => {
       const v = werte[f];
@@ -9844,6 +9949,7 @@
         id: ernLmBearbeiten ? ernLmBearbeiten.id : undefined,
         name: wert("name"), marke: wert("marke"), kcal: wert("kcal"),
         eiweiss: wert("eiweiss"), fett: wert("fett"), kohlenhydrate: wert("kh"), ballaststoffe: wert("bal"),
+        ges_fett: wert("gesfett"), zucker: wert("zucker"), salz: wert("salz"),
         portion_name: wert("portion-name"), portion_g: wert("portion-g"),
         // Neu: leer = ohne Barcode. Eigenes bearbeiten: leer = Barcode entfernen.
         // Open Food Facts: nicht mitschicken (Feld ist ausgeblendet).
