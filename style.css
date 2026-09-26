@@ -979,6 +979,10 @@
   }
   .ern-kopieren:hover { border-color: var(--accent); }
   .ern-kopieren:disabled { opacity: 0.5; cursor: wait; }
+  .ern-kop-vorschau p { margin: 0.6rem 0; line-height: 1.5; }
+  .ern-kop-hinweis { font-size: 0.85rem; font-weight: 600; }
+  #btn-ern-kop:disabled { opacity: 0.5; cursor: default; }
+  #ern-kop-status:empty { display: none; }
   .ern-woche-nav { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.7rem; }
   .ern-woche-kopf { margin: 0 0 0.3rem; font-size: 0.9rem; line-height: 1.5; }
   .ern-woche-liste { display: flex; flex-direction: column; gap: 0.4rem; }
