@@ -8827,6 +8827,7 @@
         "Kohlenhydrate (g)": ernWert(s.kohlenhydrate),
         "Ballaststoffe (g)": ernWert(s.ballaststoffe),
         "Werte unvollständig": s.luecken ? "ja" : "",
+        "Ziel-Einstellung": z && z.profil ? ernZielKurz(z.profil) : "",
       };
     });
 
@@ -8836,7 +8837,10 @@
       { Punkt: "Zeitraum", Wert: `${datumDe(von)} bis ${datumDe(bis)}` },
       { Punkt: "Erstellt", Wert: new Date().toLocaleString("de-DE") },
       { Punkt: "Werte", Wert: "Je Eintrag für die gegessene Menge, so wie beim Eintragen gespeichert. Leere Zelle = kein Wert vorhanden (nicht 0)." },
-      { Punkt: "Ziele", Wert: ernProfil ? "Berechnet mit dem aktuellen Profil (Mifflin-St Jeor × Aktivität ± Ziel, Gewicht bis zum jeweiligen Tag, Trainings eingerechnet). Frühere Profil-Stände werden nicht gespeichert." : "Kein Profil hinterlegt – daher keine Ziele." },
+      { Punkt: "Ziele", Wert: !ernProfil ? "Kein Profil hinterlegt – daher keine Ziele."
+        : ernZielVersionen && ernZielVersionen.length
+          ? "Je Tag mit den Ziel-Einstellungen, die an diesem Tag galten (Spalte „Ziel-Einstellung“ im Blatt Tage), Mifflin-St Jeor × Aktivität ± Ziel, Gewicht bis zum jeweiligen Tag, Trainings eingerechnet. Geschlecht, Geburtsdatum und Größe: aktueller Stand."
+          : "Berechnet mit dem aktuellen Profil (Mifflin-St Jeor × Aktivität ± Ziel, Gewicht bis zum jeweiligen Tag, Trainings eingerechnet). Profil-Historie noch nicht eingerichtet." },
       { Punkt: "Nährwerte", Wert: "Max Rubner-Institut (2025), Bundeslebensmittelschlüssel (BLS) 4.0, Lizenz CC BY 4.0" },
       { Punkt: "Markenprodukte", Wert: "Open Food Facts, Lizenz ODbL (Datenbank) / DbCL (Inhalte)" },
       { Punkt: "Datenschutz", Wert: "Enthält Gesundheitsdaten – Datei nicht unverschlüsselt weitergeben oder in fremden Clouds ablegen." },
@@ -8849,7 +8853,7 @@
       XLSX.utils.book_append_sheet(wb, ws, name);
     };
     blatt(zeilenEintraege, "Einträge", [11, 11, 40, 10, 8, 10, 8, 16, 16, 18]);
-    blatt(zeilenTage, "Tage", [11, 9, 9, 8, 9, 13, 14, 10, 14, 8, 16, 16, 18]);
+    blatt(zeilenTage, "Tage", [11, 9, 9, 8, 9, 13, 14, 10, 14, 8, 16, 16, 18, 70]);
     blatt(zeilenGewicht, "Gewicht", [11, 12]);
     blatt(info, "Info", [16, 110]);
     return wb;
@@ -9169,6 +9173,10 @@
   let ernProfilLaedt = false;
   let ernProfilFehlgeschlagen = false; // kein automatisches Neuladen nach Fehler (sonst Endlosschleife)
   let ernMet = [];               // [{sportart_key, sportart, met}]
+  // Profil-Historie: Ziel-Stände [{gueltig_ab, pal, ziel, …}] aufsteigend.
+  // null = Tabelle fehlt noch (Migration nicht eingespielt) → wie bisher
+  // mit dem aktuellen Profil rechnen.
+  let ernZielVersionen = null;
 
   async function ernProfilLaden() {
     ernProfilLaedt = true;
@@ -9177,6 +9185,7 @@
       ernProfil = res.profil;
       ernGewichte = res.gewichte || [];
       ernMet = res.met || [];
+      ernZielVersionen = Array.isArray(res.versionen) ? res.versionen : null;
       ernProfilGeladen = true;
       ernProfilFormFuellen();
       ernGewichtRendern();
@@ -9226,12 +9235,45 @@
       unterGrundumsatz: ziel - trainingZuschlag < grundumsatz };
   }
 
+  // Ziel-Stand, der an einem Tag gilt: größtes gueltig_ab <= Tag, sonst der
+  // erste (wie beim Gewicht). null, wenn es keine Stände gibt.
+  function ernZielVersionFuer(datum) {
+    if (!ernZielVersionen || !ernZielVersionen.length) return null;
+    let treffer = null;
+    for (const v of ernZielVersionen) { if (v.gueltig_ab <= datum) treffer = v; }
+    return treffer || ernZielVersionen[0];
+  }
+
+  // Profil für einen Tag: Angaben zur Person immer aktuell, Ziel-Einstellungen
+  // aus dem Stand, der an dem Tag galt
+  function ernProfilFuer(datum) {
+    if (!ernProfil) return null;
+    const v = ernZielVersionFuer(datum);
+    if (!v) return ernProfil;
+    return {
+      ...ernProfil,
+      pal: v.pal, ziel: v.ziel, ziel_kcal_diff: v.ziel_kcal_diff,
+      eiweiss_g_pro_kg: v.eiweiss_g_pro_kg, fett_prozent: v.fett_prozent,
+      training_anrechnung: v.training_anrechnung,
+      gueltig_ab: v.gueltig_ab,
+    };
+  }
+
   function ernZiele(datum) {
     const g = ernGewichtFuer(datum);
     const trainings = ernTrainingsAm(datum);
     const summe = trainings.reduce((a, t) => a + (t.kcal || 0), 0);
-    const r = ernBedarfRechnen(ernProfil, g && g.gewicht_kg, datum, summe);
-    return r ? { ...r, gewichtDatum: g.datum, trainings, trainingSumme: summe } : null;
+    const p = ernProfilFuer(datum);
+    const r = ernBedarfRechnen(p, g && g.gewicht_kg, datum, summe);
+    return r ? { ...r, gewichtDatum: g.datum, trainings, trainingSumme: summe, profil: p } : null;
+  }
+
+  // Kurzbeschreibung eines Ziel-Stands, z. B. „Abnehmen −500 · Aktivität 1,6 · …“
+  function ernZielKurz(v) {
+    const diff = Number(v.ziel_kcal_diff);
+    const ziel = diff === 0 ? "Halten" : diff < 0 ? `Abnehmen −${ernZahl(-diff, 0)}` : `Aufbauen +${ernZahl(diff, 0)}`;
+    const anr = v.training_anrechnung === null || v.training_anrechnung === undefined ? 100 : Number(v.training_anrechnung);
+    return `${ziel} · Aktivität ${ernZahl(v.pal)} · Eiweiß ${ernZahl(v.eiweiss_g_pro_kg)} g/kg · Fett ${v.fett_prozent} % · Training ${anr} %`;
   }
 
   // ---- Trainingskalorien ----
@@ -9328,7 +9370,11 @@
   }
 
   function ernProfilFormFuellen() {
-    const p = ernProfil;
+    // Ziel-Einstellungen: der Stand, der heute gilt
+    const p = ernProfilFuer(heuteISO());
+    document.getElementById("ern-p-gueltig").value = heuteISO();
+    document.getElementById("ern-p-gueltig-feld").classList.toggle("hidden", !ernProfil || ernZielVersionen === null);
+    ernZielVerlaufRendern();
     document.getElementById("ern-p-geschlecht").value = p ? p.geschlecht : "";
     document.getElementById("ern-p-geburt").value = p ? p.geburtsdatum : "";
     document.getElementById("ern-p-groesse").value = p ? Number(p.groesse_cm) : "";
@@ -9372,17 +9418,77 @@
     const knopf = ev.currentTarget;
     const status = document.getElementById("ern-profil-status");
     knopf.disabled = true;
+    const gueltigFeld = document.getElementById("ern-p-gueltig");
+    // Beim ersten Profil gibt es noch keinen Verlauf – dann gilt es ab heute
+    // (und über den ersten Stand ohnehin auch für frühere Tage)
+    const gueltigAb = ernProfil && ernZielVersionen !== null ? (gueltigFeld.value || heuteISO()) : heuteISO();
     try {
-      const res = await api("ernaehrung_profil_speichern", ernProfilAusFormular());
+      const res = await api("ernaehrung_profil_speichern", { ...ernProfilAusFormular(), gueltig_ab: gueltigAb });
       ernProfil = res.profil;
-      status.textContent = "✓ Gespeichert";
+      if (Array.isArray(res.versionen)) ernZielVersionen = res.versionen;
+      const ab = res.gueltig_ab || gueltigAb;
+      status.textContent = res.staende === "unveraendert"
+        ? "✓ Gespeichert – Ziel-Einstellungen unverändert, kein neuer Stand"
+        : ab === heuteISO()
+          ? `✓ Gespeichert – gilt ab heute${res.staende === "ersetzt" ? " (heutigen Stand ersetzt)" : ""}`
+          : `✓ Gespeichert – gilt ab ${datumDe(ab)}${ab < heuteISO() ? ", Tage davor bleiben unverändert" : ""}${res.staende === "ersetzt" ? " (Stand dieses Tages ersetzt)" : ""}`;
+      ernProfilFormFuellen();
       renderErnaehrung();
+      if (aktiverTab === "heute") renderHeute();
     } catch (e) {
       if (e.message !== "unauthorized") status.textContent = e.message;
     } finally {
       knopf.disabled = false;
     }
   });
+
+  // ---- Verlauf der Ziel-Einstellungen (Profil-Historie) ----
+  function ernZielVerlaufRendern() {
+    const el = document.getElementById("ern-ziel-verlauf");
+    if (!el) return;
+    if (!ernProfil || ernZielVersionen === null || !ernZielVersionen.length) { el.innerHTML = ""; return; }
+    const heute = heuteISO();
+    const aktuell = ernZielVersionFuer(heute);
+    // Neueste zuerst; „bis“ = Tag vor dem nächsten Stand
+    const zeilen = ernZielVersionen.map((v, i) => {
+      const naechster = ernZielVersionen[i + 1];
+      const von = i === 0 ? "Von Anfang an" : `Ab ${datumDe(v.gueltig_ab)}`;
+      const bis = naechster ? ` bis ${datumDe(addTage(naechster.gueltig_ab, -1))}` : "";
+      const markierung = v === aktuell ? " <span class=\"badge\">gilt heute</span>" : (v.gueltig_ab > heute ? " <span class=\"badge\">geplant</span>" : "");
+      const loeschen = ernZielVersionen.length > 1
+        ? `<button class="task-delete" onclick="ernZielVersionLoeschen('${v.gueltig_ab}')" aria-label="Stand ab ${datumDe(v.gueltig_ab)} löschen">×</button>`
+        : "";
+      return `
+        <div class="ern-ziel-stand">
+          <div class="ern-ziel-stand-text"><span><strong>${von}${bis}</strong>${markierung}</span><span class="notiz-meta">${escapeHtml(ernZielKurz(v))}</span></div>
+          ${loeschen}
+        </div>`;
+    }).reverse().join("");
+    el.innerHTML = `
+      <p class="ern-liste-titel" style="margin-top:0.8rem;">Verlauf der Ziel-Einstellungen</p>
+      <div class="ern-ziel-verlauf-liste">${zeilen}</div>
+      <p class="notiz-meta">Jeder Tag wird mit dem Stand gerechnet, der an diesem Tag galt – in der Tagessumme, der Woche und im Export. Geschlecht, Geburtsdatum und Größe gelten immer für alle Tage.</p>`;
+  }
+
+  window.ernZielVersionLoeschen = async function(gueltigAb) {
+    const i = (ernZielVersionen || []).findIndex((v) => v.gueltig_ab === gueltigAb);
+    if (i < 0) return;
+    const text = i === 0
+      ? `Den ersten Stand löschen? Dann gilt der Stand ab ${datumDe(ernZielVersionen[1].gueltig_ab)} auch für alle Tage davor.`
+      : `Stand ab ${datumDe(gueltigAb)} löschen? Ab dann gilt wieder der vorherige Stand.`;
+    if (!confirm(text)) return;
+    const status = document.getElementById("ern-profil-status");
+    try {
+      const res = await api("ernaehrung_ziel_version_loeschen", { gueltig_ab: gueltigAb });
+      ernZielVersionen = res.versionen || [];
+      status.textContent = "✓ Stand gelöscht";
+      ernProfilFormFuellen();
+      renderErnaehrung();
+      if (aktiverTab === "heute") renderHeute();
+    } catch (e) {
+      if (e.message !== "unauthorized") status.textContent = e.message;
+    }
+  };
 
   // ---- Gewicht ----
   document.getElementById("btn-ern-gewicht").addEventListener("click", async (ev) => {
