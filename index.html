@@ -514,6 +514,19 @@
           </div>
         </details>
 
+        <details class="anleitung-abschnitt ern-block" id="ern-meine-block">
+          <summary>🥫 Meine Lebensmittel</summary>
+          <div class="anleitung-text">
+            <p class="notiz-meta" style="margin-top:0;">Alle Lebensmittel, die du selbst angelegt hast. Antippen zum Korrigieren, für einen Barcode oder zum Löschen – schon eingetragene Tage bleiben dabei unverändert.</p>
+            <div class="row ern-meine-kopf">
+              <input type="search" id="ern-meine-filter" placeholder="Filtern (Name, Marke, Barcode)" autocomplete="off" aria-label="Eigene Lebensmittel filtern">
+              <button class="btn-secondary" id="btn-ern-meine-neu">➕ Neu</button>
+            </div>
+            <p class="notiz-meta" id="ern-meine-status" role="status"></p>
+            <div id="ern-meine-liste" class="ern-treffer"></div>
+          </div>
+        </details>
+
         <details class="anleitung-abschnitt ern-block" id="ern-export-block">
           <summary>⬇️ Export</summary>
           <div class="anleitung-text">
@@ -970,7 +983,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>„–“</strong> heißt: für dieses Lebensmittel liegt im BLS kein Wert vor (das ist nicht dasselbe wie 0). Die Tagessumme weist dann darauf hin</li>
                 <li><strong>Datenbank:</strong> Bundeslebensmittelschlüssel (BLS) 4.0 des Max Rubner-Instituts, rund 7.100 Grundlebensmittel und Gerichte mit laborbasierten Durchschnittswerten je 100 g essbarer Anteil. Markenprodukte stehen nicht drin – dafür gibt es Barcode und Markensuche (unten). Lizenz CC BY 4.0, Quelle wird im Eintragen-Feld genannt</li>
                 <li><strong>📷 Barcode:</strong> öffnet die Kamera und erkennt den Strichcode automatisch (Chrome auf Android; am Laptop gibt es meist keine Erkennung). Alternativ die Ziffern unter dem Barcode abtippen. Das Produkt kommt aus Open Food Facts und wird in deiner Datenbank gespeichert – beim nächsten Mal findest du es auch über die normale Suche. Unbekannt oder ohne Kalorien? Dann öffnet sich direkt das Formular für ein eigenes Lebensmittel. Der Barcode wird dabei mitgespeichert – beim nächsten Scan kommt das Produkt sofort aus deinen eigenen Lebensmitteln, ohne erneutes Abtippen. Hast du das Produkt schon als eigenes Lebensmittel (ohne Barcode), tipp stattdessen „🔗 … Barcode dort zuordnen“ und wähl es aus der Liste</li>
-                <li><strong>Barcode nachträglich:</strong> Eigenes Lebensmittel suchen, antippen, „✎ Werte dieses Lebensmittels korrigieren“ – dort steht das Feld „Barcode“ (mit 📷 zum Scannen). Ändern oder leeren geht genauso. Ein Barcode gehört immer nur zu einem deiner Lebensmittel. Bei Open-Food-Facts-Produkten ist der Barcode fest</li>
+                <li><strong>🥫 Meine Lebensmittel</strong> (unter „📊 Woche“, aufklappen): alle selbst angelegten Lebensmittel mit Filter (Name, Marke, Barcode) und Anzahl. Antippen öffnet oben das Formular zum Korrigieren, Barcode setzen oder Löschen – nach dem Speichern schließt es sich und die Liste ist aktuell. „➕ Neu“ legt eins an, ohne etwas einzutragen. Open-Food-Facts-Produkte stehen hier nicht, die findest du über die normale Suche</li>
+                <li><strong>Barcode nachträglich:</strong> Unter „🥫 Meine Lebensmittel“ antippen (oder eigenes Lebensmittel suchen, antippen, „✎ Werte dieses Lebensmittels korrigieren“) – dort steht das Feld „Barcode“ (mit 📷 zum Scannen). Ändern oder leeren geht genauso. Ein Barcode gehört immer nur zu einem deiner Lebensmittel. Bei Open-Food-Facts-Produkten ist der Barcode fest</li>
                 <li><strong>🔎 Markenprodukt suchen:</strong> erst oben Produkt/Marke eintippen (z. B. „skyr natur“), dann den Knopf – sucht bei Open Food Facts. Bewusst nur auf Knopfdruck, weil Open Food Facts Anfragen begrenzt. Antippen lädt die Nährwerte und speichert das Produkt</li>
                 <li><strong>Open Food Facts</strong> wird von Freiwilligen gepflegt (Lizenz ODbL) – Werte lohnen einen kurzen Blick auf die Packung. Falsche Werte korrigierst du nach dem Antippen über „✎ Werte dieses Lebensmittels korrigieren“</li>
                 <li><strong>➕ Eigenes Lebensmittel:</strong> Name, optional Marke, Werte je 100 g und eine Portion (z. B. „1 Riegel“ = 45 g, erscheint dann als Schnellwahl). Steht danach in der Suche. Eigene und Open-Food-Facts-Lebensmittel lassen sich korrigieren und löschen – schon eingetragene Tage bleiben dabei unverändert. BLS-Einträge bleiben fest</li>
