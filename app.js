@@ -8300,7 +8300,7 @@
     });
     const unvollstaendig = ERN_ZUSATZ.some(([f]) => s.zusatz[f].mit > 0 && s.zusatz[f].mit < s.anzahl);
     return `<div class="ern-makros ern-zusatz">${kacheln.join("")}</div>
-      ${unvollstaendig ? `<p class="notiz-meta" style="margin:0.4rem 0 0;">* nur aus den Einträgen mit Wert (der BLS hat z. B. kein Salz und keine gesättigten Fettsäuren) – die echte Menge liegt eher höher.</p>` : ""}`;
+      ${unvollstaendig ? `<p class="notiz-meta" style="margin:0.4rem 0 0;">* nur aus den Einträgen mit Wert (z. B. fehlen sie bei älteren Einträgen oder einzelnen Produkten) – die echte Menge liegt eher höher.</p>` : ""}`;
   }
 
   async function ernTagLaden() {
@@ -8888,7 +8888,7 @@
       { Punkt: "Zeitraum", Wert: `${datumDe(von)} bis ${datumDe(bis)}` },
       { Punkt: "Erstellt", Wert: new Date().toLocaleString("de-DE") },
       { Punkt: "Werte", Wert: "Je Eintrag für die gegessene Menge, so wie beim Eintragen gespeichert. Leere Zelle = kein Wert vorhanden (nicht 0)." },
-      { Punkt: "Zucker, ges. Fett, Salz", Wert: "Erst ab Session 22 (September 2026) erfasst. Der BLS liefert Zucker, aber kein Salz und keine gesättigten Fettsäuren; ältere Einträge sind leer. Tagessummen zählen nur Einträge mit Wert. Salz: DGE-Orientierungswert höchstens 6 g am Tag." },
+      { Punkt: "Zucker, ges. Fett, Salz", Wert: "Erst ab Session 22 (September 2026) erfasst. BLS-Lebensmittel haben Zucker seit dem Import, Salz und gesättigte Fettsäuren seit Session 24; ältere Einträge können leer sein. Tagessummen zählen nur Einträge mit Wert. Salz: DGE-Orientierungswert höchstens 6 g am Tag." },
       { Punkt: "Ziele", Wert: !ernProfil ? "Kein Profil hinterlegt – daher keine Ziele."
         : ernZielVersionen && ernZielVersionen.length
           ? "Je Tag mit den Ziel-Einstellungen, die an diesem Tag galten (Spalte „Ziel-Einstellung“ im Blatt Tage), Mifflin-St Jeor × Aktivität ± Ziel, Gewicht bis zum jeweiligen Tag, Trainings und Schritte über dem Sockel eingerechnet. Geschlecht, Geburtsdatum und Größe: aktueller Stand."
