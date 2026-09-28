@@ -6252,6 +6252,17 @@
   let spielAktiveKategorie = "alle";
   let spielBearbeitenId = null;
   const SPIEL_OHNE_KATEGORIE = "__ohne__";
+  // Bewertungs-Filter: "alle" | "5" | "4" | "3" (= mindestens so viele Sterne) | "ohne"
+  let spielBewertungFilter = "alle";
+  // Sortierung innerhalb einer Kategorie: "az" | "beste"
+  let spielSortierung = "az";
+  try { spielSortierung = localStorage.getItem("spiel-sortierung") === "beste" ? "beste" : "az"; } catch (_e) { /* Standard */ }
+  // Aufgeklappte Kategorien (bleiben beim Neuzeichnen und beim Bewerten offen)
+  const spielGruppenOffen = new Set();
+  try { JSON.parse(localStorage.getItem("spiel-gruppen-offen") || "[]").forEach((k) => spielGruppenOffen.add(k)); } catch (_e) { /* leer lassen */ }
+  function spielGruppenMerken() {
+    try { localStorage.setItem("spiel-gruppen-offen", JSON.stringify([...spielGruppenOffen])); } catch (_e) { /* egal */ }
+  }
 
   function spielMetaZeile(s) {
     const teile = [];
@@ -6260,6 +6271,26 @@
     if (s.dauer) teile.push(`⏱ ${escapeHtml(s.dauer)}`);
     if (s.material) teile.push(`🧰 ${escapeHtml(s.material)}`);
     return teile.join(" · ");
+  }
+
+  function spielSterne(s) {
+    const wert = Number(s.bewertung) || 0;
+    const knoepfe = [1, 2, 3, 4, 5].map((n) => `
+      <button type="button" class="spiel-stern${n <= wert ? " aktiv" : ""}" onclick="spielBewerten('${s.id}', ${n})"
+        aria-label="${n} von 5 Sternen${n === wert ? " (nochmal tippen entfernt die Bewertung)" : ""}">${n <= wert ? "★" : "☆"}</button>`).join("");
+    return `<div class="spiel-sterne" role="group" aria-label="Bewertung: ${wert ? wert + " von 5" : "noch nicht bewertet"}">${knoepfe}</div>`;
+  }
+
+  function spielPasstZuBewertung(s) {
+    const wert = Number(s.bewertung) || 0;
+    if (spielBewertungFilter === "alle") return true;
+    if (spielBewertungFilter === "ohne") return wert === 0;
+    return wert >= Number(spielBewertungFilter);
+  }
+
+  // Filter aktiv = Kategorien werden automatisch aufgeklappt
+  function spielFilterAktiv() {
+    return spielBewertungFilter !== "alle" || spielAktiveKategorie !== "alle";
   }
 
   function renderSpiele() {
@@ -6276,22 +6307,43 @@
     const gueltigeWerte = ["alle", ...kategorien, ...(ohneKategorieAnzahl > 0 ? [SPIEL_OHNE_KATEGORIE] : [])];
     if (!gueltigeWerte.includes(spielAktiveKategorie)) spielAktiveKategorie = "alle";
 
+    const anzahlBewertet = spiele.filter((s) => Number(s.bewertung) > 0).length;
+    const zaehle = (fn) => spiele.filter(fn).length;
+    const bewOption = (wert, text) => `<option value="${wert}" ${spielBewertungFilter === wert ? "selected" : ""}>${text}</option>`;
+
     filterBereich.innerHTML = `
-      <select id="spiel-kategorie-filter" onchange="spielFilterAendern(this.value)">
-        <option value="alle" ${spielAktiveKategorie === "alle" ? "selected" : ""}>Alle Kategorien (${spiele.length})</option>
-        ${kategorien.map((k) => {
-          const anzahl = spiele.filter((s) => s.kategorie === k).length;
-          return `<option value="${escapeAttr(k)}" ${spielAktiveKategorie === k ? "selected" : ""}>${escapeHtml(k)} (${anzahl})</option>`;
-        }).join("")}
-        ${ohneKategorieAnzahl > 0 ? `<option value="${SPIEL_OHNE_KATEGORIE}" ${spielAktiveKategorie === SPIEL_OHNE_KATEGORIE ? "selected" : ""}>Ohne Kategorie (${ohneKategorieAnzahl})</option>` : ""}
-      </select>`;
+      <div class="row spiel-filter">
+        <select id="spiel-kategorie-filter" onchange="spielFilterAendern(this.value)" aria-label="Nach Kategorie filtern">
+          <option value="alle" ${spielAktiveKategorie === "alle" ? "selected" : ""}>Alle Kategorien (${spiele.length})</option>
+          ${kategorien.map((k) => {
+            const anzahl = spiele.filter((s) => s.kategorie === k).length;
+            return `<option value="${escapeAttr(k)}" ${spielAktiveKategorie === k ? "selected" : ""}>${escapeHtml(k)} (${anzahl})</option>`;
+          }).join("")}
+          ${ohneKategorieAnzahl > 0 ? `<option value="${SPIEL_OHNE_KATEGORIE}" ${spielAktiveKategorie === SPIEL_OHNE_KATEGORIE ? "selected" : ""}>Ohne Kategorie (${ohneKategorieAnzahl})</option>` : ""}
+        </select>
+        <select id="spiel-bewertung-filter" onchange="spielBewertungFilterAendern(this.value)" aria-label="Nach Bewertung filtern">
+          ${bewOption("alle", "Alle Bewertungen")}
+          ${bewOption("5", `★★★★★ (${zaehle((s) => Number(s.bewertung) === 5)})`)}
+          ${bewOption("4", `ab ★★★★ (${zaehle((s) => Number(s.bewertung) >= 4)})`)}
+          ${bewOption("3", `ab ★★★ (${zaehle((s) => Number(s.bewertung) >= 3)})`)}
+          ${bewOption("ohne", `Noch nicht bewertet (${spiele.length - anzahlBewertet})`)}
+        </select>
+        <select id="spiel-sortierung" onchange="spielSortierungAendern(this.value)" aria-label="Sortierung">
+          <option value="az" ${spielSortierung === "az" ? "selected" : ""}>A–Z</option>
+          <option value="beste" ${spielSortierung === "beste" ? "selected" : ""}>Beste zuerst</option>
+        </select>
+      </div>
+      ${spiele.length ? `<p class="notiz-meta spiel-stand">${anzahlBewertet} von ${spiele.length} Spielen bewertet</p>` : ""}`;
 
     let gefiltert = spiele;
-    if (spielAktiveKategorie === SPIEL_OHNE_KATEGORIE) gefiltert = spiele.filter((s) => !s.kategorie);
-    else if (spielAktiveKategorie !== "alle") gefiltert = spiele.filter((s) => s.kategorie === spielAktiveKategorie);
+    if (spielAktiveKategorie === SPIEL_OHNE_KATEGORIE) gefiltert = gefiltert.filter((s) => !s.kategorie);
+    else if (spielAktiveKategorie !== "alle") gefiltert = gefiltert.filter((s) => s.kategorie === spielAktiveKategorie);
+    gefiltert = gefiltert.filter(spielPasstZuBewertung);
 
     if (gefiltert.length === 0) {
-      listeBereich.innerHTML = '<p class="empty-text">Noch keine Spiele hinterlegt.</p>';
+      listeBereich.innerHTML = spiele.length
+        ? '<p class="empty-text">Keine Spiele für diesen Filter.</p>'
+        : '<p class="empty-text">Noch keine Spiele hinterlegt.</p>';
       return;
     }
 
@@ -6305,10 +6357,18 @@
       if (b === SPIEL_OHNE_KATEGORIE) return -1;
       return a.localeCompare(b);
     });
+    const vergleich = spielSortierung === "beste"
+      ? (a, b) => (Number(b.bewertung) || 0) - (Number(a.bewertung) || 0) || a.titel.localeCompare(b.titel)
+      : (a, b) => a.titel.localeCompare(b.titel);
+    const autoOffen = spielFilterAktiv();
 
-    listeBereich.innerHTML = kategorienSortiert.map((kat) => {
-      const items = gruppen[kat].sort((a, b) => a.titel.localeCompare(b.titel));
+    listeBereich.innerHTML = `<div class="spiel-gruppen">` + kategorienSortiert.map((kat) => {
+      const items = gruppen[kat].slice().sort(vergleich);
       const ueberschrift = kat === SPIEL_OHNE_KATEGORIE ? "Ohne Kategorie" : kat;
+      const bewertete = items.filter((s) => Number(s.bewertung) > 0);
+      const schnitt = bewertete.length
+        ? (bewertete.reduce((sum, s) => sum + Number(s.bewertung), 0) / bewertete.length).toLocaleString("de-DE", { maximumFractionDigits: 1 })
+        : null;
       const zeilen = items.map((s) => {
         const dateien = spieleDateien.filter((d) => d.spiel_id === s.id);
 
@@ -6324,7 +6384,7 @@
                   <input type="text" id="spiel-edit-dauer-${s.id}" value="${escapeAttr(s.dauer || "")}" placeholder="Dauer" style="max-width:10rem;">
                   <input type="text" id="spiel-edit-material-${s.id}" value="${escapeAttr(s.material || "")}" placeholder="Material">
                 </div>
-                <textarea id="spiel-edit-beschreibung-${s.id}" rows="3" placeholder="Spielbeschreibung">${escapeHtml(s.beschreibung || "")}</textarea>
+                <textarea id="spiel-edit-beschreibung-${s.id}" rows="6" placeholder="Spielbeschreibung">${escapeHtml(s.beschreibung || "")}</textarea>
                 <div>
                   <button class="btn-primary" onclick="spielBearbeitenSpeichern('${s.id}')">Speichern</button>
                   <button class="link-btn" onclick="spielBearbeitenAbbrechen()">Abbrechen</button>
@@ -6336,34 +6396,88 @@
         const dateiZeilen = dateien.map((d) => {
           const hochgeladen = new Date(d.hochgeladen_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
           return `
-                <div>📎 <span onclick="event.stopPropagation(); spielDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
+                <div>📎 <span onclick="spielDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
                   <span style="opacity:0.65;">(${hochgeladen})</span>
-                  <span onclick="event.stopPropagation(); spielDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen">×</span></div>`;
+                  <span onclick="spielDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen">×</span></div>`;
         }).join("");
 
         const meta = spielMetaZeile(s);
 
         return `
-          <div class="notiz-item">
-            <div style="flex:1; cursor:pointer;" onclick="spielBearbeitenStart('${s.id}')">
-              <span class="notiz-text">${escapeHtml(s.titel)}</span>
-              ${meta ? `<div class="notiz-meta" style="margin-top:0.2rem;">${meta}</div>` : ""}
-              ${s.beschreibung ? `<div class="notiz-meta" style="margin-top:0.3rem; white-space:pre-wrap;">${escapeHtml(s.beschreibung)}</div>` : ""}
+          <div class="notiz-item spiel-karte">
+            <div class="spiel-karte-inhalt">
+              <span class="notiz-text spiel-titel">${escapeHtml(s.titel)}</span>
+              ${spielSterne(s)}
+              ${meta ? `<div class="notiz-meta" style="margin-top:0.1rem;">${meta}</div>` : ""}
+              ${s.beschreibung ? `
+              <details class="spiel-beschreibung">
+                <summary>Beschreibung</summary>
+                <div class="notiz-meta spiel-beschreibung-text">${escapeHtml(s.beschreibung)}</div>
+              </details>` : ""}
               <div class="notiz-meta" style="margin-top:0.3rem;">
                 ${dateiZeilen}
-                <label style="text-decoration:underline; cursor:pointer;" onclick="event.stopPropagation();">📎 Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="spielDateiHinzufuegen('${s.id}', this)"></label>
+                <label style="text-decoration:underline; cursor:pointer;">📎 Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="spielDateiHinzufuegen('${s.id}', this)"></label>
               </div>
             </div>
-            <button class="task-delete" onclick="spielLoeschen('${s.id}')">×</button>
+            <div class="spiel-karte-knoepfe">
+              <button class="task-edit-btn" onclick="spielBearbeitenStart('${s.id}')" aria-label="Spiel bearbeiten" title="Bearbeiten">✎</button>
+              <button class="task-delete" onclick="spielLoeschen('${s.id}')" aria-label="Spiel löschen" title="Löschen">×</button>
+            </div>
           </div>`;
       }).join("");
-      return `<h3 style="margin-top:1.2rem; margin-bottom:0.4rem; font-size:0.95rem; color:var(--ink-dim);">${escapeHtml(ueberschrift)}</h3><div class="notiz-list">${zeilen}</div>`;
-    }).join("");
+      const offen = autoOffen || spielGruppenOffen.has(kat) || items.some((s) => s.id === spielBearbeitenId);
+      return `
+        <details class="spiel-gruppe" data-kat="${escapeAttr(kat)}" ${offen ? "open" : ""} ontoggle="spielGruppeUmschalten(this)">
+          <summary class="spiel-gruppe-kopf">
+            <span class="spiel-gruppe-titel">${escapeHtml(ueberschrift)}</span>
+            <span class="spiel-gruppe-info">${schnitt ? `Ø ${schnitt} ★ · ` : ""}${bewertete.length}/${items.length} bewertet</span>
+            <span class="zl-gruppe-zahl">${items.length}</span>
+          </summary>
+          <div class="notiz-list">${zeilen}</div>
+        </details>`;
+    }).join("") + `</div>`;
   }
+
+  window.spielGruppeUmschalten = function(el) {
+    // Bei aktivem Filter ist alles automatisch offen – das nicht als Wunsch merken
+    if (spielFilterAktiv()) return;
+    const kat = el.dataset.kat;
+    if (el.open) spielGruppenOffen.add(kat); else spielGruppenOffen.delete(kat);
+    spielGruppenMerken();
+  };
 
   window.spielFilterAendern = function(wert) {
     spielAktiveKategorie = wert;
     renderSpiele();
+  };
+
+  window.spielBewertungFilterAendern = function(wert) {
+    spielBewertungFilter = ["alle", "5", "4", "3", "ohne"].includes(wert) ? wert : "alle";
+    renderSpiele();
+  };
+
+  window.spielSortierungAendern = function(wert) {
+    spielSortierung = wert === "beste" ? "beste" : "az";
+    try { localStorage.setItem("spiel-sortierung", spielSortierung); } catch (_e) { /* egal */ }
+    renderSpiele();
+  };
+
+  // Stern antippen setzt die Bewertung; denselben Stern nochmal antippen entfernt sie.
+  // Sofort anzeigen, Server im Hintergrund (wie beim Rezept-Favoriten).
+  window.spielBewerten = async function(id, sterne) {
+    const s = spiele.find((x) => x.id === id);
+    if (!s) return;
+    const vorher = s.bewertung ?? null;
+    const neu = Number(vorher) === sterne ? null : sterne;
+    s.bewertung = neu;
+    renderSpiele();
+    try {
+      await api("spiel_bewerten", { id, bewertung: neu });
+    } catch (e) {
+      s.bewertung = vorher;
+      renderSpiele();
+      alert("Bewertung konnte nicht gespeichert werden: " + e.message);
+    }
   };
 
   document.getElementById("btn-spiel-hinzufuegen").addEventListener("click", spielHinzufuegen);
