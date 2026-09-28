@@ -262,8 +262,8 @@
       </div>
 
       <div id="view-spiele" class="hidden">
-        <h1>Spiele <button class="hilfe-icon" data-hilfe="Deine Spielekartei für die Jugendarbeit – griffbereit egal ob OGS, Jugendwerk oder unterwegs. Nach Kategorie sortiert und filterbar, Beschreibung direkt im Feld, optional zusätzlich eine Datei. Nur im Bereich Privat verfügbar, damit sie immer erreichbar ist.">?</button></h1>
-        <p class="hero-text">Spielbeschreibungen für die Jugendarbeit – nach Kategorie sortiert, jederzeit griffbereit.</p>
+        <h1>Spiele <button class="hilfe-icon" data-hilfe="Deine Spielekartei für die Jugendarbeit – eine gemeinsame Kartei, griffbereit egal ob OGS, Jugendwerk oder unterwegs. Die Kategorien lassen sich auf- und zuklappen. Mit den Sternen bewertest du ein Spiel (1–5, denselben Stern nochmal antippen entfernt die Bewertung). Oben nach Kategorie und Bewertung filtern, „Beste zuerst“ sortiert nach Sternen. ✎ bearbeitet, × löscht.">?</button></h1>
+        <p class="hero-text">Spielbeschreibungen für die Jugendarbeit – nach Kategorie aufklappbar, mit Sternen bewertet.</p>
 
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
           <input type="text" id="neu-spiel-titel" placeholder="Titel">
@@ -922,8 +922,13 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li><strong>Neues Spiel:</strong> Titel, Kategorie (mit Autovervollständigung), optional Teilnehmerzahl, Altersgruppe, Dauer und Material, optional eine Beschreibung direkt im Feld und/oder eine Datei</li>
                 <li><strong>Beschreibung im Feld vs. Datei:</strong> die Freitext-Beschreibung ist sofort lesbar und durchsuchbar; eine zusätzliche Datei eignet sich für bereits ausformulierte Anleitungen (PDF/Word, max. 5 MB)</li>
-                <li>Liste ist nach Kategorie gruppiert, Filter-Dropdown oben zeigt die Anzahl je Kategorie inklusive „Ohne Kategorie"</li>
-                <li>Klick auf ein Spiel öffnet die Inline-Bearbeitung aller Felder, Löschen mit Sicherheitsabfrage entfernt auch alle hinterlegten Dateien</li>
+                <li><strong>Aufklappbare Kategorien:</strong> jede Kategorie ist ein eigener Block. Im Kopf stehen Anzahl, wie viele davon bewertet sind, und der Sterne-Schnitt. Antippen klappt auf und zu; welche offen sind, merkt sich das Gerät. Ist ein Filter aktiv, sind alle passenden Kategorien automatisch offen</li>
+                <li><strong>Beschreibung</strong> ist pro Spiel eingeklappt („▸ Beschreibung“), damit die Liste kurz bleibt</li>
+                <li><strong>Bewertung:</strong> fünf Sterne direkt unter dem Titel. Antippen setzt die Bewertung sofort, ohne Bearbeiten-Modus. Denselben Stern nochmal antippen entfernt sie. Oben steht, wie viele Spiele schon bewertet sind</li>
+                <li><strong>Filter:</strong> Kategorie und Bewertung (★★★★★, ab ★★★★, ab ★★★, noch nicht bewertet) sind kombinierbar, jeweils mit Anzahl. „Noch nicht bewertet“ eignet sich zum Durcharbeiten nach und nach</li>
+                <li><strong>Sortierung:</strong> „A–Z“ oder „Beste zuerst“ (innerhalb jeder Kategorie, unbewertete am Ende). Die Wahl merkt sich das Gerät</li>
+                <li><strong>✎</strong> öffnet die Inline-Bearbeitung aller Felder, <strong>×</strong> löscht mit Sicherheitsabfrage (inklusive hinterlegter Dateien)</li>
+                <li><strong>Viele Spiele auf einmal</strong> (z. B. aus einer PDF-Sammlung) übernimmt Claude per SQL-Import – das Dashboard selbst zerlegt Dateien nicht</li>
               </ul>
             </div>
           </details>
