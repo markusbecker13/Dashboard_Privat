@@ -7774,23 +7774,31 @@
 
     const ergebnis = await api("buchungen_batch_import", { zeilen, bereich: aktiverBereich });
 
+    // Seit Session 27 übernimmt der Import jede Kontozeile als Buchung – auch
+    // solche, die zu einer Fixkosten-Position passen. Die Übersicht rechnet
+    // nur mit Buchungen; eine übersprungene Zeile fehlte dort sonst.
+    // Fixkosten-Treffer sind nur noch eine Info. Ein älteres Backend meldet
+    // noch „uebersprungen_fixkosten“ – dann steht das ehrlich so da.
+    const alteUebersprungen = Number(ergebnis.uebersprungen_fixkosten) || 0;
+    const fixErkannt = Number(ergebnis.fixkosten_erkannt) || 0;
     let meldung = "Import abgeschlossen\n\n" +
       `Neue Ausgaben: ${ergebnis.importiert_ausgaben}\n` +
       `Neue Einnahmen: ${ergebnis.importiert_einnahmen}\n` +
       `Bereits vorhanden (Duplikate): ${ergebnis.uebersprungen_duplikate}\n` +
-      `Als Fixkosten erkannt & übersprungen: ${ergebnis.uebersprungen_fixkosten}\n` +
+      (fixErkannt ? `Davon passend zu Fixkosten (trotzdem übernommen): ${fixErkannt}\n` : "") +
+      (alteUebersprungen ? `Als Fixkosten übersprungen: ${alteUebersprungen} – bitte index.ts (Edge Function) aktualisieren!\n` : "") +
       (nichtLesbar ? `Nicht lesbare Zeilen: ${nichtLesbar}\n` : "");
 
     const treffer = Object.entries(ergebnis.fixkosten_treffer || {});
     if (treffer.length) {
       treffer.sort((a, b) => b[1] - a[1]);
-      meldung += "\nErkannte Fixkosten (Beispiele):\n" + treffer.slice(0, 8).map(([k, v]) => `  ${k}: ${v}x`).join("\n");
+      meldung += "\nPassende Fixkosten (Beispiele):\n" + treffer.slice(0, 8).map(([k, v]) => `  ${k}: ${v}x`).join("\n");
     }
     alert(meldung);
 
     await ladeDaten();
 
-    const kandidaten = erkennKandidatenFin(buchungenAktuell());
+    const kandidaten = erkennKandidatenFin(buchungenAktuell(), fixkostenAktuell());
     if (kandidaten.length) {
       zeigeErkennungsModal(kandidaten);
     } else {
@@ -7819,9 +7827,26 @@
     return sortiert.length % 2 !== 0 ? sortiert[mitte] : (sortiert[mitte - 1] + sortiert[mitte]) / 2;
   }
 
-  function erkennKandidatenFin(alleBuchungen, minMonate = 2, varianzSchwelle = 0.2) {
+  // Stichwörter wie im Backend (index.ts, fixkostenStichwoerter): Bezeichnung
+  // bis zur ersten Klammer, ab 4 Zeichen, in Großbuchstaben.
+  function finFixkostenStichwoerter(fixkostenListe) {
+    return (fixkostenListe || [])
+      .map((f) => (f.bezeichnung || "").split("(")[0].trim().toUpperCase())
+      .filter((w) => w.length >= 4);
+  }
+
+  function erkennKandidatenFin(alleBuchungen, fixkostenListe = [], minMonate = 2, varianzSchwelle = 0.2) {
+    // Buchungen, die schon zu einer Fixkosten-Position passen, gar nicht erst
+    // vorschlagen – seit Session 27 landen sie bei jedem Import als Buchung,
+    // das Fenster würde sonst jedes Mal dieselben Kandidaten zeigen.
+    const fixWoerter = finFixkostenStichwoerter(fixkostenListe);
+    const passtZuFixkosten = (notiz) => {
+      const text = (notiz || "").toUpperCase();
+      return fixWoerter.some((w) => text.includes(w));
+    };
     const gruppen = new Map();
     for (const b of alleBuchungen) {
+      if (passtZuFixkosten(b.notiz)) continue;
       const schluesselText = finNormalizeKey(b.notiz);
       if (!schluesselText) continue;
       const key = (b.typ || "ausgabe") + "|" + schluesselText;
@@ -7869,7 +7894,6 @@
   }
 
   let finErkennungKandidaten = [];
-  let finBuchungenLoeschenNachUebernahme = false; // sicherer Default: nicht automatisch löschen
 
   function zeigeErkennungsModal(kandidaten) {
     finErkennungKandidaten = kandidaten;
@@ -7910,10 +7934,7 @@
           `).join("")}
         </div>
         <div class="fin-modal-fuss">
-          <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; color:var(--ink-dim);">
-            <input type="checkbox" id="fin-erkennung-loeschen" ${finBuchungenLoeschenNachUebernahme ? "checked" : ""}>
-            Einzelbuchungen danach löschen
-          </label>
+          <span style="font-size:0.85rem; color:var(--ink-dim);">Die Einzelbuchungen bleiben erhalten – nur sie zählen in der Übersicht.</span>
           <div style="display:flex; gap:0.5rem;">
             <button class="link-btn" id="fin-erkennung-verwerfen">Verwerfen</button>
             <button class="btn-primary" id="fin-erkennung-uebernehmen">Übernehmen</button>
@@ -7921,9 +7942,6 @@
         </div>
       </div>
     `;
-    document.getElementById("fin-erkennung-loeschen").addEventListener("change", (e) => {
-      finBuchungenLoeschenNachUebernahme = e.target.checked;
-    });
     document.getElementById("fin-erkennung-verwerfen").addEventListener("click", schliesseErkennungsModal);
     document.getElementById("fin-erkennung-uebernehmen").addEventListener("click", erkennungUebernehmen);
   }
@@ -7940,16 +7958,10 @@
   }
 
   async function erkennungUebernehmen() {
-    // Haken-Zustand direkt aus dem Formular lesen statt aus der separaten
-    // Variable – die wurde nur über das change-Event aktualisiert, was
-    // unzuverlässig war und dazu führte, dass Buchungen trotz deaktiviertem
-    // Haken gelöscht wurden.
-    const loeschenCheckbox = document.getElementById("fin-erkennung-loeschen");
-    const buchungenLoeschen = loeschenCheckbox ? loeschenCheckbox.checked : finBuchungenLoeschenNachUebernahme;
-
-    const ausgewaehlte = finErkennungKandidaten.filter((k) => k.ausgewaehlt);
+    // Seit Session 27 werden hier keine Einzelbuchungen mehr gelöscht: Die
+    // Übersicht rechnet nur mit Buchungen – gelöschte Kontozeilen fehlten
+    // dort, und der Kontostand stimmte nicht mehr. Fixkosten sind reine Planung.
     let angelegt = 0;
-    let geloescht = 0;
 
     for (let i = 0; i < finErkennungKandidaten.length; i++) {
       const k = finErkennungKandidaten[i];
@@ -7963,19 +7975,12 @@
       FIN_MONATE.forEach((m) => { zahlung[m] = betrag; });
       await api("fixkosten_hinzufuegen", { ...zahlung, bereich: aktiverBereich });
       angelegt++;
-
-      if (buchungenLoeschen) {
-        for (const id of k.buchungIds) {
-          await api("buchung_loeschen", { id });
-          geloescht++;
-        }
-      }
     }
 
     schliesseErkennungsModal();
     await ladeDaten();
     renderFinanzen();
-    alert(`${angelegt} Fixkosten-Position(en) angelegt` + (geloescht ? `, ${geloescht} Einzelbuchung(en) gelöscht.` : "."));
+    alert(`${angelegt} Fixkosten-Position(en) angelegt.`);
   }
 
   // ==========================================================
