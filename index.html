@@ -815,7 +815,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Schnellerfassung mit Umschalter Ausgabe/Einnahme und Kategorie-Buttons, monatsweise Liste, inline bearbeitbar</li>
                 <li><strong>CSV-Import</strong> direkt im Browser: erkennt Buchungstag/Valuta, Betrag, Empfänger, Verwendungszweck automatisch, auch bei UTF-8- oder Windows-1252-Kodierung</li>
-                <li>Nach jedem Import läuft automatisch die <strong>Wiederkehrend-Erkennung</strong>: findet Buchungen mit gleichem Typ und ähnlichem Text über mindestens zwei Monate, zeigt sie als Kandidaten in einem Modal. Dort vor Übernahme bearbeitbar und wahlweise direkt als Fixkosten anlegbar (Einzelbuchungen werden dabei gelöscht, damit nichts doppelt auftaucht)</li>
+                <li><strong>Jede Kontozeile wird als Buchung übernommen.</strong> Passt eine Zeile zu einer Fixkosten-Position, steht das nur als Info in der Import-Meldung – übersprungen wird nichts</li>
+                <li>Erneuter Import (auch überlappender Zeiträume) ist sicher: vorhandene Buchungen werden als Duplikate erkannt (Datum + Betrag + Anfang des Buchungstexts). Die Prüfung zählt mit – zwei identische Kontozeilen ergeben zwei Buchungen</li>
+                <li>Nach jedem Import läuft automatisch die <strong>Wiederkehrend-Erkennung</strong>: findet Buchungen mit gleichem Typ und ähnlichem Text über mindestens zwei Monate, zeigt sie als Kandidaten in einem Modal. Dort vor Übernahme bearbeitbar und als Fixkosten-Planung anlegbar. Die Einzelbuchungen bleiben erhalten (nur sie zählen in der Übersicht); Buchungen, die schon zu einer Fixkosten-Position passen, werden nicht erneut vorgeschlagen</li>
               </ul>
               <p><strong>Übersicht</strong> – Jahresansicht:</p>
               <ul>
