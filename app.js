@@ -7434,7 +7434,7 @@
 
     // Hinweise oben
     const hinweise = [];
-    if (!mailEingerichtet) hinweise.push("Der Mail-Versand ist noch nicht eingerichtet (Secrets BREVO_API_KEY und MAIL_ABSENDER in der Edge Function). Vermietungen lassen sich trotzdem eintragen.");
+    if (!mailEingerichtet) hinweise.push("Der Mail-Versand ist noch nicht eingerichtet (Secrets SMTP_USER und SMTP_PASS in der Edge Function, siehe Anleitung). Vermietungen lassen sich trotzdem eintragen.");
     if (!empfaenger.length) hinweise.push("Der Mail-Verteiler ist noch leer – unten unter „Mail-Verteiler“ Adressen eintragen.");
     if (!raeumeListe.length) hinweise.push("Noch keine Räume angelegt – unten unter „Räume verwalten“ anlegen.");
     document.getElementById("raum-hinweise").innerHTML = hinweise
