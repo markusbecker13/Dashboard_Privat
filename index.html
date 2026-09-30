@@ -811,6 +811,12 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Übersicht über Fixkosten, Sonderausgaben und einzelne Buchungen, über vier Reiter oben im Tab. Fixkosten, Sonderausgaben, Buchungen und Startkapital haben ein eigenes <code>bereich</code>-Feld – zusätzlich in einem anderen Bereich eingeblendet, sind das komplett eigene, getrennte Datensätze inkl. eigenem Startkapital pro Jahr.</p>
               <p><strong>Fixkosten</strong> – zwei Excel-artige 12-Monats-Tabellen (Ausgaben, Einnahmen). Zelle anklicken, um die ganze Zeile inline zu bearbeiten; Summenspalte/-zeile aktualisieren sich automatisch.</p>
+              <ul>
+                <li><strong>Eine Zeile je Kosten</strong> (seit Session 29): Jede Position hat einen festen Erkennungsschlüssel, den bereinigten Kern des Buchungstexts ohne Zahlen, Datum und Referenzen (z. B. „ARBEITGEBER GMBH LOHN GEHALT“). Neue Buchungen derselben Kosten ergänzen nach dem CSV-Import nur den Monat in der vorhandenen Zeile, statt eine neue anzulegen</li>
+                <li><strong>Nur gebuchte Monate:</strong> Bei Positionen mit Buchungen im laufenden Jahr stehen genau die Beträge der gebuchten Monate drin, die übrigen bleiben „–“. Buchungen aus Vorjahren zählen dafür nicht. Von Hand angelegte Positionen ohne passende Buchungen behalten ihre Planwerte</li>
+                <li><strong>Namen frei kürzen:</strong> Die Bezeichnung darfst du jederzeit ändern (z. B. „Gehalt“) – die Zuordnung läuft über den Schlüssel, nicht über den Namen</li>
+                <li><strong>🧹 Doppelte zusammenführen &amp; Monate aktualisieren</strong> (unter den Tabellen): legt Zeilen mit gleichem Typ und Schlüssel zu einer zusammen (die mit dem kürzesten Namen bleibt), ersetzt lange Kontotexte mit Ziffern durch einen kurzen Namen und trägt die gebuchten Monate ein. Vorher zeigt die App, was sie ändert, und fragt nach</li>
+              </ul>
               <p><strong>Sonderausgaben</strong> – einmalige, größere Posten als Karten-Liste, ebenfalls inline bearbeitbar.</p>
               <p><strong>Buchungen</strong> – laufende Kontobewegungen:</p>
               <ul>
@@ -818,7 +824,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>CSV-Import</strong> direkt im Browser: erkennt Buchungstag/Valuta, Betrag, Empfänger, Verwendungszweck automatisch, auch bei UTF-8- oder Windows-1252-Kodierung</li>
                 <li><strong>Jede Kontozeile wird als Buchung übernommen.</strong> Passt eine Zeile zu einer Fixkosten-Position, steht das nur als Info in der Import-Meldung – übersprungen wird nichts</li>
                 <li>Erneuter Import (auch überlappender Zeiträume) ist sicher: vorhandene Buchungen werden als Duplikate erkannt (Datum + Betrag + Anfang des Buchungstexts). Die Prüfung zählt mit – zwei identische Kontozeilen ergeben zwei Buchungen</li>
-                <li>Nach jedem Import läuft automatisch die <strong>Wiederkehrend-Erkennung</strong>: findet Buchungen mit gleichem Typ und ähnlichem Text über mindestens zwei Monate, zeigt sie als Kandidaten in einem Modal. Dort vor Übernahme bearbeitbar und als Fixkosten-Planung anlegbar. Die Einzelbuchungen bleiben erhalten (nur sie zählen in der Übersicht); Buchungen, die schon zu einer Fixkosten-Position passen, werden nicht erneut vorgeschlagen</li>
+                <li>Nach dem Import trägt die App bei vorhandenen Fixkosten die neu gebuchten Monate ein (steht in der Import-Meldung). Gelöscht wird dabei nichts</li>
+                <li>Danach läuft die <strong>Wiederkehrend-Erkennung</strong>: findet Buchungen mit gleichem Typ und ähnlichem Text über mindestens zwei Monate, die im laufenden Jahr gebucht wurden und noch zu keiner Fixkosten-Position gehören. Sie schlägt einen kurzen Namen vor und zeigt die gebuchten Monate; beim Übernehmen werden genau diese eingetragen. Die Einzelbuchungen bleiben erhalten (nur sie zählen in der Übersicht)</li>
               </ul>
               <p><strong>Übersicht</strong> – Jahresansicht:</p>
               <ul>
@@ -1092,6 +1099,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Google-Sync und <code>google_kein_push</code>:</strong> mehrstufige Sync-Logik – jede Phase, die Termine zu Google schickt, muss den Filter einzeln berücksichtigen, sonst reicht eine vergessene Phase, um die Ausnahme wirkungslos zu machen</li>
                 <li><strong>Private Storage-Buckets:</strong> Dateien sind nie direkt über eine feste URL erreichbar, nur über kurz gültige (5 Min.) signierte URLs. Beim Löschen eines Datensatzes mit Datei-Anhang muss die Datei zusätzlich explizit aus dem Storage entfernt werden</li>
                 <li><strong>Finanzen-Jahresübersicht:</strong> rechnet nur aus der Tabelle <code>buchungen</code> – Fixkosten/Sonderausgaben dürfen dort nicht zusätzlich eingerechnet werden, sonst werden Beträge doppelt gezählt</li>
+                <li><strong>Fixkosten nie über den vollen Kontotext zuordnen:</strong> Bis Session 28 war die Bezeichnung einer erkannten Position der komplette Buchungstext mit Monat und Referenz – im Folgemonat passte er nicht mehr, und jeder Import legte eine weitere Zeile für dieselben Kosten an. Seit Session 29 läuft die Zuordnung über den Erkennungsschlüssel (Spalte <code>erkennung</code>, <code>fixkosten_erkennung_setup.sql</code>)</li>
               </ul>
             </div>
           </details>
@@ -1148,7 +1156,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-finanzen" class="hidden">
-        <h1>Finanzen <button class="hilfe-icon" data-hilfe="Vier Bereiche: Fixkosten (wiederkehrend, geplant), Sonderausgaben (einmalig, geplant), Buchungen (tatsächliche Kontobewegungen, auch per CSV-Import) und Übersicht (Jahresauswertung – zählt bewusst nur Buchungen, damit geplante Fixkosten/Sonderausgaben nicht doppelt mitgerechnet werden).">?</button></h1>
+        <h1>Finanzen <button class="hilfe-icon" data-hilfe="Vier Bereiche: Fixkosten (wiederkehrend, je Kosten eine Zeile mit den gebuchten Monaten), Sonderausgaben (einmalig, geplant), Buchungen (tatsächliche Kontobewegungen, auch per CSV-Import) und Übersicht (Jahresauswertung – zählt bewusst nur Buchungen, damit Fixkosten/Sonderausgaben nicht doppelt mitgerechnet werden).">?</button></h1>
         <p class="hero-text">Fixkosten, feste Einnahmen und Sonderausgaben.</p>
 
         <div class="plan-typ-tabs">
@@ -1156,7 +1164,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <button class="plan-typ-btn" id="fintyp-sonderausgaben" data-fintyp="sonderausgaben">Sonderausgaben</button>
           <button class="plan-typ-btn" id="fintyp-buchungen" data-fintyp="buchungen">Buchungen</button>
           <button class="plan-typ-btn" id="fintyp-uebersicht" data-fintyp="uebersicht">Übersicht</button>
-          <button type="button" class="hilfe-icon" data-hilfe="Fixkosten/Sonderausgaben sind Planwerte (was fällig ist). Buchungen sind die echten Kontobewegungen, die du einzeln erfasst oder per CSV aus dem Online-Banking importierst. Die Übersicht wertet nur Buchungen aus, um Doppelzählung zu vermeiden.">?</button>
+          <button type="button" class="hilfe-icon" data-hilfe="Fixkosten zeigen je Kosten eine Zeile; nach dem CSV-Import kommen die neu gebuchten Monate automatisch dazu. „🧹 Doppelte zusammenführen“ unter den Tabellen räumt ältere Doppelzeilen auf. Buchungen sind die echten Kontobewegungen, die du einzeln erfasst oder per CSV aus dem Online-Banking importierst. Die Übersicht wertet nur Buchungen aus, um Doppelzählung zu vermeiden.">?</button>
         </div>
 
         <div id="fin-fixkosten-bereich"></div>
