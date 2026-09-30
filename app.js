@@ -7331,6 +7331,7 @@
       ${fixkostenTabelleHtml("einnahme", "Feste Einnahmen")}
 
       <button class="link-btn" id="toggle-fixkosten-form">▸ Neue Position anlegen</button>
+      <button class="link-btn" id="btn-fixkosten-aufraeumen" title="Doppelte Positionen zusammenführen und Monatswerte aus den Buchungen übernehmen">🧹 Doppelte zusammenführen &amp; Monate aktualisieren</button>
       <div class="row hidden fin-neu-form" id="fixkosten-form" style="margin-top:0.6rem;">
         <select id="neue-fk-typ">
           <option value="ausgabe">Ausgabe</option>
@@ -7345,6 +7346,7 @@
       document.getElementById("fixkosten-form").classList.toggle("hidden");
     });
     document.getElementById("btn-fixkosten-anlegen").addEventListener("click", fixkostenHinzufuegen);
+    document.getElementById("btn-fixkosten-aufraeumen").addEventListener("click", finFixkostenAufraeumen);
   }
 
   async function fixkostenHinzufuegen() {
@@ -7371,6 +7373,15 @@
     const bezeichnung = document.getElementById("fk-bez-" + id).value.trim();
     if (!bezeichnung) return;
     const zahlung = { id, bezeichnung };
+    // Erkennungsschlüssel vor einer Umbenennung sichern (ältere Zeilen haben
+    // ihn noch nicht) – sonst passt die Position nach dem Kürzen des Namens
+    // nicht mehr zu ihren Buchungen. Kategorie unverändert mitschicken.
+    const alt = fixkosten.find((f) => f.id === id);
+    if (alt) {
+      const schluessel = finFixSchluessel(alt);
+      if (schluessel) zahlung.erkennung = schluessel;
+      zahlung.kategorie = alt.kategorie || null;
+    }
     FIN_MONATE.forEach((m) => { zahlung[m] = document.getElementById("fk-" + m + "-" + id).value; });
     await api("fixkosten_aktualisieren", zahlung);
     finBearbeitetesFixkosten = null;
@@ -7794,9 +7805,26 @@
       treffer.sort((a, b) => b[1] - a[1]);
       meldung += "\nPassende Fixkosten (Beispiele):\n" + treffer.slice(0, 8).map(([k, v]) => `  ${k}: ${v}x`).join("\n");
     }
-    alert(meldung);
 
     await ladeDaten();
+
+    // Seit Session 29: vorhandene Fixkosten-Positionen bekommen die Beträge
+    // der neu gebuchten Monate (laufendes Jahr) eingetragen, statt dass die
+    // Erkennung dafür neue Zeilen vorschlägt. Löscht nichts – doppelte Zeilen
+    // legt der Knopf im Reiter Fixkosten zusammen.
+    try {
+      const plan = finFixAbgleichPlanen({ zusammenfuehren: false });
+      if (plan.aenderungen.length) {
+        await api("fixkosten_abgleich", { aenderungen: plan.aenderungen, loeschen: [], bereich: aktiverBereich });
+        await ladeDaten();
+        if (plan.monateAktualisiert) {
+          meldung += `\n\nFixkosten: Monatswerte ${plan.jahr} bei ${plan.monateAktualisiert} Position(en) aus den Buchungen aktualisiert.`;
+        }
+      }
+    } catch (fehler) {
+      meldung += `\n\nFixkosten-Monate konnten nicht aktualisiert werden: ${fehler.message}`;
+    }
+    alert(meldung);
 
     const kandidaten = erkennKandidatenFin(buchungenAktuell(), fixkostenAktuell());
     if (kandidaten.length) {
@@ -7835,51 +7863,197 @@
       .filter((w) => w.length >= 4);
   }
 
+  // ---- Fester Erkennungsschlüssel je Fixkosten-Position (seit Session 29) ----
+  // Schlüssel = bereinigter Kern des Buchungstexts (finNormalizeKey: ohne
+  // Zahlen, Datum, Referenzen, max. 4 Wörter). Gespeichert in der Spalte
+  // fixkosten.erkennung; bei älteren Zeilen aus der Bezeichnung abgeleitet.
+  // Bis Session 28 war die Bezeichnung der komplette Kontotext mit Monat und
+  // Referenz („… 08/2026 EREF …“) – im Folgemonat passte sie nicht mehr, und
+  // die Erkennung legte für dieselben Kosten jedes Mal eine neue Zeile an.
+  function finFixSchluessel(f) {
+    return String(f.erkennung || "").trim() || finNormalizeKey(f.bezeichnung);
+  }
+
+  function finNameAusSchluessel(schluessel) {
+    return String(schluessel || "").toLowerCase().split(" ").filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  }
+
+  // Ist-Beträge je Monat aus den Buchungen eines Jahres, je typ|Schlüssel
+  function finIstMonate(alleBuchungen, jahr) {
+    const ergebnis = new Map();
+    for (const b of alleBuchungen) {
+      const datum = String(b.datum || "");
+      if (Number(datum.slice(0, 4)) !== jahr) continue;
+      const monat = Number(datum.slice(5, 7));
+      if (!(monat >= 1 && monat <= 12)) continue;
+      const schluessel = finNormalizeKey(b.notiz);
+      if (!schluessel) continue;
+      const key = (b.typ || "ausgabe") + "|" + schluessel;
+      if (!ergebnis.has(key)) ergebnis.set(key, new Array(12).fill(0));
+      ergebnis.get(key)[monat - 1] += finZahl(b.betrag);
+    }
+    for (const werte of ergebnis.values()) {
+      for (let i = 0; i < 12; i++) werte[i] = Math.round(werte[i] * 100) / 100;
+    }
+    return ergebnis;
+  }
+
+  // Plant den Abgleich der Fixkosten des aktiven Bereichs:
+  // - zusammenfuehren: Zeilen mit gleichem Typ und Schlüssel werden zu einer
+  //   (die mit der kürzesten Bezeichnung bleibt, meist die von Hand gekürzte)
+  // - Monatswerte: Gibt es für den Schlüssel Buchungen im laufenden Jahr,
+  //   stehen danach genau die gebuchten Monate drin, alle anderen auf 0.
+  //   Ohne Buchungen im Jahr bleiben die Werte unverändert (z. B. von Hand
+  //   angelegte Planwerte)
+  // - fehlt erkennung, wird der Schlüssel gespeichert – dann darf die
+  //   Bezeichnung danach frei gekürzt werden
+  function finFixAbgleichPlanen({ zusammenfuehren }) {
+    const jahr = new Date().getFullYear();
+    const ist = finIstMonate(buchungenAktuell(), jahr);
+    const einheiten = [];
+    const gruppen = new Map();
+    for (const f of fixkostenAktuell()) {
+      const schluessel = finFixSchluessel(f);
+      if (!schluessel || !zusammenfuehren) {
+        einheiten.push({ schluessel, zeilen: [f] });
+        continue;
+      }
+      const key = f.typ + "|" + schluessel;
+      if (!gruppen.has(key)) {
+        const einheit = { schluessel, zeilen: [] };
+        gruppen.set(key, einheit);
+        einheiten.push(einheit);
+      }
+      gruppen.get(key).zeilen.push(f);
+    }
+
+    const aenderungen = [];
+    const loeschen = [];
+    const zusammengelegt = [];
+    const umbenannt = [];
+    let monateAktualisiert = 0;
+    for (const { schluessel, zeilen } of einheiten) {
+      const behalten = zeilen.length > 1
+        ? [...zeilen].sort((a, b) => (a.bezeichnung || "").length - (b.bezeichnung || "").length)[0]
+        : zeilen[0];
+      const vorher = FIN_MONATE.map((m) => finZahl(behalten[m]));
+      let monate = zeilen.length > 1
+        ? FIN_MONATE.map((m) => Math.max(...zeilen.map((z) => finZahl(z[m]))))
+        : vorher.slice();
+      if (zeilen.length > 1) {
+        zeilen.filter((z) => z.id !== behalten.id).forEach((z) => loeschen.push(z.id));
+        zusammengelegt.push({ bezeichnung: behalten.bezeichnung, anzahl: zeilen.length });
+      }
+      const istWerte = schluessel ? ist.get(behalten.typ + "|" + schluessel) : null;
+      if (istWerte) monate = istWerte.slice();
+      const monateGeaendert = monate.some((w, i) => Math.abs(w - vorher[i]) > 0.004);
+      if (istWerte && monateGeaendert) monateAktualisiert++;
+      const erkennungFehlt = !!schluessel && String(behalten.erkennung || "").trim() !== schluessel;
+      const umbenennen = zusammenfuehren && !!schluessel && /\d/.test(behalten.bezeichnung || "");
+      if (!monateGeaendert && !erkennungFehlt && !umbenennen && zeilen.length === 1) continue;
+      const aenderung = { id: behalten.id };
+      if (schluessel) aenderung.erkennung = schluessel;
+      FIN_MONATE.forEach((m, i) => { aenderung[m] = monate[i]; });
+      // Beim Aufräumen: Rohtext vom Konto („… 08/2026 EREF …“) durch einen
+      // kurzen Namen ersetzen. Von Hand vergebene Namen (ohne Ziffern)
+      // bleiben unangetastet.
+      if (umbenennen) {
+        aenderung.bezeichnung = finNameAusSchluessel(schluessel).slice(0, 60);
+        umbenannt.push({ alt: behalten.bezeichnung, neu: aenderung.bezeichnung });
+      }
+      aenderungen.push(aenderung);
+    }
+    return { jahr, aenderungen, loeschen, zusammengelegt, monateAktualisiert, umbenannt };
+  }
+
+  async function finFixkostenAufraeumen() {
+    const plan = finFixAbgleichPlanen({ zusammenfuehren: true });
+    if (!plan.zusammengelegt.length && !plan.monateAktualisiert && !plan.umbenannt.length) {
+      try {
+        if (plan.aenderungen.length) {
+          // Nur Erkennungsschlüssel nachtragen, sichtbar ändert sich nichts
+          await api("fixkosten_abgleich", { aenderungen: plan.aenderungen, loeschen: [], bereich: aktiverBereich });
+          await ladeDaten();
+        }
+        alert("Alles aufgeräumt: keine doppelten Positionen, Monatswerte sind aktuell.");
+      } catch (fehler) {
+        alert("Aufräumen fehlgeschlagen: " + fehler.message);
+      }
+      renderFinanzen();
+      return;
+    }
+    const kurz = (t) => (String(t || "").length > 45 ? String(t).slice(0, 44) + "…" : String(t || ""));
+    let text = "";
+    if (plan.zusammengelegt.length) {
+      text += "Zusammenführen:\n" + plan.zusammengelegt
+        .map((z) => `• ${kurz(z.bezeichnung)} (${z.anzahl} Zeilen → 1)`).join("\n") + "\n\n";
+    }
+    if (plan.umbenannt.length) {
+      text += "Kürzere Namen (später frei änderbar):\n" + plan.umbenannt
+        .map((u) => `• ${kurz(u.alt)} → ${u.neu}`).join("\n") + "\n\n";
+    }
+    if (plan.monateAktualisiert) {
+      text += `Monatswerte ${plan.jahr} aus den Buchungen: ${plan.monateAktualisiert} Position(en). ` +
+        "Danach stehen dort nur die tatsächlich gebuchten Monate.\n\n";
+    }
+    if (!confirm(text + "Fortfahren?")) return;
+    try {
+      const ergebnis = await api("fixkosten_abgleich", {
+        aenderungen: plan.aenderungen, loeschen: plan.loeschen, bereich: aktiverBereich,
+      });
+      await ladeDaten();
+      renderFinanzen();
+      alert(`Fertig: ${ergebnis.aktualisiert ?? plan.aenderungen.length} aktualisiert, ${ergebnis.geloescht ?? plan.loeschen.length} doppelte Zeile(n) entfernt.`);
+    } catch (fehler) {
+      alert("Aufräumen fehlgeschlagen: " + fehler.message);
+    }
+  }
+
   function erkennKandidatenFin(alleBuchungen, fixkostenListe = [], minMonate = 2, varianzSchwelle = 0.2) {
     // Buchungen, die schon zu einer Fixkosten-Position passen, gar nicht erst
-    // vorschlagen – seit Session 27 landen sie bei jedem Import als Buchung,
-    // das Fenster würde sonst jedes Mal dieselben Kandidaten zeigen.
+    // vorschlagen – über den Erkennungsschlüssel (seit Session 29) oder wie
+    // bisher über die Bezeichnung als Stichwort.
     const fixWoerter = finFixkostenStichwoerter(fixkostenListe);
+    const fixSchluessel = new Set(fixkostenListe.map((f) => (f.typ || "ausgabe") + "|" + finFixSchluessel(f)));
     const passtZuFixkosten = (notiz) => {
       const text = (notiz || "").toUpperCase();
       return fixWoerter.some((w) => text.includes(w));
     };
+    const jahr = new Date().getFullYear();
     const gruppen = new Map();
     for (const b of alleBuchungen) {
       if (passtZuFixkosten(b.notiz)) continue;
       const schluesselText = finNormalizeKey(b.notiz);
       if (!schluesselText) continue;
       const key = (b.typ || "ausgabe") + "|" + schluesselText;
+      if (fixSchluessel.has(key)) continue;
       if (!gruppen.has(key)) gruppen.set(key, []);
       gruppen.get(key).push(b);
     }
 
+    const ist = finIstMonate(alleBuchungen, jahr);
     const kandidaten = [];
     for (const [key, eintraege] of gruppen.entries()) {
       const typ = key.split("|")[0];
+      const schluessel = key.slice(key.indexOf("|") + 1);
       const monate = new Set(eintraege.map((e) => (e.datum || "").slice(0, 7)).filter(Boolean));
       if (monate.size < minMonate) continue;
+      // Nur, was im laufenden Jahr gebucht wurde – daraus kommen die Monatswerte
+      const monatsWerte = ist.get(key);
+      if (!monatsWerte || !monatsWerte.some((w) => w)) continue;
 
       const betraege = eintraege.map((e) => finZahl(e.betrag)).filter((b) => b);
       if (!betraege.length) continue;
       const median = finMedian(betraege);
       const spanne = median ? (Math.max(...betraege) - Math.min(...betraege)) / median : 0;
 
-      const notizCounts = new Map();
-      eintraege.forEach((e) => {
-        const n = (e.notiz || "").trim();
-        notizCounts.set(n, (notizCounts.get(n) || 0) + 1);
-      });
-      let bezeichnungVorschlag = "";
-      let bestCount = 0;
-      for (const [n, c] of notizCounts.entries()) {
-        if (c > bestCount) { bestCount = c; bezeichnungVorschlag = n; }
-      }
-      bezeichnungVorschlag = (bezeichnungVorschlag || key).slice(0, 60);
-
       kandidaten.push({
         typ,
-        bezeichnungVorschlag,
+        schluessel,
+        jahr,
+        monate: monatsWerte,
+        bezeichnungVorschlag: finNameAusSchluessel(schluessel).slice(0, 60),
         anzahlMonate: monate.size,
         anzahlBuchungen: eintraege.length,
         betragMedian: Math.round(median * 100) / 100,
@@ -7924,17 +8098,17 @@
                     <option value="ausgabe" ${k.typ === "ausgabe" ? "selected" : ""}>Ausgabe</option>
                     <option value="einnahme" ${k.typ === "einnahme" ? "selected" : ""}>Einnahme</option>
                   </select>
-                  <input type="number" step="0.01" id="fin-kand-betrag-${i}" value="${k.betragMedian}" style="width:7rem;">
                 </div>
                 <div class="fin-kandidat-meta">
-                  ${k.anzahlBuchungen}× über ${k.anzahlMonate} Monate${k.variabel ? " · Betrag schwankt" : ""}
+                  ${k.anzahlBuchungen}× über ${k.anzahlMonate} Monate${k.variabel ? " · Betrag schwankt" : ""}<br>
+                  Gebucht ${k.jahr}: ${k.monate.map((w, m) => (w ? `${FIN_MONATSNAMEN_KURZ[m]} ${finEuro(w)}` : "")).filter(Boolean).join(" · ")}
                 </div>
               </div>
             </div>
           `).join("")}
         </div>
         <div class="fin-modal-fuss">
-          <span style="font-size:0.85rem; color:var(--ink-dim);">Die Einzelbuchungen bleiben erhalten – nur sie zählen in der Übersicht.</span>
+          <span style="font-size:0.85rem; color:var(--ink-dim);">Eingetragen werden nur die gebuchten Monate. Weitere Monate ergänzt der nächste Import von selbst. Die Bezeichnung darfst du frei wählen.</span>
           <div style="display:flex; gap:0.5rem;">
             <button class="link-btn" id="fin-erkennung-verwerfen">Verwerfen</button>
             <button class="btn-primary" id="fin-erkennung-uebernehmen">Übernehmen</button>
@@ -7961,26 +8135,32 @@
     // Seit Session 27 werden hier keine Einzelbuchungen mehr gelöscht: Die
     // Übersicht rechnet nur mit Buchungen – gelöschte Kontozeilen fehlten
     // dort, und der Kontostand stimmte nicht mehr. Fixkosten sind reine Planung.
+    // Seit Session 29: Monatswerte = tatsächlich gebuchte Monate des laufenden
+    // Jahres, dazu der Erkennungsschlüssel, damit spätere Importe dieselbe
+    // Position ergänzen statt eine neue vorzuschlagen.
     let angelegt = 0;
 
-    for (let i = 0; i < finErkennungKandidaten.length; i++) {
-      const k = finErkennungKandidaten[i];
-      if (!k.ausgewaehlt) continue;
-      const bezeichnung = document.getElementById("fin-kand-bez-" + i).value.trim();
-      const typ = document.getElementById("fin-kand-typ-" + i).value;
-      const betrag = document.getElementById("fin-kand-betrag-" + i).value;
-      if (!bezeichnung) continue;
+    try {
+      for (let i = 0; i < finErkennungKandidaten.length; i++) {
+        const k = finErkennungKandidaten[i];
+        if (!k.ausgewaehlt) continue;
+        const bezeichnung = document.getElementById("fin-kand-bez-" + i).value.trim();
+        const typ = document.getElementById("fin-kand-typ-" + i).value;
+        if (!bezeichnung) continue;
 
-      const zahlung = { bezeichnung, typ };
-      FIN_MONATE.forEach((m) => { zahlung[m] = betrag; });
-      await api("fixkosten_hinzufuegen", { ...zahlung, bereich: aktiverBereich });
-      angelegt++;
+        const zahlung = { bezeichnung, typ, erkennung: k.schluessel };
+        FIN_MONATE.forEach((m, idx) => { zahlung[m] = k.monate[idx] || 0; });
+        await api("fixkosten_hinzufuegen", { ...zahlung, bereich: aktiverBereich });
+        angelegt++;
+      }
+    } catch (fehler) {
+      alert("Anlegen fehlgeschlagen: " + fehler.message);
     }
 
     schliesseErkennungsModal();
     await ladeDaten();
     renderFinanzen();
-    alert(`${angelegt} Fixkosten-Position(en) angelegt.`);
+    if (angelegt) alert(`${angelegt} Fixkosten-Position(en) angelegt.`);
   }
 
   // ==========================================================
