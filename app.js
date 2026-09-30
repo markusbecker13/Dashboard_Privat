@@ -630,6 +630,46 @@
     return div.innerHTML;
   }
 
+  // Aufgaben-Projekte klappbar (seit Session 30). Zustand je
+  // „bereich|projekt-id“ (bzw. „bereich|ohne“) im Browser gemerkt,
+  // ohne gemerkten Zustand ist eine Gruppe offen.
+  const aufgGruppeOffen = {};
+  try { Object.assign(aufgGruppeOffen, JSON.parse(localStorage.getItem("aufgaben-gruppen-offen") || "{}")); } catch (_e) { /* leer lassen */ }
+  function aufgGruppenMerken() {
+    try { localStorage.setItem("aufgaben-gruppen-offen", JSON.stringify(aufgGruppeOffen)); } catch (_e) { /* egal */ }
+  }
+  window.aufgGruppeUmschalten = function(el) {
+    aufgGruppeOffen[el.dataset.schluessel] = el.open;
+    aufgGruppenMerken();
+  };
+  window.aufgAlleGruppen = function(auf) {
+    aufgGruppeOffen[`${aktiverBereich}|ohne`] = auf;
+    projekteAktuell().forEach((p) => { aufgGruppeOffen[`${aktiverBereich}|${p.id}`] = auf; });
+    aufgGruppenMerken();
+    render();
+  };
+  function aufgGruppeHtml(schluesselId, titel, liste, editKnopf) {
+    const schluessel = `${aktiverBereich}|${schluesselId}`;
+    const gemerkt = aufgGruppeOffen[schluessel];
+    const offen = liste.some((a) => a.id === aufgabeBearbeitenId) || gemerkt !== false;
+    const ueber = liste.filter((a) => a.status === "ueberfaellig").length;
+    const heute = liste.filter((a) => a.status === "heute").length;
+    const info = [
+      ueber ? badgeHtml("overdue", `${ueber} überfällig`) : "",
+      heute ? badgeHtml("today", `${heute} heute`) : "",
+    ].join("");
+    return `
+      <details class="spiel-gruppe" data-schluessel="${escapeAttr(schluessel)}" ${offen ? "open" : ""} ontoggle="aufgGruppeUmschalten(this)">
+        <summary class="spiel-gruppe-kopf">
+          <span class="spiel-gruppe-titel">${escapeHtml(titel)}</span>
+          ${editKnopf}
+          <span class="spiel-gruppe-info">${info}</span>
+          <span class="zl-gruppe-zahl">${liste.length}</span>
+        </summary>
+        <div class="task-list" style="margin:0.5rem 0 0.8rem;">${liste.map((a) => taskHtml(a, false)).join("")}</div>
+      </details>`;
+  }
+
   function render() {
     const select = document.getElementById("aufgabe-projekt");
     select.innerHTML = '<option value="">Ohne Projekt</option>' +
@@ -652,14 +692,21 @@
       .filter((g) => g.liste.length > 0);
 
     let html = "";
-    if (ohneProjekt.length > 0) {
-      html += `<div class="project-heading">Ohne Projekt</div><div class="task-list">${ohneProjekt.map((a) => taskHtml(a, false)).join("")}</div>`;
-    }
+    if (ohneProjekt.length > 0) html += aufgGruppeHtml("ohne", "Ohne Projekt", ohneProjekt, "");
     for (const g of gruppen) {
-      html += `<div class="project-heading">${escapeHtml(g.projekt.name)} <button class="project-edit-btn" onclick="projektUmbenennen('${g.projekt.id}')" title="Projekt umbenennen">✎</button></div><div class="task-list">${g.liste.map((a) => taskHtml(a, false)).join("")}</div>`;
+      // ✎ im Kopf darf die Gruppe nicht mit auf- oder zuklappen
+      const edit = `<button class="project-edit-btn" onclick="event.preventDefault(); event.stopPropagation(); projektUmbenennen('${g.projekt.id}')" title="Projekt umbenennen">✎</button>`;
+      html += aufgGruppeHtml(g.projekt.id, g.projekt.name, g.liste, edit);
     }
-    if (ohneProjekt.length === 0 && gruppen.length === 0) {
+    const anzGruppen = gruppen.length + (ohneProjekt.length > 0 ? 1 : 0);
+    if (anzGruppen === 0) {
       html = '<p class="empty-text">Keine offenen Aufgaben — gut gemacht.</p>';
+    } else {
+      html = `${anzGruppen > 1 ? `
+        <div class="row" style="margin:0 0 0.4rem; gap:0.8rem;">
+          <button class="link-btn" onclick="aufgAlleGruppen(true)">Alle aufklappen</button>
+          <button class="link-btn" onclick="aufgAlleGruppen(false)">Alle zuklappen</button>
+        </div>` : ""}<div class="spiel-gruppen">${html}</div>`;
     }
     document.getElementById("listen-bereich").innerHTML = html;
 
