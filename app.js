@@ -7359,7 +7359,17 @@
   // Eintrag verschickt die Edge Function eine Mail (Brevo) an den Verteiler.
   // ==========================================================
   let raumBearbeitenId = null;
+  let raumBearbeitenOrt = "liste";
   let raumVergangeneOffen = false;
+  // Seit Session 30: Monatsgruppen klappbar (Zustand je Bereich|Monat gemerkt,
+  // ohne Eintrag ist nur der aktuelle Monat offen) und Monatskalender
+  const raumMonatOffen = {};
+  try { Object.assign(raumMonatOffen, JSON.parse(localStorage.getItem("raum-monate-offen") || "{}")); } catch (_e) { /* leer lassen */ }
+  function raumMonateMerken() {
+    try { localStorage.setItem("raum-monate-offen", JSON.stringify(raumMonatOffen)); } catch (_e) { /* egal */ }
+  }
+  let raumKalMonat = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+  let raumKalTag = null; // ausgewähltes Datum "YYYY-MM-DD" oder null
   const RAUM_WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
   const RAUM_MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
@@ -7457,8 +7467,11 @@
     const kommend = alle.filter((v) => raumEnde(v) >= heute);
     const vergangen = alle.filter((v) => raumEnde(v) < heute).reverse();
 
-    const karte = (v) => {
-      if (raumBearbeitenId === v.id) {
+    // ort: "liste" oder "kal" (Tagesansicht unter dem Kalender). Bearbeitet
+    // wird nur an der Stelle, an der der Eintrag angetippt wurde – sonst
+    // gäbe es die Eingabefelder doppelt mit denselben IDs.
+    const karte = (v, ort = "liste") => {
+      if (raumBearbeitenId === v.id && raumBearbeitenOrt === ort) {
         return `
           <div class="notiz-item">
             <div style="flex:1;">
@@ -7487,7 +7500,7 @@
       }
       return `
         <div class="notiz-item">
-          <div style="flex:1; cursor:pointer;" onclick="raumBearbeitenStart('${v.id}')">
+          <div style="flex:1; cursor:pointer;" onclick="raumBearbeitenStart('${v.id}', '${ort}')">
             <span class="notiz-text">${escapeHtml(raumWannText(v))} · ${escapeHtml(raumName(v.raum_id))}</span>
             ${(() => {
               const serie = raumSerie(v);
@@ -7503,6 +7516,8 @@
         </div>`;
     };
 
+    raumKalenderRendern(alle, karte);
+
     let html = "";
     if (!kommend.length) {
       html += `<p class="empty-text">Keine kommenden Vermietungen.</p>`;
@@ -7513,20 +7528,41 @@
         if (!monate.has(k)) monate.set(k, []);
         monate.get(k).push(v);
       });
+      const aktMonat = heute.slice(0, 7);
+      const gruppen = [];
       for (const [k, eintraege] of monate) {
         const titel = `${RAUM_MONATE[Number(k.slice(5, 7)) - 1]} ${k.slice(0, 4)}`;
-        html += `<div class="project-heading">${escapeHtml(titel)} <span class="notiz-meta">(${eintraege.length})</span></div>
-          <div class="notiz-list">${eintraege.map(karte).join("")}</div>`;
+        const schluessel = `${aktiverBereich}|${k}`;
+        const gemerkt = raumMonatOffen[schluessel];
+        const offen = (raumBearbeitenOrt === "liste" && eintraege.some((v) => v.id === raumBearbeitenId)) || (gemerkt === undefined ? k <= aktMonat : gemerkt);
+        const ohneMail = eintraege.filter((v) => v.mail_status && v.mail_status !== "gesendet").length;
+        gruppen.push(`
+          <details class="spiel-gruppe" data-schluessel="${escapeAttr(schluessel)}" ${offen ? "open" : ""} ontoggle="raumMonatUmschalten(this)">
+            <summary class="spiel-gruppe-kopf">
+              <span class="spiel-gruppe-titel">${escapeHtml(titel)}</span>
+              ${ohneMail ? `<span class="spiel-gruppe-info">${ohneMail} ohne Mail</span>` : ""}
+              <span class="zl-gruppe-zahl">${eintraege.length}</span>
+            </summary>
+            <div class="notiz-list">${eintraege.map((v) => karte(v)).join("")}</div>
+          </details>`);
       }
+      if (gruppen.length > 1) {
+        html += `
+          <div class="row" style="margin:0.4rem 0 0.2rem; gap:0.8rem;">
+            <button class="link-btn" onclick="raumAlleMonate(true)">Alle aufklappen</button>
+            <button class="link-btn" onclick="raumAlleMonate(false)">Alle zuklappen</button>
+          </div>`;
+      }
+      html += `<div class="spiel-gruppen">${gruppen.join("")}</div>`;
     }
     if (vergangen.length) {
       html += `
-        <details class="spiel-gruppe" style="margin-top:1rem;" ${raumVergangeneOffen || vergangen.some((v) => v.id === raumBearbeitenId) ? "open" : ""} ontoggle="raumVergangeneUmschalten(this)">
+        <details class="spiel-gruppe" style="margin-top:1rem;" ${raumVergangeneOffen || (raumBearbeitenOrt === "liste" && vergangen.some((v) => v.id === raumBearbeitenId)) ? "open" : ""} ontoggle="raumVergangeneUmschalten(this)">
           <summary class="spiel-gruppe-kopf">
             <span class="spiel-gruppe-titel">Vergangene Vermietungen</span>
             <span class="zl-gruppe-zahl">${vergangen.length}</span>
           </summary>
-          <div class="notiz-list">${vergangen.map(karte).join("")}</div>
+          <div class="notiz-list">${vergangen.map((v) => karte(v)).join("")}</div>
         </details>`;
     }
     liste.innerHTML = html;
@@ -7563,6 +7599,114 @@
 
   window.raumVergangeneUmschalten = function(el) {
     raumVergangeneOffen = el.open;
+  };
+
+  window.raumMonatUmschalten = function(el) {
+    raumMonatOffen[el.dataset.schluessel] = el.open;
+    raumMonateMerken();
+  };
+
+  window.raumAlleMonate = function(auf) {
+    const heute = heuteISO();
+    raumVermietungenAktuell().filter((v) => raumEnde(v) >= heute)
+      .forEach((v) => { raumMonatOffen[`${aktiverBereich}|${v.datum.slice(0, 7)}`] = auf; });
+    raumMonateMerken();
+    renderRaumplanung();
+  };
+
+  // Monatskalender: jeder belegte Tag ist markiert (Zeiträume über alle
+  // ihre Tage). Tipp auf einen Tag zeigt darunter die Vermietungen
+  // dieses Tages, mit Bearbeiten wie in der Liste.
+  function raumBelegungNachTag(alle) {
+    const tage = new Map();
+    for (const v of alle) {
+      let tag = v.datum;
+      const ende = raumEnde(v);
+      for (let i = 0; tag <= ende && i < 400; i++) {
+        if (!tage.has(tag)) tage.set(tag, []);
+        tage.get(tag).push(v);
+        tag = addTage(tag, 1);
+      }
+    }
+    return tage;
+  }
+
+  function raumKalenderRendern(alle, karte) {
+    const el = document.getElementById("raum-kalender");
+    if (!el) return;
+    const belegung = raumBelegungNachTag(alle);
+    const jahr = raumKalMonat.getFullYear();
+    const monat = raumKalMonat.getMonth();
+    const anzahlTage = new Date(jahr, monat + 1, 0).getDate();
+    const versatz = (new Date(jahr, monat, 1).getDay() + 6) % 7; // Montag zuerst
+    const heute = heuteISO();
+    const praefix = `${jahr}-${String(monat + 1).padStart(2, "0")}-`;
+    let belegteTage = 0;
+
+    let zellen = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((l) => `<div class="cal-daylabel">${l}</div>`).join("");
+    for (let i = 0; i < versatz; i++) zellen += `<div class="cal-day empty"></div>`;
+    for (let t = 1; t <= anzahlTage; t++) {
+      const iso = praefix + String(t).padStart(2, "0");
+      const liste = belegung.get(iso) || [];
+      if (liste.length) belegteTage++;
+      const klassen = ["cal-day"];
+      if (iso === heute) klassen.push("today");
+      if (iso === raumKalTag) klassen.push("selected");
+      // Button statt div (per Tastatur erreichbar) – Browser-Standards für Buttons neutralisieren
+      const stil = ` style="padding:0; font-family:inherit;${liste.length && iso !== raumKalTag
+        ? " background:color-mix(in srgb, var(--accent-2) 24%, var(--panel)); font-weight:600;" : ""}"`;
+      const titel = liste.length
+        ? liste.map((v) => `${raumName(v.raum_id)}: ${v.mieter_name}`).join("\n") : "frei";
+      zellen += `<button type="button" class="${klassen.join(" ")}"${stil} onclick="raumKalTagWaehlen('${iso}')"
+        title="${escapeAttr(titel)}" aria-label="${t}. – ${liste.length ? liste.length + " Vermietung" + (liste.length === 1 ? "" : "en") : "frei"}">
+        <span>${t}</span>${liste.length ? `<span class="dot"></span>` : ""}
+      </button>`;
+    }
+
+    let panel = "";
+    if (raumKalTag) {
+      const liste = (belegung.get(raumKalTag) || []).slice()
+        .sort((a, b) => String(a.von || "").localeCompare(String(b.von || "")));
+      panel = `
+        <div class="cal-day-panel" style="margin-bottom:1.2rem;">
+          <h3>${escapeHtml(raumDatumText(raumKalTag))}</h3>
+          ${liste.length ? `<div class="notiz-list">${liste.map((v) => karte(v, "kal")).join("")}</div>`
+            : `<p class="empty-text" style="margin:0 0 0.6rem;">An diesem Tag ist nichts vermietet.</p>`}
+          <button class="link-btn" onclick="raumKalTagUebernehmen('${raumKalTag}')">＋ Neue Vermietung an diesem Tag</button>
+        </div>`;
+    }
+
+    el.innerHTML = `
+      <div class="cal-header" style="margin-top:1.2rem;">
+        <div class="cal-nav"><button type="button" onclick="raumKalBlaettern(-1)" aria-label="Vormonat">‹</button></div>
+        <h2 style="cursor:pointer;" onclick="raumKalHeute()" title="Zum aktuellen Monat">${RAUM_MONATE[monat]} ${jahr}</h2>
+        <div class="cal-nav"><button type="button" onclick="raumKalBlaettern(1)" aria-label="Nächster Monat">›</button></div>
+      </div>
+      <p class="notiz-meta" style="margin:-0.5rem 0 0.6rem; text-align:center;">${belegteTage ? `${belegteTage} belegte${belegteTage === 1 ? "r Tag" : " Tage"}` : "Kein Tag belegt"}</p>
+      <div class="cal-grid" style="margin-bottom:1rem;">${zellen}</div>
+      ${panel}`;
+  }
+
+  window.raumKalBlaettern = function(delta) {
+    raumKalMonat = new Date(raumKalMonat.getFullYear(), raumKalMonat.getMonth() + delta, 1);
+    raumKalTag = null;
+    renderRaumplanung();
+  };
+  window.raumKalHeute = function() {
+    const d = new Date();
+    raumKalMonat = new Date(d.getFullYear(), d.getMonth(), 1);
+    raumKalTag = null;
+    renderRaumplanung();
+  };
+  window.raumKalTagWaehlen = function(iso) {
+    raumKalTag = raumKalTag === iso ? null : iso;
+    renderRaumplanung();
+  };
+  // Datum ins Formular oben übernehmen und dorthin springen
+  window.raumKalTagUebernehmen = function(iso) {
+    document.getElementById("raum-neu-datum").value = iso;
+    const formular = document.getElementById("raum-formular");
+    if (formular) formular.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   // Vermietung eintragen. Bei Überschneidung fragt die App nach und
@@ -7691,8 +7835,9 @@
     }
   });
 
-  window.raumBearbeitenStart = function(id) {
+  window.raumBearbeitenStart = function(id, ort) {
     raumBearbeitenId = id;
+    raumBearbeitenOrt = ort === "kal" ? "kal" : "liste";
     renderRaumplanung();
   };
   window.raumBearbeitenAbbrechen = function() {
