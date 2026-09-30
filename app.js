@@ -10075,6 +10075,7 @@
   let ernMeineLaedt = false;
   let ernScanStream = null;
   let ernScanLaeuft = false;
+  let ernScanLicht = false;       // Taschenlampe an/aus (falls die Kamera das kann)
   let ernScanHistorie = false;
   let ernScanZiel = null;         // "feld" = Scan füllt das Barcode-Feld im Eigen-Formular
 
@@ -10465,38 +10466,98 @@
       status.textContent = "Barcode-Erkennung nicht verfügbar – bitte Ziffern abtippen.";
       return;
     }
+    // Session 28: höhere Auflösung – die Standard-640×480 sind für die
+    // feinen Striche eines EAN-13 oft zu unscharf.
     try {
-      ernScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      ernScanStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+      });
     } catch (e) {
-      video.classList.add("hidden");
-      status.textContent = "Kein Kamerazugriff (erlaubt?). Du kannst die Ziffern auch abtippen.";
-      return;
+      try {
+        ernScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      } catch (e2) {
+        video.classList.add("hidden");
+        status.textContent = "Kein Kamerazugriff (erlaubt?). Du kannst die Ziffern auch abtippen.";
+        return;
+      }
     }
     if (overlay.classList.contains("hidden")) { ernKameraStoppen(); return; } // inzwischen geschlossen
+    await ernKameraEinstellen();
     video.classList.remove("hidden");
     video.srcObject = ernScanStream;
     await video.play().catch(() => {});
-    status.textContent = "Barcode ins Bild halten – ruhig und nicht zu nah.";
+    status.textContent = "Barcode quer ins Bild halten, etwa 15–20 cm Abstand, gutes Licht.";
     ernScanLaeuft = true;
+    const start = Date.now();
+    let hinweisGezeigt = false;
+    let letzterCode = null;   // Code muss zweimal hintereinander gleich gelesen werden
     const pruefen = async () => {
       if (!ernScanLaeuft) return;
       try {
         if (video.readyState >= 2) {
           const codes = await detektor.detect(video);
-          const treffer = codes.find((c) => /^\d{8,14}$/.test(c.rawValue));
-          if (treffer) {
+          const gueltig = codes.map((c) => c.rawValue).find((v) => ernGtinGueltig(v));
+          if (gueltig && gueltig === letzterCode) {
             if (navigator.vibrate) navigator.vibrate(80);
             const ziel = ernScanZiel;
             ernScannerSchliessen();
-            ernScanErgebnis(treffer.rawValue, ziel);
+            ernScanErgebnis(gueltig, ziel);
             return;
           }
+          letzterCode = gueltig || null;
         }
       } catch (e) { /* einzelnes Bild nicht auswertbar – weiter */ }
-      setTimeout(pruefen, 250);
+      if (!hinweisGezeigt && Date.now() - start > 8000) {
+        hinweisGezeigt = true;
+        status.textContent = "Noch nichts erkannt – etwas weiter weg halten (scharf stellen), Licht anmachen oder die Ziffern abtippen.";
+      }
+      setTimeout(pruefen, 150);
     };
     pruefen();
   }
+
+  // Prüfziffer von EAN-8/-13, UPC-A/-E (GTIN, Modulo 10). Ein falsch
+  // gelesener Strich ergibt fast immer eine ungültige Prüfziffer – so
+  // landet kein Lesefehler bei Open Food Facts („nicht bekannt“).
+  function ernGtinGueltig(code) {
+    if (!/^\d{8,14}$/.test(code || "")) return false;
+    const z = code.split("").map(Number);
+    const pruef = z.pop();
+    let summe = 0;
+    z.reverse().forEach((d, i) => { summe += d * (i % 2 === 0 ? 3 : 1); });
+    return (10 - (summe % 10)) % 10 === pruef;
+  }
+
+  // Autofokus, leichter Zoom (Handys fokussieren nah oft nicht scharf –
+  // mit Zoom kann man weiter weg halten) und Licht-Knopf, falls vorhanden.
+  async function ernKameraEinstellen() {
+    const knopf = document.getElementById("btn-ern-scanner-licht");
+    ernScanLicht = false;
+    if (!knopf) return;   // alte index.html aus dem Cache
+    knopf.classList.add("hidden");
+    knopf.textContent = "🔦 Licht an";
+    const spur = ernScanStream && ernScanStream.getVideoTracks()[0];
+    if (!spur || typeof spur.getCapabilities !== "function") return;
+    const fk = spur.getCapabilities();
+    const einst = {};
+    if (Array.isArray(fk.focusMode) && fk.focusMode.includes("continuous")) einst.focusMode = "continuous";
+    if (fk.zoom && fk.zoom.max >= 1.5) einst.zoom = Math.min(2, fk.zoom.max);
+    if (Object.keys(einst).length) {
+      try { await spur.applyConstraints({ advanced: [einst] }); } catch (e) { /* Gerät kann es nicht – egal */ }
+    }
+    if (fk.torch) knopf.classList.remove("hidden");
+  }
+
+  document.getElementById("btn-ern-scanner-licht")?.addEventListener("click", async () => {
+    const spur = ernScanStream && ernScanStream.getVideoTracks()[0];
+    if (!spur) return;
+    try {
+      await spur.applyConstraints({ advanced: [{ torch: !ernScanLicht }] });
+      ernScanLicht = !ernScanLicht;
+      document.getElementById("btn-ern-scanner-licht").textContent = ernScanLicht ? "🔦 Licht aus" : "🔦 Licht an";
+    } catch (e) { /* ignorieren */ }
+  });
 
   function ernKameraStoppen() {
     ernScanLaeuft = false;
