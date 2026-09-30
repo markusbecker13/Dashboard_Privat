@@ -670,7 +670,7 @@
       <div id="view-reiter-verwaltung" class="hidden">
         <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
-        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Ernährung gibt es nur in Privat und taucht hier bei den anderen Bereichen deshalb nicht auf.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Raumplanung ist ebenfalls bereichsgetrennt (Standard: AWO). Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Ernährung gibt es nur in Privat und taucht hier bei den anderen Bereichen deshalb nicht auf.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -889,6 +889,22 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Nachträglich korrigieren:</strong> auf einen Eintrag tippen öffnet die Inline-Bearbeitung – dort auch ein abweichendes Rückgabedatum eintragbar oder ein Eintrag durch Leeren des Rückgabe-Feldes wieder auf „offen" setzbar</li>
                 <li><strong>Im Inventar-Reiter</strong> zeigen Gegenstände mit offenen Ausleihen direkt einen Hinweis, an wen wie viel gerade verliehen ist</li>
                 <li>Löschen entfernt nur den Verleih-Eintrag, nicht den Inventar-Gegenstand selbst</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Raumplanung <span class="anleitung-nur">(Standard: nur AWO OV Liblar, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
+            <div class="anleitung-text">
+              <p>Vermietungen der Räume eintragen. Bei jedem <strong>neuen</strong> Eintrag geht automatisch eine Mail an alle Adressen im Mail-Verteiler.</p>
+              <ul>
+                <li><strong>Neue Vermietung:</strong> Raum, Datum, optional Von/Bis (ohne Uhrzeit = ganztägig), Mieter (Pflicht), optional Kontakt, Zweck und Notiz, dann „Eintragen &amp; Mail senden“. Darunter steht, an wie viele Adressen die Mail ging</li>
+                <li><strong>Überschneidung:</strong> Ist der Raum zur selben Zeit schon vermietet, zeigt die App die bestehende Vermietung und fragt, ob du trotzdem speichern willst</li>
+                <li><strong>Liste:</strong> kommende Vermietungen nach Monat, darunter „Vergangene Vermietungen“ (aufklappbar). Jede zeigt, ob die Mail rausging. Fehlgeschlagen oder Verteiler leer? „Erneut senden“ direkt am Eintrag</li>
+                <li><strong>Bearbeiten:</strong> auf einen Eintrag tippen. Änderungen und Löschen verschicken bewusst keine Mail</li>
+                <li><strong>Räume verwalten</strong> (unten, aufklappen): Räume anlegen, mit ✎ umbenennen, mit × löschen – vorhandene Vermietungen bleiben dann ohne Raum erhalten</li>
+                <li><strong>Mail-Verteiler</strong> (unten, aufklappen): beliebig viele Adressen, optional mit Namen. Die Mail geht in BCC raus, niemand sieht die anderen Adressen</li>
+                <li><strong>Versand:</strong> über den Mail-Dienst Brevo. Einmal einrichten: bei Brevo ein Konto anlegen, eine Absenderadresse bestätigen, einen API-Schlüssel erzeugen und in Supabase als Secrets <code>BREVO_API_KEY</code> und <code>MAIL_ABSENDER</code> (optional <code>MAIL_ABSENDER_NAME</code>) hinterlegen. Ohne diese Secrets lässt sich trotzdem alles eintragen, oben steht dann ein Hinweis</li>
               </ul>
             </div>
           </details>
@@ -1114,6 +1130,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Schriften:</strong> Bricolage Grotesque und DM Sans liegen direkt im Dashboard (Ordner fonts/, Lizenz SIL OFL 1.1). Beim Öffnen wird keine Verbindung zu Google Fonts mehr aufgebaut, die IP-Adresse geht also nicht an Google</li>
                 <li>Aktuell werden nur eigene Daten gespeichert (keine Daten Dritter) – das fällt unter die private Haushaltsausnahme der DSGVO</li>
                 <li><strong>Wetter:</strong> die Abfrage läuft serverseitig über die Edge Function bei Open-Meteo (ohne API-Schlüssel). Open-Meteo bekommt nur den eingestellten Ort, nicht deine IP-Adresse</li>
+                <li><strong>Raumplanung (AWO):</strong> Hier liegen Namen und Kontaktdaten der Mieter, also Daten Dritter – dafür gilt die private Haushaltsausnahme nicht mehr. Die Mails laufen über Brevo (Auftragsverarbeiter). Der Ortsverein sollte das kurz prüfen: Information der Mieter, Löschfrist für alte Vermietungen, Auftragsverarbeitungsvertrag mit Brevo und Supabase (Einschätzung, keine Rechtsprüfung)</li>
                 <li><strong>OGS Rapunzel &amp; AWO OV Liblar:</strong> beide Bereiche sind für organisatorische Inhalte gedacht, keine personenbezogenen Daten über Kinder, Familien oder Kolleg:innen. Sollten künftig doch personenbezogene Daten Dritter hinzukommen, braucht es eine erneute Prüfung. <strong>Achtung Verleih:</strong> das Feld „An wen" nimmt Namen auf – dort möglichst Kürzel, Gruppen oder Funktionen statt vollständiger Namen eintragen</li>
                 <li><strong>Rezeptfotos:</strong> liegen in einem privaten Storage-Bucket (EU), sichtbar nur über kurzlebige signierte Links nach dem Login. Empfehlung: nur das Essen fotografieren, keine Personen – in OGS und AWO erst recht keine Kinder (Einschätzung, keine Rechtsprüfung)</li>
                 <li><strong>Business (zwischenkaffeeundchaos):</strong> Für geschäftliche Tätigkeit gilt die private Haushaltsausnahme nicht. Solange dort nur eigene Planungsdaten liegen (Aufgaben, Ideen, Notizen), ist das unkritisch. Bitte <strong>keine Kundendaten</strong> (Namen, E-Mail-Adressen, Bestellungen) im Dashboard ablegen – dafür bräuchte es u.a. einen Auftragsverarbeitungsvertrag mit Supabase und einen Eintrag im Verzeichnis der Verarbeitungstätigkeiten</li>
@@ -1262,6 +1279,57 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <p class="empty-text" style="margin-top:0.3rem;">Neue Gegenstände zuerst im Inventar-Reiter anlegen – hier nur auswählen und verleihen.</p>
 
         <div id="verleih-liste-bereich"></div>
+      </div>
+
+      <div id="view-raumplanung" class="hidden">
+        <h1>Raumplanung <button class="hilfe-icon" data-hilfe="Vermietungen der Räume eintragen. Bei jedem neuen Eintrag geht automatisch eine Mail an alle Adressen im Mail-Verteiler (unten). Überschneidet sich eine Vermietung im selben Raum, fragt die App nach. Zum Bearbeiten auf einen Eintrag tippen – Änderungen verschicken keine Mail.">?</button></h1>
+        <p class="hero-text">Vermietungen eintragen – bei jedem neuen Eintrag geht eine Mail an den Verteiler.</p>
+
+        <div id="raum-hinweise"></div>
+
+        <div class="rezept-form" id="raum-formular">
+          <div class="task-edit-felder">
+            <label class="ern-feld">Raum<select id="raum-neu-raum"></select></label>
+            <label class="ern-feld">Datum<input type="date" id="raum-neu-datum"></label>
+            <label class="ern-feld">Von<input type="time" id="raum-neu-von"></label>
+            <label class="ern-feld">Bis<input type="time" id="raum-neu-bis"></label>
+            <label class="ern-feld ern-feld-breit">Mieter<input type="text" id="raum-neu-mieter" maxlength="200" placeholder="Name oder Gruppe"></label>
+            <label class="ern-feld ern-feld-breit">Kontakt (optional)<input type="text" id="raum-neu-kontakt" maxlength="300" placeholder="Telefon oder Mail"></label>
+            <label class="ern-feld ern-feld-breit">Zweck (optional)<input type="text" id="raum-neu-zweck" maxlength="300" placeholder="z. B. Geburtstagsfeier"></label>
+            <label class="ern-feld ern-feld-breit">Notiz (optional)<textarea id="raum-neu-notiz" rows="2" maxlength="2000"></textarea></label>
+          </div>
+          <div class="row" style="margin-bottom:0;">
+            <button class="btn-primary" id="btn-raum-vermietung">Eintragen &amp; Mail senden</button>
+          </div>
+          <p class="notiz-meta" id="raum-status" role="status"></p>
+        </div>
+
+        <div id="raum-vermietungen-liste" style="margin-top:1.2rem;"></div>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;" id="raum-raeume-block">
+          <summary>Räume verwalten</summary>
+          <div class="anleitung-text">
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+              <input type="text" id="raum-raum-name" placeholder="Name (z. B. Saal)" maxlength="120">
+              <input type="text" id="raum-raum-beschreibung" placeholder="Beschreibung (optional)" maxlength="500" style="flex:1; min-width:12rem;">
+              <button class="btn-primary" id="btn-raum-raum">+ Raum</button>
+            </div>
+            <div id="raum-raeume-liste" style="margin-top:0.6rem;"></div>
+          </div>
+        </details>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;" id="raum-verteiler-block">
+          <summary>Mail-Verteiler</summary>
+          <div class="anleitung-text">
+            <p class="empty-text" style="margin-top:0;">An alle Adressen hier geht bei jeder neuen Vermietung eine Mail. Die Empfänger stehen in BCC und sehen die anderen Adressen nicht.</p>
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+              <input type="email" id="raum-empf-email" placeholder="Mailadresse" autocomplete="off" style="flex:1; min-width:12rem;">
+              <input type="text" id="raum-empf-name" placeholder="Name (optional)" maxlength="120">
+              <button class="btn-primary" id="btn-raum-empf">+ Adresse</button>
+            </div>
+            <div id="raum-empfaenger-liste" style="margin-top:0.6rem;"></div>
+          </div>
+        </details>
       </div>
 
       <div id="view-training" class="hidden">
