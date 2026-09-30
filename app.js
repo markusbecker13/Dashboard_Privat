@@ -7745,19 +7745,91 @@
 
   // Formular: Art der Vermietung (ein Tag / Zeitraum / mehrere Tage)
   let raumNeueTage = [];
+
+  // Regelmäßige Termine (seit Session 30): aus erstem Datum, Rhythmus und
+  // Enddatum die einzelnen Tage berechnen. Gespeichert wird danach genau wie
+  // bei „Mehrere einzelne Tage“ (tage[], gemeinsame gruppe_id, eine Mail).
+  //   woche / 2wochen: +7 bzw. +14 Tage
+  //   monat_tag: gleicher Tag im Monat – Monate ohne diesen Tag (z. B. 31.)
+  //     werden übersprungen, nicht auf den Monatsletzten verschoben
+  //   monat_wochentag: gleicher Wochentag an gleicher Stelle (z. B. 2. Dienstag);
+  //     beim 5. Wochentag fallen Monate ohne fünften weg
+  const RAUM_REGEL_MAX = 60;
+  const RAUM_ORDINAL = ["1.", "2.", "3.", "4.", "5."];
+  function raumRegelTermine(start, bis, rhythmus) {
+    const tage = [];
+    if (!start || !bis || bis < start) return tage;
+    const [j, m, t] = start.split("-").map(Number);
+    const iso = (d) => datumLokalISO(d);
+    if (rhythmus === "woche" || rhythmus === "2wochen") {
+      const schritt = rhythmus === "woche" ? 7 : 14;
+      for (let tag = start; tag <= bis && tage.length <= RAUM_REGEL_MAX; tag = addTage(tag, schritt)) tage.push(tag);
+      return tage;
+    }
+    const wochentag = new Date(j, m - 1, t).getDay();
+    const nr = Math.floor((t - 1) / 7); // 0 = erster … 4 = fünfter
+    for (let k = 0; k < 400 && tage.length <= RAUM_REGEL_MAX; k++) {
+      let d;
+      if (rhythmus === "monat_tag") {
+        d = new Date(j, m - 1 + k, t);
+        if (d.getDate() !== t) continue; // Monat hat diesen Tag nicht
+      } else {
+        const erster = new Date(j, m - 1 + k, 1);
+        const versatz = (wochentag - erster.getDay() + 7) % 7;
+        d = new Date(erster.getFullYear(), erster.getMonth(), 1 + versatz + nr * 7);
+        if (d.getMonth() !== erster.getMonth()) continue; // kein 5. Wochentag
+      }
+      const s = iso(d);
+      if (s > bis) break;
+      tage.push(s);
+    }
+    return tage;
+  }
+  function raumRegelBeschreibung(start, rhythmus) {
+    if (!start) return "";
+    const [j, m, t] = start.split("-").map(Number);
+    const wt = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"][new Date(j, m - 1, t).getDay()];
+    if (rhythmus === "woche") return `jeden ${wt}`;
+    if (rhythmus === "2wochen") return `jeden zweiten ${wt}`;
+    if (rhythmus === "monat_tag") return `jeden ${t}. im Monat`;
+    return `jeden ${RAUM_ORDINAL[Math.floor((t - 1) / 7)]} ${wt} im Monat`;
+  }
+  function raumRegelVorschau() {
+    const el = document.getElementById("raum-neu-regel-vorschau");
+    if (!el || document.getElementById("raum-neu-art").value !== "regel") return;
+    const start = document.getElementById("raum-neu-datum").value;
+    const bis = document.getElementById("raum-neu-datum-bis").value;
+    const rhythmus = document.getElementById("raum-neu-rhythmus").value;
+    if (!start || !bis) { el.textContent = "Erstes Datum und „Bis Datum“ wählen – dann steht hier, welche Termine entstehen."; return; }
+    if (bis < start) { el.textContent = "„Bis Datum“ liegt vor dem ersten Termin."; return; }
+    const tage = raumRegelTermine(start, bis, rhythmus);
+    if (tage.length > RAUM_REGEL_MAX) {
+      el.textContent = `Das wären mehr als ${RAUM_REGEL_MAX} Termine – bitte ein früheres „Bis Datum“ wählen und die Serie später verlängern.`;
+      return;
+    }
+    const liste = tage.length <= 6 ? tage.map(raumDatumText).join(", ")
+      : `${tage.slice(0, 3).map(raumDatumText).join(", ")} … ${raumDatumText(tage[tage.length - 1])}`;
+    el.textContent = `${raumRegelBeschreibung(start, rhythmus)}: ${tage.length} Termin${tage.length === 1 ? "" : "e"} – ${liste}`;
+  }
+
   function raumArtAnwenden() {
     const art = document.getElementById("raum-neu-art").value;
-    document.getElementById("raum-neu-datum-bis-feld").classList.toggle("hidden", art !== "zeitraum");
+    document.getElementById("raum-neu-datum-bis-feld").classList.toggle("hidden", art !== "zeitraum" && art !== "regel");
+    document.getElementById("raum-neu-rhythmus-feld").classList.toggle("hidden", art !== "regel");
+    document.getElementById("raum-neu-regel-vorschau").classList.toggle("hidden", art !== "regel");
+    document.getElementById("raum-neu-datum-bis-label").textContent = art === "regel" ? "Bis Datum (letzter Termin)" : "Bis Datum";
     document.getElementById("raum-neu-tage-feld").classList.toggle("hidden", art !== "mehrere");
-    document.getElementById("raum-neu-datum-label").textContent = art === "zeitraum" ? "Von Datum" : "Datum";
+    document.getElementById("raum-neu-datum-label").textContent = art === "zeitraum" ? "Von Datum" : art === "regel" ? "Erster Termin" : "Datum";
     document.getElementById("raum-neu-von-label").textContent = art === "zeitraum" ? "Beginn (1. Tag)" : "Von";
     document.getElementById("raum-neu-bis-label").textContent = art === "zeitraum" ? "Ende (letzter Tag)" : "Bis";
     const hinweise = {
       tag: "",
       zeitraum: "Durchgehend belegt – z. B. Freitag 18:00 bis Sonntag 14:00.",
       mehrere: "Datum wählen und „+ Tag hinzufügen“ – alle Tage bekommen dieselbe Uhrzeit. Es geht eine Mail für alle Termine raus.",
+      regel: "Alle Termine bekommen dieselbe Uhrzeit. Es geht eine Mail für alle Termine raus. Einzelne Termine (z. B. in den Ferien) danach einfach löschen.",
     };
     document.getElementById("raum-neu-art-hinweis").textContent = hinweise[art] || "";
+    raumRegelVorschau();
   }
   function raumTageRendern() {
     const ziel = document.getElementById("raum-neu-tage-liste");
@@ -7771,6 +7843,8 @@
     raumTageRendern();
   };
   document.getElementById("raum-neu-art").addEventListener("change", raumArtAnwenden);
+  ["raum-neu-datum", "raum-neu-datum-bis", "raum-neu-rhythmus"].forEach((id) =>
+    document.getElementById(id).addEventListener("change", raumRegelVorschau));
   document.getElementById("btn-raum-tag-dazu").addEventListener("click", () => {
     const feld = document.getElementById("raum-neu-datum");
     const t = feld.value;
@@ -7815,6 +7889,14 @@
       }
       daten.tage = raumNeueTage.slice();
       daten.datum = raumNeueTage[0];
+    } else if (art === "regel") {
+      const bis = document.getElementById("raum-neu-datum-bis").value;
+      const tage = raumRegelTermine(daten.datum, bis, document.getElementById("raum-neu-rhythmus").value);
+      if (!bis || bis < daten.datum) { status.textContent = "Bitte ein „Bis Datum“ nach dem ersten Termin wählen."; return; }
+      if (tage.length > RAUM_REGEL_MAX) { status.textContent = `Höchstens ${RAUM_REGEL_MAX} Termine auf einmal – bitte ein früheres „Bis Datum“ wählen.`; return; }
+      if (tage.length < 2) { status.textContent = "Das ergibt nur einen Termin – dafür bitte „Ein Tag“ wählen."; return; }
+      daten.tage = tage;
+      daten.datum = tage[0];
     } else if (art === "zeitraum") {
       daten.datum_bis = document.getElementById("raum-neu-datum-bis").value;
       if (!daten.datum_bis || daten.datum_bis <= daten.datum) {
