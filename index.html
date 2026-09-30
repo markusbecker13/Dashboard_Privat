@@ -902,6 +902,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Anlass / Belegung statt Name:</strong> Hier steht nur, wofür der Raum belegt ist (z. B. „Geburtstagsfeier“, „Seniorentreff“) – keine Namen. Auch Kürzel wie „Familie M.“ können im Ort erkennbar sein. <strong>Kontakt</strong> ist optional und nur für den Fall gedacht, dass Vorstand oder Stellvertretung jemanden erreichen müssen; er steht dann mit in der Mail</li>
                 <li><strong>Art „Ein Tag“:</strong> wie bisher, ein Datum mit Von/Bis</li>
                 <li><strong>Art „Zeitraum (durchgehend)“:</strong> Von Datum bis Bis Datum am Stück belegt, z. B. Freitag 18:00 bis Sonntag 14:00. „Beginn“ gilt für den ersten, „Ende“ für den letzten Tag</li>
+                <li><strong>Art „Regelmäßig“:</strong> erstes Datum, Uhrzeit, Wiederholung (jede Woche, alle 2 Wochen, jeden Monat am gleichen Datum oder jeden Monat am gleichen Wochentag, z. B. „2. Dienstag“) und „Bis Datum“ (letzter möglicher Termin). Darunter steht sofort, wie viele Termine das ergibt und welche. Gespeichert wird wie bei „Mehrere einzelne Tage“: je Termin ein Eintrag als 🔁 Serie, eine Mail mit allen Terminen, höchstens 60 auf einmal. Einzelne Termine lassen sich danach löschen (×) oder ändern, z. B. in den Ferien</li>
                 <li><strong>Art „Mehrere einzelne Tage“:</strong> Datum wählen, „+ Tag hinzufügen“ – danach springt das Datum eine Woche weiter (praktisch für wöchentliche Termine, beliebig änderbar). Ein Tipp auf einen Tag entfernt ihn. Alle Tage bekommen dieselbe Uhrzeit. Jeder Tag wird ein eigener Eintrag (🔁 Serie), aber es geht <strong>eine</strong> Mail mit allen Terminen raus. Höchstens 60 Tage auf einmal</li>
                 <li><strong>Überschneidung:</strong> Ist der Raum zur selben Zeit schon vermietet, zeigt die App die bestehende Vermietung und fragt, ob du trotzdem speichern willst</li>
                 <li><strong>Monatskalender</strong> (unter dem Formular): belegte Tage sind in der Akzentfarbe des Bereichs gefüllt (in AWO Rot) mit weißem Punkt, Zeiträume an allen ihren Tagen, heute ist umrandet, der angetippte Tag ist dunkel. ‹ › blättern, Tipp auf den Monatsnamen springt zum aktuellen Monat. Einen Tag antippen zeigt darunter seine Vermietungen (auch dort bearbeitbar); „＋ Neue Vermietung an diesem Tag“ übernimmt das Datum ins Formular. Nochmal antippen schließt den Tag</li>
@@ -1299,9 +1300,17 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <option value="tag">Ein Tag</option>
               <option value="zeitraum">Zeitraum (durchgehend)</option>
               <option value="mehrere">Mehrere einzelne Tage</option>
+              <option value="regel">Regelmäßig (wöchentlich, monatlich …)</option>
             </select></label>
             <label class="ern-feld"><span id="raum-neu-datum-label">Datum</span><input type="date" id="raum-neu-datum"></label>
-            <label class="ern-feld hidden" id="raum-neu-datum-bis-feld">Bis Datum<input type="date" id="raum-neu-datum-bis"></label>
+            <label class="ern-feld hidden" id="raum-neu-rhythmus-feld">Wiederholung<select id="raum-neu-rhythmus">
+              <option value="woche">Jede Woche</option>
+              <option value="2wochen">Alle 2 Wochen</option>
+              <option value="monat_tag">Jeden Monat (gleiches Datum)</option>
+              <option value="monat_wochentag">Jeden Monat (gleicher Wochentag)</option>
+            </select></label>
+            <label class="ern-feld hidden" id="raum-neu-datum-bis-feld"><span id="raum-neu-datum-bis-label">Bis Datum</span><input type="date" id="raum-neu-datum-bis"></label>
+            <p class="notiz-meta ern-feld-breit hidden" id="raum-neu-regel-vorschau" style="margin:0;" role="status"></p>
             <div class="ern-feld ern-feld-breit hidden" id="raum-neu-tage-feld">
               <div class="row" style="margin-bottom:0.3rem;">
                 <button type="button" class="btn-secondary" id="btn-raum-tag-dazu">+ Tag hinzufügen</button>
