@@ -648,8 +648,23 @@
     aufgGruppenMerken();
     render();
   };
+  // Projektname direkt im Gruppenkopf bearbeiten (statt Popup-Abfrage)
+  let aufgProjektEditId = null;
   function aufgGruppeHtml(schluesselId, titel, liste, editKnopf) {
     const schluessel = `${aktiverBereich}|${schluesselId}`;
+    if (aufgProjektEditId === schluesselId) {
+      return `
+        <div class="spiel-gruppe">
+          <div class="spiel-gruppe-kopf" style="cursor:default; flex-wrap:wrap; padding:0.5rem 0.7rem;">
+            <input type="text" id="aufg-projekt-name-edit" value="${escapeAttr(titel)}" aria-label="Projektname" style="flex:1 1 12rem; min-width:0;"
+              onkeydown="if (event.key === 'Enter') projektNameSpeichern('${schluesselId}'); if (event.key === 'Escape') projektNameAbbrechen();">
+            <button class="btn-primary" onclick="projektNameSpeichern('${schluesselId}')">Speichern</button>
+            <button class="link-btn" onclick="projektNameAbbrechen()">Abbrechen</button>
+            <span id="aufg-projekt-name-status" class="notiz-meta" role="status" style="flex-basis:100%; margin:0;"></span>
+          </div>
+          <div class="task-list" style="margin:0.5rem 0 0.8rem;">${liste.map((a) => taskHtml(a, false)).join("")}</div>
+        </div>`;
+    }
     const gemerkt = aufgGruppeOffen[schluessel];
     const offen = liste.some((a) => a.id === aufgabeBearbeitenId) || gemerkt !== false;
     const ueber = liste.filter((a) => a.status === "ueberfaellig").length;
@@ -769,16 +784,37 @@
     await ladeDaten();
   }
 
-  window.projektUmbenennen = async function(id) {
+  window.projektUmbenennen = function(id) {
+    if (!projekteAktuell().some((p) => p.id === id)) return;
+    aufgProjektEditId = id;
+    render();
+    const feld = document.getElementById("aufg-projekt-name-edit");
+    if (feld) { feld.focus(); feld.select(); }
+  };
+
+  window.projektNameAbbrechen = function() {
+    aufgProjektEditId = null;
+    render();
+  };
+
+  window.projektNameSpeichern = async function(id) {
     const projekt = projekteAktuell().find((p) => p.id === id);
-    if (!projekt) return;
-    const neuerName = prompt("Neuer Projektname:", projekt.name);
-    if (!neuerName || !neuerName.trim() || neuerName.trim() === projekt.name) return;
+    const feld = document.getElementById("aufg-projekt-name-edit");
+    const status = document.getElementById("aufg-projekt-name-status");
+    if (!projekt || !feld) return;
+    const neuerName = feld.value.trim();
+    if (!neuerName) { status.textContent = "Bitte einen Namen eingeben."; return; }
+    if (neuerName === projekt.name) { projektNameAbbrechen(); return; }
+    if (projekteAktuell().some((p) => p.id !== id && p.name.toLowerCase() === neuerName.toLowerCase())) {
+      status.textContent = "Diesen Projektnamen gibt es in diesem Bereich schon.";
+      return;
+    }
     try {
-      await api("projekt_umbenennen", { id, name: neuerName.trim() });
+      await api("projekt_umbenennen", { id, name: neuerName });
+      aufgProjektEditId = null;
       await ladeDaten();
     } catch (e) {
-      alert("Umbenennen fehlgeschlagen – existiert der Name schon?");
+      status.textContent = "Umbenennen fehlgeschlagen – existiert der Name schon?";
     }
   };
 
