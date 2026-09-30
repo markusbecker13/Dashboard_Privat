@@ -854,6 +854,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Name, Kategorie (mit Autovervollständigung aus bestehenden Kategorien), Menge, optional Standort, optional Beschreibung, Zustand (Gut / Eingeschränkt nutzbar / Defekt)</li>
                 <li>Liste automatisch nach Kategorie gruppiert, Filter-Dropdown zeigt die Anzahl je Kategorie</li>
+                <li><strong>Wiederbeschaffungswert</strong> (optional, seit Session 29): Betrag je Stück in €, was eine Neuanschaffung heute kosten würde. Beim Gegenstand steht er mit „zusammen“ (Wert × Menge), im Kopf jeder Kategorie die Summe, über der Liste der Gesamtwert (bei gewählter Kategorie nur deren Wert). Ein * heißt: Einige Gegenstände haben noch keinen Wert, die echte Summe liegt höher. Nachtragen über Antippen → Feld „Wert je Stück“</li>
                 <li><strong>Aufklappbare Kategorien</strong> (seit Session 29): jede Kategorie ist ein eigener Block mit Anzahl, dazu „x defekt“ und „x verliehen“, wenn es welche gibt. Antippen klappt auf und zu; welche offen sind, merkt sich das Gerät je Bereich. „Alle aufklappen“ / „Alle zuklappen“ über der Liste. Ist im Filter eine Kategorie gewählt oder wird ein Gegenstand bearbeitet, ist seine Kategorie automatisch offen</li>
                 <li>Klick auf einen Eintrag öffnet die Inline-Bearbeitung, Löschen mit Sicherheitsabfrage</li>
               </ul>
@@ -1196,6 +1197,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <input type="text" id="neu-inv-kategorie" placeholder="Kategorie" list="inv-kategorie-liste">
           <datalist id="inv-kategorie-liste"></datalist>
           <input type="number" id="neu-inv-menge" placeholder="Menge" min="1" value="1" style="width:5rem;">
+          <input type="number" id="neu-inv-wert" placeholder="Wert je Stück (€)" min="0" step="0.01" inputmode="decimal" style="width:9.5rem;" title="Wiederbeschaffungswert je Stück in € (optional)">
           <input type="text" id="neu-inv-standort" placeholder="Standort (optional)">
           <input type="text" id="neu-inv-beschreibung" placeholder="Beschreibung (optional)" style="min-width:14rem; flex:1;">
           <select id="neu-inv-zustand">
