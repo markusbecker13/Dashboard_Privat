@@ -3389,6 +3389,16 @@
   const INV_ZUSTAND_LABEL = { gut: "✅ Gut", eingeschraenkt: "⚠️ Eingeschränkt nutzbar", defekt: "❌ Defekt" };
   let invAktiveKategorie = "alle";
   let invBearbeitenId = null;
+  // Offene Inventar-Kategorien, je Bereich (Schlüssel "bereich|Kategorie")
+  const invGruppenOffen = new Set();
+  try { JSON.parse(localStorage.getItem("inv-gruppen-offen") || "[]").forEach((k) => invGruppenOffen.add(k)); } catch (_e) { /* leer lassen */ }
+  function invGruppenMerken() {
+    try { localStorage.setItem("inv-gruppen-offen", JSON.stringify([...invGruppenOffen])); } catch (_e) { /* egal */ }
+  }
+  function invGruppenSchluessel(kat) {
+    return `${aktiverBereich}|${kat}`;
+  }
+
 
   function renderInventar() {
     const filterBereich = document.getElementById("inv-filter-bereich");
@@ -3460,9 +3470,56 @@
             <button class="task-delete" onclick="invLoeschen('${i.id}')">×</button>
           </div>`;
       }).join("");
-      return `<h3 style="margin-top:1.2rem; margin-bottom:0.4rem; font-size:0.95rem; color:var(--ink-dim);">${escapeHtml(kat)}</h3><div class="notiz-list">${zeilen}</div>`;
+      // Aufklappbar je Kategorie (seit Session 29), gleiche Optik wie bei den
+      // Spielen. Offen bleibt, was du geöffnet hast (je Bereich gemerkt),
+      // außerdem automatisch bei gewählter Kategorie im Filter und beim
+      // Bearbeiten eines Gegenstands darin.
+      const schluessel = invGruppenSchluessel(kat);
+      const offen = invAktiveKategorie !== "alle" || invGruppenOffen.has(schluessel) || items.some((i) => i.id === invBearbeitenId);
+      const defekt = items.filter((i) => i.zustand === "defekt").length;
+      const verliehen = items.filter((i) => verleihAktuell().some((v) => v.inventar_id === i.id && !v.rueckgabe_am)).length;
+      const info = [
+        defekt ? `${defekt} defekt` : "",
+        verliehen ? `${verliehen} verliehen` : "",
+      ].filter(Boolean).join(" · ");
+      return `
+        <details class="spiel-gruppe" data-schluessel="${escapeAttr(schluessel)}" ${offen ? "open" : ""} ontoggle="invGruppeUmschalten(this)">
+          <summary class="spiel-gruppe-kopf">
+            <span class="spiel-gruppe-titel">${escapeHtml(kat)}</span>
+            ${info ? `<span class="spiel-gruppe-info">${info}</span>` : ""}
+            <span class="zl-gruppe-zahl">${items.length}</span>
+          </summary>
+          <div class="notiz-list">${zeilen}</div>
+        </details>`;
     }).join("");
+    if (kategorienSortiert.length > 1) {
+      listeBereich.innerHTML = `
+        <div class="row" style="margin:0.4rem 0 0.2rem; gap:0.8rem;">
+          <button class="link-btn" onclick="invAlleGruppen(true)">Alle aufklappen</button>
+          <button class="link-btn" onclick="invAlleGruppen(false)">Alle zuklappen</button>
+        </div>
+        <div class="spiel-gruppen">${listeBereich.innerHTML}</div>`;
+    } else {
+      listeBereich.innerHTML = `<div class="spiel-gruppen">${listeBereich.innerHTML}</div>`;
+    }
   }
+
+  window.invGruppeUmschalten = function(el) {
+    // Bei gewählter Kategorie ist sie automatisch offen – das nicht als Wunsch merken
+    if (invAktiveKategorie !== "alle") return;
+    const schluessel = el.dataset.schluessel;
+    if (el.open) invGruppenOffen.add(schluessel); else invGruppenOffen.delete(schluessel);
+    invGruppenMerken();
+  };
+
+  window.invAlleGruppen = function(auf) {
+    const kategorien = [...new Set(ogsInventarAktuell().map((i) => i.kategorie))];
+    kategorien.forEach((k) => {
+      if (auf) invGruppenOffen.add(invGruppenSchluessel(k)); else invGruppenOffen.delete(invGruppenSchluessel(k));
+    });
+    invGruppenMerken();
+    renderInventar();
+  };
 
   window.invFilterAendern = function(wert) {
     invAktiveKategorie = wert;
@@ -3479,7 +3536,17 @@
     const standort = document.getElementById("neu-inv-standort").value.trim() || null;
     const beschreibung = document.getElementById("neu-inv-beschreibung").value.trim() || null;
     const zustand = document.getElementById("neu-inv-zustand").value;
-    await api("ogs_inventar_hinzufuegen", { name, kategorie, menge, standort, beschreibung, zustand, bereich: aktiverBereich });
+    try {
+      await api("ogs_inventar_hinzufuegen", { name, kategorie, menge, standort, beschreibung, zustand, bereich: aktiverBereich });
+    } catch (fehler) {
+      alert("Speichern fehlgeschlagen: " + fehler.message);
+      return;
+    }
+    // Seit die Kategorien zuklappbar sind (Session 29): die Kategorie des neuen
+    // Gegenstands aufklappen, sonst verschwindet er in einem zugeklappten Block
+    // und es sieht aus, als wäre nichts gespeichert worden.
+    invGruppenOffen.add(invGruppenSchluessel(kategorie));
+    invGruppenMerken();
     document.getElementById("neu-inv-name").value = "";
     document.getElementById("neu-inv-kategorie").value = "";
     document.getElementById("neu-inv-menge").value = "1";
@@ -3507,7 +3574,15 @@
     const standort = document.getElementById(`inv-edit-standort-${id}`).value.trim() || null;
     const beschreibung = document.getElementById(`inv-edit-beschreibung-${id}`).value.trim() || null;
     const zustand = document.getElementById(`inv-edit-zustand-${id}`).value;
-    await api("ogs_inventar_aktualisieren", { id, name, kategorie, menge, standort, beschreibung, zustand });
+    try {
+      await api("ogs_inventar_aktualisieren", { id, name, kategorie, menge, standort, beschreibung, zustand });
+    } catch (fehler) {
+      alert("Speichern fehlgeschlagen: " + fehler.message);
+      return;
+    }
+    // Kategorie nach dem Speichern offen lassen (auch eine geänderte)
+    invGruppenOffen.add(invGruppenSchluessel(kategorie));
+    invGruppenMerken();
     invBearbeitenId = null;
     await ladeDaten();
   };
