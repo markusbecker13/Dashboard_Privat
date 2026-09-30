@@ -7471,8 +7471,8 @@
                 ${v.gruppe_id ? "" : `<label class="ern-feld">Bis Datum (optional)<input type="date" id="raum-edit-datumbis-${v.id}" value="${escapeAttr(v.datum_bis || "")}"></label>`}
                 <label class="ern-feld">Von<input type="time" id="raum-edit-von-${v.id}" value="${v.von ? String(v.von).slice(0, 5) : ""}"></label>
                 <label class="ern-feld">Bis<input type="time" id="raum-edit-bis-${v.id}" value="${v.bis ? String(v.bis).slice(0, 5) : ""}"></label>
-                <label class="ern-feld ern-feld-breit">Mieter<input type="text" id="raum-edit-mieter-${v.id}" maxlength="200" value="${escapeAttr(v.mieter_name)}"></label>
-                <label class="ern-feld ern-feld-breit">Kontakt<input type="text" id="raum-edit-kontakt-${v.id}" maxlength="300" value="${escapeAttr(v.mieter_kontakt || "")}"></label>
+                <label class="ern-feld ern-feld-breit">Anlass / Belegung<input type="text" id="raum-edit-mieter-${v.id}" maxlength="200" value="${escapeAttr(v.mieter_name)}"></label>
+                <label class="ern-feld ern-feld-breit">Kontakt (optional, nur wenn nötig)<input type="text" id="raum-edit-kontakt-${v.id}" maxlength="300" value="${escapeAttr(v.mieter_kontakt || "")}"></label>
                 <label class="ern-feld ern-feld-breit">Zweck<input type="text" id="raum-edit-zweck-${v.id}" maxlength="300" value="${escapeAttr(v.zweck || "")}"></label>
                 <label class="ern-feld ern-feld-breit">Notiz<textarea id="raum-edit-notiz-${v.id}" rows="2" maxlength="2000">${escapeHtml(v.notiz || "")}</textarea></label>
               </div>
@@ -7669,7 +7669,7 @@
       }
     }
     if (!daten.datum || !daten.mieter_name) {
-      status.textContent = "Bitte mindestens Datum und Mieter angeben.";
+      status.textContent = "Bitte mindestens Datum und Anlass / Belegung angeben.";
       return;
     }
     knopf.disabled = true;
