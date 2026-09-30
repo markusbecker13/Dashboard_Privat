@@ -7384,10 +7384,26 @@
   function raumZeitText(v) {
     const von = v.von ? String(v.von).slice(0, 5) : null;
     const bis = v.bis ? String(v.bis).slice(0, 5) : null;
+    // Zeitraum: von = Beginn am ersten Tag, bis = Ende am letzten Tag
+    if (v.datum_bis && v.datum_bis !== v.datum) {
+      return `${raumDatumText(v.datum)}${von ? " " + von : ""} – ${raumDatumText(v.datum_bis)}${bis ? " " + bis : ""}${von || bis ? " Uhr" : ""}`;
+    }
     if (von && bis) return `${von}–${bis} Uhr`;
     if (von) return `ab ${von} Uhr`;
     if (bis) return `bis ${bis} Uhr`;
     return "ganztägig";
+  }
+  // Kopfzeile eines Eintrags: Datum + Zeit bzw. der ganze Zeitraum
+  function raumWannText(v) {
+    if (v.datum_bis && v.datum_bis !== v.datum) return raumZeitText(v);
+    return `${raumDatumText(v.datum)} · ${raumZeitText(v)}`;
+  }
+  function raumEnde(v) {
+    return v.datum_bis || v.datum;
+  }
+  function raumSerie(v) {
+    if (!v.gruppe_id) return [];
+    return raumVermietungen.filter((x) => x.gruppe_id === v.gruppe_id).sort((a, b) => a.datum.localeCompare(b.datum));
   }
   function raumMailStatusHtml(v) {
     if (v.mail_status === "gesendet") {
@@ -7438,8 +7454,8 @@
     const heute = heuteISO();
     const alle = raumVermietungenAktuell().slice().sort((a, b) =>
       a.datum.localeCompare(b.datum) || String(a.von || "").localeCompare(String(b.von || "")));
-    const kommend = alle.filter((v) => v.datum >= heute);
-    const vergangen = alle.filter((v) => v.datum < heute).reverse();
+    const kommend = alle.filter((v) => raumEnde(v) >= heute);
+    const vergangen = alle.filter((v) => raumEnde(v) < heute).reverse();
 
     const karte = (v) => {
       if (raumBearbeitenId === v.id) {
@@ -7452,6 +7468,7 @@
                   ${raeumeListe.map((r) => `<option value="${r.id}" ${r.id === v.raum_id ? "selected" : ""}>${escapeHtml(r.name)}</option>`).join("")}
                 </select></label>
                 <label class="ern-feld">Datum<input type="date" id="raum-edit-datum-${v.id}" value="${escapeAttr(v.datum)}"></label>
+                ${v.gruppe_id ? "" : `<label class="ern-feld">Bis Datum (optional)<input type="date" id="raum-edit-datumbis-${v.id}" value="${escapeAttr(v.datum_bis || "")}"></label>`}
                 <label class="ern-feld">Von<input type="time" id="raum-edit-von-${v.id}" value="${v.von ? String(v.von).slice(0, 5) : ""}"></label>
                 <label class="ern-feld">Bis<input type="time" id="raum-edit-bis-${v.id}" value="${v.bis ? String(v.bis).slice(0, 5) : ""}"></label>
                 <label class="ern-feld ern-feld-breit">Mieter<input type="text" id="raum-edit-mieter-${v.id}" maxlength="200" value="${escapeAttr(v.mieter_name)}"></label>
@@ -7462,15 +7479,22 @@
               <div class="row" style="margin-bottom:0;">
                 <button class="btn-primary" onclick="raumBearbeitenSpeichern('${v.id}')">Speichern</button>
                 <button class="link-btn" onclick="raumBearbeitenAbbrechen()">Abbrechen</button>
+                ${v.gruppe_id ? `<button class="link-btn" style="color:var(--accent);" onclick="raumSerieLoeschen('${v.id}')">Ganze Serie löschen (${raumSerie(v).length})</button>` : ""}
               </div>
-              <p class="notiz-meta">Änderungen verschicken keine Mail.</p>
+              <p class="notiz-meta">Änderungen verschicken keine Mail.${v.gruppe_id ? " Bei einer Serie ändert sich nur dieser Termin." : " „Bis Datum“ leer lassen für einen einzelnen Tag."}</p>
             </div>
           </div>`;
       }
       return `
         <div class="notiz-item">
           <div style="flex:1; cursor:pointer;" onclick="raumBearbeitenStart('${v.id}')">
-            <span class="notiz-text">${escapeHtml(raumDatumText(v.datum))} · ${escapeHtml(raumZeitText(v))} · ${escapeHtml(raumName(v.raum_id))}</span>
+            <span class="notiz-text">${escapeHtml(raumWannText(v))} · ${escapeHtml(raumName(v.raum_id))}</span>
+            ${(() => {
+              const serie = raumSerie(v);
+              if (serie.length < 2) return "";
+              const nr = serie.findIndex((x) => x.id === v.id) + 1;
+              return `<span class="notiz-meta" style="display:block;">🔁 Serie · Termin ${nr} von ${serie.length}</span>`;
+            })()}
             <span class="notiz-meta" style="display:block;">${escapeHtml(v.mieter_name)}${v.mieter_kontakt ? " · " + escapeHtml(v.mieter_kontakt) : ""}${v.zweck ? " · " + escapeHtml(v.zweck) : ""}</span>
             ${v.notiz ? `<span class="notiz-meta" style="display:block;">${escapeHtml(v.notiz)}</span>` : ""}
             ${raumMailStatusHtml(v)}
@@ -7510,7 +7534,7 @@
     // Räume
     document.getElementById("raum-raeume-liste").innerHTML = raeumeListe.length
       ? `<div class="notiz-list">${raeumeListe.map((r) => {
-          const anzahl = raumVermietungenAktuell().filter((v) => v.raum_id === r.id && v.datum >= heute).length;
+          const anzahl = raumVermietungenAktuell().filter((v) => v.raum_id === r.id && raumEnde(v) >= heute).length;
           return `
             <div class="notiz-item">
               <div style="flex:1;">
@@ -7565,9 +7589,56 @@
     return antwort;
   }
 
+  // Formular: Art der Vermietung (ein Tag / Zeitraum / mehrere Tage)
+  let raumNeueTage = [];
+  function raumArtAnwenden() {
+    const art = document.getElementById("raum-neu-art").value;
+    document.getElementById("raum-neu-datum-bis-feld").classList.toggle("hidden", art !== "zeitraum");
+    document.getElementById("raum-neu-tage-feld").classList.toggle("hidden", art !== "mehrere");
+    document.getElementById("raum-neu-datum-label").textContent = art === "zeitraum" ? "Von Datum" : "Datum";
+    document.getElementById("raum-neu-von-label").textContent = art === "zeitraum" ? "Beginn (1. Tag)" : "Von";
+    document.getElementById("raum-neu-bis-label").textContent = art === "zeitraum" ? "Ende (letzter Tag)" : "Bis";
+    const hinweise = {
+      tag: "",
+      zeitraum: "Durchgehend belegt – z. B. Freitag 18:00 bis Sonntag 14:00.",
+      mehrere: "Datum wählen und „+ Tag hinzufügen“ – alle Tage bekommen dieselbe Uhrzeit. Es geht eine Mail für alle Termine raus.",
+    };
+    document.getElementById("raum-neu-art-hinweis").textContent = hinweise[art] || "";
+  }
+  function raumTageRendern() {
+    const ziel = document.getElementById("raum-neu-tage-liste");
+    if (!ziel) return;
+    ziel.innerHTML = raumNeueTage.length
+      ? raumNeueTage.map((t) => `<button type="button" class="chip" onclick="raumTagEntfernen('${t}')" title="Entfernen">${escapeHtml(raumDatumText(t))} ×</button>`).join("")
+      : `<span class="notiz-meta">Noch keine Tage gewählt.</span>`;
+  }
+  window.raumTagEntfernen = function(t) {
+    raumNeueTage = raumNeueTage.filter((x) => x !== t);
+    raumTageRendern();
+  };
+  document.getElementById("raum-neu-art").addEventListener("change", raumArtAnwenden);
+  document.getElementById("btn-raum-tag-dazu").addEventListener("click", () => {
+    const feld = document.getElementById("raum-neu-datum");
+    const t = feld.value;
+    if (!t) return;
+    if (!raumNeueTage.includes(t)) {
+      if (raumNeueTage.length >= 60) { alert("Höchstens 60 Termine auf einmal."); return; }
+      raumNeueTage.push(t);
+      raumNeueTage.sort();
+    }
+    // Vorschlag für den nächsten Termin: eine Woche später
+    const d = new Date(t + "T00:00:00");
+    d.setDate(d.getDate() + 7);
+    feld.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    raumTageRendern();
+  });
+  raumArtAnwenden();
+  raumTageRendern();
+
   document.getElementById("btn-raum-vermietung").addEventListener("click", async () => {
     const status = document.getElementById("raum-status");
     const knopf = document.getElementById("btn-raum-vermietung");
+    const art = document.getElementById("raum-neu-art").value;
     const daten = {
       raum_id: document.getElementById("raum-neu-raum").value || null,
       datum: document.getElementById("raum-neu-datum").value,
@@ -7579,6 +7650,24 @@
       notiz: document.getElementById("raum-neu-notiz").value.trim(),
       bereich: aktiverBereich,
     };
+    if (art === "mehrere") {
+      // Das gerade gewählte Datum zählt mit, auch ohne „+ Tag“
+      if (daten.datum && !raumNeueTage.includes(daten.datum)) raumNeueTage.push(daten.datum);
+      raumNeueTage.sort();
+      raumTageRendern();
+      if (raumNeueTage.length < 2) {
+        status.textContent = "Bitte mindestens zwei Tage hinzufügen (oder „Ein Tag“ wählen).";
+        return;
+      }
+      daten.tage = raumNeueTage.slice();
+      daten.datum = raumNeueTage[0];
+    } else if (art === "zeitraum") {
+      daten.datum_bis = document.getElementById("raum-neu-datum-bis").value;
+      if (!daten.datum_bis || daten.datum_bis <= daten.datum) {
+        status.textContent = "Beim Zeitraum muss „Bis Datum“ nach dem Startdatum liegen.";
+        return;
+      }
+    }
     if (!daten.datum || !daten.mieter_name) {
       status.textContent = "Bitte mindestens Datum und Mieter angeben.";
       return;
@@ -7588,10 +7677,13 @@
     try {
       const ergebnis = await raumVermietungSenden("vermietung_hinzufuegen", daten);
       if (!ergebnis) { status.textContent = "Nicht gespeichert."; return; }
-      ["raum-neu-von", "raum-neu-bis", "raum-neu-mieter", "raum-neu-kontakt", "raum-neu-zweck", "raum-neu-notiz"]
+      ["raum-neu-von", "raum-neu-bis", "raum-neu-datum-bis", "raum-neu-mieter", "raum-neu-kontakt", "raum-neu-zweck", "raum-neu-notiz"]
         .forEach((id) => { document.getElementById(id).value = ""; });
+      raumNeueTage = [];
+      raumTageRendern();
       await ladeDaten();
-      status.textContent = raumMailErgebnisText(ergebnis.mail);
+      const anzahl = ergebnis.anzahl || 1;
+      status.textContent = (anzahl > 1 ? `${anzahl} Termine eingetragen. ` : "") + raumMailErgebnisText(ergebnis.mail);
     } catch (fehler) {
       if (fehler.message !== "unauthorized") status.textContent = "Fehler: " + fehler.message;
     } finally {
@@ -7613,6 +7705,7 @@
       id,
       raum_id: wert("raum") || null,
       datum: wert("datum"),
+      datum_bis: document.getElementById(`raum-edit-datumbis-${id}`)?.value || null,
       von: wert("von"),
       bis: wert("bis"),
       mieter_name: wert("mieter").trim(),
@@ -7631,9 +7724,25 @@
   };
   window.raumVermietungLoeschen = async function(id) {
     const v = raumVermietungen.find((x) => x.id === id);
-    if (!confirm(`Vermietung${v ? " am " + raumDatumText(v.datum) : ""} löschen? Es geht keine Mail raus.`)) return;
+    const serie = v ? raumSerie(v) : [];
+    const frage = serie.length > 1
+      ? `Nur den Termin am ${raumDatumText(v.datum)} löschen? Die anderen ${serie.length - 1} Termine der Serie bleiben.\n(Ganze Serie: Eintrag antippen → „Ganze Serie löschen“.) Es geht keine Mail raus.`
+      : `Vermietung${v ? " am " + raumDatumText(v.datum) : ""} löschen? Es geht keine Mail raus.`;
+    if (!confirm(frage)) return;
     try {
       await api("vermietung_loeschen", { id });
+      await ladeDaten();
+    } catch (fehler) {
+      alert("Löschen fehlgeschlagen: " + fehler.message);
+    }
+  };
+  window.raumSerieLoeschen = async function(id) {
+    const v = raumVermietungen.find((x) => x.id === id);
+    const serie = v ? raumSerie(v) : [];
+    if (!confirm(`Alle ${serie.length} Termine dieser Serie löschen? Es geht keine Mail raus.`)) return;
+    try {
+      await api("vermietung_loeschen", { id, ganze_serie: true });
+      raumBearbeitenId = null;
       await ladeDaten();
     } catch (fehler) {
       alert("Löschen fehlgeschlagen: " + fehler.message);
