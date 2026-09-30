@@ -81,6 +81,11 @@
   let timerSession = null; // laufender Timer im Fokus-Modus
   let zielEvents = [];
   let rezepte = [];
+  // Raumplanung (seit Session 29)
+  let raeume = [];
+  let raumVermietungen = [];
+  let raumMailEmpfaenger = [];
+  let mailEingerichtet = false;
   let zielEventBearbeitenId = null;
   let auswertungJahr = new Date().getFullYear();
   let aktiverBereich = localStorage.getItem("aktiver-bereich") || "privat";
@@ -92,7 +97,7 @@
     reflexion: "view-reflexion", spiele: "view-spiele", einkauf: "view-einkauf", export: "view-export",
     verlauf: "view-verlauf", anleitung: "view-anleitung", ogsideen: "view-ogs-ideen",
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
-    reiterverwaltung: "view-reiter-verwaltung", training: "view-training",
+    reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
     rezepte: "view-rezepte", ernaehrung: "view-ernaehrung",
   };
 
@@ -106,6 +111,7 @@
     ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
+    ["raumplanung", "Raumplanung"],
   ];
   // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
@@ -122,7 +128,7 @@
       "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih"],
-    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen"],
+    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung"],
     business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen"],
   };
 
@@ -143,7 +149,7 @@
       { schluessel: "heute", label: "Heute", icon: "☀️", tabs: ["heute"] },
       { schluessel: "planen", label: "Planen", icon: "🗓️", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
       { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf", "rezepte", "training", "ernaehrung"] },
-      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", icon: BEREICH_ARBEIT_ICON[aktiverBereich] || "📌", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih"] },
+      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", icon: BEREICH_ARBEIT_ICON[aktiverBereich] || "📌", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung"] },
       { schluessel: "verwalten", label: "Verwalten", icon: "🛠️", tabs: ["export", "verlauf", "anleitung"] },
     ];
   }
@@ -507,6 +513,10 @@
     intervallTimer = data.intervall_timer || [];
     zielEvents = data.training_ziel_events || [];
     rezepte = data.rezepte || [];
+    raeume = data.raeume || [];
+    raumVermietungen = data.raum_vermietungen || [];
+    raumMailEmpfaenger = data.raum_mail_empfaenger || [];
+    mailEingerichtet = data.mail_eingerichtet === true;
     bereichAnwenden();
     renderReiterVerwaltung();
     render();
@@ -526,6 +536,7 @@
     renderProjekte();
     renderSpiele();
     renderRezepte();
+    renderRaumplanung();
   }
 
   function badgeHtml(cls, text) {
@@ -1114,6 +1125,7 @@
     if (aktiv === "ogsprojekte") renderProjekte();
     if (aktiv === "spiele") renderSpiele();
     if (aktiv === "verleih") renderVerleih();
+    if (aktiv === "raumplanung") renderRaumplanung();
     if (aktiv === "training") renderTraining();
     if (aktiv === "rezepte") renderRezepte();
     if (aktiv === "ernaehrung") { renderErnaehrung(); if (ernProfilGeladen) ernMetRendern(); }
@@ -7341,6 +7353,361 @@
     }
     document.getElementById("plan-overview-bereich").innerHTML = overviewHtml;
   }
+
+  // ==========================================================
+  // Raumplanung (seit Session 29): Vermietungen je Raum, bei jedem neuen
+  // Eintrag verschickt die Edge Function eine Mail (Brevo) an den Verteiler.
+  // ==========================================================
+  let raumBearbeitenId = null;
+  let raumVergangeneOffen = false;
+  const RAUM_WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const RAUM_MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+  function raeumeAktuell() {
+    return raeume.filter((r) => bereichVon(r) === aktiverBereich).sort((a, b) => a.name.localeCompare(b.name, "de"));
+  }
+  function raumVermietungenAktuell() {
+    return raumVermietungen.filter((v) => bereichVon(v) === aktiverBereich);
+  }
+  function raumEmpfaengerAktuell() {
+    return raumMailEmpfaenger.filter((e) => bereichVon(e) === aktiverBereich).sort((a, b) => a.email.localeCompare(b.email));
+  }
+  function raumName(id) {
+    const r = raeume.find((x) => x.id === id);
+    return r ? r.name : "ohne Raum";
+  }
+  function raumDatumText(iso) {
+    const d = new Date(iso + "T00:00:00");
+    if (isNaN(d.getTime())) return iso;
+    return `${RAUM_WOCHENTAGE[d.getDay()]}, ${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
+  }
+  function raumZeitText(v) {
+    const von = v.von ? String(v.von).slice(0, 5) : null;
+    const bis = v.bis ? String(v.bis).slice(0, 5) : null;
+    if (von && bis) return `${von}–${bis} Uhr`;
+    if (von) return `ab ${von} Uhr`;
+    if (bis) return `bis ${bis} Uhr`;
+    return "ganztägig";
+  }
+  function raumMailStatusHtml(v) {
+    if (v.mail_status === "gesendet") {
+      return `<span class="notiz-meta" style="display:block;">✉️ Mail verschickt${v.mail_gesendet_am ? " am " + new Date(v.mail_gesendet_am).toLocaleDateString("de-DE") : ""}</span>`;
+    }
+    const texte = {
+      fehler: "⚠️ Mail fehlgeschlagen" + (v.mail_fehler ? ": " + v.mail_fehler : ""),
+      keine_empfaenger: "⚠️ Keine Mail – der Verteiler war leer",
+      nicht_eingerichtet: "⚠️ Keine Mail – Versand ist noch nicht eingerichtet",
+    };
+    if (!texte[v.mail_status]) return "";
+    return `<span class="notiz-meta" style="display:block; color:var(--accent);">${escapeHtml(texte[v.mail_status])}
+      <button class="link-btn" onclick="event.stopPropagation(); raumMailErneut('${v.id}')">Erneut senden</button></span>`;
+  }
+  function raumMailErgebnisText(mail) {
+    if (!mail) return "";
+    if (mail.status === "gesendet") return `Mail an ${mail.anzahl} Adresse${mail.anzahl === 1 ? "" : "n"} verschickt.`;
+    if (mail.status === "keine_empfaenger") return "Gespeichert – aber keine Mail, weil der Verteiler leer ist.";
+    if (mail.status === "nicht_eingerichtet") return "Gespeichert – aber keine Mail, weil der Versand noch nicht eingerichtet ist.";
+    return "Gespeichert – aber die Mail ist fehlgeschlagen" + (mail.fehler ? ": " + mail.fehler : ".");
+  }
+
+  function renderRaumplanung() {
+    const liste = document.getElementById("raum-vermietungen-liste");
+    if (!liste) return;
+    const raeumeListe = raeumeAktuell();
+    const empfaenger = raumEmpfaengerAktuell();
+
+    // Hinweise oben
+    const hinweise = [];
+    if (!mailEingerichtet) hinweise.push("Der Mail-Versand ist noch nicht eingerichtet (Secrets BREVO_API_KEY und MAIL_ABSENDER in der Edge Function). Vermietungen lassen sich trotzdem eintragen.");
+    if (!empfaenger.length) hinweise.push("Der Mail-Verteiler ist noch leer – unten unter „Mail-Verteiler“ Adressen eintragen.");
+    if (!raeumeListe.length) hinweise.push("Noch keine Räume angelegt – unten unter „Räume verwalten“ anlegen.");
+    document.getElementById("raum-hinweise").innerHTML = hinweise
+      .map((h) => `<p class="notiz-meta" style="color:var(--accent); margin:0 0 0.5rem;">${escapeHtml(h)}</p>`).join("");
+
+    // Raum-Auswahl im Formular (Auswahl behalten)
+    const auswahl = document.getElementById("raum-neu-raum");
+    const bisher = auswahl.value;
+    auswahl.innerHTML = raeumeListe.length
+      ? raeumeListe.map((r) => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join("")
+      : `<option value="">– kein Raum angelegt –</option>`;
+    if (bisher && raeumeListe.some((r) => r.id === bisher)) auswahl.value = bisher;
+    const datumFeld = document.getElementById("raum-neu-datum");
+    if (!datumFeld.value) datumFeld.value = heuteISO();
+
+    // Vermietungen: kommende nach Monat, vergangene eingeklappt
+    const heute = heuteISO();
+    const alle = raumVermietungenAktuell().slice().sort((a, b) =>
+      a.datum.localeCompare(b.datum) || String(a.von || "").localeCompare(String(b.von || "")));
+    const kommend = alle.filter((v) => v.datum >= heute);
+    const vergangen = alle.filter((v) => v.datum < heute).reverse();
+
+    const karte = (v) => {
+      if (raumBearbeitenId === v.id) {
+        return `
+          <div class="notiz-item">
+            <div style="flex:1;">
+              <div class="task-edit-felder">
+                <label class="ern-feld">Raum<select id="raum-edit-raum-${v.id}">
+                  <option value="">– ohne Raum –</option>
+                  ${raeumeListe.map((r) => `<option value="${r.id}" ${r.id === v.raum_id ? "selected" : ""}>${escapeHtml(r.name)}</option>`).join("")}
+                </select></label>
+                <label class="ern-feld">Datum<input type="date" id="raum-edit-datum-${v.id}" value="${escapeAttr(v.datum)}"></label>
+                <label class="ern-feld">Von<input type="time" id="raum-edit-von-${v.id}" value="${v.von ? String(v.von).slice(0, 5) : ""}"></label>
+                <label class="ern-feld">Bis<input type="time" id="raum-edit-bis-${v.id}" value="${v.bis ? String(v.bis).slice(0, 5) : ""}"></label>
+                <label class="ern-feld ern-feld-breit">Mieter<input type="text" id="raum-edit-mieter-${v.id}" maxlength="200" value="${escapeAttr(v.mieter_name)}"></label>
+                <label class="ern-feld ern-feld-breit">Kontakt<input type="text" id="raum-edit-kontakt-${v.id}" maxlength="300" value="${escapeAttr(v.mieter_kontakt || "")}"></label>
+                <label class="ern-feld ern-feld-breit">Zweck<input type="text" id="raum-edit-zweck-${v.id}" maxlength="300" value="${escapeAttr(v.zweck || "")}"></label>
+                <label class="ern-feld ern-feld-breit">Notiz<textarea id="raum-edit-notiz-${v.id}" rows="2" maxlength="2000">${escapeHtml(v.notiz || "")}</textarea></label>
+              </div>
+              <div class="row" style="margin-bottom:0;">
+                <button class="btn-primary" onclick="raumBearbeitenSpeichern('${v.id}')">Speichern</button>
+                <button class="link-btn" onclick="raumBearbeitenAbbrechen()">Abbrechen</button>
+              </div>
+              <p class="notiz-meta">Änderungen verschicken keine Mail.</p>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="notiz-item">
+          <div style="flex:1; cursor:pointer;" onclick="raumBearbeitenStart('${v.id}')">
+            <span class="notiz-text">${escapeHtml(raumDatumText(v.datum))} · ${escapeHtml(raumZeitText(v))} · ${escapeHtml(raumName(v.raum_id))}</span>
+            <span class="notiz-meta" style="display:block;">${escapeHtml(v.mieter_name)}${v.mieter_kontakt ? " · " + escapeHtml(v.mieter_kontakt) : ""}${v.zweck ? " · " + escapeHtml(v.zweck) : ""}</span>
+            ${v.notiz ? `<span class="notiz-meta" style="display:block;">${escapeHtml(v.notiz)}</span>` : ""}
+            ${raumMailStatusHtml(v)}
+          </div>
+          <button class="task-delete" onclick="event.stopPropagation(); raumVermietungLoeschen('${v.id}')" aria-label="Vermietung löschen">×</button>
+        </div>`;
+    };
+
+    let html = "";
+    if (!kommend.length) {
+      html += `<p class="empty-text">Keine kommenden Vermietungen.</p>`;
+    } else {
+      const monate = new Map();
+      kommend.forEach((v) => {
+        const k = v.datum.slice(0, 7);
+        if (!monate.has(k)) monate.set(k, []);
+        monate.get(k).push(v);
+      });
+      for (const [k, eintraege] of monate) {
+        const titel = `${RAUM_MONATE[Number(k.slice(5, 7)) - 1]} ${k.slice(0, 4)}`;
+        html += `<div class="project-heading">${escapeHtml(titel)} <span class="notiz-meta">(${eintraege.length})</span></div>
+          <div class="notiz-list">${eintraege.map(karte).join("")}</div>`;
+      }
+    }
+    if (vergangen.length) {
+      html += `
+        <details class="spiel-gruppe" style="margin-top:1rem;" ${raumVergangeneOffen || vergangen.some((v) => v.id === raumBearbeitenId) ? "open" : ""} ontoggle="raumVergangeneUmschalten(this)">
+          <summary class="spiel-gruppe-kopf">
+            <span class="spiel-gruppe-titel">Vergangene Vermietungen</span>
+            <span class="zl-gruppe-zahl">${vergangen.length}</span>
+          </summary>
+          <div class="notiz-list">${vergangen.map(karte).join("")}</div>
+        </details>`;
+    }
+    liste.innerHTML = html;
+
+    // Räume
+    document.getElementById("raum-raeume-liste").innerHTML = raeumeListe.length
+      ? `<div class="notiz-list">${raeumeListe.map((r) => {
+          const anzahl = raumVermietungenAktuell().filter((v) => v.raum_id === r.id && v.datum >= heute).length;
+          return `
+            <div class="notiz-item">
+              <div style="flex:1;">
+                <span class="notiz-text">${escapeHtml(r.name)}</span>
+                <span class="notiz-meta" style="display:block;">${r.beschreibung ? escapeHtml(r.beschreibung) + " · " : ""}${anzahl} kommende Vermietung${anzahl === 1 ? "" : "en"}</span>
+              </div>
+              <button class="task-edit-btn" onclick="raumUmbenennen('${r.id}')" aria-label="Raum bearbeiten" title="Bearbeiten">✎</button>
+              <button class="task-delete" onclick="raumLoeschen('${r.id}')" aria-label="Raum löschen">×</button>
+            </div>`;
+        }).join("")}</div>`
+      : `<p class="empty-text">Noch keine Räume.</p>`;
+
+    // Verteiler
+    document.getElementById("raum-empfaenger-liste").innerHTML = empfaenger.length
+      ? `<div class="notiz-list">${empfaenger.map((e) => `
+          <div class="notiz-item">
+            <div style="flex:1;">
+              <span class="notiz-text">${escapeHtml(e.email)}</span>
+              ${e.name ? `<span class="notiz-meta" style="display:block;">${escapeHtml(e.name)}</span>` : ""}
+            </div>
+            <button class="task-delete" onclick="raumEmpfaengerLoeschen('${e.id}')" aria-label="Adresse entfernen">×</button>
+          </div>`).join("")}</div>
+        <p class="notiz-meta">${empfaenger.length} Adresse${empfaenger.length === 1 ? "" : "n"} im Verteiler.</p>`
+      : `<p class="empty-text">Noch keine Adressen.</p>`;
+  }
+
+  window.raumVergangeneUmschalten = function(el) {
+    raumVergangeneOffen = el.open;
+  };
+
+  // Vermietung eintragen. Bei Überschneidung fragt die App nach und
+  // schickt dann mit trotzdem = true erneut.
+  async function raumVermietungSenden(action, daten) {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, token, aktiver_bereich: aktiverBereich, ...daten }),
+    });
+    const antwort = await res.json().catch(() => ({}));
+    if (res.status === 409 && antwort.konflikt) {
+      const ok = confirm(`${antwort.error}:\n\n${(antwort.mit || []).join("\n")}\n\nTrotzdem speichern?`);
+      if (!ok) return null;
+      return api(action, { ...daten, trotzdem: true });
+    }
+    if (res.status === 401) {
+      localStorage.removeItem("aufgaben-token");
+      token = "";
+      zeigeLogin("Bitte erneut anmelden.");
+      throw new Error("unauthorized");
+    }
+    if (!res.ok) throw new Error(antwort.error || "Serverfehler");
+    return antwort;
+  }
+
+  document.getElementById("btn-raum-vermietung").addEventListener("click", async () => {
+    const status = document.getElementById("raum-status");
+    const knopf = document.getElementById("btn-raum-vermietung");
+    const daten = {
+      raum_id: document.getElementById("raum-neu-raum").value || null,
+      datum: document.getElementById("raum-neu-datum").value,
+      von: document.getElementById("raum-neu-von").value,
+      bis: document.getElementById("raum-neu-bis").value,
+      mieter_name: document.getElementById("raum-neu-mieter").value.trim(),
+      mieter_kontakt: document.getElementById("raum-neu-kontakt").value.trim(),
+      zweck: document.getElementById("raum-neu-zweck").value.trim(),
+      notiz: document.getElementById("raum-neu-notiz").value.trim(),
+      bereich: aktiverBereich,
+    };
+    if (!daten.datum || !daten.mieter_name) {
+      status.textContent = "Bitte mindestens Datum und Mieter angeben.";
+      return;
+    }
+    knopf.disabled = true;
+    status.textContent = "Wird gespeichert …";
+    try {
+      const ergebnis = await raumVermietungSenden("vermietung_hinzufuegen", daten);
+      if (!ergebnis) { status.textContent = "Nicht gespeichert."; return; }
+      ["raum-neu-von", "raum-neu-bis", "raum-neu-mieter", "raum-neu-kontakt", "raum-neu-zweck", "raum-neu-notiz"]
+        .forEach((id) => { document.getElementById(id).value = ""; });
+      await ladeDaten();
+      status.textContent = raumMailErgebnisText(ergebnis.mail);
+    } catch (fehler) {
+      if (fehler.message !== "unauthorized") status.textContent = "Fehler: " + fehler.message;
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+
+  window.raumBearbeitenStart = function(id) {
+    raumBearbeitenId = id;
+    renderRaumplanung();
+  };
+  window.raumBearbeitenAbbrechen = function() {
+    raumBearbeitenId = null;
+    renderRaumplanung();
+  };
+  window.raumBearbeitenSpeichern = async function(id) {
+    const wert = (feld) => document.getElementById(`raum-edit-${feld}-${id}`).value;
+    const daten = {
+      id,
+      raum_id: wert("raum") || null,
+      datum: wert("datum"),
+      von: wert("von"),
+      bis: wert("bis"),
+      mieter_name: wert("mieter").trim(),
+      mieter_kontakt: wert("kontakt").trim(),
+      zweck: wert("zweck").trim(),
+      notiz: wert("notiz").trim(),
+    };
+    try {
+      const ergebnis = await raumVermietungSenden("vermietung_aktualisieren", daten);
+      if (!ergebnis) return;
+      raumBearbeitenId = null;
+      await ladeDaten();
+    } catch (fehler) {
+      if (fehler.message !== "unauthorized") alert("Speichern fehlgeschlagen: " + fehler.message);
+    }
+  };
+  window.raumVermietungLoeschen = async function(id) {
+    const v = raumVermietungen.find((x) => x.id === id);
+    if (!confirm(`Vermietung${v ? " am " + raumDatumText(v.datum) : ""} löschen? Es geht keine Mail raus.`)) return;
+    try {
+      await api("vermietung_loeschen", { id });
+      await ladeDaten();
+    } catch (fehler) {
+      alert("Löschen fehlgeschlagen: " + fehler.message);
+    }
+  };
+  window.raumMailErneut = async function(id) {
+    try {
+      const ergebnis = await api("vermietung_mail_senden", { id });
+      await ladeDaten();
+      alert(raumMailErgebnisText(ergebnis.mail).replace(/^Gespeichert – aber /, ""));
+    } catch (fehler) {
+      alert("Mail fehlgeschlagen: " + fehler.message);
+    }
+  };
+
+  document.getElementById("btn-raum-raum").addEventListener("click", async () => {
+    const name = document.getElementById("raum-raum-name").value.trim();
+    if (!name) return;
+    try {
+      await api("raum_hinzufuegen", { name, beschreibung: document.getElementById("raum-raum-beschreibung").value.trim(), bereich: aktiverBereich });
+      document.getElementById("raum-raum-name").value = "";
+      document.getElementById("raum-raum-beschreibung").value = "";
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  });
+  window.raumUmbenennen = async function(id) {
+    const r = raeume.find((x) => x.id === id);
+    if (!r) return;
+    const name = prompt("Name des Raums:", r.name);
+    if (name === null || !name.trim()) return;
+    const beschreibung = prompt("Beschreibung (optional):", r.beschreibung || "");
+    if (beschreibung === null) return;
+    try {
+      await api("raum_aktualisieren", { id, name: name.trim(), beschreibung: beschreibung.trim() });
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+  window.raumLoeschen = async function(id) {
+    const r = raeume.find((x) => x.id === id);
+    if (!confirm(`Raum „${r ? r.name : ""}“ löschen? Vorhandene Vermietungen bleiben erhalten, stehen dann aber ohne Raum.`)) return;
+    try {
+      await api("raum_loeschen", { id });
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+
+  document.getElementById("btn-raum-empf").addEventListener("click", async () => {
+    const email = document.getElementById("raum-empf-email").value.trim();
+    if (!email) return;
+    try {
+      await api("raum_empfaenger_hinzufuegen", { email, name: document.getElementById("raum-empf-name").value.trim(), bereich: aktiverBereich });
+      document.getElementById("raum-empf-email").value = "";
+      document.getElementById("raum-empf-name").value = "";
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  });
+  window.raumEmpfaengerLoeschen = async function(id) {
+    const e = raumMailEmpfaenger.find((x) => x.id === id);
+    if (!confirm(`${e ? e.email : "Adresse"} aus dem Verteiler entfernen?`)) return;
+    try {
+      await api("raum_empfaenger_loeschen", { id });
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
 
   // ==========================================================
   // Finanzen-Modul: Fixkosten + Sonderausgaben
