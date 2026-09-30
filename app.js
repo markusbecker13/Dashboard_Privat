@@ -7651,15 +7651,25 @@
       if (liste.length) belegteTage++;
       const klassen = ["cal-day"];
       if (iso === heute) klassen.push("today");
-      if (iso === raumKalTag) klassen.push("selected");
-      // Button statt div (per Tastatur erreichbar) – Browser-Standards für Buttons neutralisieren
-      const stil = ` style="padding:0; font-family:inherit;${liste.length && iso !== raumKalTag
-        ? " background:color-mix(in srgb, var(--accent-2) 24%, var(--panel)); font-weight:600;" : ""}"`;
+      // Button statt div (per Tastatur erreichbar) – Browser-Standards für Buttons neutralisieren.
+      // Belegt = volle Akzentfarbe des Bereichs mit weißer Schrift (AWO-Rot,
+      // Kontrast ca. 5,9:1). Ausgewählter Tag = dunkle Navigationsfarbe, damit
+      // er sich von belegten Tagen abhebt. Heute bleibt am Rahmen erkennbar
+      // (bei belegten Tagen zusätzlich ein heller Innenring).
+      let stil = "padding:0; font-family:inherit;";
+      if (iso === raumKalTag) {
+        stil += " background:var(--nav-bg); color:var(--nav-ink); border-color:var(--nav-bg); font-weight:700;";
+      } else if (liste.length) {
+        stil += " background:var(--accent); color:#fff; border-color:var(--accent); font-weight:700;";
+        if (iso === heute) stil += " box-shadow:inset 0 0 0 2px var(--panel);";
+      }
+      stil = ` style="${stil}"`;
+      const punktStil = liste.length ? ` style="background:${iso === raumKalTag ? "var(--nav-ink)" : "#fff"};"` : "";
       const titel = liste.length
         ? liste.map((v) => `${raumName(v.raum_id)}: ${v.mieter_name}`).join("\n") : "frei";
       zellen += `<button type="button" class="${klassen.join(" ")}"${stil} onclick="raumKalTagWaehlen('${iso}')"
         title="${escapeAttr(titel)}" aria-label="${t}. – ${liste.length ? liste.length + " Vermietung" + (liste.length === 1 ? "" : "en") : "frei"}">
-        <span>${t}</span>${liste.length ? `<span class="dot"></span>` : ""}
+        <span>${t}</span>${liste.length ? `<span class="dot"${punktStil}></span>` : ""}
       </button>`;
     }
 
