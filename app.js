@@ -3398,6 +3398,23 @@
   function invGruppenSchluessel(kat) {
     return `${aktiverBereich}|${kat}`;
   }
+  // Wiederbeschaffungswert je Stück (seit Session 29), null = nicht eingetragen
+  function invWert(i) {
+    if (i.wiederbeschaffungswert === null || i.wiederbeschaffungswert === undefined || i.wiederbeschaffungswert === "") return null;
+    const n = Number(i.wiederbeschaffungswert);
+    return Number.isFinite(n) ? n : null;
+  }
+  // Summe Wert × Menge; ohne = Anzahl Gegenstände ohne eingetragenen Wert
+  function invWertSumme(liste) {
+    let summe = 0;
+    let ohne = 0;
+    for (const i of liste) {
+      const w = invWert(i);
+      if (w === null) ohne++;
+      else summe += w * (Number(i.menge) || 1);
+    }
+    return { summe: Math.round(summe * 100) / 100, ohne };
+  }
 
 
   function renderInventar() {
@@ -3420,7 +3437,13 @@
           const anzahl = inventarAktuell.filter((i) => i.kategorie === k).length;
           return `<option value="${escapeAttr(k)}" ${invAktiveKategorie === k ? "selected" : ""}>${escapeHtml(k)} (${anzahl})</option>`;
         }).join("")}
-      </select>`;
+      </select>
+      ${(() => {
+        const liste = invAktiveKategorie === "alle" ? inventarAktuell : inventarAktuell.filter((i) => i.kategorie === invAktiveKategorie);
+        const w = invWertSumme(liste);
+        if (!w.summe && !w.ohne) return "";
+        return `<p class="notiz-meta" style="margin:0.5rem 0 0;">Wiederbeschaffungswert${invAktiveKategorie === "alle" ? " gesamt" : ""}: <strong>${finEuro(w.summe)}</strong>${w.ohne ? ` · ${w.ohne} Gegenstand${w.ohne === 1 ? "" : "e"} ohne Wert (*)` : ""}</p>`;
+      })()}`;
 
     const gefiltert = invAktiveKategorie === "alle" ? inventarAktuell : inventarAktuell.filter((i) => i.kategorie === invAktiveKategorie);
 
@@ -3443,6 +3466,7 @@
                 <input type="text" id="inv-edit-name-${i.id}" value="${escapeAttr(i.name)}" placeholder="Gegenstand">
                 <input type="text" id="inv-edit-kategorie-${i.id}" value="${escapeAttr(i.kategorie)}" placeholder="Kategorie" list="inv-kategorie-liste">
                 <input type="number" id="inv-edit-menge-${i.id}" value="${i.menge}" min="1" style="width:5rem;">
+                <input type="number" id="inv-edit-wert-${i.id}" value="${invWert(i) ?? ""}" min="0" step="0.01" inputmode="decimal" placeholder="Wert je Stück (€)" title="Wiederbeschaffungswert je Stück in €" style="width:9.5rem;">
                 <input type="text" id="inv-edit-standort-${i.id}" value="${escapeAttr(i.standort || "")}" placeholder="Standort">
                 <input type="text" id="inv-edit-beschreibung-${i.id}" value="${escapeAttr(i.beschreibung || "")}" placeholder="Beschreibung" style="min-width:14rem; flex:1;">
                 <select id="inv-edit-zustand-${i.id}">
@@ -3464,6 +3488,7 @@
             <div style="flex:1; cursor:pointer;" onclick="invBearbeitenStart('${i.id}')">
               <span class="notiz-text">${escapeHtml(i.name)}</span>
               <span class="notiz-meta">${i.menge}× ${i.standort ? "· " + escapeHtml(i.standort) + " " : ""}· ${INV_ZUSTAND_LABEL[i.zustand] || i.zustand}</span>
+              ${invWert(i) !== null ? `<span class="notiz-meta" style="display:block;">Wiederbeschaffung: ${finEuro(invWert(i))} je Stück${Number(i.menge) > 1 ? ` · zusammen ${finEuro(invWert(i) * Number(i.menge))}` : ""}</span>` : ""}
               ${i.beschreibung ? `<span class="notiz-meta" style="display:block;">${escapeHtml(i.beschreibung)}</span>` : ""}
               ${ausleiheHinweis}
             </div>
@@ -3478,7 +3503,9 @@
       const offen = invAktiveKategorie !== "alle" || invGruppenOffen.has(schluessel) || items.some((i) => i.id === invBearbeitenId);
       const defekt = items.filter((i) => i.zustand === "defekt").length;
       const verliehen = items.filter((i) => verleihAktuell().some((v) => v.inventar_id === i.id && !v.rueckgabe_am)).length;
+      const wertKat = invWertSumme(items);
       const info = [
+        wertKat.summe ? finEuro(wertKat.summe) + (wertKat.ohne ? "*" : "") : "",
         defekt ? `${defekt} defekt` : "",
         verliehen ? `${verliehen} verliehen` : "",
       ].filter(Boolean).join(" · ");
@@ -3536,8 +3563,9 @@
     const standort = document.getElementById("neu-inv-standort").value.trim() || null;
     const beschreibung = document.getElementById("neu-inv-beschreibung").value.trim() || null;
     const zustand = document.getElementById("neu-inv-zustand").value;
+    const wiederbeschaffungswert = document.getElementById("neu-inv-wert").value.trim();
     try {
-      await api("ogs_inventar_hinzufuegen", { name, kategorie, menge, standort, beschreibung, zustand, bereich: aktiverBereich });
+      await api("ogs_inventar_hinzufuegen", { name, kategorie, menge, standort, beschreibung, zustand, wiederbeschaffungswert, bereich: aktiverBereich });
     } catch (fehler) {
       alert("Speichern fehlgeschlagen: " + fehler.message);
       return;
@@ -3553,6 +3581,7 @@
     document.getElementById("neu-inv-standort").value = "";
     document.getElementById("neu-inv-beschreibung").value = "";
     document.getElementById("neu-inv-zustand").value = "gut";
+    document.getElementById("neu-inv-wert").value = "";
     await ladeDaten();
   }
 
@@ -3574,8 +3603,9 @@
     const standort = document.getElementById(`inv-edit-standort-${id}`).value.trim() || null;
     const beschreibung = document.getElementById(`inv-edit-beschreibung-${id}`).value.trim() || null;
     const zustand = document.getElementById(`inv-edit-zustand-${id}`).value;
+    const wiederbeschaffungswert = document.getElementById(`inv-edit-wert-${id}`).value.trim();
     try {
-      await api("ogs_inventar_aktualisieren", { id, name, kategorie, menge, standort, beschreibung, zustand });
+      await api("ogs_inventar_aktualisieren", { id, name, kategorie, menge, standort, beschreibung, zustand, wiederbeschaffungswert });
     } catch (fehler) {
       alert("Speichern fehlgeschlagen: " + fehler.message);
       return;
