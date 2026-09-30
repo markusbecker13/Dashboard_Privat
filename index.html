@@ -898,10 +898,13 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Vermietungen der Räume eintragen. Bei jedem <strong>neuen</strong> Eintrag geht automatisch eine Mail an alle Adressen im Mail-Verteiler.</p>
               <ul>
-                <li><strong>Neue Vermietung:</strong> Raum, Datum, optional Von/Bis (ohne Uhrzeit = ganztägig), Mieter (Pflicht), optional Kontakt, Zweck und Notiz, dann „Eintragen &amp; Mail senden“. Darunter steht, an wie viele Adressen die Mail ging</li>
+                <li><strong>Neue Vermietung:</strong> Raum, Art, Datum, optional Von/Bis (ohne Uhrzeit = ganztägig), Mieter (Pflicht), optional Kontakt, Zweck und Notiz, dann „Eintragen &amp; Mail senden“. Darunter steht, an wie viele Adressen die Mail ging</li>
+                <li><strong>Art „Ein Tag“:</strong> wie bisher, ein Datum mit Von/Bis</li>
+                <li><strong>Art „Zeitraum (durchgehend)“:</strong> Von Datum bis Bis Datum am Stück belegt, z. B. Freitag 18:00 bis Sonntag 14:00. „Beginn“ gilt für den ersten, „Ende“ für den letzten Tag</li>
+                <li><strong>Art „Mehrere einzelne Tage“:</strong> Datum wählen, „+ Tag hinzufügen“ – danach springt das Datum eine Woche weiter (praktisch für wöchentliche Termine, beliebig änderbar). Ein Tipp auf einen Tag entfernt ihn. Alle Tage bekommen dieselbe Uhrzeit. Jeder Tag wird ein eigener Eintrag (🔁 Serie), aber es geht <strong>eine</strong> Mail mit allen Terminen raus. Höchstens 60 Tage auf einmal</li>
                 <li><strong>Überschneidung:</strong> Ist der Raum zur selben Zeit schon vermietet, zeigt die App die bestehende Vermietung und fragt, ob du trotzdem speichern willst</li>
                 <li><strong>Liste:</strong> kommende Vermietungen nach Monat, darunter „Vergangene Vermietungen“ (aufklappbar). Jede zeigt, ob die Mail rausging. Fehlgeschlagen oder Verteiler leer? „Erneut senden“ direkt am Eintrag</li>
-                <li><strong>Bearbeiten:</strong> auf einen Eintrag tippen. Änderungen und Löschen verschicken bewusst keine Mail</li>
+                <li><strong>Bearbeiten:</strong> auf einen Eintrag tippen. Bei einem einzelnen Eintrag lässt sich ein „Bis Datum“ setzen oder leeren. Bei einer Serie ändert sich nur dieser Termin; dort gibt es zusätzlich „Ganze Serie löschen“. Das × löscht bei einer Serie nur den einen Termin. Änderungen und Löschen verschicken bewusst keine Mail</li>
                 <li><strong>Räume verwalten</strong> (unten, aufklappen): Räume anlegen, mit ✎ umbenennen, mit × löschen – vorhandene Vermietungen bleiben dann ohne Raum erhalten</li>
                 <li><strong>Mail-Verteiler</strong> (unten, aufklappen): beliebig viele Adressen, optional mit Namen. Die Mail geht in BCC raus, niemand sieht die anderen Adressen</li>
                 <li><strong>Versand:</strong> über den Mail-Dienst Brevo. Einmal einrichten: bei Brevo ein Konto anlegen, eine Absenderadresse bestätigen, einen API-Schlüssel erzeugen und in Supabase als Secrets <code>BREVO_API_KEY</code> und <code>MAIL_ABSENDER</code> (optional <code>MAIL_ABSENDER_NAME</code>) hinterlegen. Ohne diese Secrets lässt sich trotzdem alles eintragen, oben steht dann ein Hinweis</li>
@@ -1290,9 +1293,22 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <div class="rezept-form" id="raum-formular">
           <div class="task-edit-felder">
             <label class="ern-feld">Raum<select id="raum-neu-raum"></select></label>
-            <label class="ern-feld">Datum<input type="date" id="raum-neu-datum"></label>
-            <label class="ern-feld">Von<input type="time" id="raum-neu-von"></label>
-            <label class="ern-feld">Bis<input type="time" id="raum-neu-bis"></label>
+            <label class="ern-feld">Art<select id="raum-neu-art">
+              <option value="tag">Ein Tag</option>
+              <option value="zeitraum">Zeitraum (durchgehend)</option>
+              <option value="mehrere">Mehrere einzelne Tage</option>
+            </select></label>
+            <label class="ern-feld"><span id="raum-neu-datum-label">Datum</span><input type="date" id="raum-neu-datum"></label>
+            <label class="ern-feld hidden" id="raum-neu-datum-bis-feld">Bis Datum<input type="date" id="raum-neu-datum-bis"></label>
+            <div class="ern-feld ern-feld-breit hidden" id="raum-neu-tage-feld">
+              <div class="row" style="margin-bottom:0.3rem;">
+                <button type="button" class="btn-secondary" id="btn-raum-tag-dazu">+ Tag hinzufügen</button>
+              </div>
+              <div class="chip-liste" id="raum-neu-tage-liste"></div>
+            </div>
+            <label class="ern-feld"><span id="raum-neu-von-label">Von</span><input type="time" id="raum-neu-von"></label>
+            <label class="ern-feld"><span id="raum-neu-bis-label">Bis</span><input type="time" id="raum-neu-bis"></label>
+            <p class="notiz-meta ern-feld-breit" id="raum-neu-art-hinweis" style="margin:0;"></p>
             <label class="ern-feld ern-feld-breit">Mieter<input type="text" id="raum-neu-mieter" maxlength="200" placeholder="Name oder Gruppe"></label>
             <label class="ern-feld ern-feld-breit">Kontakt (optional)<input type="text" id="raum-neu-kontakt" maxlength="300" placeholder="Telefon oder Mail"></label>
             <label class="ern-feld ern-feld-breit">Zweck (optional)<input type="text" id="raum-neu-zweck" maxlength="300" placeholder="z. B. Geburtstagsfeier"></label>
