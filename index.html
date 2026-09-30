@@ -854,6 +854,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Name, Kategorie (mit Autovervollständigung aus bestehenden Kategorien), Menge, optional Standort, optional Beschreibung, Zustand (Gut / Eingeschränkt nutzbar / Defekt)</li>
                 <li>Liste automatisch nach Kategorie gruppiert, Filter-Dropdown zeigt die Anzahl je Kategorie</li>
+                <li><strong>Aufklappbare Kategorien</strong> (seit Session 29): jede Kategorie ist ein eigener Block mit Anzahl, dazu „x defekt“ und „x verliehen“, wenn es welche gibt. Antippen klappt auf und zu; welche offen sind, merkt sich das Gerät je Bereich. „Alle aufklappen“ / „Alle zuklappen“ über der Liste. Ist im Filter eine Kategorie gewählt oder wird ein Gegenstand bearbeitet, ist seine Kategorie automatisch offen</li>
                 <li>Klick auf einen Eintrag öffnet die Inline-Bearbeitung, Löschen mit Sicherheitsabfrage</li>
               </ul>
             </div>
@@ -1187,7 +1188,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-ogs-inventar" class="hidden">
-        <h1>Inventar <button class="hilfe-icon" data-hilfe="Material und Ausstattung, nach Kategorie sortiert und filterbar. Nur im Bereich OGS verfügbar.">?</button></h1>
+        <h1>Inventar <button class="hilfe-icon" data-hilfe="Material und Ausstattung, nach Kategorie sortiert, auf- und zuklappbar und filterbar. Antippen auf einen Gegenstand öffnet die Bearbeitung.">?</button></h1>
         <p class="hero-text">Material und Ausstattung der OGS Rapunzel – nach Kategorie sortiert.</p>
 
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
