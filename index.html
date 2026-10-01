@@ -814,9 +814,11 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <p><strong>Fixkosten</strong> – zwei Excel-artige 12-Monats-Tabellen (Ausgaben, Einnahmen). Zelle anklicken, um die ganze Zeile inline zu bearbeiten; Summenspalte/-zeile aktualisieren sich automatisch.</p>
               <ul>
                 <li><strong>Eine Zeile je Kosten</strong> (seit Session 29): Jede Position hat einen festen Erkennungsschlüssel, den bereinigten Kern des Buchungstexts ohne Zahlen, Datum und Referenzen (z. B. „ARBEITGEBER GMBH LOHN GEHALT“). Neue Buchungen derselben Kosten ergänzen nach dem CSV-Import nur den Monat in der vorhandenen Zeile, statt eine neue anzulegen</li>
-                <li><strong>Nur gebuchte Monate:</strong> Bei Positionen mit Buchungen im laufenden Jahr stehen genau die Beträge der gebuchten Monate drin, die übrigen bleiben „–“. Buchungen aus Vorjahren zählen dafür nicht. Von Hand angelegte Positionen ohne passende Buchungen behalten ihre Planwerte</li>
+                <li><strong>Gebuchte und kommende Monate</strong> (seit Session 31): Die Tabelle gilt für das laufende Jahr. Gebuchte Monate zeigen den echten Betrag aus den Buchungen, vergangene Monate ohne Buchung „–“. Der <strong>aktuelle Monat</strong> ist kräftiger, die <strong>kommenden Monate</strong> sind heller in der Bereichsfarbe hinterlegt – dort stehen Planwerte. Wurde eine Position in den letzten beiden Monaten jeweils gebucht, trägt die App den zuletzt gebuchten Betrag für die kommenden Monate vor (jährliche oder vierteljährliche Zahlungen werden so nicht hochgerechnet). Buchungen aus Vorjahren zählen nicht. Von Hand angelegte Positionen ohne passende Buchungen behalten ihre Werte</li>
+                <li><strong>Beitragsanpassung eintragen:</strong> Zeile antippen, im betreffenden Monat den neuen Betrag eintragen, ✓. Mit dem Häkchen „Geänderten Betrag auch für die Folgemonate“ (Standard: an) gilt er für alle späteren Monate, die du nicht selbst geändert hast. Weicht ein kommender Monat vom Vormonat ab, steht dort ↑ oder ↓ (am PC zeigt Darüberfahren mit der Maus den alten Betrag, am Handy siehst du ihn im Vormonat). Kommt die Buchung für den Monat per CSV-Import, ersetzt der echte Betrag den Planwert – auch wenn er anders ist</li>
+                <li><strong>Gekündigt?</strong> Vorgemerkte Planwerte bleiben stehen, bis du sie änderst – kommende Monate dann auf 0 setzen oder die Position löschen</li>
                 <li><strong>Namen frei kürzen:</strong> Die Bezeichnung darfst du jederzeit ändern (z. B. „Gehalt“) – die Zuordnung läuft über den Schlüssel, nicht über den Namen</li>
-                <li><strong>🧹 Doppelte zusammenführen &amp; Monate aktualisieren</strong> (unter den Tabellen): legt Zeilen mit gleichem Typ und Schlüssel zu einer zusammen (die mit dem kürzesten Namen bleibt), ersetzt lange Kontotexte mit Ziffern durch einen kurzen Namen und trägt die gebuchten Monate ein. Vorher zeigt die App, was sie ändert, und fragt nach</li>
+                <li><strong>🧹 Doppelte zusammenführen &amp; Monate aktualisieren</strong> (unter den Tabellen): legt Zeilen mit gleichem Typ und Schlüssel zu einer zusammen (die mit dem kürzesten Namen bleibt), ersetzt lange Kontotexte mit Ziffern durch einen kurzen Namen und trägt die gebuchten Monate ein; kommende Monate behalten ihre Planwerte. Vorher zeigt die App, was sie ändert, und fragt nach</li>
               </ul>
               <p><strong>Sonderausgaben</strong> – einmalige, größere Posten als Karten-Liste, ebenfalls inline bearbeitbar.</p>
               <p><strong>Buchungen</strong> – laufende Kontobewegungen:</p>
@@ -825,8 +827,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>CSV-Import</strong> direkt im Browser: erkennt Buchungstag/Valuta, Betrag, Empfänger, Verwendungszweck automatisch, auch bei UTF-8- oder Windows-1252-Kodierung</li>
                 <li><strong>Jede Kontozeile wird als Buchung übernommen.</strong> Passt eine Zeile zu einer Fixkosten-Position, steht das nur als Info in der Import-Meldung – übersprungen wird nichts</li>
                 <li>Erneuter Import (auch überlappender Zeiträume) ist sicher: vorhandene Buchungen werden als Duplikate erkannt (Datum + Betrag + Anfang des Buchungstexts). Die Prüfung zählt mit – zwei identische Kontozeilen ergeben zwei Buchungen</li>
-                <li>Nach dem Import trägt die App bei vorhandenen Fixkosten die neu gebuchten Monate ein (steht in der Import-Meldung). Gelöscht wird dabei nichts</li>
-                <li>Danach läuft die <strong>Wiederkehrend-Erkennung</strong>: findet Buchungen mit gleichem Typ und ähnlichem Text über mindestens zwei Monate, die im laufenden Jahr gebucht wurden und noch zu keiner Fixkosten-Position gehören. Sie schlägt einen kurzen Namen vor und zeigt die gebuchten Monate; beim Übernehmen werden genau diese eingetragen. Die Einzelbuchungen bleiben erhalten (nur sie zählen in der Übersicht)</li>
+                <li>Nach dem Import trägt die App bei vorhandenen Fixkosten die neu gebuchten Monate ein (steht in der Import-Meldung) – ein dort eingetragener Planwert wird durch den echten Betrag ersetzt. Kommende Monate behalten ihren Planwert. Gelöscht wird dabei nichts</li>
+                <li>Danach läuft die <strong>Wiederkehrend-Erkennung</strong>: findet Buchungen mit gleichem Typ und ähnlichem Text über mindestens zwei Monate, die im laufenden Jahr gebucht wurden und noch zu keiner Fixkosten-Position gehören. Sie schlägt einen kurzen Namen vor und zeigt die gebuchten Monate; beim Übernehmen werden diese eingetragen, bei monatlichen Kosten zusätzlich der letzte Betrag für die kommenden Monate. Die Einzelbuchungen bleiben erhalten (nur sie zählen in der Übersicht)</li>
               </ul>
               <p><strong>Übersicht</strong> – Jahresansicht:</p>
               <ul>
@@ -1182,7 +1184,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-finanzen" class="hidden">
-        <h1>Finanzen <button class="hilfe-icon" data-hilfe="Vier Bereiche: Fixkosten (wiederkehrend, je Kosten eine Zeile mit den gebuchten Monaten), Sonderausgaben (einmalig, geplant), Buchungen (tatsächliche Kontobewegungen, auch per CSV-Import) und Übersicht (Jahresauswertung – zählt bewusst nur Buchungen, damit Fixkosten/Sonderausgaben nicht doppelt mitgerechnet werden).">?</button></h1>
+        <h1>Finanzen <button class="hilfe-icon" data-hilfe="Vier Bereiche: Fixkosten (wiederkehrend, je Kosten eine Zeile mit den gebuchten Monaten und Planwerten für die kommenden), Sonderausgaben (einmalig, geplant), Buchungen (tatsächliche Kontobewegungen, auch per CSV-Import) und Übersicht (Jahresauswertung – zählt bewusst nur Buchungen, damit Fixkosten/Sonderausgaben nicht doppelt mitgerechnet werden).">?</button></h1>
         <p class="hero-text">Fixkosten, feste Einnahmen und Sonderausgaben.</p>
 
         <div class="plan-typ-tabs">
@@ -1190,7 +1192,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <button class="plan-typ-btn" id="fintyp-sonderausgaben" data-fintyp="sonderausgaben">Sonderausgaben</button>
           <button class="plan-typ-btn" id="fintyp-buchungen" data-fintyp="buchungen">Buchungen</button>
           <button class="plan-typ-btn" id="fintyp-uebersicht" data-fintyp="uebersicht">Übersicht</button>
-          <button type="button" class="hilfe-icon" data-hilfe="Fixkosten zeigen je Kosten eine Zeile; nach dem CSV-Import kommen die neu gebuchten Monate automatisch dazu. „🧹 Doppelte zusammenführen“ unter den Tabellen räumt ältere Doppelzeilen auf. Buchungen sind die echten Kontobewegungen, die du einzeln erfasst oder per CSV aus dem Online-Banking importierst. Die Übersicht wertet nur Buchungen aus, um Doppelzählung zu vermeiden.">?</button>
+          <button type="button" class="hilfe-icon" data-hilfe="Fixkosten zeigen je Kosten eine Zeile für das laufende Jahr; kommende Monate sind farbig hinterlegt und enthalten Planwerte. Eine Beitragsanpassung trägst du im jeweiligen Monat ein (Zeile antippen). Nach dem CSV-Import ersetzen die echten Beträge die Planwerte der gebuchten Monate. „🧹 Doppelte zusammenführen“ unter den Tabellen räumt ältere Doppelzeilen auf. Buchungen sind die echten Kontobewegungen, die du einzeln erfasst oder per CSV aus dem Online-Banking importierst. Die Übersicht wertet nur Buchungen aus, um Doppelzählung zu vermeiden.">?</button>
         </div>
 
         <div id="fin-fixkosten-bereich"></div>
