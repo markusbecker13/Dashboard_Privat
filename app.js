@@ -8172,13 +8172,63 @@
     else renderFinUebersicht();
   }
 
+  // Kommende Monate (seit Session 31): Die Tabelle gilt immer für das
+  // laufende Jahr. Monate nach dem aktuellen sind Planwerte und farblich
+  // abgesetzt; der aktuelle Monat ist hervorgehoben. Ein Planwert, der vom
+  // Vormonat abweicht, ist als Anpassung markiert (↑/↓). Sobald beim
+  // CSV-Import eine Buchung für den Monat kommt, ersetzt sie den Planwert.
+  function finMonatArt(i) {
+    const aktuell = new Date().getMonth();
+    if (i === aktuell) return "aktuell";
+    return i > aktuell ? "kommend" : "vergangen";
+  }
+  function finMonatKlasse(i) {
+    const art = finMonatArt(i);
+    return art === "vergangen" ? "" : `fin-m-${art}`;
+  }
+  // Farben inline (style.css bleibt unverändert), passend zur Bereichsfarbe.
+  // basis = Hintergrund der Zeile (--panel, Summenzeile --bg)
+  const FIN_ANPASSUNG_STIL = "color:var(--accent); font-weight:600;";
+  function finMonatFarbe(art, basis = "var(--panel)") {
+    if (art === "aktuell") return `color-mix(in srgb, var(--accent) 16%, ${basis})`;
+    if (art === "kommend") return `color-mix(in srgb, var(--accent) 7%, ${basis})`;
+    return "";
+  }
+  function finMonatStil(i, basis, zusatz = "") {
+    const farbe = finMonatFarbe(finMonatArt(i), basis);
+    const stil = (farbe ? `background:${farbe};` : "") + zusatz;
+    return stil ? ` style="${stil}"` : "";
+  }
+
+  function fixkostenZelleHtml(f, i) {
+    const m = FIN_MONATE[i];
+    const wert = finZahl(f[m]);
+    const klassen = [finMonatKlasse(i)];
+    let titel = "";
+    let pfeil = "";
+    if (finMonatArt(i) === "kommend" && wert && i > 0) {
+      const vorher = finZahl(f[FIN_MONATE[i - 1]]);
+      if (vorher && Math.abs(wert - vorher) > 0.004) {
+        klassen.push("fin-anpassung");
+        pfeil = wert > vorher ? "↑ " : "↓ ";
+        titel = ` title="Anpassung: vorher ${escapeAttr(finEuro(vorher))}"`;
+      }
+    }
+    const k = klassen.filter(Boolean).join(" ");
+    const stil = finMonatStil(i, "var(--panel)", pfeil ? FIN_ANPASSUNG_STIL : "");
+    return `<td${k ? ` class="${k}"` : ""}${stil}${titel}>${wert ? pfeil + finEuro(wert) : "–"}</td>`;
+  }
+
   function fixkostenZeileHtml(f, istBearbeitet) {
     const summe = FIN_MONATE.reduce((s, m) => s + finZahl(f[m]), 0);
     if (istBearbeitet) {
       return `
         <tr data-fk-id="${f.id}">
-          <td class="fin-bez"><input type="text" id="fk-bez-${f.id}" value="${escapeAttr(f.bezeichnung)}"></td>
-          ${FIN_MONATE.map((m) => `<td><input type="number" step="0.01" id="fk-${m}-${f.id}" value="${finZahl(f[m])}"></td>`).join("")}
+          <td class="fin-bez">
+            <input type="text" id="fk-bez-${f.id}" value="${escapeAttr(f.bezeichnung)}">
+            <label class="fin-folge-check" style="display:flex; align-items:center; gap:0.35rem; margin-top:0.35rem; font-size:0.75rem; color:var(--ink-dim); white-space:normal; min-height:32px;"><input type="checkbox" id="fk-folge-${f.id}" checked style="width:1rem; height:1rem;"> Geänderten Betrag auch für die Folgemonate</label>
+          </td>
+          ${FIN_MONATE.map((m, i) => `<td class="${finMonatKlasse(i)}"${finMonatStil(i)}><input type="number" step="0.01" id="fk-${m}-${f.id}" value="${finZahl(f[m])}" aria-label="${FIN_MONATSNAMEN_KURZ[i]}"></td>`).join("")}
           <td>${finEuro(summe)}</td>
           <td>
             <button class="fin-loesch-btn" onclick="fixkostenSpeichern('${f.id}')" title="Speichern">✓</button>
@@ -8189,7 +8239,7 @@
     return `
       <tr data-fk-id="${f.id}">
         <td class="fin-bez" style="cursor:pointer;" onclick="fixkostenBearbeitenStart('${f.id}')">${escapeHtml(f.bezeichnung)}</td>
-        ${FIN_MONATE.map((m) => `<td>${finZahl(f[m]) ? finEuro(f[m]) : "–"}</td>`).join("")}
+        ${FIN_MONATE.map((_m, i) => fixkostenZelleHtml(f, i)).join("")}
         <td><strong>${finEuro(summe)}</strong></td>
         <td><button class="fin-loesch-btn" onclick="fixkostenLoeschen('${f.id}')" title="Löschen">×</button></td>
       </tr>`;
@@ -8204,8 +8254,8 @@
         <table class="fin-tabelle">
           <thead>
             <tr>
-              <th class="fin-bez-th">${titel}</th>
-              ${FIN_MONATSNAMEN_KURZ.map((m) => `<th>${m}</th>`).join("")}
+              <th class="fin-bez-th">${titel} ${new Date().getFullYear()}</th>
+              ${FIN_MONATSNAMEN_KURZ.map((m, i) => `<th class="${finMonatKlasse(i)}"${finMonatStil(i, "var(--panel)", finMonatArt(i) === "aktuell" ? "color:var(--ink); font-weight:700;" : "")}${finMonatArt(i) === "aktuell" ? ' aria-current="date"' : ""}>${m}</th>`).join("")}
               <th>Summe</th>
               <th></th>
             </tr>
@@ -8213,10 +8263,10 @@
           <tbody>
             ${zeilen.length
               ? zeilen.map((f) => fixkostenZeileHtml(f, f.id === finBearbeitetesFixkosten)).join("")
-              : `<tr><td class="fin-bez" colspan="14"><span class="empty-text">Noch keine Einträge.</span></td></tr>`}
+              : `<tr><td class="fin-bez" colspan="15"><span class="empty-text">Noch keine Einträge.</span></td></tr>`}
             <tr class="fin-tabelle-summe">
               <td class="fin-bez">Summe ${titel}</td>
-              ${summenProMonat.map((s) => `<td>${finEuro(s)}</td>`).join("")}
+              ${summenProMonat.map((s, i) => `<td class="${finMonatKlasse(i)}"${finMonatStil(i, "var(--bg)")}>${finEuro(s)}</td>`).join("")}
               <td>${finEuro(summeGesamt)}</td>
               <td></td>
             </tr>
@@ -8230,6 +8280,12 @@
     el.innerHTML = `
       ${fixkostenTabelleHtml("ausgabe", "Fixkosten")}
       ${fixkostenTabelleHtml("einnahme", "Feste Einnahmen")}
+      <p class="notiz-meta" style="margin:-0.9rem 0 1.4rem; line-height:1.6;">
+        <span style="display:inline-block; width:0.9rem; height:0.9rem; border-radius:3px; border:1px solid var(--border); vertical-align:-0.12rem; margin-right:0.2rem; background:${finMonatFarbe("aktuell")};"></span>aktueller Monat ·
+        <span style="display:inline-block; width:0.9rem; height:0.9rem; border-radius:3px; border:1px solid var(--border); vertical-align:-0.12rem; margin-right:0.2rem; background:${finMonatFarbe("kommend")};"></span>kommende Monate (Planwerte) ·
+        <span style="${FIN_ANPASSUNG_STIL}">↑ ↓</span> Anpassung zum Vormonat.<br>
+        Neuer Beitrag: Zeile antippen, Betrag im Monat ändern, ✓ – gilt dann auch für die Folgemonate. Kommt die Buchung per CSV-Import, ersetzt der echte Betrag den Planwert.
+      </p>
 
       <button class="link-btn" id="toggle-fixkosten-form">▸ Neue Position anlegen</button>
       <button class="link-btn" id="btn-fixkosten-aufraeumen" title="Doppelte Positionen zusammenführen und Monatswerte aus den Buchungen übernehmen">🧹 Doppelte zusammenführen &amp; Monate aktualisieren</button>
@@ -8283,7 +8339,20 @@
       if (schluessel) zahlung.erkennung = schluessel;
       zahlung.kategorie = alt.kategorie || null;
     }
-    FIN_MONATE.forEach((m) => { zahlung[m] = document.getElementById("fk-" + m + "-" + id).value; });
+    const neu = FIN_MONATE.map((m) => finZahl(document.getElementById("fk-" + m + "-" + id).value));
+    // Beitragsanpassung: ein geänderter aktueller/kommender Monat gilt auch
+    // für die Folgemonate, die du nicht selbst geändert hast
+    const folge = document.getElementById("fk-folge-" + id);
+    if (alt && folge && folge.checked) {
+      const vorher = FIN_MONATE.map((m) => finZahl(alt[m]));
+      const geaendert = neu.map((w, i) => Math.abs(w - vorher[i]) > 0.004);
+      const ab = new Date().getMonth();
+      for (let i = ab; i < 12; i++) {
+        if (!geaendert[i]) continue;
+        for (let j = i + 1; j < 12 && !geaendert[j]; j++) neu[j] = neu[i];
+      }
+    }
+    FIN_MONATE.forEach((m, i) => { zahlung[m] = neu[i]; });
     await api("fixkosten_aktualisieren", zahlung);
     finBearbeitetesFixkosten = null;
     await ladeDaten();
@@ -8804,13 +8873,37 @@
   // - zusammenfuehren: Zeilen mit gleichem Typ und Schlüssel werden zu einer
   //   (die mit der kürzesten Bezeichnung bleibt, meist die von Hand gekürzte)
   // - Monatswerte: Gibt es für den Schlüssel Buchungen im laufenden Jahr,
-  //   stehen danach genau die gebuchten Monate drin, alle anderen auf 0.
+  //   stehen danach die gebuchten Monate drin, vergangene ohne Buchung auf 0,
+  //   kommende behalten ihren Planwert (finMonateMitPlan, seit Session 31).
   //   Ohne Buchungen im Jahr bleiben die Werte unverändert (z. B. von Hand
   //   angelegte Planwerte)
   // - fehlt erkennung, wird der Schlüssel gespeichert – dann darf die
   //   Bezeichnung danach frei gekürzt werden
+  // Monatswerte einer Position aus Ist (Buchungen) und Plan (seit Session 31):
+  // - gebuchter Monat: Ist-Betrag (überschreibt einen Planwert, z. B. eine
+  //   eingetragene Beitragsanpassung, sobald die echte Buchung da ist)
+  // - vergangener Monat ohne Buchung: 0
+  // - aktueller oder kommender Monat ohne Buchung: Planwert bleibt. Ist er
+  //   leer und wurde die Position in den letzten beiden Monaten jeweils
+  //   gebucht (monatlich, zuletzt im Vor- oder aktuellen Monat), wird der
+  //   zuletzt gebuchte Betrag vorgemerkt. Jährliche oder vierteljährliche
+  //   Zahlungen werden so nicht hochgerechnet.
+  function finMonateMitPlan(istWerte, planWerte, aktuellerMonat) {
+    let zuletzt = -1;
+    for (let i = 11; i >= 0; i--) { if (istWerte[i]) { zuletzt = i; break; } }
+    const monatlich = zuletzt >= 1 && zuletzt >= aktuellerMonat - 1 && !!istWerte[zuletzt - 1];
+    return istWerte.map((w, i) => {
+      if (w) return w;
+      if (i < aktuellerMonat) return 0;
+      const plan = finZahl(planWerte[i]);
+      if (plan) return plan;
+      return monatlich && i > zuletzt ? istWerte[zuletzt] : 0;
+    });
+  }
+
   function finFixAbgleichPlanen({ zusammenfuehren }) {
     const jahr = new Date().getFullYear();
+    const aktuellerMonat = new Date().getMonth();
     const ist = finIstMonate(buchungenAktuell(), jahr);
     const einheiten = [];
     const gruppen = new Map();
@@ -8847,7 +8940,7 @@
         zusammengelegt.push({ bezeichnung: behalten.bezeichnung, anzahl: zeilen.length });
       }
       const istWerte = schluessel ? ist.get(behalten.typ + "|" + schluessel) : null;
-      if (istWerte) monate = istWerte.slice();
+      if (istWerte) monate = finMonateMitPlan(istWerte, monate, aktuellerMonat);
       const monateGeaendert = monate.some((w, i) => Math.abs(w - vorher[i]) > 0.004);
       if (istWerte && monateGeaendert) monateAktualisiert++;
       const erkennungFehlt = !!schluessel && String(behalten.erkennung || "").trim() !== schluessel;
@@ -8896,7 +8989,7 @@
     }
     if (plan.monateAktualisiert) {
       text += `Monatswerte ${plan.jahr} aus den Buchungen: ${plan.monateAktualisiert} Position(en). ` +
-        "Danach stehen dort nur die tatsächlich gebuchten Monate.\n\n";
+        "Gebuchte Monate bekommen den echten Betrag, kommende Monate behalten ihren Planwert.\n\n";
     }
     if (!confirm(text + "Fortfahren?")) return;
     try {
@@ -9050,7 +9143,11 @@
         if (!bezeichnung) continue;
 
         const zahlung = { bezeichnung, typ, erkennung: k.schluessel };
-        FIN_MONATE.forEach((m, idx) => { zahlung[m] = k.monate[idx] || 0; });
+        // Seit Session 31: monatlich gebuchte Kosten gleich für die kommenden
+        // Monate vormerken (Planwerte, beim Import durch echte Beträge ersetzt)
+        const ist = FIN_MONATE.map((_m, idx) => finZahl(k.monate[idx]));
+        const monate = finMonateMitPlan(ist, new Array(12).fill(0), new Date().getMonth());
+        FIN_MONATE.forEach((m, idx) => { zahlung[m] = monate[idx]; });
         await api("fixkosten_hinzufuegen", { ...zahlung, bereich: aktiverBereich });
         angelegt++;
       }
