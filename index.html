@@ -923,12 +923,13 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Übersicht, wer welchen Schlüssel oder elektronischen Key hat (seit Session 32).</p>
               <ul>
-                <li><strong>Eintragen:</strong> Art (🔑 Schlüssel oder 📡 elektronischer Key), Seriennummer (Pflicht), Name, Verein und optional eine Notiz (z. B. welche Tür), dann „+ Eintragen“. Art und Verein bleiben danach stehen – praktisch, wenn mehrere Keys an denselben Verein gehen</li>
+                <li><strong>Zuerst Zugänge anlegen:</strong> unten unter „Zugänge verwalten“ die Türen eintragen (z. B. Haupteingang, Saal, Küche), optional mit Beschreibung. ✎ benennt um, × löscht – der Zugang verschwindet dann auch bei allen Schlüsseln, die ihn hatten</li>
+                <li><strong>Eintragen:</strong> Art (🔑 Schlüssel oder 📡 elektronischer Key), Seriennummer (Pflicht), Name, Verein, die Zugänge ankreuzen (beliebig viele) und optional eine Notiz, dann „+ Eintragen“. Art, Verein und Zugänge bleiben danach stehen – praktisch, wenn mehrere gleiche Keys an denselben Verein gehen</li>
                 <li><strong>Personen und/oder Vereine:</strong> Name und Verein sind beide optional. Ein Key, der nur einem Verein gehört, bekommt keinen Namen; ein Schlüssel einer Einzelperson keinen Verein (steht dann unter „Ohne Verein“)</li>
                 <li><strong>Vorschläge:</strong> Beim Tippen von Name und Verein schlägt das Feld schon Eingetragenes vor – so bleibt die Schreibweise gleich und die Gruppierung stimmt</li>
                 <li><strong>Seriennummer doppelt?</strong> Dieselbe Nummer lässt sich je Art nur einmal eintragen, die App meldet das</li>
-                <li><strong>Liste:</strong> nach Verein gruppiert und aufklappbar, im Kopf die Anzahl 🔑/📡. Darüber die Suche (Nummer, Name, Verein, Notiz) und die Auswahl „nur Schlüssel“ / „nur Keys“</li>
-                <li><strong>Bearbeiten:</strong> auf einen Eintrag tippen, z. B. wenn ein Key an eine andere Person geht. × löscht ihn (z. B. verloren oder zurückgegeben)</li>
+                <li><strong>Liste:</strong> nach Verein gruppiert und aufklappbar, im Kopf die Anzahl 🔑/📡, unter jedem Eintrag 🚪 seine Zugänge. Darüber die Suche (Nummer, Name, Verein, Zugang, Notiz), die Auswahl „nur Schlüssel“ / „nur Keys“ und – sobald es Zugänge gibt – ein Zugangsfilter: zeigt z. B. alle, die in die Küche kommen</li>
+                <li><strong>Bearbeiten:</strong> auf einen Eintrag tippen, z. B. wenn ein Key an eine andere Person geht oder eine Tür dazukommt (Zugänge an- oder abhaken). × löscht ihn (z. B. verloren oder zurückgegeben)</li>
                 <li><strong>Verlauf:</strong> dort stehen nur Art und Seriennummer, keine Namen</li>
               </ul>
             </div>
@@ -1381,7 +1382,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-schluessel" class="hidden">
-        <h1>Schlüssel <button class="hilfe-icon" data-hilfe="Schlüssel und elektronische Keys mit Seriennummer, Name und Verein eintragen. Die Liste ist nach Verein gruppiert (ohne Verein steht unten). Suche findet Seriennummer, Name, Verein und Notiz; das Auswahlfeld zeigt nur Schlüssel oder nur Keys. Zum Bearbeiten auf einen Eintrag tippen, × löscht ihn. Name und Verein schlagen beim Tippen schon Eingetragenes vor.">?</button></h1>
+        <h1>Schlüssel <button class="hilfe-icon" data-hilfe="Schlüssel und elektronische Keys mit Seriennummer, Name und Verein eintragen und ankreuzen, welche Zugänge (Türen) sie öffnen – auch mehrere. Die Zugänge legst du einmal unten unter „Zugänge verwalten“ an. Die Liste ist nach Verein gruppiert (ohne Verein steht unten). Suche findet Seriennummer, Name, Verein, Zugang und Notiz; die Auswahlfelder zeigen nur Schlüssel oder nur Keys bzw. nur einen Zugang („Wer kommt in die Küche?“). Zum Bearbeiten auf einen Eintrag tippen, × löscht ihn. Name und Verein schlagen beim Tippen schon Eingetragenes vor.">?</button></h1>
         <p class="hero-text">Wer hat welchen Schlüssel oder Key – mit Seriennummer und Verein.</p>
 
         <div class="rezept-form">
@@ -1393,7 +1394,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <label class="ern-feld">Seriennummer<input type="text" id="schluessel-neu-nr" maxlength="100" autocomplete="off"></label>
             <label class="ern-feld">Name<input type="text" id="schluessel-neu-name" maxlength="120" list="schluessel-namen-vorschlaege" autocomplete="off"></label>
             <label class="ern-feld">Verein<input type="text" id="schluessel-neu-verein" maxlength="120" list="schluessel-vereine-vorschlaege" autocomplete="off"></label>
-            <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="schluessel-neu-notiz" maxlength="500" placeholder="z. B. Haupteingang, Küche"></label>
+            <div class="ern-feld ern-feld-breit">Zugänge<div id="schluessel-neu-zugaenge"></div></div>
+            <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="schluessel-neu-notiz" maxlength="500" placeholder="z. B. Ersatzschlüssel, Pfand bezahlt"></label>
           </div>
           <datalist id="schluessel-namen-vorschlaege"></datalist>
           <datalist id="schluessel-vereine-vorschlaege"></datalist>
@@ -1410,9 +1412,23 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <option value="schluessel">🔑 nur Schlüssel</option>
             <option value="key">📡 nur Keys</option>
           </select>
+          <select id="schluessel-filter-zugang" class="hidden" aria-label="Nach Zugang filtern"></select>
         </div>
         <p class="notiz-meta" id="schluessel-zusammenfassung"></p>
         <div id="schluessel-liste"></div>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
+          <summary>Zugänge verwalten</summary>
+          <div class="anleitung-text">
+            <p class="empty-text" style="margin-top:0;">Türen und Zugänge, die beim Eintragen eines Schlüssels oder Keys zum Ankreuzen erscheinen.</p>
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+              <input type="text" id="schluessel-zugang-name" placeholder="Name (z. B. Haupteingang)" maxlength="120">
+              <input type="text" id="schluessel-zugang-beschreibung" placeholder="Beschreibung (optional)" maxlength="300" style="flex:1; min-width:12rem;">
+              <button class="btn-primary" id="btn-schluessel-zugang">+ Zugang</button>
+            </div>
+            <div id="schluessel-zugaenge-liste" style="margin-top:0.6rem;"></div>
+          </div>
+        </details>
       </div>
 
       <div id="view-training" class="hidden">
