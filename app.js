@@ -85,6 +85,8 @@
   let raeume = [];
   let raumVermietungen = [];
   let raumMailEmpfaenger = [];
+  // Schlüsselverwaltung (seit Session 32)
+  let schluesselListe = [];
   let mailEingerichtet = false;
   let zielEventBearbeitenId = null;
   let auswertungJahr = new Date().getFullYear();
@@ -98,7 +100,7 @@
     verlauf: "view-verlauf", anleitung: "view-anleitung", ogsideen: "view-ogs-ideen",
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
-    rezepte: "view-rezepte", ernaehrung: "view-ernaehrung",
+    rezepte: "view-rezepte", ernaehrung: "view-ernaehrung", schluessel: "view-schluessel",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -111,7 +113,7 @@
     ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
-    ["raumplanung", "Raumplanung"],
+    ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"],
   ];
   // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
@@ -128,7 +130,7 @@
       "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih"],
-    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung"],
+    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel"],
     business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen"],
   };
 
@@ -149,7 +151,7 @@
       { schluessel: "heute", label: "Heute", icon: "☀️", tabs: ["heute"] },
       { schluessel: "planen", label: "Planen", icon: "🗓️", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
       { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf", "rezepte", "training", "ernaehrung"] },
-      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", icon: BEREICH_ARBEIT_ICON[aktiverBereich] || "📌", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung"] },
+      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", icon: BEREICH_ARBEIT_ICON[aktiverBereich] || "📌", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
       { schluessel: "verwalten", label: "Verwalten", icon: "🛠️", tabs: ["export", "verlauf", "anleitung"] },
     ];
   }
@@ -515,6 +517,7 @@
     rezepte = data.rezepte || [];
     raeume = data.raeume || [];
     raumVermietungen = data.raum_vermietungen || [];
+    schluesselListe = data.schluessel || [];
     raumMailEmpfaenger = data.raum_mail_empfaenger || [];
     mailEingerichtet = data.mail_eingerichtet === true;
     bereichAnwenden();
@@ -537,6 +540,7 @@
     renderSpiele();
     renderRezepte();
     renderRaumplanung();
+    renderSchluessel();
   }
 
   function badgeHtml(cls, text) {
@@ -1209,6 +1213,7 @@
     if (aktiv === "spiele") renderSpiele();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
+    if (aktiv === "schluessel") renderSchluessel();
     if (aktiv === "training") renderTraining();
     if (aktiv === "rezepte") renderRezepte();
     if (aktiv === "ernaehrung") { renderErnaehrung(); if (ernProfilGeladen) ernMetRendern(); }
@@ -7436,6 +7441,183 @@
     }
     document.getElementById("plan-overview-bereich").innerHTML = overviewHtml;
   }
+
+  // ==========================================================
+  // Schlüsselverwaltung (seit Session 32): Schlüssel und elektronische
+  // Keys mit Seriennummer, Name und Verein – gruppiert nach Verein.
+  // ==========================================================
+  let schluesselBearbeitenId = null;
+  let schluesselSuche = "";
+  let schluesselFilterArt = "alle";
+  const SCHLUESSEL_ART = { schluessel: { icon: "🔑", text: "Schlüssel" }, key: { icon: "📡", text: "Elektronischer Key" } };
+  const SCHLUESSEL_OHNE_VEREIN = "Ohne Verein";
+
+  function schluesselAktuell() {
+    return schluesselListe.filter((k) => bereichVon(k) === aktiverBereich);
+  }
+  function schluesselVergleich(a, b) {
+    return (a.inhaber || "").localeCompare(b.inhaber || "", "de")
+      || (a.art || "").localeCompare(b.art || "")
+      || (a.seriennummer || "").localeCompare(b.seriennummer || "", "de", { numeric: true });
+  }
+  function schluesselArtOptionen(gewaehlt) {
+    return Object.entries(SCHLUESSEL_ART).map(([wert, a]) =>
+      `<option value="${wert}" ${wert === gewaehlt ? "selected" : ""}>${a.icon} ${a.text}</option>`).join("");
+  }
+
+  function renderSchluessel() {
+    const liste = document.getElementById("schluessel-liste");
+    if (!liste) return;
+    const alle = schluesselAktuell();
+
+    // Vorschläge für Name und Verein aus den vorhandenen Einträgen
+    const eindeutig = (feld) => [...new Set(alle.map((k) => (k[feld] || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "de"));
+    document.getElementById("schluessel-namen-vorschlaege").innerHTML = eindeutig("inhaber").map((n) => `<option value="${escapeAttr(n)}">`).join("");
+    document.getElementById("schluessel-vereine-vorschlaege").innerHTML = eindeutig("verein").map((n) => `<option value="${escapeAttr(n)}">`).join("");
+
+    const anzSchl = alle.filter((k) => k.art !== "key").length;
+    const anzKey = alle.length - anzSchl;
+    document.getElementById("schluessel-zusammenfassung").textContent = alle.length
+      ? `${anzSchl} Schlüssel · ${anzKey} elektronische Key${anzKey === 1 ? "" : "s"}`
+      : "";
+    renderSchluesselListe();
+  }
+
+  function renderSchluesselListe() {
+    const liste = document.getElementById("schluessel-liste");
+    if (!liste) return;
+    const alle = schluesselAktuell();
+    if (!alle.length) {
+      liste.innerHTML = `<p class="empty-text">Noch keine Schlüssel oder Keys eingetragen.</p>`;
+      return;
+    }
+    const suche = schluesselSuche.trim().toLowerCase();
+    const gefiltert = alle.filter((k) => {
+      if (schluesselFilterArt !== "alle" && (k.art || "schluessel") !== schluesselFilterArt) return false;
+      if (!suche) return true;
+      return [k.seriennummer, k.inhaber, k.verein, k.notiz].some((t) => (t || "").toLowerCase().includes(suche));
+    });
+    if (!gefiltert.length) {
+      liste.innerHTML = `<p class="empty-text">Nichts gefunden.</p>`;
+      return;
+    }
+
+    const gruppen = {};
+    gefiltert.forEach((k) => {
+      const v = (k.verein || "").trim() || SCHLUESSEL_OHNE_VEREIN;
+      (gruppen[v] = gruppen[v] || []).push(k);
+    });
+    const namen = Object.keys(gruppen).sort((a, b) => {
+      if (a === SCHLUESSEL_OHNE_VEREIN) return 1;
+      if (b === SCHLUESSEL_OHNE_VEREIN) return -1;
+      return a.localeCompare(b, "de");
+    });
+
+    const karte = (k) => {
+      const art = SCHLUESSEL_ART[k.art] || SCHLUESSEL_ART.schluessel;
+      if (schluesselBearbeitenId === k.id) {
+        return `
+          <div class="notiz-item" style="display:block;">
+            <div class="task-edit-felder">
+              <label class="ern-feld">Art<select id="schl-edit-art-${k.id}">${schluesselArtOptionen(k.art)}</select></label>
+              <label class="ern-feld">Seriennummer<input type="text" id="schl-edit-nr-${k.id}" value="${escapeAttr(k.seriennummer)}" maxlength="100"></label>
+              <label class="ern-feld">Name<input type="text" id="schl-edit-name-${k.id}" value="${escapeAttr(k.inhaber || "")}" maxlength="120" list="schluessel-namen-vorschlaege"></label>
+              <label class="ern-feld">Verein<input type="text" id="schl-edit-verein-${k.id}" value="${escapeAttr(k.verein || "")}" maxlength="120" list="schluessel-vereine-vorschlaege"></label>
+              <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="schl-edit-notiz-${k.id}" value="${escapeAttr(k.notiz || "")}" maxlength="500"></label>
+            </div>
+            <div class="row" style="margin:0.4rem 0 0;">
+              <button class="btn-primary" onclick="schluesselSpeichern('${k.id}')">Speichern</button>
+              <button class="link-btn" onclick="schluesselBearbeitenAbbrechen()">Abbrechen</button>
+            </div>
+          </div>`;
+      }
+      const meta = [art.text, k.notiz ? escapeHtml(k.notiz) : ""].filter(Boolean).join(" · ");
+      return `
+        <div class="notiz-item">
+          <div style="flex:1; cursor:pointer;" onclick="schluesselBearbeitenStart('${k.id}')">
+            <span class="notiz-text">${art.icon} ${k.inhaber ? escapeHtml(k.inhaber) : `<em>ohne Name</em>`}</span>
+            <span class="notiz-meta" style="display:block;">Nr. <strong>${escapeHtml(k.seriennummer)}</strong> · ${meta}</span>
+          </div>
+          <button class="task-delete" onclick="event.stopPropagation(); schluesselLoeschen('${k.id}')" aria-label="Eintrag löschen">×</button>
+        </div>`;
+    };
+
+    liste.innerHTML = namen.map((v) => {
+      const eintraege = gruppen[v].sort(schluesselVergleich);
+      const s = eintraege.filter((k) => k.art !== "key").length;
+      const kz = eintraege.length - s;
+      const zahl = [s ? `🔑 ${s}` : "", kz ? `📡 ${kz}` : ""].filter(Boolean).join(" ");
+      return `
+        <details class="spiel-gruppe" open>
+          <summary class="spiel-gruppe-kopf">
+            <span class="spiel-gruppe-titel">${escapeHtml(v)}</span>
+            <span class="zl-gruppe-zahl">${zahl}</span>
+          </summary>
+          <div class="notiz-list">${eintraege.map(karte).join("")}</div>
+        </details>`;
+    }).join("");
+  }
+
+  document.getElementById("btn-schluessel-neu").addEventListener("click", async () => {
+    const status = document.getElementById("schluessel-status");
+    const felder = {
+      art: document.getElementById("schluessel-neu-art").value,
+      seriennummer: document.getElementById("schluessel-neu-nr").value.trim(),
+      inhaber: document.getElementById("schluessel-neu-name").value.trim(),
+      verein: document.getElementById("schluessel-neu-verein").value.trim(),
+      notiz: document.getElementById("schluessel-neu-notiz").value.trim(),
+    };
+    if (!felder.seriennummer) { status.textContent = "Bitte die Seriennummer angeben."; return; }
+    try {
+      await api("schluessel_hinzufuegen", { ...felder, bereich: aktiverBereich });
+      // Verein und Art bleiben stehen – praktisch beim Eintragen mehrerer Keys für denselben Verein
+      ["schluessel-neu-nr", "schluessel-neu-name", "schluessel-neu-notiz"].forEach((id) => { document.getElementById(id).value = ""; });
+      status.textContent = `Eingetragen: Nr. ${felder.seriennummer}.`;
+      await ladeDaten();
+      document.getElementById("schluessel-neu-nr").focus();
+    } catch (fehler) {
+      status.textContent = fehler.message;
+    }
+  });
+  document.getElementById("schluessel-suche").addEventListener("input", (e) => {
+    schluesselSuche = e.target.value;
+    renderSchluesselListe();
+  });
+  document.getElementById("schluessel-filter-art").addEventListener("change", (e) => {
+    schluesselFilterArt = e.target.value;
+    renderSchluesselListe();
+  });
+  window.schluesselBearbeitenStart = function(id) {
+    schluesselBearbeitenId = id;
+    renderSchluesselListe();
+  };
+  window.schluesselBearbeitenAbbrechen = function() {
+    schluesselBearbeitenId = null;
+    renderSchluesselListe();
+  };
+  window.schluesselSpeichern = async function(id) {
+    const wert = (f) => document.getElementById(`schl-edit-${f}-${id}`).value.trim();
+    try {
+      await api("schluessel_aktualisieren", {
+        id, art: wert("art"), seriennummer: wert("nr"), inhaber: wert("name"), verein: wert("verein"), notiz: wert("notiz"),
+      });
+      schluesselBearbeitenId = null;
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+  window.schluesselLoeschen = async function(id) {
+    const k = schluesselListe.find((x) => x.id === id);
+    if (!confirm(`${k && k.art === "key" ? "Key" : "Schlüssel"} Nr. ${k ? k.seriennummer : ""} löschen?`)) return;
+    try {
+      await api("schluessel_loeschen", { id });
+      if (schluesselBearbeitenId === id) schluesselBearbeitenId = null;
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
 
   // ==========================================================
   // Raumplanung (seit Session 29): Vermietungen je Raum, bei jedem neuen
