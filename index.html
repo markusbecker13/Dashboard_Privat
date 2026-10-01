@@ -670,7 +670,7 @@
       <div id="view-reiter-verwaltung" class="hidden">
         <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
-        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Raumplanung ist ebenfalls bereichsgetrennt (Standard: AWO). Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Ernährung gibt es nur in Privat und taucht hier bei den anderen Bereichen deshalb nicht auf.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Raumplanung und Schlüssel sind ebenfalls bereichsgetrennt (Standard: AWO). Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Ernährung gibt es nur in Privat und taucht hier bei den anderen Bereichen deshalb nicht auf.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -919,6 +919,22 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
+            <summary>Schlüssel <span class="anleitung-nur">(Standard: nur AWO OV Liblar, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
+            <div class="anleitung-text">
+              <p>Übersicht, wer welchen Schlüssel oder elektronischen Key hat (seit Session 32).</p>
+              <ul>
+                <li><strong>Eintragen:</strong> Art (🔑 Schlüssel oder 📡 elektronischer Key), Seriennummer (Pflicht), Name, Verein und optional eine Notiz (z. B. welche Tür), dann „+ Eintragen“. Art und Verein bleiben danach stehen – praktisch, wenn mehrere Keys an denselben Verein gehen</li>
+                <li><strong>Personen und/oder Vereine:</strong> Name und Verein sind beide optional. Ein Key, der nur einem Verein gehört, bekommt keinen Namen; ein Schlüssel einer Einzelperson keinen Verein (steht dann unter „Ohne Verein“)</li>
+                <li><strong>Vorschläge:</strong> Beim Tippen von Name und Verein schlägt das Feld schon Eingetragenes vor – so bleibt die Schreibweise gleich und die Gruppierung stimmt</li>
+                <li><strong>Seriennummer doppelt?</strong> Dieselbe Nummer lässt sich je Art nur einmal eintragen, die App meldet das</li>
+                <li><strong>Liste:</strong> nach Verein gruppiert und aufklappbar, im Kopf die Anzahl 🔑/📡. Darüber die Suche (Nummer, Name, Verein, Notiz) und die Auswahl „nur Schlüssel“ / „nur Keys“</li>
+                <li><strong>Bearbeiten:</strong> auf einen Eintrag tippen, z. B. wenn ein Key an eine andere Person geht. × löscht ihn (z. B. verloren oder zurückgegeben)</li>
+                <li><strong>Verlauf:</strong> dort stehen nur Art und Seriennummer, keine Namen</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
             <summary>Notizen</summary>
             <div class="anleitung-text">
               <p>Schneller Ablageort für spontane Gedanken.</p>
@@ -1140,6 +1156,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li>Aktuell werden nur eigene Daten gespeichert (keine Daten Dritter) – das fällt unter die private Haushaltsausnahme der DSGVO</li>
                 <li><strong>Wetter:</strong> die Abfrage läuft serverseitig über die Edge Function bei Open-Meteo (ohne API-Schlüssel). Open-Meteo bekommt nur den eingestellten Ort, nicht deine IP-Adresse</li>
                 <li><strong>Raumplanung (AWO):</strong> Grundsätzlich ohne personenbezogene Daten – im Pflichtfeld steht nur der Anlass, die Mail geht nur an den Verteiler (Vorsitz und Stellvertretung). Das Feld Kontakt ist optional: Wird dort eine Telefonnummer oder Mailadresse eingetragen, sind das Daten Dritter, die in Supabase liegen und per Mail über das web.de-Postfach an den Verteiler gehen. Dann gilt die private Haushaltsausnahme nicht mehr, und der Ortsverein sollte kurz prüfen: Information der Betroffenen, Löschfrist für alte Vermietungen, Auftragsverarbeitung mit Supabase (Einschätzung, keine Rechtsprüfung)</li>
+                <li><strong>Schlüssel (AWO):</strong> Name plus Seriennummer ist ein personenbezogenes Datum Dritter. Das ist für eine Schlüsselübersicht üblich und sachlich nötig, fällt aber nicht mehr unter die private Haushaltsausnahme – verantwortlich ist dann der Ortsverein. Empfehlung: nur Name, keine Adressen oder Telefonnummern, Einträge bei Rückgabe löschen, und im Vorstand kurz klären, dass die Liste hier geführt wird (Supabase, EU-Region Frankfurt; Auftragsverarbeitung prüfen). Einschätzung, keine Rechtsprüfung</li>
                 <li><strong>OGS Rapunzel &amp; AWO OV Liblar:</strong> beide Bereiche sind für organisatorische Inhalte gedacht, keine personenbezogenen Daten über Kinder, Familien oder Kolleg:innen. Sollten künftig doch personenbezogene Daten Dritter hinzukommen, braucht es eine erneute Prüfung. <strong>Achtung Verleih:</strong> das Feld „An wen" nimmt Namen auf – dort möglichst Kürzel, Gruppen oder Funktionen statt vollständiger Namen eintragen</li>
                 <li><strong>Rezeptfotos:</strong> liegen in einem privaten Storage-Bucket (EU), sichtbar nur über kurzlebige signierte Links nach dem Login. Empfehlung: nur das Essen fotografieren, keine Personen – in OGS und AWO erst recht keine Kinder (Einschätzung, keine Rechtsprüfung)</li>
                 <li><strong>Business (zwischenkaffeeundchaos):</strong> Für geschäftliche Tätigkeit gilt die private Haushaltsausnahme nicht. Solange dort nur eigene Planungsdaten liegen (Aufgaben, Ideen, Notizen), ist das unkritisch. Bitte <strong>keine Kundendaten</strong> (Namen, E-Mail-Adressen, Bestellungen) im Dashboard ablegen – dafür bräuchte es u.a. einen Auftragsverarbeitungsvertrag mit Supabase und einen Eintrag im Verzeichnis der Verarbeitungstätigkeiten</li>
@@ -1361,6 +1378,41 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div id="raum-empfaenger-liste" style="margin-top:0.6rem;"></div>
           </div>
         </details>
+      </div>
+
+      <div id="view-schluessel" class="hidden">
+        <h1>Schlüssel <button class="hilfe-icon" data-hilfe="Schlüssel und elektronische Keys mit Seriennummer, Name und Verein eintragen. Die Liste ist nach Verein gruppiert (ohne Verein steht unten). Suche findet Seriennummer, Name, Verein und Notiz; das Auswahlfeld zeigt nur Schlüssel oder nur Keys. Zum Bearbeiten auf einen Eintrag tippen, × löscht ihn. Name und Verein schlagen beim Tippen schon Eingetragenes vor.">?</button></h1>
+        <p class="hero-text">Wer hat welchen Schlüssel oder Key – mit Seriennummer und Verein.</p>
+
+        <div class="rezept-form">
+          <div class="task-edit-felder">
+            <label class="ern-feld">Art<select id="schluessel-neu-art">
+              <option value="schluessel">🔑 Schlüssel</option>
+              <option value="key">📡 Elektronischer Key</option>
+            </select></label>
+            <label class="ern-feld">Seriennummer<input type="text" id="schluessel-neu-nr" maxlength="100" autocomplete="off"></label>
+            <label class="ern-feld">Name<input type="text" id="schluessel-neu-name" maxlength="120" list="schluessel-namen-vorschlaege" autocomplete="off"></label>
+            <label class="ern-feld">Verein<input type="text" id="schluessel-neu-verein" maxlength="120" list="schluessel-vereine-vorschlaege" autocomplete="off"></label>
+            <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="schluessel-neu-notiz" maxlength="500" placeholder="z. B. Haupteingang, Küche"></label>
+          </div>
+          <datalist id="schluessel-namen-vorschlaege"></datalist>
+          <datalist id="schluessel-vereine-vorschlaege"></datalist>
+          <div class="row" style="margin-bottom:0;">
+            <button class="btn-primary" id="btn-schluessel-neu">+ Eintragen</button>
+          </div>
+          <p class="notiz-meta" id="schluessel-status" role="status"></p>
+        </div>
+
+        <div class="row" style="flex-wrap:wrap; align-items:center; margin-top:0.6rem;">
+          <input type="search" id="schluessel-suche" placeholder="Suchen: Nummer, Name, Verein …" style="flex:1; min-width:12rem;" autocomplete="off">
+          <select id="schluessel-filter-art">
+            <option value="alle">Alle</option>
+            <option value="schluessel">🔑 nur Schlüssel</option>
+            <option value="key">📡 nur Keys</option>
+          </select>
+        </div>
+        <p class="notiz-meta" id="schluessel-zusammenfassung"></p>
+        <div id="schluessel-liste"></div>
       </div>
 
       <div id="view-training" class="hidden">
