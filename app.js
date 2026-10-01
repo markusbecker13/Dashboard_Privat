@@ -87,6 +87,7 @@
   let raumMailEmpfaenger = [];
   // Schlüsselverwaltung (seit Session 32)
   let schluesselListe = [];
+  let schluesselZugaenge = [];
   let mailEingerichtet = false;
   let zielEventBearbeitenId = null;
   let auswertungJahr = new Date().getFullYear();
@@ -518,6 +519,7 @@
     raeume = data.raeume || [];
     raumVermietungen = data.raum_vermietungen || [];
     schluesselListe = data.schluessel || [];
+    schluesselZugaenge = data.schluessel_zugaenge || [];
     raumMailEmpfaenger = data.raum_mail_empfaenger || [];
     mailEingerichtet = data.mail_eingerichtet === true;
     bereichAnwenden();
@@ -7445,15 +7447,26 @@
   // ==========================================================
   // Schlüsselverwaltung (seit Session 32): Schlüssel und elektronische
   // Keys mit Seriennummer, Name und Verein – gruppiert nach Verein.
+  // Seit Session 32b: Zugänge (Türen) einmal anlegen und je Schlüssel
+  // ankreuzen – ein Schlüssel/Key kann zu mehreren Türen gehören.
   // ==========================================================
   let schluesselBearbeitenId = null;
   let schluesselSuche = "";
   let schluesselFilterArt = "alle";
+  let schluesselFilterZugang = "alle";
   const SCHLUESSEL_ART = { schluessel: { icon: "🔑", text: "Schlüssel" }, key: { icon: "📡", text: "Elektronischer Key" } };
   const SCHLUESSEL_OHNE_VEREIN = "Ohne Verein";
 
   function schluesselAktuell() {
     return schluesselListe.filter((k) => bereichVon(k) === aktiverBereich);
+  }
+  function zugaengeAktuell() {
+    return schluesselZugaenge.filter((z) => bereichVon(z) === aktiverBereich).sort((a, b) => a.name.localeCompare(b.name, "de"));
+  }
+  // Namen der Zugänge eines Schlüssels, in der Reihenfolge der Zugangsliste
+  function schluesselZugangNamen(k) {
+    const ids = k.zugaenge || [];
+    return zugaengeAktuell().filter((z) => ids.includes(z.id)).map((z) => z.name);
   }
   function schluesselVergleich(a, b) {
     return (a.inhaber || "").localeCompare(b.inhaber || "", "de")
@@ -7464,16 +7477,44 @@
     return Object.entries(SCHLUESSEL_ART).map(([wert, a]) =>
       `<option value="${wert}" ${wert === gewaehlt ? "selected" : ""}>${a.icon} ${a.text}</option>`).join("");
   }
+  // Ankreuzfelder für die Zugänge; containerId bündelt sie für das Auslesen
+  function schluesselZugangAuswahlHtml(containerId, gewaehlt) {
+    const zugaenge = zugaengeAktuell();
+    if (!zugaenge.length) {
+      return `<span class="notiz-meta">Noch keine Zugänge – unten unter „Zugänge verwalten“ anlegen.</span>`;
+    }
+    return `<div id="${containerId}" style="display:flex; flex-wrap:wrap; gap:0.3rem 0.9rem;">${zugaenge.map((z) => `
+      <label style="display:flex; align-items:center; gap:0.3rem; font-weight:normal;">
+        <input type="checkbox" value="${z.id}" ${gewaehlt.includes(z.id) ? "checked" : ""}> ${escapeHtml(z.name)}
+      </label>`).join("")}</div>`;
+  }
+  function schluesselZugangAuswahlLesen(containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return null; // keine Zugänge angelegt → Feld nicht mitschicken
+    return [...el.querySelectorAll("input[type=checkbox]:checked")].map((c) => c.value);
+  }
 
   function renderSchluessel() {
     const liste = document.getElementById("schluessel-liste");
     if (!liste) return;
     const alle = schluesselAktuell();
+    const zugaenge = zugaengeAktuell();
 
     // Vorschläge für Name und Verein aus den vorhandenen Einträgen
     const eindeutig = (feld) => [...new Set(alle.map((k) => (k[feld] || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "de"));
     document.getElementById("schluessel-namen-vorschlaege").innerHTML = eindeutig("inhaber").map((n) => `<option value="${escapeAttr(n)}">`).join("");
     document.getElementById("schluessel-vereine-vorschlaege").innerHTML = eindeutig("verein").map((n) => `<option value="${escapeAttr(n)}">`).join("");
+
+    // Zugänge im Formular – angekreuzte bleiben nach dem Neuladen erhalten
+    const bisher = schluesselZugangAuswahlLesen("schluessel-neu-zugaenge-auswahl") || [];
+    document.getElementById("schluessel-neu-zugaenge").innerHTML = schluesselZugangAuswahlHtml("schluessel-neu-zugaenge-auswahl", bisher);
+
+    // Filter nach Zugang
+    const filter = document.getElementById("schluessel-filter-zugang");
+    if (schluesselFilterZugang !== "alle" && !zugaenge.some((z) => z.id === schluesselFilterZugang)) schluesselFilterZugang = "alle";
+    filter.innerHTML = `<option value="alle">Alle Zugänge</option>` + zugaenge.map((z) =>
+      `<option value="${z.id}" ${z.id === schluesselFilterZugang ? "selected" : ""}>🚪 ${escapeHtml(z.name)}</option>`).join("");
+    filter.classList.toggle("hidden", !zugaenge.length);
 
     const anzSchl = alle.filter((k) => k.art !== "key").length;
     const anzKey = alle.length - anzSchl;
@@ -7481,6 +7522,22 @@
       ? `${anzSchl} Schlüssel · ${anzKey} elektronische Key${anzKey === 1 ? "" : "s"}`
       : "";
     renderSchluesselListe();
+
+    // Zugänge verwalten
+    document.getElementById("schluessel-zugaenge-liste").innerHTML = zugaenge.length
+      ? `<div class="notiz-list">${zugaenge.map((z) => {
+          const anzahl = alle.filter((k) => (k.zugaenge || []).includes(z.id)).length;
+          return `
+            <div class="notiz-item">
+              <div style="flex:1;">
+                <span class="notiz-text">🚪 ${escapeHtml(z.name)}</span>
+                <span class="notiz-meta" style="display:block;">${z.beschreibung ? escapeHtml(z.beschreibung) + " · " : ""}${anzahl} Schlüssel/Key${anzahl === 1 ? "" : "s"}</span>
+              </div>
+              <button class="task-edit-btn" onclick="zugangBearbeiten('${z.id}')" aria-label="Zugang bearbeiten" title="Bearbeiten">✎</button>
+              <button class="task-delete" onclick="zugangLoeschen('${z.id}')" aria-label="Zugang löschen">×</button>
+            </div>`;
+        }).join("")}</div>`
+      : `<p class="empty-text">Noch keine Zugänge.</p>`;
   }
 
   function renderSchluesselListe() {
@@ -7494,8 +7551,9 @@
     const suche = schluesselSuche.trim().toLowerCase();
     const gefiltert = alle.filter((k) => {
       if (schluesselFilterArt !== "alle" && (k.art || "schluessel") !== schluesselFilterArt) return false;
+      if (schluesselFilterZugang !== "alle" && !(k.zugaenge || []).includes(schluesselFilterZugang)) return false;
       if (!suche) return true;
-      return [k.seriennummer, k.inhaber, k.verein, k.notiz].some((t) => (t || "").toLowerCase().includes(suche));
+      return [k.seriennummer, k.inhaber, k.verein, k.notiz, ...schluesselZugangNamen(k)].some((t) => (t || "").toLowerCase().includes(suche));
     });
     if (!gefiltert.length) {
       liste.innerHTML = `<p class="empty-text">Nichts gefunden.</p>`;
@@ -7523,6 +7581,7 @@
               <label class="ern-feld">Seriennummer<input type="text" id="schl-edit-nr-${k.id}" value="${escapeAttr(k.seriennummer)}" maxlength="100"></label>
               <label class="ern-feld">Name<input type="text" id="schl-edit-name-${k.id}" value="${escapeAttr(k.inhaber || "")}" maxlength="120" list="schluessel-namen-vorschlaege"></label>
               <label class="ern-feld">Verein<input type="text" id="schl-edit-verein-${k.id}" value="${escapeAttr(k.verein || "")}" maxlength="120" list="schluessel-vereine-vorschlaege"></label>
+              <div class="ern-feld ern-feld-breit">Zugänge${schluesselZugangAuswahlHtml("schl-edit-zug-" + k.id, k.zugaenge || [])}</div>
               <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="schl-edit-notiz-${k.id}" value="${escapeAttr(k.notiz || "")}" maxlength="500"></label>
             </div>
             <div class="row" style="margin:0.4rem 0 0;">
@@ -7531,12 +7590,14 @@
             </div>
           </div>`;
       }
+      const zug = schluesselZugangNamen(k);
       const meta = [art.text, k.notiz ? escapeHtml(k.notiz) : ""].filter(Boolean).join(" · ");
       return `
         <div class="notiz-item">
           <div style="flex:1; cursor:pointer;" onclick="schluesselBearbeitenStart('${k.id}')">
             <span class="notiz-text">${art.icon} ${k.inhaber ? escapeHtml(k.inhaber) : `<em>ohne Name</em>`}</span>
             <span class="notiz-meta" style="display:block;">Nr. <strong>${escapeHtml(k.seriennummer)}</strong> · ${meta}</span>
+            ${zug.length ? `<span class="notiz-meta" style="display:block;">🚪 ${zug.map(escapeHtml).join(", ")}</span>` : ""}
           </div>
           <button class="task-delete" onclick="event.stopPropagation(); schluesselLoeschen('${k.id}')" aria-label="Eintrag löschen">×</button>
         </div>`;
@@ -7567,10 +7628,12 @@
       verein: document.getElementById("schluessel-neu-verein").value.trim(),
       notiz: document.getElementById("schluessel-neu-notiz").value.trim(),
     };
+    const zugaenge = schluesselZugangAuswahlLesen("schluessel-neu-zugaenge-auswahl");
+    if (zugaenge) felder.zugaenge = zugaenge;
     if (!felder.seriennummer) { status.textContent = "Bitte die Seriennummer angeben."; return; }
     try {
       await api("schluessel_hinzufuegen", { ...felder, bereich: aktiverBereich });
-      // Verein und Art bleiben stehen – praktisch beim Eintragen mehrerer Keys für denselben Verein
+      // Art, Verein und Zugänge bleiben stehen – praktisch beim Eintragen mehrerer gleicher Keys
       ["schluessel-neu-nr", "schluessel-neu-name", "schluessel-neu-notiz"].forEach((id) => { document.getElementById(id).value = ""; });
       status.textContent = `Eingetragen: Nr. ${felder.seriennummer}.`;
       await ladeDaten();
@@ -7587,6 +7650,10 @@
     schluesselFilterArt = e.target.value;
     renderSchluesselListe();
   });
+  document.getElementById("schluessel-filter-zugang").addEventListener("change", (e) => {
+    schluesselFilterZugang = e.target.value;
+    renderSchluesselListe();
+  });
   window.schluesselBearbeitenStart = function(id) {
     schluesselBearbeitenId = id;
     renderSchluesselListe();
@@ -7597,10 +7664,11 @@
   };
   window.schluesselSpeichern = async function(id) {
     const wert = (f) => document.getElementById(`schl-edit-${f}-${id}`).value.trim();
+    const daten = { id, art: wert("art"), seriennummer: wert("nr"), inhaber: wert("name"), verein: wert("verein"), notiz: wert("notiz") };
+    const zugaenge = schluesselZugangAuswahlLesen("schl-edit-zug-" + id);
+    if (zugaenge) daten.zugaenge = zugaenge;
     try {
-      await api("schluessel_aktualisieren", {
-        id, art: wert("art"), seriennummer: wert("nr"), inhaber: wert("name"), verein: wert("verein"), notiz: wert("notiz"),
-      });
+      await api("schluessel_aktualisieren", daten);
       schluesselBearbeitenId = null;
       await ladeDaten();
     } catch (fehler) {
@@ -7613,6 +7681,45 @@
     try {
       await api("schluessel_loeschen", { id });
       if (schluesselBearbeitenId === id) schluesselBearbeitenId = null;
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+
+  document.getElementById("btn-schluessel-zugang").addEventListener("click", async () => {
+    const name = document.getElementById("schluessel-zugang-name").value.trim();
+    if (!name) return;
+    try {
+      await api("zugang_hinzufuegen", { name, beschreibung: document.getElementById("schluessel-zugang-beschreibung").value.trim(), bereich: aktiverBereich });
+      document.getElementById("schluessel-zugang-name").value = "";
+      document.getElementById("schluessel-zugang-beschreibung").value = "";
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  });
+  window.zugangBearbeiten = async function(id) {
+    const z = schluesselZugaenge.find((x) => x.id === id);
+    if (!z) return;
+    const name = prompt("Name des Zugangs:", z.name);
+    if (name === null || !name.trim()) return;
+    const beschreibung = prompt("Beschreibung (optional):", z.beschreibung || "");
+    if (beschreibung === null) return;
+    try {
+      await api("zugang_aktualisieren", { id, name: name.trim(), beschreibung: beschreibung.trim() });
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+  window.zugangLoeschen = async function(id) {
+    const z = schluesselZugaenge.find((x) => x.id === id);
+    const anzahl = schluesselAktuell().filter((k) => (k.zugaenge || []).includes(id)).length;
+    const text = `Zugang „${z ? z.name : ""}“ löschen?` + (anzahl ? ` Er wird bei ${anzahl} Schlüssel/Key${anzahl === 1 ? "" : "s"} entfernt.` : "");
+    if (!confirm(text)) return;
+    try {
+      await api("zugang_loeschen", { id });
       await ladeDaten();
     } catch (fehler) {
       alert(fehler.message);
