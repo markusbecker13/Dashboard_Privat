@@ -135,6 +135,7 @@
     business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen"],
   };
 
+  // Prüft, ob ein Reiter im Bereich sichtbar ist (Nutzereinstellung, sonst Standardliste; manche nur privat)
   function reiterIstSichtbar(bereich, schluessel) {
     if (NUR_PRIVAT_REITER.includes(schluessel) && bereich !== "privat") return false;
     const eintrag = tabEinstellungen.find((e) => e.bereich === bereich && e.tab_id === schluessel);
@@ -157,10 +158,12 @@
     ];
   }
 
+  // Liefert die im aktiven Bereich sichtbaren Reiter einer Themengruppe
   function sichtbareTabsInGruppe(gruppe) {
     return gruppe.tabs.filter((schluessel) => reiterIstSichtbar(aktiverBereich, schluessel));
   }
 
+  // Findet die Themengruppe, zu der ein Reiter gehört
   function gruppeVonTab(schluessel) {
     return hauptkategorien().find((g) => g.tabs.includes(schluessel));
   }
@@ -175,6 +178,7 @@
   let wetterLetzterAbruf = 0; // Timestamp (ms), für einfaches Caching
   const WETTER_CACHE_MS = 30 * 60 * 1000; // 30 Minuten
 
+  // Zentraler POST-Aufruf an die Edge Function mit Token und aktivem Bereich; behandelt 401/429/Fehler
   async function api(action, extra = {}) {
     const res = await fetch(API_URL, {
       method: "POST",
@@ -215,6 +219,7 @@
     business: { src: "icons/zwischenkaffeeundchaos-herz.png", alt: "zwischenkaffeeundchaos" },
   };
 
+  // Setzt Farbwelt, Statusleisten-Farbe und Logo/Namen in der Kopfzeile passend zum Bereich
   function farbweltAnwenden(bereich) {
     const welt = BEREICH_FARBWELT.includes(bereich) ? bereich : "neutral";
     document.documentElement.dataset.bereich = welt;
@@ -237,11 +242,13 @@
     if (name) name.classList.toggle("hidden", !!eintrag);
   }
 
+  // Zeigt das heutige Datum ausgeschrieben auf der Willkommensseite an
   function willkommenDatumAnzeigen() {
     const el = document.getElementById("willkommen-datum");
     if (el) el.textContent = new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
   }
 
+  // Zeigt den Login-Screen (neutrale Farbwelt) mit optionaler Fehlermeldung
   function zeigeLogin(fehler) {
     farbweltAnwenden("neutral");
     document.getElementById("app").classList.add("hidden");
@@ -250,6 +257,7 @@
     document.getElementById("login-error").textContent = fehler || "";
   }
 
+  // Zeigt die Bereichsauswahl (Willkommensseite) und blendet Login und App aus
   function zeigeBereichAuswahl() {
     farbweltAnwenden("neutral");
     willkommenDatumAnzeigen();
@@ -258,6 +266,7 @@
     document.getElementById("bereich-screen").classList.remove("hidden");
   }
 
+  // Blendet die App ein, setzt Name, Untertitel und Farbwelt des aktiven Bereichs
   function zeigeApp() {
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("bereich-screen").classList.add("hidden");
@@ -283,6 +292,7 @@
   };
   const BEREICH_KNOPF_TEXT = { privat: "Privat", ogs: "OGS", awo: "AWO", business: "Business", verwaltung: "Verwaltung" };
 
+  // Liefert die Themengruppen, die im aktiven Bereich mindestens einen sichtbaren Reiter haben
   function sichtbareGruppen() {
     return hauptkategorien().filter((g) => sichtbareTabsInGruppe(g).length > 0);
   }
@@ -293,12 +303,14 @@
     return `letzter-reiter-${aktiverBereich}-${gruppe}`;
   }
 
+  // Ermittelt den Start-Reiter: "heute", sonst den ersten sichtbaren Reiter
   function ersterSichtbarerReiter() {
     if (reiterIstSichtbar(aktiverBereich, "heute")) return "heute";
     const gruppe = sichtbareGruppen()[0];
     return gruppe ? sichtbareTabsInGruppe(gruppe)[0] : "heute";
   }
 
+  // Öffnet eine Themengruppe beim zuletzt gemerkten oder ersten sichtbaren Reiter
   window.gruppeOeffnen = function(schluessel) {
     const gruppe = hauptkategorien().find((g) => g.schluessel === schluessel);
     if (!gruppe) return;
@@ -308,6 +320,7 @@
     tabWechseln(sichtbar.includes(gemerkt) ? gemerkt : sichtbar[0]);
   };
 
+  // Rendert untere Themenleiste und obere Reiter-Leiste; in der Verwaltung ohne Navigation
   function renderNavigation() {
     const bereichKnopf = document.getElementById("content-bereich-text");
     if (bereichKnopf) bereichKnopf.textContent = BEREICH_KNOPF_TEXT[aktiverBereich] || "Bereich";
@@ -353,6 +366,7 @@
     }
   }
 
+  // Wechselt den aktiven Bereich, schließt offene Rezept-Zustände und rendert alles neu
   window.bereichAuswaehlen = function(bereich) {
     aktiverBereich = bereich;
     localStorage.setItem("aktiver-bereich", bereich);
@@ -378,11 +392,13 @@
     }
   };
 
+  // Zeigt den im Browser gespeicherten Dashboard-Namen in der Kopfzeile an
   function dashboardNameAnzeigen() {
     const gespeichert = localStorage.getItem("dashboard-name");
     document.getElementById("brand-name").textContent = gespeichert || "Dashboard";
   }
 
+  // Fragt einen neuen Dashboard-Namen ab und speichert ihn im localStorage
   window.dashboardNameBearbeiten = function() {
     const aktuell = localStorage.getItem("dashboard-name") || "Dashboard";
     const neu = prompt("Wie soll dein Dashboard heißen?", aktuell);
@@ -391,11 +407,13 @@
     dashboardNameAnzeigen();
   };
 
+  // Zeigt den gespeicherten Untertitel neben dem Dashboard-Namen an
   function untertitelAnzeigen() {
     const gespeichert = localStorage.getItem("dashboard-untertitel");
     document.getElementById("brand-sub").textContent = gespeichert || "Aufgaben";
   }
 
+  // Fragt einen neuen Untertitel ab und speichert ihn im localStorage
   window.untertitelBearbeiten = function() {
     const aktuell = localStorage.getItem("dashboard-untertitel") || "Aufgaben";
     const neu = prompt("Welcher Untertitel soll neben dem Namen stehen?", aktuell);
@@ -409,6 +427,7 @@
     if (e.key === "Enter") anmelden();
   });
 
+  // Meldet ab (auch bei ungültiger Session), löscht das Token und zeigt den Login
   async function abmelden() {
     try {
       await api("logout");
@@ -425,6 +444,7 @@
   document.getElementById("bereich-screen-abmelden").addEventListener("click", abmelden);
   document.getElementById("btn-bereich-wechseln").addEventListener("click", zeigeBereichAuswahl);
 
+  // Meldet mit Passwort an, speichert das Token, lädt Daten und öffnet Bereichswahl bzw. geteilten Inhalt
   async function anmelden() {
     const eingegebenesPass = document.getElementById("login-pass").value;
     try {
@@ -460,16 +480,19 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
 
+  // Liefert das heutige Datum als lokales ISO-Datum
   function heuteISO() {
     return datumLokalISO();
   }
 
+  // Addiert Tage zu einem ISO-Datum und gibt das lokale ISO-Datum zurück
   function addTage(datumISO, tage) {
     const d = new Date(datumISO + "T00:00:00");
     d.setDate(d.getDate() + tage);
     return datumLokalISO(d);
   }
 
+  // Ergänzt eine Aufgabe um Status (überfällig/heute/normal) und fällige Erinnerung
   function enrich(a) {
     const heute = heuteISO();
     let status = "normal";
@@ -481,6 +504,7 @@
     return { ...a, status, erinnerungFaellig };
   }
 
+  // Lädt alle Daten per api("liste") in die globalen Listen und rendert alle Ansichten neu
   async function ladeDaten() {
     const data = await api("liste");
     projekte = data.projekte || [];
@@ -545,22 +569,26 @@
     renderSchluessel();
   }
 
+  // Erzeugt das HTML für ein Badge mit CSS-Klasse und escaptem Text
   function badgeHtml(cls, text) {
     return `<span class="badge ${cls}">${escapeHtml(text)}</span>`;
   }
 
   let aufgabeBearbeitenId = null;
 
+  // Startet die Inline-Bearbeitung einer Aufgabe
   window.aufgabeBearbeitenStart = function(id) {
     aufgabeBearbeitenId = id;
     render();
   };
 
+  // Bricht die Inline-Bearbeitung einer Aufgabe ab
   window.aufgabeBearbeitenAbbrechen = function() {
     aufgabeBearbeitenId = null;
     render();
   };
 
+  // Speichert die bearbeitete Aufgabe und lädt die Daten neu
   window.aufgabeBearbeitenSpeichern = async function(id) {
     const titel = document.getElementById("edit-aufgabe-titel").value.trim();
     if (!titel) return;
@@ -575,6 +603,7 @@
     render();
   };
 
+  // Erzeugt das Bearbeitungsformular (HTML) für eine Aufgabe
   function taskEditHtml(a) {
     const projektOptions = '<option value="">Ohne Projekt</option>' +
       projekteAktuell().map((p) => `<option value="${p.id}" ${p.id === a.projekt_id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
@@ -597,6 +626,7 @@
       </div>`;
   }
 
+  // Erzeugt das HTML einer Aufgabenzeile mit Fälligkeits-/Erinnerungs-Badges und Aktionsknöpfen
   function taskHtml(a, done) {
     if (a.id === aufgabeBearbeitenId) return taskEditHtml(a);
     const projekt = projekteAktuell().find((p) => p.id === a.projekt_id);
@@ -630,6 +660,7 @@
       </div>`;
   }
 
+  // Escaped Text für die sichere Ausgabe als HTML
   function escapeHtml(s) {
     const div = document.createElement("div");
     div.textContent = s;
@@ -644,10 +675,12 @@
   function aufgGruppenMerken() {
     try { localStorage.setItem("aufgaben-gruppen-offen", JSON.stringify(aufgGruppeOffen)); } catch (_e) { /* egal */ }
   }
+  // Merkt den Auf-/Zu-Zustand einer Aufgaben-Projektgruppe im Browser
   window.aufgGruppeUmschalten = function(el) {
     aufgGruppeOffen[el.dataset.schluessel] = el.open;
     aufgGruppenMerken();
   };
+  // Klappt alle Aufgaben-Projektgruppen des aktiven Bereichs auf oder zu
   window.aufgAlleGruppen = function(auf) {
     aufgGruppeOffen[`${aktiverBereich}|ohne`] = auf;
     projekteAktuell().forEach((p) => { aufgGruppeOffen[`${aktiverBereich}|${p.id}`] = auf; });
@@ -691,6 +724,7 @@
       </details>`;
   }
 
+  // Rendert die offenen Aufgaben des aktiven Bereichs nach Projekt gruppiert plus Erledigt-Liste
   function render() {
     const select = document.getElementById("aufgabe-projekt");
     select.innerHTML = '<option value="">Ohne Projekt</option>' +
@@ -753,6 +787,7 @@
     if (e.key === "Enter") aufgabeHinzufuegen();
   });
 
+  // Legt eine neue Aufgabe im aktiven Bereich an, leert das Formular und lädt neu
   async function aufgabeHinzufuegen() {
     const titel = document.getElementById("neue-aufgabe").value.trim();
     if (!titel) return;
@@ -782,6 +817,7 @@
     if (e.key === "Enter") projektAnlegen();
   });
 
+  // Legt ein neues Projekt im aktiven Bereich an und lädt die Daten neu
   async function projektAnlegen() {
     const name = document.getElementById("neues-projekt").value.trim();
     if (!name) return;
@@ -790,6 +826,7 @@
     await ladeDaten();
   }
 
+  // Schaltet den Gruppenkopf eines Projekts in den Umbenennen-Modus
   window.projektUmbenennen = function(id) {
     if (!projekteAktuell().some((p) => p.id === id)) return;
     aufgProjektEditId = id;
@@ -798,11 +835,13 @@
     if (feld) { feld.focus(); feld.select(); }
   };
 
+  // Bricht das Umbenennen eines Projekts ab
   window.projektNameAbbrechen = function() {
     aufgProjektEditId = null;
     render();
   };
 
+  // Prüft den neuen Projektnamen (leer/doppelt), speichert ihn und lädt neu
   window.projektNameSpeichern = async function(id) {
     const projekt = projekteAktuell().find((p) => p.id === id);
     const feld = document.getElementById("aufg-projekt-name-edit");
@@ -824,16 +863,19 @@
     }
   };
 
+  // Schaltet eine Aufgabe erledigt/offen und lädt die Daten neu
   async function umschalten(id) {
     await api("aufgabe_umschalten", { id });
     await ladeDaten();
   }
 
+  // Löscht eine Aufgabe und lädt die Daten neu
   async function loeschen(id) {
     await api("aufgabe_loeschen", { id });
     await ladeDaten();
   }
 
+  // Verschiebt die fällige Erinnerung einer Aufgabe und lädt die Daten neu
   async function erinnerungVerschieben(id) {
     await api("erinnerung_verschieben", { id });
     await ladeDaten();
@@ -846,6 +888,7 @@
   function initHilfeSystem() {
     let offenesPopover = null;
 
+    // Schließt das offene Hilfe-Popover und setzt die aktiven Hilfe-Icons zurück
     function schliesseHilfePopover() {
       if (offenesPopover) {
         offenesPopover.remove();
@@ -922,6 +965,7 @@
     history.replaceState({}, "", location.pathname);
   })();
 
+  // Prüft, ob ein geteilter Inhalt in sessionStorage auf Verarbeitung wartet
   function geteiltAnstehend() {
     try { return sessionStorage.getItem(GETEILT_SCHLUESSEL) !== null; } catch (e) { return false; }
   }
@@ -937,6 +981,7 @@
     renderOgsIdeen();
   }
 
+  // Übernimmt geteilten Inhalt: öffnet Rezepte und startet den Import mit dem enthaltenen Link
   function geteiltenInhaltVerarbeiten() {
     let roh = null;
     try {
@@ -1027,11 +1072,13 @@
     return `vor ${tage} Tag${tage === 1 ? "" : "en"}`;
   }
 
+  // Formatiert ein ISO-Datum als TT.MM.JJJJ (trotz Name ohne Uhrzeit)
   function formatDatumUhrzeit(iso) {
     const dt = new Date(iso);
     return dt.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
   }
 
+  // Rendert die Google-Kalender-Statuskarte (verbinden bzw. Sync-Info, jetzt sync., trennen)
   function renderGoogleSyncKarte(status) {
     const el = document.getElementById("google-sync-karte");
     if (!el) return;
@@ -1068,6 +1115,7 @@
     document.getElementById("sync-trennen-btn").addEventListener("click", googleTrennenKlick);
   }
 
+  // Lädt den Google-Sync-Status vom Server und rendert die Statuskarte
   async function ladeGoogleSyncStatus() {
     if (googleSyncKarteLaedt) return;
     googleSyncKarteLaedt = true;
@@ -1083,6 +1131,7 @@
     }
   }
 
+  // Startet den Google-OAuth-Login und leitet zur Google-Seite weiter
   async function googleVerbindenKlick() {
     try {
       const { url } = await api("google_auth_start");
@@ -1092,6 +1141,7 @@
     }
   }
 
+  // Trennt nach Rückfrage die Google-Kalender-Verbindung und aktualisiert die Statuskarte
   async function googleTrennenKlick() {
     if (!confirm("Google-Kalender-Verknüpfung wirklich entfernen?")) return;
     const btn = document.getElementById("sync-trennen-btn");
@@ -1105,6 +1155,7 @@
     }
   }
 
+  // Stößt einen manuellen Google-Sync an, lädt neu und zeigt das Ergebnis an
   async function googleSyncJetztKlick() {
     const btn = document.getElementById("sync-jetzt-btn");
     const feedback = document.getElementById("sync-feedback");
@@ -1143,40 +1194,49 @@
     return objekt.bereich || "privat";
   }
 
+  // Liefert die Projekte des aktiven Bereichs
   function projekteAktuell() {
     return projekte.filter((p) => bereichVon(p) === aktiverBereich);
   }
 
+  // Liefert die Fixkosten des aktiven Bereichs
   function fixkostenAktuell() {
     return fixkosten.filter((f) => bereichVon(f) === aktiverBereich);
   }
 
+  // Liefert die Sonderausgaben des aktiven Bereichs
   function sonderausgabenAktuell() {
     return sonderausgaben.filter((s) => bereichVon(s) === aktiverBereich);
   }
 
+  // Liefert die Buchungen des aktiven Bereichs
   function buchungenAktuell() {
     return buchungen.filter((b) => bereichVon(b) === aktiverBereich);
   }
 
+  // Liefert die Inventar-Einträge des aktiven Bereichs
   function ogsInventarAktuell() {
     return ogsInventar.filter((i) => bereichVon(i) === aktiverBereich);
   }
 
+  // Liefert die Projekte (Projekte-Reiter) des aktiven Bereichs
   function ogsProjekteAktuell() {
     return ogsProjekte.filter((p) => bereichVon(p) === aktiverBereich);
   }
 
+  // Liefert die Verleih-Einträge des aktiven Bereichs
   function verleihAktuell() {
     return verleih.filter((v) => bereichVon(v) === aktiverBereich);
   }
 
+  // Liefert die Trainingseinträge des aktiven Bereichs
   function trainingAktuell() {
     return training.filter((t) => bereichVon(t) === aktiverBereich);
   }
 
   const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar", business: "Business" };
 
+  // Aktualisiert Navigation sowie Titel und Untertitel des Ideen-Reiters für den aktiven Bereich
   function bereichAnwenden() {
     renderNavigation();
     const ideenTitel = document.getElementById("ogs-ideen-titel");
@@ -1233,10 +1293,12 @@
   const menuToggleBtn = document.getElementById("menu-toggle");
   const accountMenuEl = document.getElementById("account-menu");
 
+  // Öffnet das Konto-Menü (⋮)
   function kontoMenuOeffnen() {
     accountMenuEl.classList.remove("hidden");
     menuToggleBtn.setAttribute("aria-expanded", "true");
   }
+  // Schließt das Konto-Menü (⋮)
   function kontoMenuSchliessen() {
     accountMenuEl.classList.add("hidden");
     menuToggleBtn.setAttribute("aria-expanded", "false");
@@ -1272,6 +1334,7 @@
     `).join("");
   }
 
+  // Speichert die Sichtbarkeit eines Reiters je Bereich und aktualisiert die Navigation
   window.reiterUmschalten = async function(bereich, schluessel, sichtbar) {
     const idx = tabEinstellungen.findIndex((e) => e.bereich === bereich && e.tab_id === schluessel);
     if (idx >= 0) tabEinstellungen[idx].sichtbar = sichtbar;
@@ -1293,11 +1356,13 @@
     80: ["🌦️", "Regenschauer"], 81: ["🌧️", "Kräftiger Regenschauer"], 82: ["⛈️", "Heftiger Regenschauer"],
     95: ["⛈️", "Gewitter"], 96: ["⛈️", "Gewitter mit Hagel"], 99: ["⛈️", "Starkes Gewitter mit Hagel"],
   };
+  // Liefert Icon und Beschreibung zu einem WMO-Wettercode
   function wetterCodeInfo(code) {
     return WETTER_CODES[code] || ["🌡️", "Unbekannt"];
   }
   const WETTER_WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
+  // Lädt das Wetter für den gewählten Ort (30-Min-Cache) und zeigt Lade-/Fehlerkachel
   async function ladeWetter(erzwingen = false) {
     const container = document.getElementById("wetter-bereich");
     if (!container) {
@@ -1327,6 +1392,7 @@
     }
   }
 
+  // Rendert die Wetter-Kachel und den aufklappbaren 5-Tage-Ausblick
   function renderWetter() {
     if (!wetterDaten) return;
     const [aktIcon, aktText] = wetterCodeInfo(wetterDaten.aktueller_code);
@@ -1363,11 +1429,13 @@
     }
   }
 
+  // Klappt den 5-Tage-Wetterausblick auf oder zu
   window.wetterAusblickUmschalten = function () {
     wetterAusblickOffen = !wetterAusblickOffen;
     renderWetter();
   };
 
+  // Fragt einen neuen Wetter-Ort ab, speichert ihn und lädt das Wetter neu
   window.wetterOrtBearbeiten = function () {
     const neu = prompt("Ort für die Wettervorhersage:", wetterOrt);
     if (neu === null) return;
@@ -1553,6 +1621,7 @@
     ],
   };
 
+  // Wählt das Zitat des Tages für einen Bereich anhand des Kalendertags
   function zitatDesTages(bereich, datum = new Date()) {
     const liste = ZITATE[bereich];
     if (!liste || liste.length === 0) return null;
@@ -1562,6 +1631,7 @@
     return liste[((tag % liste.length) + liste.length) % liste.length];
   }
 
+  // Zeigt das Zitat des Tages des aktiven Bereichs auf dem Start-Screen an
   function renderTagesZitat() {
     const el = document.getElementById("tages-zitat");
     if (!el) return;
@@ -1572,6 +1642,7 @@
       `<figcaption class="tages-zitat-quelle">${escapeHtml(z.autor)} · <cite>${escapeHtml(z.quelle)}</cite></figcaption>`;
   }
 
+  // Rendert den Heute-Screen: Kopf mit Gruß, Zeitleiste (Überfälliges, Termine, Aufgaben) und Kacheln
   function renderHeute() {
     bereichAnwenden();
     const heuteIso = heuteISO();
@@ -1807,10 +1878,12 @@
   const MONATSNAMEN = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
   const TAGLABEL = ["Mo","Di","Mi","Do","Fr","Sa","So"];
 
+  // Wandelt ein Datum in ein lokales ISO-Datum (YYYY-MM-DD) um
   function dateToISO(d) {
     return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
   }
 
+  // Liefert die Termine des aktiven Bereichs an einem Tag, nach Uhrzeit sortiert
   function termineAmTag(isoDatum) {
     return termine.filter((t) => t.datum === isoDatum && bereichVon(t) === aktiverBereich).sort((a,b) => (a.uhrzeit||"99:99").localeCompare(b.uhrzeit||"99:99"));
   }
@@ -1824,6 +1897,7 @@
     renderKalender();
   });
 
+  // Rendert das Monatsraster des Kalenders mit Termin-Punkten, nächsten Terminen und Tagespanel
   function renderKalender() {
     document.getElementById("cal-monat-label").textContent =
       MONATSNAMEN[calMonat.getMonth()] + " " + calMonat.getFullYear();
@@ -1856,6 +1930,7 @@
     renderCalDayPanel();
   }
 
+  // Rendert die nächsten fünf Termine des aktiven Bereichs ab heute
   function renderUpcoming() {
     const heuteIso = dateToISO(new Date());
     const kommende = termine
@@ -1883,6 +1958,7 @@
     return Math.round((Date.UTC(bj, bm - 1, bt) - Date.UTC(vj, vm - 1, vt)) / 86400000);
   }
 
+  // Liefert das Label für einen Zeitleisten-Tag (Gestern, Vorgestern oder Wochentag + Datum)
   function zlTagLabel(iso, heuteIso) {
     const tage = tageSeitIso(iso, heuteIso);
     if (tage === 1) return "Gestern";
@@ -1892,20 +1968,24 @@
     return wt + ", " + formatDatumKurz(iso);
   }
 
+  // Merkt, ob eine Tagesgruppe der Zeitleiste auf- oder zugeklappt ist
   window.zlGruppeUmschalten = function(key, offen) {
     if (offen) zlGruppenOffen.add(key); else zlGruppenOffen.delete(key);
   };
 
+  // Formatiert ein ISO-Datum kurz als TT.MM.
   function formatDatumKurz(iso) {
     const [j,m,t] = iso.split("-");
     return t + "." + m + ".";
   }
 
+  // Wählt einen Kalendertag aus bzw. hebt die Auswahl wieder auf
   window.calTagAuswaehlen = function(iso) {
     calAusgewaehlterTag = (calAusgewaehlterTag === iso) ? null : iso;
     renderKalender();
   };
 
+  // Rendert das Tagespanel mit Terminen und Formular zum Anlegen oder Bearbeiten
   function renderCalDayPanel() {
     const panel = document.getElementById("cal-day-panel");
     if (!calAusgewaehlterTag) { panel.innerHTML = ""; return; }
@@ -1964,11 +2044,13 @@
     }
   }
 
+  // Startet die Bearbeitung eines Termins im Tagespanel
   window.terminBearbeitenStart = function(id) {
     calBearbeiteterTermin = id;
     renderCalDayPanel();
   };
 
+  // Legt einen Termin am ausgewählten Tag im aktiven Bereich an und lädt neu
   async function terminHinzufuegen() {
     const titel = document.getElementById("termin-titel").value.trim();
     if (!titel || !calAusgewaehlterTag) return;
@@ -1981,6 +2063,7 @@
     renderKalender();
   }
 
+  // Speichert den bearbeiteten Termin und lädt die Daten neu
   async function terminAktualisieren() {
     const id = calBearbeiteterTermin;
     const titel = document.getElementById("termin-titel").value.trim();
@@ -1995,6 +2078,7 @@
     renderKalender();
   }
 
+  // Löscht einen Termin und lädt die Daten neu
   window.terminLoeschen = async function(id) {
     if (calBearbeiteterTermin === id) calBearbeiteterTermin = null;
     await api("termin_loeschen", { id });
@@ -2017,12 +2101,14 @@
     radio.addEventListener("change", blockzeitArtUmschalten);
   });
 
+  // Blendet je nach Blockzeit-Art Wochentage oder Datum im Formular ein
   function blockzeitArtUmschalten() {
     const wiederkehrend = document.getElementById("blockzeit-art-wiederkehrend").checked;
     document.getElementById("blockzeit-wochentage-row").classList.toggle("hidden", !wiederkehrend);
     document.getElementById("blockzeit-datum-row").classList.toggle("hidden", wiederkehrend);
   }
 
+  // Erzeugt die Wochentag-Checkboxen für wiederkehrende Blockzeiten
   function renderBlockzeitWochentage() {
     const row = document.getElementById("blockzeit-wochentage-row");
     row.innerHTML = TAGLABEL.map((label, i) => `
@@ -2035,6 +2121,7 @@
   document.getElementById("btn-blockzeit-anlegen").addEventListener("click", blockzeitSpeichern);
   document.getElementById("btn-blockzeit-abbrechen").addEventListener("click", blockzeitFormZuruecksetzen);
 
+  // Setzt das Blockzeit-Formular auf Anlegen-Modus mit leeren Feldern zurück
   function blockzeitFormZuruecksetzen() {
     blockzeitBearbeiteterId = null;
     document.getElementById("blockzeit-titel").value = "";
@@ -2049,6 +2136,7 @@
     document.getElementById("btn-blockzeit-abbrechen").classList.add("hidden");
   }
 
+  // Füllt das Blockzeit-Formular mit einer bestehenden Blockzeit zum Bearbeiten
   window.blockzeitBearbeitenStart = function(id) {
     const b = blockzeiten.find((bb) => bb.id === id);
     if (!b) return;
@@ -2075,6 +2163,7 @@
     document.getElementById("blockzeit-titel").scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
+  // Prüft Eingaben und legt die Blockzeit an oder aktualisiert sie (wiederkehrend oder einmalig)
   async function blockzeitSpeichern() {
     const titel = document.getElementById("blockzeit-titel").value.trim();
     const start_zeit = document.getElementById("blockzeit-start").value;
@@ -2102,12 +2191,14 @@
     await ladeDaten();
   }
 
+  // Löscht eine Blockzeit und lädt die Daten neu
   window.blockzeitLoeschen = async function(id) {
     if (blockzeitBearbeiteterId === id) blockzeitFormZuruecksetzen();
     await api("blockzeit_loeschen", { id });
     await ladeDaten();
   };
 
+  // Liefert den Wiederholungstext einer Blockzeit: einmaliges Datum oder sortierte Wochentage
   function blockzeitWiederholungText(b) {
     if (b.datum) return "einmalig · " + formatDatumKurz(b.datum);
     if (b.wochentage && b.wochentage.length > 0) {
@@ -2117,6 +2208,7 @@
     return "";
   }
 
+  // Rendert die Liste der Blockzeiten, sortiert nach Startzeit
   function renderBlockzeiten() {
     const bereich = document.getElementById("blockzeiten-liste");
     if (blockzeiten.length === 0) {
@@ -2153,13 +2245,16 @@
   let freiBearbeiteterTermin = null;
   let freiBearbeiteteAufgabe = null;
 
+  // Wandelt JS-Wochentag in Index mit Montag=0 bis Sonntag=6 um
   function wochentagIndex(d) {
     return (d.getDay() + 6) % 7; // 0=Mo … 6=So
   }
+  // Rechnet eine Uhrzeit "HH:MM" in Minuten seit Mitternacht um
   function zeitZuMinuten(t) {
     const [h, m] = t.split(":").map(Number);
     return h * 60 + m;
   }
+  // Rechnet Minuten seit Mitternacht in eine Uhrzeit "HH:MM" um
   function minutenZuZeit(min) {
     const h = Math.floor(min / 60);
     const m = min % 60;
@@ -2178,6 +2273,7 @@
   });
   document.getElementById("btn-frei-rahmen-speichern").addEventListener("click", freiRahmenSpeichern);
 
+  // Liefert den gespeicherten Zeitrahmen des Wochentags, sonst Vorschlag 08:00–20:00
   function freiRahmenFuerWochentag(wtIndex) {
     const eintrag = tagesrahmen.find((r) => r.wochentag === wtIndex);
     if (eintrag) {
@@ -2186,6 +2282,7 @@
     return { start_zeit: "08:00", end_zeit: "20:00", aktiv: true }; // Vorschlag, noch nicht gespeichert
   }
 
+  // Speichert den Zeitrahmen für den Wochentag des angezeigten Tages
   async function freiRahmenSpeichern() {
     const wochentag = wochentagIndex(freiTag);
     const start_zeit = document.getElementById("frei-rahmen-start").value;
@@ -2197,6 +2294,7 @@
     renderFrei();
   }
 
+  // Sammelt belegte Blöcke eines Tages aus Terminen, Aufgaben mit Uhrzeit und Blockzeiten
   function freiBusyBloecke(tagIso, wtIndex) {
     const bloecke = [];
 
@@ -2222,6 +2320,7 @@
     return bloecke.sort((a, b) => zeitZuMinuten(a.start) - zeitZuMinuten(b.start));
   }
 
+  // Berechnet freie Lücken im Zeitrahmen, indem überlappende Blöcke verschmolzen werden
   function freiLueckenBerechnen(rahmenStart, rahmenEnde, bloecke) {
     const rStart = zeitZuMinuten(rahmenStart);
     const rEnde = zeitZuMinuten(rahmenEnde);
@@ -2266,6 +2365,7 @@
     ].sort((a, b) => zeitZuMinuten(a.start) - zeitZuMinuten(b.start));
   }
 
+  // Rendert die Frei-Zeitleiste des gewählten Tages mit belegten Blöcken und freien Lücken
   function renderFrei() {
     const iso = dateToISO(freiTag);
     const wtIndex = wochentagIndex(freiTag);
@@ -2341,18 +2441,21 @@
     }
   };
 
+  // Schaltet einen Termin in der Frei-Ansicht erledigt/offen und zeichnet neu
   window.freiTerminUmschalten = async function(id) {
     await api("termin_umschalten", { id });
     await ladeDaten();
     renderFrei();
   };
 
+  // Schaltet eine Aufgabe in der Frei-Ansicht erledigt/offen und zeichnet neu
   window.freiAufgabeUmschalten = async function(id) {
     await api("aufgabe_umschalten", { id });
     await ladeDaten();
     renderFrei();
   };
 
+  // Löscht einen Termin aus der Frei-Ansicht und schließt ggf. dessen Formular
   window.freiTerminEntfernen = async function(id) {
     if (freiBearbeiteterTermin === id) freiFormularSchliessen();
     await api("termin_loeschen", { id });
@@ -2360,12 +2463,14 @@
     renderFrei();
   };
 
+  // Löscht eine Aufgabe aus der Frei-Ansicht und zeichnet neu
   window.freiAufgabeEntfernen = async function(id) {
     await api("aufgabe_loeschen", { id });
     await ladeDaten();
     renderFrei();
   };
 
+  // Wählt eine freie Lücke aus und öffnet das Formular zum Eintragen
   window.freiLueckeAuswaehlen = function(start, ende) {
     freiBearbeiteterTermin = null;
     freiBearbeiteteAufgabe = null;
@@ -2375,6 +2480,7 @@
     document.getElementById("frei-formular-bereich").scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
+  // Schließt das Formular der Frei-Ansicht und setzt Auswahl/Bearbeitung zurück
   function freiFormularSchliessen() {
     freiAusgewaehlteLuecke = null;
     freiBearbeiteterTermin = null;
@@ -2382,6 +2488,7 @@
     document.getElementById("frei-formular-bereich").innerHTML = "";
   }
 
+  // Öffnet das Bearbeiten-Formular für einen Termin in der Frei-Ansicht
   window.freiTerminBearbeitenStart = function(id) {
     freiAusgewaehlteLuecke = null;
     freiBearbeiteteAufgabe = null;
@@ -2390,6 +2497,7 @@
     document.getElementById("frei-formular-bereich").scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
+  // Rendert das Formular zum Verschieben/Bearbeiten eines Termins
   function renderFreiTerminFormular() {
     const bereich = document.getElementById("frei-formular-bereich");
     const t = termine.find((tt) => tt.id === freiBearbeiteterTermin);
@@ -2419,6 +2527,7 @@
     document.getElementById("btn-frei-termin-abbrechen").addEventListener("click", freiFormularSchliessen);
   }
 
+  // Speichert den bearbeiteten Termin und springt ggf. zum neuen Datum
   async function freiTerminSpeichern() {
     const id = freiBearbeiteterTermin;
     const titel = document.getElementById("frei-termin-titel").value.trim();
@@ -2435,6 +2544,7 @@
     renderFrei();
   }
 
+  // Öffnet das Bearbeiten-Formular für eine Aufgabe in der Frei-Ansicht
   window.freiAufgabeBearbeitenStart = function(id) {
     freiAusgewaehlteLuecke = null;
     freiBearbeiteterTermin = null;
@@ -2443,6 +2553,7 @@
     document.getElementById("frei-formular-bereich").scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
+  // Rendert das Formular zum Verschieben/Bearbeiten einer Aufgabe inkl. Projektauswahl
   function renderFreiAufgabeFormular() {
     const bereich = document.getElementById("frei-formular-bereich");
     const a = aufgaben.find((aa) => aa.id === freiBearbeiteteAufgabe);
@@ -2473,6 +2584,7 @@
     document.getElementById("btn-frei-aufgabe-abbrechen").addEventListener("click", freiFormularSchliessen);
   }
 
+  // Speichert die bearbeitete Aufgabe und springt ggf. zum neuen Fälligkeitsdatum
   async function freiAufgabeSpeichern() {
     const id = freiBearbeiteteAufgabe;
     const titel = document.getElementById("frei-aufgabe-titel").value.trim();
@@ -2489,6 +2601,7 @@
     renderFrei();
   }
 
+  // Rendert das Formular zum Eintragen eines Termins oder einer Aufgabe in eine freie Lücke
   function renderFreiFormular() {
     const bereich = document.getElementById("frei-formular-bereich");
     if (!freiAusgewaehlteLuecke) { bereich.innerHTML = ""; return; }
@@ -2526,6 +2639,7 @@
     document.getElementById("btn-frei-abbrechen").addEventListener("click", freiFormularSchliessen);
   }
 
+  // Legt in der gewählten Lücke einen Termin oder eine Aufgabe (Bereich privat) an
   async function freiEintragen() {
     const titel = document.getElementById("frei-titel").value.trim();
     if (!titel) return;
@@ -2578,6 +2692,7 @@
     if (e.key === "Enter") notizHinzufuegen();
   });
 
+  // Legt eine neue Notiz im aktiven Bereich an, optional mit Projekt
   async function notizHinzufuegen() {
     const text = document.getElementById("neue-notiz").value.trim();
     if (!text) return;
@@ -2587,6 +2702,7 @@
     await ladeDaten();
   }
 
+  // Löscht eine Notiz und lädt die Daten neu
   window.notizLoeschen = async function(id) {
     await api("notiz_loeschen", { id });
     await ladeDaten();
@@ -2630,6 +2746,7 @@
     if (e.key === "Enter") ogsIdeeHinzufuegen();
   });
 
+  // Legt eine neue OGS-Idee mit optionaler Beschreibung im aktiven Bereich an
   async function ogsIdeeHinzufuegen() {
     const titel = document.getElementById("neue-ogs-idee").value.trim();
     if (!titel) return;
@@ -2640,6 +2757,7 @@
     await ladeDaten();
   }
 
+  // Ändert den Status einer OGS-Idee
   window.ogsIdeeStatusAendern = async function(id, status) {
     const idee = ogsIdeen.find((i) => i.id === id);
     if (!idee) return;
@@ -2647,6 +2765,7 @@
     await ladeDaten();
   };
 
+  // Löscht eine OGS-Idee und lädt die Daten neu
   window.ogsIdeeLoeschen = async function(id) {
     await api("ogs_idee_loeschen", { id });
     await ladeDaten();
@@ -2678,6 +2797,7 @@
   let kochmodus = null;              // { id, zutatenErledigt:Set, schritteErledigt:Set, wakeLock, wach }
   let rezeptVorlage = null;          // per Link importierte Daten, füllen das Formular "neu" vor
 
+  // Liefert Text, wann ein Rezept zuletzt gekocht wurde (heute, gestern, vor X Tagen)
   function rezeptGekochtText(iso) {
     if (!iso) return "noch nie gekocht";
     const tage = tageSeitIso(iso, heuteISO());
@@ -2697,6 +2817,7 @@
     [/^(\d+(?:[.,]\d+)?)/, (m) => Number(m[1].replace(",", "."))],                   // 200, 1,5, 1.5
   ];
 
+  // Liest die Menge am Zeilenanfang (Zahl, Bruch, Tausenderpunkt) und deren Textlänge
   function mengeLesen(text) {
     for (const [muster, wert] of MENGE_MUSTER) {
       const m = text.match(muster);
@@ -2708,6 +2829,7 @@
     return null;
   }
 
+  // Formatiert eine Menge gerundet im deutschen Zahlenformat
   function mengeFormatieren(zahl) {
     const gerundet = zahl >= 10 ? Math.round(zahl) : Math.max(0.1, Math.round(zahl * 10) / 10);
     return gerundet.toLocaleString("de-DE", { maximumFractionDigits: 1 });
@@ -2745,10 +2867,12 @@
     });
   }
 
+  // Liefert die Rezepte des aktiven Bereichs
   function rezepteAktuell() {
     return rezepte.filter((r) => bereichVon(r) === aktiverBereich);
   }
 
+  // Baut die Metazeile eines Rezepts (Foto, Kategorie, Portionen, Zeit)
   function rezeptMeta(r) {
     const teile = [];
     if (r.bild_pfad) teile.push("📷");
@@ -2758,6 +2882,7 @@
     return teile.join(" · ");
   }
 
+  // Rendert die Zutaten als HTML-Listen mit Zwischentiteln, skaliert um den Faktor
   function rezeptZutatenHtml(text, faktor = 1) {
     const zeilen = rezeptZutatenZeilen(text, faktor);
     if (zeilen.length === 0) return "";
@@ -2807,10 +2932,12 @@
       </div>`;
   }
 
+  // Liefert die Beschriftung des Einkaufslisten-Knopfs je nach Anzahl gewählter Zutaten
   function rezeptEinkaufButtonText(anzahl) {
     return anzahl === 0 ? "Zutaten auswählen" : `${anzahl} auf die Einkaufsliste`;
   }
 
+  // Rendert die Rezeptquelle als Link mit Hostname oder als reinen Text
   function rezeptQuelleHtml(quelle) {
     if (!quelle) return "";
     if (/^https?:\/\/\S+$/i.test(quelle)) {
@@ -2827,6 +2954,7 @@
     return eintrag && eintrag.ablauf > Date.now() ? eintrag.url : null;
   }
 
+  // Holt die signierte Foto-URL eines Rezepts (55 Min. gecacht) und zeichnet betroffene Ansichten neu
   async function rezeptBildLaden(id) {
     if (rezeptBildUrl(id) || rezeptBildLaedt.has(id)) return;
     rezeptBildLaedt.add(id);
@@ -2878,6 +3006,7 @@
     return { base64: dataUrl.split(",")[1], typ: "image/jpeg", vorschau: dataUrl };
   }
 
+  // Zeigt im Rezeptformular die Fotovorschau (neu, gespeichert oder keins) und den Entfernen-Knopf
   function rezeptFotoVorschauZeigen() {
     const box = document.getElementById("rezept-f-foto-vorschau");
     if (!box) return;
@@ -2893,6 +3022,7 @@
     if (entfernen) entfernen.classList.toggle("hidden", !hatFoto);
   }
 
+  // Markiert das Rezeptfoto im Formular zum Entfernen und aktualisiert die Vorschau
   window.rezeptFotoEntfernenKlick = function() {
     rezeptFotoNeu = null;
     rezeptFotoEntfernen = true;
@@ -2919,6 +3049,7 @@
     kochWachAnzeigen();
   }
 
+  // Zeigt im Kochmodus den Status der Bildschirm-Wachhaltung an
   function kochWachAnzeigen() {
     const el = document.getElementById("koch-wach");
     if (!el || !kochmodus) return;
@@ -2936,6 +3067,7 @@
     if (kochmodus && document.visibilityState === "visible" && !kochmodus.wakeLock) kochWachHalten();
   });
 
+  // Startet den Kochmodus als Vollbild-Overlay mit Wake Lock und Zurück-Tasten-Eintrag
   window.kochmodusStarten = function(id) {
     const r = rezepte.find((x) => x.id === id);
     if (!r) return;
@@ -2955,6 +3087,7 @@
     if (r.bild_pfad) rezeptBildLaden(r.id);
   };
 
+  // Beendet den Kochmodus: gibt Wake Lock frei und entfernt das Overlay
   function kochmodusAufraeumen() {
     if (!kochmodus) return;
     if (kochmodus.wakeLock) { try { kochmodus.wakeLock.release(); } catch (e) { /* egal */ } }
@@ -2964,6 +3097,7 @@
     document.body.classList.remove("koch-offen");
   }
 
+  // Schließt den Kochmodus über history.back oder räumt direkt auf
   window.kochmodusSchliessen = function() {
     if (!kochmodus) return;
     if (history.state && history.state.kochmodus) history.back(); // räumt über popstate auf
@@ -2973,6 +3107,7 @@
   window.addEventListener("popstate", () => { if (kochmodus) kochmodusAufraeumen(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && kochmodus) window.kochmodusSchliessen(); });
 
+  // Hakt im Kochmodus eine Zutat ab bzw. wieder an
   window.kochZutatUmschalten = function(index) {
     if (!kochmodus) return;
     const set = kochmodus.zutatenErledigt;
@@ -2980,6 +3115,7 @@
     renderKochmodus();
   };
 
+  // Hakt im Kochmodus einen Zubereitungsschritt ab bzw. wieder an
   window.kochSchrittUmschalten = function(index) {
     if (!kochmodus) return;
     const set = kochmodus.schritteErledigt;
@@ -2987,12 +3123,14 @@
     renderKochmodus();
   };
 
+  // Ändert im Kochmodus die angezeigte Portionenzahl
   window.kochPortionenAendern = function(delta) {
     if (!kochmodus) return;
     window.rezeptPortionenAendern(kochmodus.id, delta);
     renderKochmodus();
   };
 
+  // Schließt den Kochmodus und markiert das Rezept als heute gekocht
   window.kochFertig = async function() {
     if (!kochmodus) return;
     const id = kochmodus.id;
@@ -3001,6 +3139,7 @@
     if (r && r.zuletzt_gekocht !== heuteISO()) await window.rezeptHeuteGekocht(id);
   };
 
+  // Rendert das Kochmodus-Overlay mit abhakbaren Zutaten, Schritten und Portionsrechner
   function renderKochmodus() {
     const overlay = document.getElementById("koch-overlay");
     if (!overlay || !kochmodus) return;
@@ -3050,6 +3189,7 @@
     kochWachAnzeigen();
   }
 
+  // Sortiervergleich für Rezepte: nach Favorit, längst nicht gekocht oder zuletzt gekocht
   function rezeptVergleich(a, b) {
     const alphabetisch = a.titel.localeCompare(b.titel, "de");
     if (rezeptSortierung === "lange") {
@@ -3066,6 +3206,7 @@
     return (b.favorit === true) - (a.favorit === true) || alphabetisch;
   }
 
+  // Rendert Rezeptliste mit Kategorie-Filter, Suche, Sortierung und aufgeklappter Detailansicht
   function renderRezepte() {
     const listeBereich = document.getElementById("rezept-liste-bereich");
     const filter = document.getElementById("rezept-kategorie-filter");
@@ -3168,6 +3309,7 @@
     }).join("") + "</div>";
   }
 
+  // Rendert das Rezeptformular für neues, importiertes oder bearbeitetes Rezept inkl. Foto
   function rezeptFormRendern() {
     const formBereich = document.getElementById("rezept-form-bereich");
     const neuBtn = document.getElementById("btn-rezept-neu");
@@ -3301,6 +3443,7 @@
     }
   });
 
+  // Klappt die Detailansicht eines Rezepts auf/zu und beendet ggf. die Zutatenauswahl
   window.rezeptUmschalten = function(id) {
     rezeptOffenId = rezeptOffenId === id ? null : id;
     if (rezeptEinkaufId && rezeptEinkaufId !== rezeptOffenId) { rezeptEinkaufId = null; rezeptEinkaufAuswahl = new Set(); }
@@ -3313,6 +3456,7 @@
     renderRezepte();
   });
 
+  // Erhöht/verringert die angezeigte Portionenzahl eines Rezepts (1–100)
   window.rezeptPortionenAendern = function(id, delta) {
     const r = rezepte.find((x) => x.id === id);
     if (!r || !r.portionen) return;
@@ -3321,23 +3465,27 @@
     renderRezepte();
   };
 
+  // Setzt die angezeigte Portionenzahl auf den Rezept-Grundwert zurück
   window.rezeptPortionenZuruecksetzen = function(id) {
     delete rezeptPortionenAnzeige[id];
     renderRezepte();
   };
 
+  // Startet die Auswahl von Zutaten für die Einkaufsliste
   window.rezeptEinkaufStarten = function(id) {
     rezeptEinkaufId = id;
     rezeptEinkaufAuswahl = new Set();
     renderRezepte();
   };
 
+  // Bricht die Zutatenauswahl für die Einkaufsliste ab
   window.rezeptEinkaufAbbrechen = function() {
     rezeptEinkaufId = null;
     rezeptEinkaufAuswahl = new Set();
     renderRezepte();
   };
 
+  // Wählt eine Zutat für die Einkaufsliste an/ab und aktualisiert nur den Knopf
   window.rezeptEinkaufWaehlen = function(index, an) {
     if (an) rezeptEinkaufAuswahl.add(index); else rezeptEinkaufAuswahl.delete(index);
     // nur den Knopf aktualisieren, nicht neu zeichnen (Scrollposition bleibt)
@@ -3348,6 +3496,7 @@
     }
   };
 
+  // Liefert skalierte Zutaten des Rezepts, die nicht schon offen auf der Einkaufsliste stehen
   function rezeptEinkaufKandidaten(r) {
     const faktor = r.portionen ? (rezeptPortionenAnzeige[r.id] || r.portionen) / r.portionen : 1;
     const offeneArtikel = new Set(einkaufsliste
@@ -3357,6 +3506,7 @@
       .filter((z) => z.typ === "zutat" && !offeneArtikel.has(z.text.toLowerCase()));
   }
 
+  // Wählt alle noch nicht vorhandenen Zutaten für die Einkaufsliste aus
   window.rezeptEinkaufAlle = function(id) {
     const r = rezepte.find((x) => x.id === id);
     if (!r) return;
@@ -3364,6 +3514,7 @@
     renderRezepte();
   };
 
+  // Übernimmt die gewählten Zutaten in die Einkaufsliste des aktiven Bereichs
   window.rezeptEinkaufUebernehmen = async function(id) {
     const r = rezepte.find((x) => x.id === id);
     if (!r || rezeptEinkaufAuswahl.size === 0) return;
@@ -3383,6 +3534,7 @@
     alert(`${texte.length} ${texte.length === 1 ? "Zutat steht" : "Zutaten stehen"} jetzt auf der Einkaufsliste.`);
   };
 
+  // Markiert ein Rezept als heute gekocht und merkt das vorherige Datum
   window.rezeptHeuteGekocht = async function(id) {
     const r = rezepte.find((x) => x.id === id);
     if (!r) return;
@@ -3396,6 +3548,7 @@
     await ladeDaten();
   };
 
+  // Nimmt "Heute gekocht" zurück und stellt das vorherige Datum wieder her
   window.rezeptGekochtZuruecknehmen = async function(id) {
     // Vorheriges Datum aus dieser Sitzung wiederherstellen; unbekannt = null
     const vorher = Object.prototype.hasOwnProperty.call(rezeptGekochtVorher, id) ? rezeptGekochtVorher[id] : null;
@@ -3409,16 +3562,19 @@
     await ladeDaten();
   };
 
+  // Öffnet das Rezeptformular zum Bearbeiten
   window.rezeptBearbeiten = function(id) {
     rezeptFormId = id;
     rezeptFormRendern();
   };
 
+  // Schließt das Rezeptformular
   window.rezeptFormSchliessen = function() {
     rezeptFormId = null;
     rezeptFormRendern();
   };
 
+  // Speichert das Rezept inkl. neuem oder entferntem Foto; Formular bleibt bei Fehler offen
   window.rezeptSpeichern = async function() {
     const titelFeld = document.getElementById("rezept-f-titel");
     const titel = titelFeld.value.trim();
@@ -3462,6 +3618,7 @@
     await ladeDaten();
   };
 
+  // Schaltet den Favoriten-Status eines Rezepts sofort um und speichert im Hintergrund
   window.rezeptFavoritUmschalten = async function(id) {
     const r = rezepte.find((x) => x.id === id);
     if (!r) return;
@@ -3476,6 +3633,7 @@
     }
   };
 
+  // Löscht ein Rezept nach Rückfrage und schließt ggf. Detail/Formular
   window.rezeptLoeschen = async function(id) {
     const r = rezepte.find((x) => x.id === id);
     if (!r || !confirm(`Rezept „${r.titel}“ wirklich löschen?`)) return;
@@ -3497,6 +3655,7 @@
   function invGruppenMerken() {
     try { localStorage.setItem("inv-gruppen-offen", JSON.stringify([...invGruppenOffen])); } catch (_e) { /* egal */ }
   }
+  // Liefert den Schlüssel "Bereich|Kategorie" für offene Inventar-Gruppen
   function invGruppenSchluessel(kat) {
     return `${aktiverBereich}|${kat}`;
   }
@@ -3519,6 +3678,7 @@
   }
 
 
+  // Rendert das Inventar mit Kategorie-Filter, Wertsumme und aufklappbaren Kategoriegruppen
   function renderInventar() {
     const filterBereich = document.getElementById("inv-filter-bereich");
     const listeBereich = document.getElementById("inv-liste-bereich");
@@ -3633,6 +3793,7 @@
     }
   }
 
+  // Merkt den Auf-/Zu-Zustand einer Inventar-Kategorie (nur ohne aktiven Filter)
   window.invGruppeUmschalten = function(el) {
     // Bei gewählter Kategorie ist sie automatisch offen – das nicht als Wunsch merken
     if (invAktiveKategorie !== "alle") return;
@@ -3641,6 +3802,7 @@
     invGruppenMerken();
   };
 
+  // Klappt alle Inventar-Kategorien auf oder zu und merkt den Zustand
   window.invAlleGruppen = function(auf) {
     const kategorien = [...new Set(ogsInventarAktuell().map((i) => i.kategorie))];
     kategorien.forEach((k) => {
@@ -3650,6 +3812,7 @@
     renderInventar();
   };
 
+  // Setzt den Kategorie-Filter des Inventars und zeichnet neu
   window.invFilterAendern = function(wert) {
     invAktiveKategorie = wert;
     renderInventar();
@@ -3657,6 +3820,7 @@
 
   document.getElementById("btn-inv-hinzufuegen").addEventListener("click", invHinzufuegen);
 
+  // Legt einen neuen Inventar-Gegenstand an und klappt seine Kategorie auf
   async function invHinzufuegen() {
     const name = document.getElementById("neu-inv-name").value.trim();
     const kategorie = document.getElementById("neu-inv-kategorie").value.trim();
@@ -3687,16 +3851,19 @@
     await ladeDaten();
   }
 
+  // Öffnet die Bearbeitung eines Inventar-Gegenstands
   window.invBearbeitenStart = function(id) {
     invBearbeitenId = id;
     renderInventar();
   };
 
+  // Bricht die Bearbeitung eines Inventar-Gegenstands ab
   window.invBearbeitenAbbrechen = function() {
     invBearbeitenId = null;
     renderInventar();
   };
 
+  // Speichert den bearbeiteten Inventar-Gegenstand und lässt seine Kategorie offen
   window.invBearbeitenSpeichern = async function(id) {
     const name = document.getElementById(`inv-edit-name-${id}`).value.trim();
     const kategorie = document.getElementById(`inv-edit-kategorie-${id}`).value.trim();
@@ -3719,6 +3886,7 @@
     await ladeDaten();
   };
 
+  // Löscht einen Inventar-Gegenstand nach Rückfrage
   window.invLoeschen = async function(id) {
     if (!confirm("Diesen Gegenstand wirklich löschen?")) return;
     await api("ogs_inventar_loeschen", { id });
@@ -3736,6 +3904,7 @@
   let projBearbeitenId = null;
   let verleihBearbeitenId = null;
 
+  // Liest eine Datei als Base64-String (ohne Data-URL-Präfix) ein
   function dateiZuBase64(datei) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -3745,6 +3914,7 @@
     });
   }
 
+  // Rendert die OGS-Projekte mit Unterprojekten, Dateien und Bearbeitungsformular
   function renderProjekte() {
     const bereich = document.getElementById("proj-liste-bereich");
     if (!bereich) return;
@@ -3773,6 +3943,7 @@
       return;
     }
 
+    // Baut das HTML eines (Unter-)Projekts mit Dateien bzw. im Bearbeiten-Modus
     function projektHtml(p, istUnterprojekt) {
       const datum = new Date(p.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
       const dateien = ogsProjektDateien.filter((d) => d.projekt_id === p.id);
@@ -3840,6 +4011,7 @@
 
   document.getElementById("btn-proj-hinzufuegen").addEventListener("click", projHinzufuegen);
 
+  // Legt ein neues OGS-Projekt an, optional mit Hauptprojekt und PDF/DOCX-Datei (max. 5 MB)
   async function projHinzufuegen() {
     const titel = document.getElementById("neu-proj-titel").value.trim();
     if (!titel) return;
@@ -3873,16 +4045,19 @@
     await ladeDaten();
   }
 
+  // Öffnet das Bearbeiten-Formular für ein Projekt und rendert die Projektliste neu
   window.projBearbeitenStart = function(id) {
     projBearbeitenId = id;
     renderProjekte();
   };
 
+  // Bricht das Bearbeiten eines Projekts ab und rendert die Projektliste neu
   window.projBearbeitenAbbrechen = function() {
     projBearbeitenId = null;
     renderProjekte();
   };
 
+  // Speichert Titel, Kategorie, Beschreibung und Hauptprojekt eines bearbeiteten Projekts und lädt neu
   window.projBearbeitenSpeichern = async function(id) {
     const titel = document.getElementById(`proj-edit-titel-${id}`).value.trim();
     if (!titel) return;
@@ -3899,6 +4074,7 @@
     }
   };
 
+  // Löscht ein Projekt samt hinterlegter Dateien nach Rückfrage
   window.projLoeschen = async function(id) {
     if (!confirm("Dieses Projekt inklusive hinterlegter Dateien wirklich löschen?")) return;
     try {
@@ -3909,6 +4085,7 @@
     }
   };
 
+  // Holt eine Download-URL für eine Projektdatei und öffnet sie in neuem Tab
   window.projDateiOeffnen = async function(dateiId) {
     try {
       const res = await api("ogs_projekt_datei_url", { datei_id: dateiId });
@@ -3918,6 +4095,7 @@
     }
   };
 
+  // Prüft Typ (PDF/DOCX) und Größe (max. 5 MB) und lädt eine Datei zu einem Projekt hoch
   window.projDateiHinzufuegen = async function(id, input) {
     const datei = input.files[0];
     if (!datei) return;
@@ -3938,6 +4116,7 @@
     await ladeDaten();
   };
 
+  // Entfernt eine Datei aus einem Projekt nach Rückfrage
   window.projDateiLoeschen = async function(dateiId) {
     if (!confirm("Diese Datei wirklich entfernen?")) return;
     await api("ogs_projekt_datei_loeschen", { datei_id: dateiId });
@@ -3970,6 +4149,7 @@
     return felder.map((f) => f.trim());
   }
 
+  // Importiert Projekte aus einer CSV-Datei (Spalten Titel, Beschreibung, Kategorie) in den aktiven Bereich
   async function projCsvImport() {
     const input = document.getElementById("proj-csv-datei");
     const status = document.getElementById("proj-csv-status");
@@ -4019,6 +4199,7 @@
     return `${t}.${m}.${j}`;
   }
 
+  // Rendert Inventar-Auswahl und Verleihliste (offen/zurückgegeben), jeweils gruppiert nach Person
   function renderVerleih() {
     const bereichEl = document.getElementById("verleih-liste-bereich");
     if (!bereichEl) return;
@@ -4036,10 +4217,12 @@
     const eintraegeAktuell = verleihAktuell();
     const inventarById = Object.fromEntries(ogsInventar.map((i) => [i.id, i]));
 
+    // Liefert den Namen des verliehenen Gegenstands oder einen Platzhalter, falls gelöscht
     function gegenstandName(v) {
       return inventarById[v.inventar_id]?.name || "(gelöschter Gegenstand)";
     }
 
+    // Baut das HTML eines Verleih-Eintrags – als Bearbeiten-Formular oder als Anzeigezeile
     function eintragHtml(v) {
       if (verleihBearbeitenId === v.id) {
         return `
@@ -4073,6 +4256,7 @@
     const offeneEintraege = eintraegeAktuell.filter((v) => !v.rueckgabe_am);
     const zurueckEintraege = eintraegeAktuell.filter((v) => v.rueckgabe_am);
 
+    // Gruppiert Verleih-Einträge nach Person, sortiert nach Datumsfeld und erzeugt aufklappbare Blöcke
     function nachPersonGruppiert(liste, datumsfeld, aufsteigend) {
       const gruppen = {};
       liste.forEach((v) => { (gruppen[v.ausgeliehen_an] = gruppen[v.ausgeliehen_an] || []).push(v); });
@@ -4104,6 +4288,7 @@
 
   document.getElementById("btn-verleih-hinzufuegen").addEventListener("click", verleihHinzufuegen);
 
+  // Legt einen neuen Verleih-Eintrag aus dem Formular an und setzt die Felder zurück
   async function verleihHinzufuegen() {
     const inventar_id = document.getElementById("verleih-inventar").value;
     const ausgeliehen_an = document.getElementById("verleih-an").value.trim();
@@ -4120,27 +4305,32 @@
     await ladeDaten();
   }
 
+  // Markiert einen Verleih als heute zurückgegeben und lädt die Daten neu
   window.verleihRueckgabe = async function(id) {
     await api("verleih_rueckgabe", { id });
     await ladeDaten();
   };
 
+  // Löscht einen Verleih-Eintrag nach Rückfrage
   window.verleihLoeschen = async function(id) {
     if (!confirm("Diesen Verleih-Eintrag endgültig löschen?")) return;
     await api("verleih_loeschen", { id });
     await ladeDaten();
   };
 
+  // Öffnet das Bearbeiten-Formular für einen Verleih-Eintrag
   window.verleihBearbeitenStart = function(id) {
     verleihBearbeitenId = id;
     renderVerleih();
   };
 
+  // Bricht das Bearbeiten eines Verleih-Eintrags ab
   window.verleihBearbeitenAbbrechen = function() {
     verleihBearbeitenId = null;
     renderVerleih();
   };
 
+  // Speichert den bearbeiteten Verleih-Eintrag (Person, Menge, Daten, Notiz) und lädt neu
   window.verleihBearbeitenSpeichern = async function(id) {
     const ausgeliehen_an = document.getElementById(`verleih-edit-an-${id}`).value.trim();
     if (!ausgeliehen_an) return;
@@ -4179,6 +4369,7 @@
     return datumLokalISO(d);
   }
 
+  // Liefert das Wochenziel für eine Sportart im aktiven Bereich (Gesamtziel ohne Eintrag: 2)
   function trainingWochenziel(sportart) {
     const key = (sportart || "").trim();
     const eintrag = trainingEinstellungen.find((e) => e.bereich === aktiverBereich && (e.sportart || "") === key);
@@ -4186,6 +4377,7 @@
     return key ? null : 2;
   }
 
+  // Liefert die sportartspezifischen Wochenziele des aktiven Bereichs, alphabetisch sortiert
   function trainingSportartZieleAktuell() {
     return trainingEinstellungen
       .filter((e) => e.bereich === aktiverBereich && (e.sportart || "").trim())
@@ -4219,6 +4411,7 @@
     return laengste;
   }
 
+  // Erzeugt das HTML einer Übungs-Eingabezeile (Name, Sätze, Wdh, Sek., kg, Variante)
   function trainingUebungZeileHtml(u, i, praefix) {
     return `
       <div class="row" style="gap:0.4rem; margin-bottom:0.3rem; flex-wrap:wrap;">
@@ -4232,6 +4425,7 @@
       </div>`;
   }
 
+  // Erzeugt den Block mit allen Übungszeilen plus Button zum Hinzufügen
   function trainingUebungenBlockHtml(arr, praefix) {
     return `
       <div id="${praefix}-uebungen-liste">${arr.map((u, i) => trainingUebungZeileHtml(u, i, praefix)).join("")}</div>
@@ -4257,6 +4451,7 @@
     return arr;
   }
 
+  // Liefert das passende Übungs-Array zum Formular-Präfix (neu, Plan neu, Plan/Training bearbeiten)
   function trainingUebungenArray(praefix) {
     if (praefix === "neu") return trainingFormUebungen;
     if (praefix === "plan-neu") return planFormUebungen;
@@ -4264,6 +4459,7 @@
     return trainingBearbeitenUebungen;
   }
 
+  // Fügt eine leere Übungszeile hinzu, ohne bereits eingetippte Werte zu verlieren
   window.trainingUebungZeileHinzufuegen = function(praefix) {
     const arr = trainingUebungenArray(praefix);
     const aktuell = trainingUebungenAusDom(praefix, arr.length);
@@ -4273,6 +4469,7 @@
     renderTraining();
   };
 
+  // Entfernt eine Übungszeile, ohne eingetippte Werte der übrigen Zeilen zu verlieren
   window.trainingUebungZeileEntfernen = function(praefix, index) {
     const arr = trainingUebungenArray(praefix);
     const aktuell = trainingUebungenAusDom(praefix, arr.length);
@@ -4282,6 +4479,7 @@
     renderTraining();
   };
 
+  // Rendert den Trainingsbereich: Filter, Wochenziel/Serie, Unterbereiche und Wochenliste der Einträge
   function renderTraining() {
     // Für die kcal-Anzeige in Privat: Gewicht und MET-Werte einmal laden
     if (aktiverBereich === "privat" && !ernProfilGeladen && !ernProfilLaedt && !ernProfilFehlgeschlagen) ernProfilLaden();
@@ -4367,6 +4565,7 @@
     const trainingByIdAktuell = {};
     eintraegeAktuell.forEach((t) => { trainingByIdAktuell[t.id] = t; });
 
+    // Ermittelt das letzte frühere Gewicht derselben Übung für die Trendanzeige
     function vorherigesGewicht(t, u) {
       if (u.gewicht_kg === null || u.gewicht_kg === undefined || u.gewicht_kg === "") return null;
       const name = (u.name || "").trim().toLowerCase();
@@ -4419,6 +4618,7 @@
       return gewichtNeu || wdhNeu || sekundenNeu;
     }
 
+    // Liefert einen Pfeil (↑/↓/→) für den Vergleich mit dem vorherigen Wert
     function trendSymbol(aktuell, vorher) {
       if (vorher === null || vorher === undefined) return "";
       const diff = Number(aktuell) - Number(vorher);
@@ -4427,6 +4627,7 @@
       return ` <span style="color:var(--ink-dim);">→</span>`;
     }
 
+    // Rendert die Übungen eines Trainings als Chips mit Werten, Trend und Bestleistungs-Pokal
     function uebungenAnzeige(uebungenListe, t) {
       if (!uebungenListe.length) return "";
       const chips = uebungenListe.map((u) => {
@@ -4476,6 +4677,7 @@
       return streckeNeu || hoehenmeterNeu;
     }
 
+    // Baut das HTML eines Trainingseintrags – als Bearbeiten-Formular oder als Anzeigezeile
     function eintragHtml(t) {
       const uebungenListe = (uebungenByTraining[t.id] || []).slice().sort((a, b) => a.reihenfolge - b.reihenfolge);
       if (trainingBearbeitenId === t.id) {
@@ -4552,6 +4754,7 @@
 
   document.getElementById("btn-training-hinzufuegen").addEventListener("click", trainingHinzufuegen);
 
+  // Speichert ein neues Training samt Übungen aus dem Formular und setzt das Formular zurück
   async function trainingHinzufuegen() {
     const sportart = document.getElementById("training-sportart").value.trim();
     if (!sportart) return;
@@ -4580,6 +4783,7 @@
     renderTraining();
   }
 
+  // Löscht ein Training nach Rückfrage und rendert neu
   window.trainingLoeschen = async function(id) {
     if (!confirm("Dieses Training endgültig löschen?")) return;
     await api("training_loeschen", { id });
@@ -4587,6 +4791,7 @@
     renderTraining();
   };
 
+  // Öffnet das Bearbeiten-Formular eines Trainings und lädt dessen Übungen ins Formular
   window.trainingBearbeitenStart = function(id) {
     trainingBearbeitenId = id;
     trainingBearbeitenUebungen = trainingUebungen
@@ -4596,12 +4801,14 @@
     renderTraining();
   };
 
+  // Bricht das Bearbeiten eines Trainings ab und verwirft die Formular-Übungen
   window.trainingBearbeitenAbbrechen = function() {
     trainingBearbeitenId = null;
     trainingBearbeitenUebungen = [];
     renderTraining();
   };
 
+  // Speichert das bearbeitete Training inkl. Übungen und Plan-Verknüpfung und lädt neu
   window.trainingBearbeitenSpeichern = async function(id) {
     const sportart = document.getElementById(`training-edit-sportart-${id}`).value.trim();
     if (!sportart) return;
@@ -4622,6 +4829,7 @@
     renderTraining();
   };
 
+  // Fragt per Prompt das Wochenziel (gesamt oder für gefilterte Sportart) ab und speichert es
   window.trainingZielBearbeiten = async function() {
     const sportart = trainingFilterSportart || "";
     const aktuell = sportart ? (trainingWochenziel(sportart) ?? trainingWochenziel("")) : trainingWochenziel("");
@@ -4644,10 +4852,12 @@
     return trainingsplaene.filter((p) => bereichVon(p) === aktiverBereich);
   }
 
+  // Liefert die Übungen eines Trainingsplans in Reihenfolge
   function planUebungenFuer(planId) {
     return trainingsplanUebungen.filter((u) => u.plan_id === planId).sort((a, b) => a.reihenfolge - b.reihenfolge);
   }
 
+  // Liefert den Namen eines Trainingsplans zur ID oder null
   function planName(planId) {
     const p = trainingsplaene.find((pl) => pl.id === planId);
     return p ? p.name : null;
@@ -4664,6 +4874,7 @@
     renderTraining();
   };
 
+  // Rendert Plan-Auswahl, Liste der Trainingspläne und das Neu-Formular für Pläne
   function renderTrainingsplaene() {
     const listEl = document.getElementById("trainingsplan-liste");
     if (!listEl) return;
@@ -4677,6 +4888,7 @@
       auswahlEl.value = plaene.some((p) => p.id === trainingFormPlanId) ? trainingFormPlanId : "";
     }
 
+    // Rendert die Übungen eines Plans als Chips mit Werten
     function uebungenAnzeige(liste) {
       if (!liste.length) return "";
       const chips = liste.map((u) => {
@@ -4691,6 +4903,7 @@
       return `<div class="chip-liste" style="margin-top:0.4rem;">${chips.join("")}</div>`;
     }
 
+    // Baut das HTML eines Plans – als Bearbeiten-Formular oder aufklappbar mit Aktionen
     function planHtml(p) {
       const uebungen = planUebungenFuer(p.id);
       if (planBearbeitenId === p.id) {
@@ -4731,6 +4944,7 @@
   const btnPlanHinzufuegen = document.getElementById("btn-plan-hinzufuegen");
   if (btnPlanHinzufuegen) btnPlanHinzufuegen.addEventListener("click", planHinzufuegen);
 
+  // Legt einen neuen Trainingsplan mit Übungen aus dem Formular an
   async function planHinzufuegen() {
     const nameEl = document.getElementById("plan-neu-name");
     const name = nameEl.value.trim();
@@ -4744,6 +4958,7 @@
     renderTraining();
   }
 
+  // Öffnet das Bearbeiten-Formular eines Plans und lädt dessen Übungen ins Formular
   window.planBearbeitenStart = function(id) {
     planBearbeitenId = id;
     planBearbeitenUebungen = planUebungenFuer(id)
@@ -4751,12 +4966,14 @@
     renderTraining();
   };
 
+  // Bricht das Bearbeiten eines Plans ab
   window.planBearbeitenAbbrechen = function() {
     planBearbeitenId = null;
     planBearbeitenUebungen = [];
     renderTraining();
   };
 
+  // Speichert Name und Übungen des bearbeiteten Plans und lädt neu
   window.planBearbeitenSpeichern = async function(id) {
     const name = document.getElementById(`plan-edit-name-${id}`).value.trim();
     if (!name) return;
@@ -4769,6 +4986,7 @@
     renderTraining();
   };
 
+  // Löscht einen Trainingsplan nach Rückfrage (Trainings bleiben, verlieren Verknüpfung)
   window.planLoeschen = async function(id) {
     if (!confirm("Diesen Trainingsplan endgültig löschen? Bereits erfasste Trainings bleiben erhalten, verlieren aber die Verknüpfung.")) return;
     await api("plan_loeschen", { id });
@@ -4795,6 +5013,7 @@
     };
   }
 
+  // Macht aus einem Plan-Namen einen dateinamentauglichen Slug (Umlaute ersetzt)
   function planDateinameSlug(text) {
     const ersatz = { ä: "ae", ö: "oe", ü: "ue", ß: "ss" };
     const slug = (text || "plan")
@@ -4805,6 +5024,7 @@
     return slug || "plan";
   }
 
+  // Exportiert einen einzelnen Trainingsplan als JSON-Datei
   window.planExportieren = function(planId) {
     const p = trainingsplaene.find((pl) => pl.id === planId);
     if (!p) return;
@@ -4812,6 +5032,7 @@
     downloadDatei(`trainingsplan-${planDateinameSlug(p.name)}.json`, JSON.stringify(exportObj, null, 2), "application/json");
   };
 
+  // Exportiert alle Trainingspläne des aktiven Bereichs als JSON-Datei
   function plaeneAlleExportieren() {
     const plaene = trainingsplaeneAktuell();
     if (!plaene.length) { alert("Keine Trainingspläne zum Exportieren vorhanden."); return; }
@@ -4861,6 +5082,7 @@
     return reihenfolge.map((name) => ({ name, uebungen: nachPlan.get(name) }));
   }
 
+  // Wandelt einen CSV-Wert in eine Ganzzahl um oder liefert null
   function csvGanzzahlOderNull(raw) {
     const s = (raw || "").trim();
     if (!s) return null;
@@ -4868,6 +5090,7 @@
     return Number.isFinite(n) ? n : null;
   }
 
+  // Lädt eine CSV-Vorlage mit Beispielzeilen für den Plan-Import herunter
   window.planVorlageHerunterladen = function() {
     const vorlage =
       "Plan;Übung;Sätze;Wiederholungen;Sekunden;Gewicht (kg)\n" +
@@ -4879,6 +5102,7 @@
     downloadDatei("trainingsplaene-vorlage.csv", vorlage, "text/csv");
   };
 
+  // Importiert Pläne aus JSON/CSV, warnt bei Duplikaten und ergänzt neue Übungen in den Stammdaten
   async function plaeneImportieren(file) {
     const text = await file.text();
     const istJson = file.name.toLowerCase().endsWith(".json");
@@ -5031,6 +5255,7 @@
     return trainingBildUrls[eintrag.id]?.url || null;
   }
 
+  // Liefert ein Bild-Tag für Chips, falls zum Namen ein Stammdaten-Bild geladen ist
   function chipBildHtml(typ, name) {
     const url = stammdatenBildUrlFuerName(typ, name);
     return url ? `<img src="${escapeAttr(url)}" class="chip-bild" alt="">` : "";
@@ -5056,6 +5281,7 @@
     ["Push", ["liegestütz", "push up", "pushup", "dips", "dip", "bankdrück", "bench", "schulterdrück", "overhead press", "military press", "pike", "handstand", "trizeps", "triceps", "seitheben", "lateral raise", "frontheben", "press", "push"]],
   ];
 
+  // Normalisiert Text für Stichwortvergleich (klein, Trennzeichen zu Leerzeichen)
   function kategorieNormText(text) {
     return String(text || "").toLowerCase().replace(/[-_/.]+/g, " ").replace(/\s+/g, " ").trim();
   }
@@ -5081,10 +5307,12 @@
     return fest || wert;
   }
 
+  // Rendert Sportarten- und Übungs-Stammdaten, Kategorie-Listen und Autovervollständigungs-Vorschläge
   function renderTrainingsstammdaten() {
     const sportarten = trainingStammdatenAktuell("sportart");
     const uebungen = trainingStammdatenAktuell("uebung");
 
+    // Baut das HTML eines Stammdaten-Eintrags – als Bearbeiten-Formular oder als Anzeigezeile
     function eintragHtml(s) {
       if (stammdatenBearbeitenId === s.id) {
         const bildUrl = trainingBildUrls[s.id]?.url;
@@ -5121,6 +5349,7 @@
         </div>`;
     }
 
+    // Rendert eine einfache Stammdaten-Liste oder einen Leer-Hinweis
     function listeHtml(liste) {
       if (!liste.length) return '<p class="empty-text">Noch keine hinterlegt.</p>';
       return `<div class="notiz-list">${liste.map(eintragHtml).join("")}</div>`;
@@ -5143,6 +5372,7 @@
         </div>`;
     }
 
+    // Rendert die Übungen nach Kategorie gruppiert, mit Suchfilter und gemerktem Aufklappzustand
     function uebungenGruppiertHtml(liste) {
       if (!liste.length) return '<p class="empty-text">Noch keine hinterlegt.</p>';
       const sucheEl = document.getElementById("stammdaten-uebung-suche");
@@ -5237,6 +5467,7 @@
   const btnStammUebung = document.getElementById("btn-stammdaten-uebung-hinzufuegen");
   if (btnStammUebung) btnStammUebung.addEventListener("click", () => stammdatenHinzufuegen("uebung"));
 
+  // Legt eine Sportart/Übung in den Stammdaten an und trägt ggf. die Kategorie direkt nach
   async function stammdatenHinzufuegen(typ) {
     const inputId = typ === "sportart" ? "stammdaten-sportart-neu" : "stammdaten-uebung-neu";
     const el = document.getElementById(inputId);
@@ -5342,22 +5573,26 @@
     });
   }
 
+  // Setzt/entfernt das Übernehmen-Häkchen eines Kategorie-Vorschlags
   window.uebungKategorieVorschlagHaken = function(id, haken) {
     const v = uebungKategorieVorschlaege && uebungKategorieVorschlaege.find((x) => x.id === id);
     if (v) v.uebernehmen = haken;
     renderUebungKategorieVorschlag();
   };
 
+  // Ändert die vorgeschlagene Kategorie einer Übung in der Vorschau
   window.uebungKategorieVorschlagAendern = function(id, kategorie) {
     const v = uebungKategorieVorschlaege && uebungKategorieVorschlaege.find((x) => x.id === id);
     if (v) v.kategorie = kategorie;
   };
 
+  // Schließt die Kategorie-Vorschau ohne zu speichern
   window.uebungKategorieVorschlaegeSchliessen = function() {
     uebungKategorieVorschlaege = null;
     renderUebungKategorieVorschlag();
   };
 
+  // Speichert die angehakten Kategorie-Vorschläge in 5er-Paketen und lädt neu
   window.uebungKategorieVorschlaegeUebernehmen = async function() {
     if (!uebungKategorieVorschlaege) return;
     const auswahl = uebungKategorieVorschlaege.filter((v) => v.uebernehmen && v.kategorie);
@@ -5388,22 +5623,26 @@
     }
   };
 
+  // Löscht einen Stammdaten-Eintrag und rendert neu
   window.stammdatenLoeschen = async function(id) {
     await api("stammdaten_loeschen", { id });
     await ladeDaten();
     renderTraining();
   };
 
+  // Öffnet das Bearbeiten-Formular eines Stammdaten-Eintrags
   window.stammdatenBearbeitenStart = function(id) {
     stammdatenBearbeitenId = id;
     renderTraining();
   };
 
+  // Bricht das Bearbeiten eines Stammdaten-Eintrags ab
   window.stammdatenBearbeitenAbbrechen = function() {
     stammdatenBearbeitenId = null;
     renderTraining();
   };
 
+  // Speichert Beschreibung, Kategorie, Bild und ggf. neuen Namen (mit Zusammenführen) eines Eintrags
   window.stammdatenBearbeitenSpeichern = async function(id) {
     const beschreibungEl = document.getElementById(`stammdaten-edit-beschreibung-${id}`);
     const kategorieEl = document.getElementById(`stammdaten-edit-kategorie-${id}`);
@@ -5508,6 +5747,7 @@
     }
   }
 
+  // Löscht das Wochenziel einer Sportart im aktiven Bereich
   window.trainingSportartZielLoeschen = async function(sportart) {
     await api("training_ziel_loeschen", { bereich: aktiverBereich, sportart });
     await ladeDaten();
@@ -5569,6 +5809,7 @@
     sessionFokusOeffnen();
   };
 
+  // Öffnet das Vollbild-Overlay für die Plan-Session, aktiviert Wake-Lock und startet den Tick
   function sessionFokusOeffnen() {
     if (document.getElementById("session-fokus-overlay")) { renderTrainingSession(); return; }
     const overlay = document.createElement("div");
@@ -5590,6 +5831,7 @@
     sessionTickHandle = setInterval(sessionTick, 250);
   }
 
+  // Schließt das Session-Overlay, stoppt den Tick, gibt Wake-Lock frei und beendet Vollbild
   function sessionFokusSchliessen() {
     clearInterval(sessionTickHandle);
     sessionTickHandle = null;
@@ -5603,6 +5845,7 @@
     }
   }
 
+  // Übernimmt die Eingaben aus dem Fokus-Modus in den Session-Zustand der aktuellen Übung
   function trainingSessionAusDomUebernehmen() {
     if (!trainingSession) return;
     const sportartEl = document.getElementById("session-sportart");
@@ -5624,6 +5867,7 @@
     if (progressionEl) u.progression = progressionEl.value.trim();
   }
 
+  // Wechselt in der Plan-Session zur nächsten Übung mit frischem Countdown
   window.trainingSessionWeiter = function() {
     trainingSessionAusDomUebernehmen();
     trainingSession.index = Math.min(trainingSession.index + 1, trainingSession.uebungen.length - 1);
@@ -5631,6 +5875,7 @@
     renderTrainingSession();
   };
 
+  // Wechselt in der Plan-Session zur vorherigen Übung mit frischem Countdown
   window.trainingSessionZurueck = function() {
     trainingSessionAusDomUebernehmen();
     trainingSession.index = Math.max(trainingSession.index - 1, 0);
@@ -5638,6 +5883,7 @@
     renderTrainingSession();
   };
 
+  // Bricht die Plan-Session nach Rückfrage ab und schließt den Fokus-Modus
   window.trainingSessionAbbrechen = function() {
     if (!confirm("Trainings-Session abbrechen? Bisher eingegebene Werte gehen verloren.")) return;
     sessionFokusSchliessen();
@@ -5645,6 +5891,7 @@
     renderTraining();
   };
 
+  // Speichert die Plan-Session als neues, verlinktes Training mit gemessener Dauer
   window.trainingSessionAbschliessen = async function() {
     trainingSessionAusDomUebernehmen();
     const sportart = (trainingSession.sportart || "").trim();
@@ -5687,6 +5934,7 @@
     return `${String(Math.floor(s / 60)).padStart(2, "0")}:${sek}`;
   }
 
+  // Liefert die Restzeit des Satz-Countdowns in ms je nach Status
   function sessionCountdownRestMs(c) {
     if (c.status === "laeuft") return Math.max(0, c.endeMs - Date.now());
     if (c.status === "pausiert") return c.restMs;
@@ -5713,6 +5961,7 @@
     return trainingSession.countdown;
   }
 
+  // Aktualisiert Gesamtzeit und Countdown-Anzeige; schaltet bei Ablauf zum nächsten Satz mit Signal
   function sessionTick() {
     if (!trainingSession) return;
     const gesamtEl = document.getElementById("session-gesamtzeit");
@@ -5738,6 +5987,7 @@
     }
   }
 
+  // Startet bzw. setzt den Satz-Countdown fort (schaltet Audio für iOS frei)
   window.sessionCountdownStart = function() {
     const c = sessionCountdownAktuell();
     if (!c) return;
@@ -5759,6 +6009,7 @@
     renderTrainingSession();
   };
 
+  // Pausiert den laufenden Satz-Countdown und merkt die Restzeit
   window.sessionCountdownPause = function() {
     const c = trainingSession && trainingSession.countdown;
     if (!c || c.status !== "laeuft") return;
@@ -5780,6 +6031,7 @@
     renderTrainingSession();
   };
 
+  // Setzt den Countdown der aktuellen Übung zurück („Nochmal“)
   window.sessionCountdownNeu = function() {
     if (!trainingSession) return;
     trainingSessionAusDomUebernehmen();
@@ -5787,6 +6039,7 @@
     renderTrainingSession();
   };
 
+  // Erzeugt das HTML des Satz-Countdowns mit Status und passendem Knopf
   function sessionCountdownHtml() {
     const c = sessionCountdownAktuell();
     if (!c) return "";
@@ -5813,6 +6066,7 @@
       </div>`;
   }
 
+  // Rendert das Fokus-Overlay der Plan-Session (Übung, Werte, Countdown, Navigation)
   function renderTrainingSession() {
     const overlay = document.getElementById("session-fokus-overlay");
     if (!overlay) return;
@@ -5868,6 +6122,7 @@
       .filter((t) => bereichVon(t) === aktiverBereich)
       .sort((a, b) => a.name.localeCompare(b.name));
 
+    // Baut das HTML eines Intervall-Timers – als Bearbeiten-Formular oder als Anzeigezeile
     function timerHtml(t) {
       if (timerBearbeitenId === t.id) {
         return `
@@ -5917,6 +6172,7 @@
   const btnTimerHinzufuegen = document.getElementById("btn-timer-hinzufuegen");
   if (btnTimerHinzufuegen) btnTimerHinzufuegen.addEventListener("click", timerHinzufuegen);
 
+  // Legt einen neuen Intervall-Timer aus dem Formular im aktiven Bereich an
   async function timerHinzufuegen() {
     const nameEl = document.getElementById("timer-neu-name");
     const name = nameEl.value.trim();
@@ -5934,16 +6190,19 @@
     renderTraining();
   }
 
+  // Öffnet das Bearbeiten-Formular eines Intervall-Timers
   window.timerBearbeitenStart = function(id) {
     timerBearbeitenId = id;
     renderTraining();
   };
 
+  // Bricht das Bearbeiten eines Intervall-Timers ab
   window.timerBearbeitenAbbrechen = function() {
     timerBearbeitenId = null;
     renderTraining();
   };
 
+  // Speichert den bearbeiteten Intervall-Timer und lädt die Trainingsdaten neu
   window.timerBearbeitenSpeichern = async function(id) {
     const name = document.getElementById(`timer-edit-name-${id}`).value.trim();
     if (!name) return;
@@ -5960,6 +6219,7 @@
     renderTraining();
   };
 
+  // Löscht einen Intervall-Timer nach Rückfrage
   window.timerLoeschen = async function(id) {
     if (!confirm("Diesen Timer endgültig löschen?")) return;
     await api("timer_loeschen", { id });
@@ -5969,6 +6229,7 @@
 
   let timerIntervalHandle = null;
 
+  // Startet einen Intervall-Timer: legt die Session an (mit Vorbereitung, falls gesetzt) und öffnet den Fokusmodus
   window.timerStarten = function(id) {
     const t = intervallTimer.find((x) => x.id === id);
     if (!t) return;
@@ -5990,6 +6251,7 @@
     timerSignal(timerSession.phase);
   };
 
+  // Öffnet das Vollbild-Overlay des Timers, hält den Bildschirm wach und startet den Sekundentakt
   function timerFokusOeffnen() {
     if (!document.getElementById("timer-fokus-overlay")) {
       const overlay = document.createElement("div");
@@ -6008,6 +6270,7 @@
     timerIntervalHandle = setInterval(timerTick, 1000);
   }
 
+  // Stoppt den Sekundentakt, entfernt das Timer-Overlay und verlässt den Vollbildmodus
   function timerFokusSchliessen() {
     clearInterval(timerIntervalHandle);
     timerIntervalHandle = null;
@@ -6018,6 +6281,7 @@
     }
   }
 
+  // Sekundentakt des Timers: zählt herunter und wechselt bei 0 in die nächste Phase
   function timerTick() {
     if (!timerSession || !timerSession.laeuft) return;
     timerSession.sekundenVerbleibend--;
@@ -6028,6 +6292,7 @@
     }
   }
 
+  // Schaltet zur nächsten Phase (Vorbereitung → Arbeit → Pause → …) bzw. beendet nach der letzten Runde
   function timerPhaseWeiter() {
     const t = timerSession;
     if (t.phase === "vorbereitung") {
@@ -6079,6 +6344,7 @@
     }
   }
 
+  // Gibt Vibration und Signalton passend zur Phase aus (Arbeit hoch, Pause tief, Fertig als Melodie)
   function timerSignal(phase) {
     try {
       if (navigator.vibrate) {
@@ -6111,12 +6377,14 @@
     } catch {}
   }
 
+  // Pausiert den laufenden Timer bzw. setzt ihn fort
   window.timerPausieren = function() {
     if (!timerSession) return;
     timerSession.laeuft = !timerSession.laeuft;
     renderTimerSession();
   };
 
+  // Beendet den Timer (mit Rückfrage, solange nicht fertig) und gibt den Wake-Lock frei
   window.timerAbbrechen = function() {
     if (!timerSession) return;
     if (timerSession.phase !== "fertig" && !confirm("Timer beenden?")) return;
@@ -6125,6 +6393,7 @@
     timerFokusSchliessen();
   };
 
+  // Zeichnet das Timer-Overlay: Phase, Runde und Countdown mm:ss samt Pause-/Beenden-Knöpfen
   function renderTimerSession() {
     const overlay = document.getElementById("timer-fokus-overlay");
     if (!overlay || !timerSession) return;
@@ -6168,6 +6437,7 @@
         + trainingsplaeneAktuell().map((p) => `<option value="${p.id}">${escapeAttr(p.name)}</option>`).join("");
     }
 
+    // Liefert den Countdown-Text bis zum Datum (z. B. "noch 20 Tage (≈ 3 Wochen)" oder "war vor …")
     function countdownText(datum) {
       const tage = Math.round((new Date(datum + "T00:00:00") - new Date(heute + "T00:00:00")) / 86400000);
       if (tage < 0) return `war vor ${Math.abs(tage)} Tag${Math.abs(tage) === 1 ? "" : "en"}`;
@@ -6176,6 +6446,7 @@
       return `noch ${tage} Tag${tage === 1 ? "" : "e"}${wochenText}`;
     }
 
+    // Erzeugt das HTML eines Ziel-Events – Bearbeitungsformular oder Anzeige mit Countdown und Plan-Start
     function eventHtml(z) {
       const istVorbei = z.datum < heute;
       if (zielEventBearbeitenId === z.id) {
@@ -6225,6 +6496,7 @@
   const btnZieleventHinzufuegen = document.getElementById("btn-zielevent-hinzufuegen");
   if (btnZieleventHinzufuegen) btnZieleventHinzufuegen.addEventListener("click", zieleventHinzufuegen);
 
+  // Legt ein neues Ziel-Event im aktiven Bereich an und leert das Formular
   async function zieleventHinzufuegen() {
     const nameEl = document.getElementById("zielevent-neu-name");
     const datumEl = document.getElementById("zielevent-neu-datum");
@@ -6245,16 +6517,19 @@
     renderTraining();
   }
 
+  // Öffnet ein Ziel-Event im Bearbeitungsmodus
   window.zieleventBearbeitenStart = function(id) {
     zielEventBearbeitenId = id;
     renderTraining();
   };
 
+  // Bricht die Bearbeitung eines Ziel-Events ab
   window.zieleventBearbeitenAbbrechen = function() {
     zielEventBearbeitenId = null;
     renderTraining();
   };
 
+  // Speichert das bearbeitete Ziel-Event und lädt die Daten neu
   window.zieleventBearbeitenSpeichern = async function(id) {
     const name = document.getElementById(`zielevent-edit-name-${id}`).value.trim();
     const datum = document.getElementById(`zielevent-edit-datum-${id}`).value;
@@ -6269,6 +6544,7 @@
     renderTraining();
   };
 
+  // Löscht ein Ziel-Event nach Rückfrage
   window.zieleventLoeschen = async function(id) {
     if (!confirm("Dieses Ziel endgültig löschen?")) return;
     await api("zielevent_loeschen", { id });
@@ -6291,6 +6567,7 @@
     return (eintrag && eintrag.kategorie) || "Ohne Kategorie";
   }
 
+  // Formatiert Minuten als lesbare Dauer, z. B. "1 Std. 30 Min."
   function formatMinuten(min) {
     if (!min) return "0 Min.";
     const h = Math.floor(min / 60);
@@ -6299,6 +6576,7 @@
     return m ? `${h} Std. ${m} Min.` : `${h} Std.`;
   }
 
+  // Baut das SVG-Balkendiagramm der Trainings je Sportart-Kategorie für ein Jahr (Einheiten + Dauer)
   function trainingKategorienChartSvg(jahr) {
     const proKategorie = {};
     training
@@ -6333,6 +6611,7 @@
     return `<svg viewBox="0 0 ${breite} ${hoehe}" style="width:100%; height:auto; display:block;">${balken}</svg>`;
   }
 
+  // Füllt die Jahresauswahl und rendert die Kategorie-Auswertung für das gewählte Jahr
   function renderKategorieAuswertung() {
     const bereichEl = document.getElementById("auswertung-kategorie-bereich");
     if (!bereichEl) return;
@@ -6353,6 +6632,7 @@
     bereichEl.innerHTML = trainingKategorienChartSvg(auswertungJahr);
   }
 
+  // Übernimmt das gewählte Auswertungsjahr und zeichnet das Training neu
   window.auswertungJahrGewaehlt = function(jahr) {
     auswertungJahr = Number(jahr);
     renderTraining();
@@ -6364,6 +6644,7 @@
 
   let verlaufAusgewaehlteUebung = null;
 
+  // Liefert alle Übungsnamen aus Trainings des aktiven Bereichs, alphabetisch sortiert
   function trainingUebungsnamenAktuell() {
     const idsAktuell = new Set(training.filter((t) => bereichVon(t) === aktiverBereich).map((t) => t.id));
     const namen = new Set();
@@ -6373,6 +6654,7 @@
     return [...namen].sort((a, b) => a.localeCompare(b));
   }
 
+  // Sammelt die Gewichtsangaben einer Übung im aktiven Bereich als Datum/Gewicht-Punkte, chronologisch
   function trainingVerlaufFuerUebung(name) {
     const key = (name || "").trim().toLowerCase();
     if (!key) return [];
@@ -6390,6 +6672,7 @@
     return punkte;
   }
 
+  // Baut das SVG-Liniendiagramm des Gewichtsverlaufs einer Übung mit Min/Max- und Datumslabels
   function trainingVerlaufChartSvg(punkte) {
     const breite = 700, hoehe = 200, unten = 24, oben = 20, linksrand = 10, rechtsrand = 10;
     const werte = punkte.map((p) => p.gewicht_kg);
@@ -6418,6 +6701,7 @@
     </svg>`;
   }
 
+  // Rendert Übungsauswahl und Gewichtsverlauf-Diagramm samt Veränderung seit dem ersten Eintrag
   function renderTrainingsverlauf() {
     const auswahlEl = document.getElementById("verlauf-uebung-auswahl");
     const chartEl = document.getElementById("verlauf-chart-bereich");
@@ -6471,6 +6755,7 @@
     try { localStorage.setItem("spiel-gruppen-offen", JSON.stringify([...spielGruppenOffen])); } catch (_e) { /* egal */ }
   }
 
+  // Baut die Infozeile eines Spiels (Teilnehmer, Alter, Dauer, Material) mit Icons
   function spielMetaZeile(s) {
     const teile = [];
     if (s.teilnehmerzahl) teile.push(`👥 ${escapeHtml(s.teilnehmerzahl)}`);
@@ -6480,6 +6765,7 @@
     return teile.join(" · ");
   }
 
+  // Erzeugt die fünf antippbaren Bewertungssterne eines Spiels
   function spielSterne(s) {
     const wert = Number(s.bewertung) || 0;
     const knoepfe = [1, 2, 3, 4, 5].map((n) => `
@@ -6488,6 +6774,7 @@
     return `<div class="spiel-sterne" role="group" aria-label="Bewertung: ${wert ? wert + " von 5" : "noch nicht bewertet"}">${knoepfe}</div>`;
   }
 
+  // Prüft, ob ein Spiel zum aktiven Bewertungsfilter passt
   function spielPasstZuBewertung(s) {
     const wert = Number(s.bewertung) || 0;
     if (spielBewertungFilter === "alle") return true;
@@ -6500,6 +6787,7 @@
     return spielBewertungFilter !== "alle" || spielAktiveKategorie !== "alle";
   }
 
+  // Rendert Filterleiste und Spielekartei, gruppiert nach Kategorie, mit Bewertung, Dateien und Bearbeiten
   function renderSpiele() {
     const filterBereich = document.getElementById("spiel-filter-bereich");
     const listeBereich = document.getElementById("spiel-liste-bereich");
@@ -6645,6 +6933,7 @@
     }).join("") + `</div>`;
   }
 
+  // Merkt sich das Auf-/Zuklappen einer Spiele-Kategorie (nicht bei aktivem Filter)
   window.spielGruppeUmschalten = function(el) {
     // Bei aktivem Filter ist alles automatisch offen – das nicht als Wunsch merken
     if (spielFilterAktiv()) return;
@@ -6653,16 +6942,19 @@
     spielGruppenMerken();
   };
 
+  // Setzt den Kategorie-Filter der Spielekartei
   window.spielFilterAendern = function(wert) {
     spielAktiveKategorie = wert;
     renderSpiele();
   };
 
+  // Setzt den Bewertungsfilter der Spielekartei (nur gültige Werte)
   window.spielBewertungFilterAendern = function(wert) {
     spielBewertungFilter = ["alle", "5", "4", "3", "ohne"].includes(wert) ? wert : "alle";
     renderSpiele();
   };
 
+  // Setzt die Sortierung der Spiele (A–Z/beste zuerst) und speichert sie in localStorage
   window.spielSortierungAendern = function(wert) {
     spielSortierung = wert === "beste" ? "beste" : "az";
     try { localStorage.setItem("spiel-sortierung", spielSortierung); } catch (_e) { /* egal */ }
@@ -6689,6 +6981,7 @@
 
   document.getElementById("btn-spiel-hinzufuegen").addEventListener("click", spielHinzufuegen);
 
+  // Legt ein neues Spiel an, optional mit PDF-/Word-Anhang (max. 5 MB), und leert das Formular
   async function spielHinzufuegen() {
     const titel = document.getElementById("neu-spiel-titel").value.trim();
     if (!titel) return;
@@ -6728,16 +7021,19 @@
     await ladeDaten();
   }
 
+  // Öffnet ein Spiel im Bearbeitungsmodus
   window.spielBearbeitenStart = function(id) {
     spielBearbeitenId = id;
     renderSpiele();
   };
 
+  // Bricht die Bearbeitung eines Spiels ab
   window.spielBearbeitenAbbrechen = function() {
     spielBearbeitenId = null;
     renderSpiele();
   };
 
+  // Speichert das bearbeitete Spiel und lädt die Daten neu
   window.spielBearbeitenSpeichern = async function(id) {
     const titel = document.getElementById(`spiel-edit-titel-${id}`).value.trim();
     if (!titel) return;
@@ -6752,12 +7048,14 @@
     await ladeDaten();
   };
 
+  // Löscht ein Spiel samt Dateien nach Rückfrage
   window.spielLoeschen = async function(id) {
     if (!confirm("Dieses Spiel inklusive hinterlegter Dateien wirklich löschen?")) return;
     await api("spiel_loeschen", { id });
     await ladeDaten();
   };
 
+  // Holt eine Download-URL für eine Spiel-Datei und öffnet sie in neuem Tab
   window.spielDateiOeffnen = async function(dateiId) {
     try {
       const res = await api("spiel_datei_url", { datei_id: dateiId });
@@ -6767,6 +7065,7 @@
     }
   };
 
+  // Hängt eine PDF-/Word-Datei (max. 5 MB) an ein bestehendes Spiel an
   window.spielDateiHinzufuegen = async function(id, input) {
     const datei = input.files[0];
     if (!datei) return;
@@ -6787,6 +7086,7 @@
     await ladeDaten();
   };
 
+  // Entfernt eine Datei von einem Spiel nach Rückfrage
   window.spielDateiLoeschen = async function(dateiId) {
     if (!confirm("Diese Datei wirklich entfernen?")) return;
     await api("spiel_datei_loeschen", { datei_id: dateiId });
@@ -6808,10 +7108,12 @@
       </div>`;
   }
 
+  // Escaped Text für HTML-Attribute (zusätzlich Anführungszeichen)
   function escapeAttr(s) {
     return escapeHtml(s).replace(/"/g, "&quot;");
   }
 
+  // Rendert die Links des aktiven Bereichs, gruppiert nach Projekt, und füllt die Projektauswahl
   function renderLinks() {
     const select = document.getElementById("link-projekt");
     select.innerHTML = '<option value="">Ohne Projekt</option>' +
@@ -6844,6 +7146,7 @@
     if (e.key === "Enter") linkHinzufuegen();
   });
 
+  // Speichert einen neuen Link im aktiven Bereich und leert das Formular
   async function linkHinzufuegen() {
     const titel = document.getElementById("neuer-link-titel").value.trim();
     const url = document.getElementById("neuer-link-url").value.trim();
@@ -6858,6 +7161,7 @@
     await ladeDaten();
   }
 
+  // Löscht einen Link
   window.linkLoeschen = async function(id) {
     await api("link_loeschen", { id });
     await ladeDaten();
@@ -6869,12 +7173,14 @@
   document.getElementById("reflex-datum").value = heuteISO();
   let reflexBearbeiteterId = null;
 
+  // Formatiert ein ISO-Datum lang auf Deutsch, z. B. "3. Oktober 2026"
   function formatDatumLang(iso) {
     const [j, m, t] = iso.split("-");
     const monate = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
     return `${parseInt(t,10)}. ${monate[parseInt(m,10)-1]} ${j}`;
   }
 
+  // Rendert die Reflexionseinträge des aktiven Bereichs
   function renderReflexionen() {
     const bereich = document.getElementById("reflexion-bereich");
     const reflexionenBereich = reflexionen.filter((r) => bereichVon(r) === aktiverBereich);
@@ -6895,6 +7201,7 @@
       </div>`).join("");
   }
 
+  // Setzt das Reflexionsformular auf Neueintrag mit heutigem Datum zurück
   function reflexFormZuruecksetzen() {
     reflexBearbeiteterId = null;
     document.getElementById("reflex-text").value = "";
@@ -6903,6 +7210,7 @@
     document.getElementById("btn-reflex-abbrechen").classList.add("hidden");
   }
 
+  // Lädt eine Reflexion ins Formular zum Bearbeiten und scrollt dorthin
   window.reflexionBearbeitenStart = function(id) {
     const r = reflexionen.find((rr) => rr.id === id);
     if (!r) return;
@@ -6917,6 +7225,7 @@
   document.getElementById("btn-reflex-hinzufuegen").addEventListener("click", reflexSpeichern);
   document.getElementById("btn-reflex-abbrechen").addEventListener("click", reflexFormZuruecksetzen);
 
+  // Speichert die Reflexion – aktualisiert beim Bearbeiten, sonst neu im aktiven Bereich
   async function reflexSpeichern() {
     const text = document.getElementById("reflex-text").value.trim();
     if (!text) return;
@@ -6931,6 +7240,7 @@
     await ladeDaten();
   }
 
+  // Löscht eine Reflexion (setzt das Formular zurück, falls sie gerade bearbeitet wird)
   window.reflexionLoeschen = async function(id) {
     if (reflexBearbeiteterId === id) reflexFormZuruecksetzen();
     await api("reflexion_loeschen", { id });
@@ -6955,6 +7265,7 @@
       };
     });
   }
+  // Bereitet Termine als Tabellenzeilen für den Export auf
   function fT() {
     return termine.map((t) => ({
       Titel: t.titel,
@@ -6964,6 +7275,7 @@
       Notiz: t.notiz || "",
     }));
   }
+  // Bereitet Notizen (mit Projektname) als Tabellenzeilen für den Export auf
   function fN() {
     return notizen.map((n) => {
       const p = projekteAktuell().find((pr) => pr.id === n.projekt_id);
@@ -6974,6 +7286,7 @@
       };
     });
   }
+  // Bereitet Links (mit Projektname) als Tabellenzeilen für den Export auf
   function fL() {
     return links.map((l) => {
       const p = projekteAktuell().find((pr) => pr.id === l.projekt_id);
@@ -6985,12 +7298,14 @@
       };
     });
   }
+  // Bereitet Reflexionen als Tabellenzeilen für den Export auf
   function fR() {
     return reflexionen.map((r) => ({
       Datum: r.datum,
       Text: r.text,
     }));
   }
+  // Bereitet die Einkaufsliste als Tabellenzeilen für den Export auf
   function fE() {
     return einkaufsliste.map((e) => ({
       Artikel: e.text,
@@ -6998,6 +7313,7 @@
       "Erstellt am": e.erstellt_am ? e.erstellt_am.slice(0, 10) : "",
     }));
   }
+  // Bereitet den Verlauf (mit Bereich und Zeitpunkt) als Tabellenzeilen für den Export auf
   function fV() {
     return verlauf.map((v) => ({
       Bereich: BEREICH_KNOPF_TEXT[bereichVon(v)] || bereichVon(v),
@@ -7007,6 +7323,7 @@
       Beschreibung: v.beschreibung || "",
     }));
   }
+  // Bereitet Ziele mit Zeitraum, übergeordnetem Ziel und Schritt-Fortschritt für den Export auf
   function fZ() {
     const TYP_LABEL = { woche: "Woche", monat: "Monat", jahr: "Jahr" };
     return ziele.map((z) => {
@@ -7023,6 +7340,7 @@
     });
   }
 
+  // Bereitet Rezepte als Tabellenzeilen für den Export auf
   function fRz() {
     return rezepte.map((r) => ({
       Bereich: BEREICH_KNOPF_TEXT[bereichVon(r)] || bereichVon(r),
@@ -7040,6 +7358,71 @@
     }));
   }
 
+  // Bereichsfilter für die Export-Funktionen: ohne Angabe alle Bereiche
+  function exportImBereich(objekt, bereich) {
+    return !bereich || bereichVon(objekt) === bereich;
+  }
+
+  // Bereitet Raumvermietungen (nach Datum sortiert) als Tabellenzeilen für den Export auf
+  function fRaum(bereich) {
+    const MAIL = { gesendet: "verschickt", fehler: "fehlgeschlagen", keine_empfaenger: "Verteiler leer", nicht_eingerichtet: "Versand nicht eingerichtet" };
+    return raumVermietungen.filter((v) => exportImBereich(v, bereich))
+      .sort((a, b) => (a.datum || "").localeCompare(b.datum || "") || String(a.von || "").localeCompare(String(b.von || "")))
+      .map((v) => ({
+        Bereich: BEREICH_KNOPF_TEXT[bereichVon(v)] || bereichVon(v),
+        Raum: raumName(v.raum_id),
+        Datum: v.datum,
+        "Bis Datum": v.datum_bis && v.datum_bis !== v.datum ? v.datum_bis : "",
+        Von: v.von ? String(v.von).slice(0, 5) : "",
+        Bis: v.bis ? String(v.bis).slice(0, 5) : "",
+        "Anlass / Belegung": v.mieter_name || "",
+        Kontakt: v.mieter_kontakt || "",
+        Zweck: v.zweck || "",
+        Notiz: v.notiz || "",
+        Serie: v.gruppe_id ? "Ja" : "Nein",
+        Mail: MAIL[v.mail_status] || "",
+      }));
+  }
+
+  // Namen der Zugänge eines Schlüssels – bereichsunabhängig, für den Export
+  function schluesselZugangNamenAlle(k) {
+    const ids = k.zugaenge || [];
+    return schluesselZugaenge.filter((z) => ids.includes(z.id))
+      .map((z) => z.name).sort((a, b) => a.localeCompare(b, "de"));
+  }
+
+  // Bereitet Schlüssel und Keys (nach Verein und Name sortiert) als Tabellenzeilen für den Export auf
+  function fSchl(bereich) {
+    return schluesselListe.filter((k) => exportImBereich(k, bereich))
+      .sort((a, b) => (a.verein || "￿").localeCompare(b.verein || "￿", "de") || schluesselVergleich(a, b))
+      .map((k) => ({
+        Bereich: BEREICH_KNOPF_TEXT[bereichVon(k)] || bereichVon(k),
+        Verein: k.verein || "",
+        Name: k.inhaber || "",
+        Art: k.art === "key" ? "Elektronischer Key" : "Schlüssel",
+        Seriennummer: k.seriennummer,
+        "Zugänge": schluesselZugangNamenAlle(k).join(", "),
+        Notiz: k.notiz || "",
+        "Geändert am": (k.aktualisiert_am || k.erstellt_am || "").slice(0, 10),
+      }));
+  }
+
+  // Bereitet die Zugänge mit allen Schlüsseln/Keys, die sie öffnen, für den Export auf
+  function fZug(bereich) {
+    return schluesselZugaenge.filter((z) => exportImBereich(z, bereich))
+      .sort((a, b) => a.name.localeCompare(b.name, "de"))
+      .map((z) => {
+        const keys = schluesselListe.filter((k) => (k.zugaenge || []).includes(z.id)).sort(schluesselVergleich);
+        return {
+          Bereich: BEREICH_KNOPF_TEXT[bereichVon(z)] || bereichVon(z),
+          Zugang: z.name,
+          Beschreibung: z.beschreibung || "",
+          Anzahl: keys.length,
+          "Schlüssel / Keys": keys.map((k) => `${k.inhaber || "ohne Name"}${k.verein ? " (" + k.verein + ")" : ""} – ${k.art === "key" ? "Key" : "Schlüssel"} ${k.seriennummer}`).join("; "),
+        };
+      });
+  }
+
   const EXPORT_KATEGORIEN = [
     { id: "aufgaben", name: "Aufgaben", daten: fA },
     { id: "termine", name: "Termine", daten: fT },
@@ -7048,10 +7431,14 @@
     { id: "reflexion", name: "Reflexion", daten: fR },
     { id: "einkauf", name: "Einkaufsliste", daten: fE },
     { id: "rezepte", name: "Rezepte", daten: fRz },
+    { id: "raumplanung", name: "Raumplanung", daten: () => fRaum() },
+    { id: "schluessel", name: "Schlüssel", daten: () => fSchl() },
+    { id: "zugaenge", name: "Zugänge", daten: () => fZug() },
     { id: "verlauf", name: "Verlauf", daten: fV },
     { id: "ziele", name: "Ziele", daten: fZ },
   ];
 
+  // Lädt Inhalt als Datei im Browser herunter (über Blob-URL)
   function downloadDatei(filename, content, mime) {
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -7064,6 +7451,7 @@
     URL.revokeObjectURL(url);
   }
 
+  // Wandelt Exportdaten in eine HTML-Tabelle mit Überschrift um
   function tabelleAlsHtml(titel, daten) {
     if (daten.length === 0) return `<h2>${escapeHtml(titel)}</h2><p>Keine Einträge.</p>`;
     const spalten = Object.keys(daten[0]);
@@ -7076,12 +7464,14 @@
     return html;
   }
 
+  // Verpackt HTML als Word-kompatibles Dokument (.doc)
   function wordDokument(titel, innerHtml) {
     return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
       <head><meta charset="utf-8"><title>${escapeHtml(titel)}</title></head>
       <body>${innerHtml}</body></html>`;
   }
 
+  // Exportiert eine Kategorie als Excel-Datei (SheetJS)
   window.exportExcel = function(kategorieId) {
     if (typeof XLSX === "undefined") { alert("Export-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen."); return; }
     const k = EXPORT_KATEGORIEN.find((k) => k.id === kategorieId);
@@ -7092,12 +7482,14 @@
     XLSX.writeFile(wb, `${k.name}.xlsx`);
   };
 
+  // Exportiert eine Kategorie als Word-Datei
   window.exportWord = function(kategorieId) {
     const k = EXPORT_KATEGORIEN.find((k) => k.id === kategorieId);
     const html = wordDokument(k.name, tabelleAlsHtml(k.name, k.daten()));
     downloadDatei(`${k.name}.doc`, html, "application/msword");
   };
 
+  // Exportiert alle Kategorien als Excel-Datei mit je einem Tabellenblatt
   window.exportAllesExcel = function() {
     if (typeof XLSX === "undefined") { alert("Export-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen."); return; }
     const wb = XLSX.utils.book_new();
@@ -7109,12 +7501,42 @@
     XLSX.writeFile(wb, "dashboard-export.xlsx");
   };
 
+  // Exportiert alle Kategorien in ein gemeinsames Word-Dokument
   window.exportAllesWord = function() {
     const teile = EXPORT_KATEGORIEN.map((k) => tabelleAlsHtml(k.name, k.daten())).join("<br>");
     const html = wordDokument("Dashboard Export", `<h1>Dashboard Export</h1>${teile}`);
     downloadDatei("dashboard-export.doc", html, "application/msword");
   };
 
+  // Export direkt aus einem Reiter, nur mit den Daten des aktiven Bereichs
+  // (Schlüssel: zwei Tabellen – Schlüssel und Zugänge)
+  const REITER_EXPORTE = {
+    raumplanung: { datei: "Raumplanung", teile: [["Raumplanung", fRaum]] },
+    schluessel: { datei: "Schluessel", teile: [["Schlüssel", fSchl], ["Zugänge", fZug]] },
+  };
+  // Exportiert die Daten eines Reiters im aktiven Bereich als Excel- oder Word-Datei
+  window.reiterExport = function(reiter, format) {
+    const e = REITER_EXPORTE[reiter];
+    if (!e) return;
+    const bereich = aktiverBereich;
+    const zusatz = BEREICH_KNOPF_TEXT[bereich] || bereich;
+    const datum = heuteISO();
+    if (format === "excel") {
+      if (typeof XLSX === "undefined") { alert("Export-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen."); return; }
+      const wb = XLSX.utils.book_new();
+      for (const [name, fn] of e.teile) {
+        const daten = fn(bereich);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(daten.length ? daten : [{ Hinweis: "Keine Einträge" }]), name.slice(0, 31));
+      }
+      XLSX.writeFile(wb, `${e.datei}-${zusatz}-${datum}.xlsx`);
+    } else {
+      const teile = e.teile.map(([name, fn]) => tabelleAlsHtml(name, fn(bereich))).join("<br>");
+      const titel = `${e.teile[0][0]} – ${zusatz} (Stand ${datum.split("-").reverse().join(".")})`;
+      downloadDatei(`${e.datei}-${zusatz}-${datum}.doc`, wordDokument(titel, `<h1>${escapeHtml(titel)}</h1>${teile}`), "application/msword");
+    }
+  };
+
+  // Rendert die Exportliste mit Excel-/Word-Knöpfen für alles und je Kategorie
   function renderExport() {
     let html = `
       <div class="export-row export-alle">
@@ -7174,6 +7596,7 @@
     if (e.key === "Enter") einkaufHinzufuegen();
   });
 
+  // Fügt einen Artikel zur Einkaufsliste des aktiven Bereichs hinzu
   async function einkaufHinzufuegen() {
     const text = document.getElementById("neuer-einkauf").value.trim();
     if (!text) return;
@@ -7182,11 +7605,13 @@
     await ladeDaten();
   }
 
+  // Hakt einen Einkaufsartikel ab bzw. wieder auf
   window.einkaufUmschalten = async function(id) {
     await api("einkauf_umschalten", { id });
     await ladeDaten();
   };
 
+  // Löscht einen Einkaufsartikel
   window.einkaufLoeschen = async function(id) {
     await api("einkauf_loeschen", { id });
     await ladeDaten();
@@ -7224,14 +7649,18 @@
     start.setDate(start.getDate() - tag);
     return start;
   }
+  // Liefert den Monatsersten zum Datum
   function monatStart(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+  // Liefert den 1. Januar des Jahres zum Datum
   function jahrStart(d) { return new Date(d.getFullYear(), 0, 1); }
 
+  // Liefert den Start des Planungszeitraums (Woche/Monat/Jahr) zum Ankerdatum
   function periodStart(typ, anker) {
     if (typ === "woche") return wochenStart(anker);
     if (typ === "monat") return monatStart(anker);
     return jahrStart(anker);
   }
+  // Liefert das Ende des Planungszeitraums (Woche/Monat/Jahr) ab dessen Start
   function periodEnd(typ, start) {
     if (typ === "woche") {
       const end = new Date(start);
@@ -7241,6 +7670,7 @@
     if (typ === "monat") return new Date(start.getFullYear(), start.getMonth() + 1, 0);
     return new Date(start.getFullYear(), 11, 31);
   }
+  // Verschiebt den Planungsanker um eine Woche/einen Monat/ein Jahr vor oder zurück
   function planAnkerVerschieben(richtung) {
     const a = new Date(planAnker);
     if (planTyp === "woche") {
@@ -7256,12 +7686,14 @@
     }
     planAnker = a;
   }
+  // Erzeugt die Überschrift des Planungszeitraums (Jahr, Monat oder Woche vom … bis …)
   function planLabel(typ, start, end) {
     if (typ === "jahr") return String(start.getFullYear());
     if (typ === "monat") return MONATSNAMEN[start.getMonth()] + " " + start.getFullYear();
     const fmt = (d) => d.getDate() + "." + (d.getMonth() + 1) + ".";
     return "Woche vom " + fmt(start) + "–" + fmt(end) + " " + end.getFullYear();
   }
+  // Liefert den übergeordneten Zeitraumtyp (Woche → Monat → Jahr)
   function uebergeordneterTyp(typ) {
     if (typ === "woche") return "monat";
     if (typ === "monat") return "jahr";
@@ -7292,6 +7724,7 @@
     if (e.key === "Enter") zielAnlegen();
   });
 
+  // Legt ein neues Ziel für den angezeigten Zeitraum an, optional mit übergeordnetem Ziel
   async function zielAnlegen() {
     const titel = document.getElementById("neues-ziel").value.trim();
     if (!titel) return;
@@ -7308,11 +7741,13 @@
     await ladeDaten();
   }
 
+  // Löscht ein Ziel
   window.zielLoeschen = async function(id) {
     await api("ziel_loeschen", { id });
     await ladeDaten();
   };
 
+  // Fügt einem Ziel einen neuen Schritt hinzu
   window.zielSchrittHinzufuegen = async function(zielId, inputEl) {
     const text = inputEl.value.trim();
     if (!text) return;
@@ -7320,11 +7755,13 @@
     await ladeDaten();
   };
 
+  // Öffnet den Tab "frei" für den heutigen Tag
   window.heuteFreiOeffnen = function() {
     freiTag = new Date();
     tabWechseln("frei");
   };
 
+  // Springt aus einer Ziel-Kachel zur Planung des Zeitraums, klappt das Ziel auf und scrollt hin
   window.zielKachelKlick = function(id) {
     const z = ziele.find((zz) => zz.id === id);
     if (!z) return;
@@ -7338,22 +7775,26 @@
     });
   };
 
+  // Klappt eine Zielkarte in der Planung auf bzw. zu
   window.zielKarteUmschalten = function(id) {
     if (zielExpandiert.has(id)) zielExpandiert.delete(id);
     else zielExpandiert.add(id);
     renderPlanung();
   };
 
+  // Hakt einen Zielschritt ab bzw. wieder auf
   window.zielSchrittUmschalten = async function(id) {
     await api("ziel_schritt_umschalten", { id });
     await ladeDaten();
   };
 
+  // Löscht einen Zielschritt
   window.zielSchrittLoeschen = async function(id) {
     await api("ziel_schritt_loeschen", { id });
     await ladeDaten();
   };
 
+  // Baut die HTML-Karte eines Ziels mit Schritten, Fortschritt, übergeordnetem Ziel und Eingabe für neue Schritte
   function zielKarteHtml(z) {
     const schritte = zielSchritte.filter((s) => s.ziel_id === z.id);
     const erledigtCount = schritte.filter((s) => s.erledigt).length;
@@ -7386,6 +7827,7 @@
       </div>`;
   }
 
+  // Rendert die Planung für Woche/Monat/Jahr: Ziele des Zeitraums, Auswahl übergeordneter Ziele, Termine und Aufgaben
   function renderPlanung() {
     const start = periodStart(planTyp, planAnker);
     const end = periodEnd(planTyp, start);
@@ -7457,9 +7899,11 @@
   const SCHLUESSEL_ART = { schluessel: { icon: "🔑", text: "Schlüssel" }, key: { icon: "📡", text: "Elektronischer Key" } };
   const SCHLUESSEL_OHNE_VEREIN = "Ohne Verein";
 
+  // Liefert die Schlüssel/Keys des aktiven Bereichs
   function schluesselAktuell() {
     return schluesselListe.filter((k) => bereichVon(k) === aktiverBereich);
   }
+  // Liefert die Zugänge (Türen) des aktiven Bereichs, alphabetisch sortiert
   function zugaengeAktuell() {
     return schluesselZugaenge.filter((z) => bereichVon(z) === aktiverBereich).sort((a, b) => a.name.localeCompare(b.name, "de"));
   }
@@ -7468,11 +7912,13 @@
     const ids = k.zugaenge || [];
     return zugaengeAktuell().filter((z) => ids.includes(z.id)).map((z) => z.name);
   }
+  // Sortiervergleich für Schlüssel: nach Inhaber, dann Art, dann Seriennummer (numerisch)
   function schluesselVergleich(a, b) {
     return (a.inhaber || "").localeCompare(b.inhaber || "", "de")
       || (a.art || "").localeCompare(b.art || "")
       || (a.seriennummer || "").localeCompare(b.seriennummer || "", "de", { numeric: true });
   }
+  // Erzeugt die Select-Optionen für die Schlüsselart (Schlüssel/elektronischer Key) mit Vorauswahl
   function schluesselArtOptionen(gewaehlt) {
     return Object.entries(SCHLUESSEL_ART).map(([wert, a]) =>
       `<option value="${wert}" ${wert === gewaehlt ? "selected" : ""}>${a.icon} ${a.text}</option>`).join("");
@@ -7488,12 +7934,14 @@
         <input type="checkbox" value="${z.id}" ${gewaehlt.includes(z.id) ? "checked" : ""}> ${escapeHtml(z.name)}
       </label>`).join("")}</div>`;
   }
+  // Liest die angekreuzten Zugang-IDs aus einem Container; null, wenn keine Zugänge angelegt sind
   function schluesselZugangAuswahlLesen(containerId) {
     const el = document.getElementById(containerId);
     if (!el) return null; // keine Zugänge angelegt → Feld nicht mitschicken
     return [...el.querySelectorAll("input[type=checkbox]:checked")].map((c) => c.value);
   }
 
+  // Rendert die Schlüsselverwaltung: Vorschläge, Zugangsauswahl, Filter, Zusammenfassung, Liste und Zugänge
   function renderSchluessel() {
     const liste = document.getElementById("schluessel-liste");
     if (!liste) return;
@@ -7540,6 +7988,7 @@
       : `<p class="empty-text">Noch keine Zugänge.</p>`;
   }
 
+  // Rendert die gefilterte Schlüsselliste nach Verein gruppiert, inkl. Bearbeiten-Ansicht des gewählten Eintrags
   function renderSchluesselListe() {
     const liste = document.getElementById("schluessel-liste");
     if (!liste) return;
@@ -7654,14 +8103,17 @@
     schluesselFilterZugang = e.target.value;
     renderSchluesselListe();
   });
+  // Öffnet die Bearbeiten-Ansicht für einen Schlüssel
   window.schluesselBearbeitenStart = function(id) {
     schluesselBearbeitenId = id;
     renderSchluesselListe();
   };
+  // Bricht das Bearbeiten eines Schlüssels ab
   window.schluesselBearbeitenAbbrechen = function() {
     schluesselBearbeitenId = null;
     renderSchluesselListe();
   };
+  // Speichert den bearbeiteten Schlüssel samt Zugängen und lädt die Daten neu
   window.schluesselSpeichern = async function(id) {
     const wert = (f) => document.getElementById(`schl-edit-${f}-${id}`).value.trim();
     const daten = { id, art: wert("art"), seriennummer: wert("nr"), inhaber: wert("name"), verein: wert("verein"), notiz: wert("notiz") };
@@ -7675,6 +8127,7 @@
       alert(fehler.message);
     }
   };
+  // Löscht einen Schlüssel/Key nach Rückfrage und lädt die Daten neu
   window.schluesselLoeschen = async function(id) {
     const k = schluesselListe.find((x) => x.id === id);
     if (!confirm(`${k && k.art === "key" ? "Key" : "Schlüssel"} Nr. ${k ? k.seriennummer : ""} löschen?`)) return;
@@ -7699,6 +8152,7 @@
       alert(fehler.message);
     }
   });
+  // Bearbeitet Name und Beschreibung eines Zugangs per Prompt und speichert
   window.zugangBearbeiten = async function(id) {
     const z = schluesselZugaenge.find((x) => x.id === id);
     if (!z) return;
@@ -7713,6 +8167,7 @@
       alert(fehler.message);
     }
   };
+  // Löscht einen Zugang nach Rückfrage (mit Anzahl betroffener Schlüssel) und lädt die Daten neu
   window.zugangLoeschen = async function(id) {
     const z = schluesselZugaenge.find((x) => x.id === id);
     const anzahl = schluesselAktuell().filter((k) => (k.zugaenge || []).includes(id)).length;
@@ -7745,24 +8200,30 @@
   const RAUM_WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
   const RAUM_MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
+  // Liefert die Räume des aktiven Bereichs, alphabetisch sortiert
   function raeumeAktuell() {
     return raeume.filter((r) => bereichVon(r) === aktiverBereich).sort((a, b) => a.name.localeCompare(b.name, "de"));
   }
+  // Liefert die Raumvermietungen des aktiven Bereichs
   function raumVermietungenAktuell() {
     return raumVermietungen.filter((v) => bereichVon(v) === aktiverBereich);
   }
+  // Liefert die Mail-Empfänger des Raum-Verteilers im aktiven Bereich, nach E-Mail sortiert
   function raumEmpfaengerAktuell() {
     return raumMailEmpfaenger.filter((e) => bereichVon(e) === aktiverBereich).sort((a, b) => a.email.localeCompare(b.email));
   }
+  // Gibt den Namen eines Raums zur ID zurück, sonst „ohne Raum“
   function raumName(id) {
     const r = raeume.find((x) => x.id === id);
     return r ? r.name : "ohne Raum";
   }
+  // Formatiert ein ISO-Datum als „Wt, TT.MM.JJJJ“
   function raumDatumText(iso) {
     const d = new Date(iso + "T00:00:00");
     if (isNaN(d.getTime())) return iso;
     return `${RAUM_WOCHENTAGE[d.getDay()]}, ${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
   }
+  // Formatiert die Zeitangabe einer Vermietung (Zeitraum, von–bis, ab, bis oder ganztägig)
   function raumZeitText(v) {
     const von = v.von ? String(v.von).slice(0, 5) : null;
     const bis = v.bis ? String(v.bis).slice(0, 5) : null;
@@ -7780,13 +8241,16 @@
     if (v.datum_bis && v.datum_bis !== v.datum) return raumZeitText(v);
     return `${raumDatumText(v.datum)} · ${raumZeitText(v)}`;
   }
+  // Liefert das Enddatum einer Vermietung (datum_bis oder datum)
   function raumEnde(v) {
     return v.datum_bis || v.datum;
   }
+  // Liefert alle Vermietungen derselben Serie (gruppe_id), nach Datum sortiert
   function raumSerie(v) {
     if (!v.gruppe_id) return [];
     return raumVermietungen.filter((x) => x.gruppe_id === v.gruppe_id).sort((a, b) => a.datum.localeCompare(b.datum));
   }
+  // Erzeugt die Statuszeile zum Mailversand einer Vermietung, bei Fehlern mit „Erneut senden“
   function raumMailStatusHtml(v) {
     if (v.mail_status === "gesendet") {
       return `<span class="notiz-meta" style="display:block;">✉️ Mail verschickt${v.mail_gesendet_am ? " am " + new Date(v.mail_gesendet_am).toLocaleDateString("de-DE") : ""}</span>`;
@@ -7800,6 +8264,7 @@
     return `<span class="notiz-meta" style="display:block; color:var(--accent);">${escapeHtml(texte[v.mail_status])}
       <button class="link-btn" onclick="event.stopPropagation(); raumMailErneut('${v.id}')">Erneut senden</button></span>`;
   }
+  // Erzeugt den Rückmeldetext zum Mailversand nach dem Speichern einer Vermietung
   function raumMailErgebnisText(mail) {
     if (!mail) return "";
     if (mail.status === "gesendet") return `Mail an ${mail.anzahl} Adresse${mail.anzahl === 1 ? "" : "n"} verschickt.`;
@@ -7808,6 +8273,7 @@
     return "Gespeichert – aber die Mail ist fehlgeschlagen" + (mail.fehler ? ": " + mail.fehler : ".");
   }
 
+  // Rendert die Raumplanung: Hinweise, Formular, Kalender, Vermietungen nach Monat, Räume und Verteiler
   function renderRaumplanung() {
     const liste = document.getElementById("raum-vermietungen-liste");
     if (!liste) return;
@@ -7969,15 +8435,18 @@
       : `<p class="empty-text">Noch keine Adressen.</p>`;
   }
 
+  // Merkt sich, ob die vergangenen Vermietungen aufgeklappt sind
   window.raumVergangeneUmschalten = function(el) {
     raumVergangeneOffen = el.open;
   };
 
+  // Merkt den Auf-/Zuklapp-Zustand einer Monatsgruppe und speichert ihn in localStorage
   window.raumMonatUmschalten = function(el) {
     raumMonatOffen[el.dataset.schluessel] = el.open;
     raumMonateMerken();
   };
 
+  // Klappt alle Monatsgruppen kommender Vermietungen auf oder zu und rendert neu
   window.raumAlleMonate = function(auf) {
     const heute = heuteISO();
     raumVermietungenAktuell().filter((v) => raumEnde(v) >= heute)
@@ -8003,6 +8472,7 @@
     return tage;
   }
 
+  // Rendert den Monatskalender der Raumbelegung mit markierten Tagen und Tagespanel für den gewählten Tag
   function raumKalenderRendern(alle, karte) {
     const el = document.getElementById("raum-kalender");
     if (!el) return;
@@ -8069,17 +8539,20 @@
       ${panel}`;
   }
 
+  // Blättert den Raumkalender um delta Monate und hebt die Tagesauswahl auf
   window.raumKalBlaettern = function(delta) {
     raumKalMonat = new Date(raumKalMonat.getFullYear(), raumKalMonat.getMonth() + delta, 1);
     raumKalTag = null;
     renderRaumplanung();
   };
+  // Springt im Raumkalender zum aktuellen Monat
   window.raumKalHeute = function() {
     const d = new Date();
     raumKalMonat = new Date(d.getFullYear(), d.getMonth(), 1);
     raumKalTag = null;
     renderRaumplanung();
   };
+  // Wählt einen Kalendertag aus bzw. hebt die Auswahl beim zweiten Tipp wieder auf
   window.raumKalTagWaehlen = function(iso) {
     raumKalTag = raumKalTag === iso ? null : iso;
     renderRaumplanung();
@@ -8157,6 +8630,7 @@
     }
     return tage;
   }
+  // Beschreibt den Rhythmus einer Terminserie in Worten, z. B. „jeden zweiten Dienstag“
   function raumRegelBeschreibung(start, rhythmus) {
     if (!start) return "";
     const [j, m, t] = start.split("-").map(Number);
@@ -8166,6 +8640,7 @@
     if (rhythmus === "monat_tag") return `jeden ${t}. im Monat`;
     return `jeden ${RAUM_ORDINAL[Math.floor((t - 1) / 7)]} ${wt} im Monat`;
   }
+  // Zeigt im Formular die Vorschau der Termine, die eine regelmäßige Serie erzeugen würde
   function raumRegelVorschau() {
     const el = document.getElementById("raum-neu-regel-vorschau");
     if (!el || document.getElementById("raum-neu-art").value !== "regel") return;
@@ -8184,6 +8659,7 @@
     el.textContent = `${raumRegelBeschreibung(start, rhythmus)}: ${tage.length} Termin${tage.length === 1 ? "" : "e"} – ${liste}`;
   }
 
+  // Passt Felder, Beschriftungen und Hinweis des Vermietungsformulars an die gewählte Art an
   function raumArtAnwenden() {
     const art = document.getElementById("raum-neu-art").value;
     document.getElementById("raum-neu-datum-bis-feld").classList.toggle("hidden", art !== "zeitraum" && art !== "regel");
@@ -8203,6 +8679,7 @@
     document.getElementById("raum-neu-art-hinweis").textContent = hinweise[art] || "";
     raumRegelVorschau();
   }
+  // Rendert die gewählten Einzeltage als entfernbare Chips
   function raumTageRendern() {
     const ziel = document.getElementById("raum-neu-tage-liste");
     if (!ziel) return;
@@ -8210,6 +8687,7 @@
       ? raumNeueTage.map((t) => `<button type="button" class="chip" onclick="raumTagEntfernen('${t}')" title="Entfernen">${escapeHtml(raumDatumText(t))} ×</button>`).join("")
       : `<span class="notiz-meta">Noch keine Tage gewählt.</span>`;
   }
+  // Entfernt einen Tag aus der Auswahl für mehrere Einzeltage
   window.raumTagEntfernen = function(t) {
     raumNeueTage = raumNeueTage.filter((x) => x !== t);
     raumTageRendern();
@@ -8299,15 +8777,18 @@
     }
   });
 
+  // Öffnet die Bearbeiten-Ansicht einer Vermietung in der Liste oder im Kalender
   window.raumBearbeitenStart = function(id, ort) {
     raumBearbeitenId = id;
     raumBearbeitenOrt = ort === "kal" ? "kal" : "liste";
     renderRaumplanung();
   };
+  // Bricht das Bearbeiten einer Vermietung ab
   window.raumBearbeitenAbbrechen = function() {
     raumBearbeitenId = null;
     renderRaumplanung();
   };
+  // Speichert die bearbeitete Vermietung (mit Überschneidungsprüfung) und lädt die Daten neu
   window.raumBearbeitenSpeichern = async function(id) {
     const wert = (feld) => document.getElementById(`raum-edit-${feld}-${id}`).value;
     const daten = {
@@ -8331,6 +8812,7 @@
       if (fehler.message !== "unauthorized") alert("Speichern fehlgeschlagen: " + fehler.message);
     }
   };
+  // Löscht eine Vermietung bzw. nur diesen Termin einer Serie nach Rückfrage, ohne Mail
   window.raumVermietungLoeschen = async function(id) {
     const v = raumVermietungen.find((x) => x.id === id);
     const serie = v ? raumSerie(v) : [];
@@ -8345,6 +8827,7 @@
       alert("Löschen fehlgeschlagen: " + fehler.message);
     }
   };
+  // Löscht nach Rückfrage alle Termine einer Vermietungsserie, ohne Mail
   window.raumSerieLoeschen = async function(id) {
     const v = raumVermietungen.find((x) => x.id === id);
     const serie = v ? raumSerie(v) : [];
@@ -8357,6 +8840,7 @@
       alert("Löschen fehlgeschlagen: " + fehler.message);
     }
   };
+  // Verschickt die Mail zu einer Vermietung erneut und meldet das Ergebnis
   window.raumMailErneut = async function(id) {
     try {
       const ergebnis = await api("vermietung_mail_senden", { id });
@@ -8379,6 +8863,7 @@
       alert(fehler.message);
     }
   });
+  // Bearbeitet Name und Beschreibung eines Raums per Prompt und speichert
   window.raumUmbenennen = async function(id) {
     const r = raeume.find((x) => x.id === id);
     if (!r) return;
@@ -8393,6 +8878,7 @@
       alert(fehler.message);
     }
   };
+  // Löscht einen Raum nach Rückfrage; Vermietungen bleiben ohne Raum erhalten
   window.raumLoeschen = async function(id) {
     const r = raeume.find((x) => x.id === id);
     if (!confirm(`Raum „${r ? r.name : ""}“ löschen? Vorhandene Vermietungen bleiben erhalten, stehen dann aber ohne Raum.`)) return;
@@ -8416,6 +8902,7 @@
       alert(fehler.message);
     }
   });
+  // Entfernt eine Adresse nach Rückfrage aus dem Raum-Mailverteiler
   window.raumEmpfaengerLoeschen = async function(id) {
     const e = raumMailEmpfaenger.find((x) => x.id === id);
     if (!confirm(`${e ? e.email : "Adresse"} aus dem Verteiler entfernen?`)) return;
@@ -8433,6 +8920,7 @@
   function finEuro(n) {
     return Number(n || 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
   }
+  // Wandelt einen Wert (auch mit Komma) in eine Zahl um, ungültig oder leer ergibt 0
   function finZahl(v) {
     if (v === null || v === undefined || v === "") return 0;
     const n = typeof v === "number" ? v : parseFloat(String(v).replace(",", "."));
@@ -8454,6 +8942,7 @@
     });
   });
 
+  // Rendert den aktiven Finanzen-Reiter (Fixkosten, Sonderausgaben, Buchungen oder Übersicht)
   function renderFinanzen() {
     if (finTyp === "fixkosten") renderFinFixkosten();
     else if (finTyp === "sonderausgaben") renderFinSonderausgaben();
@@ -8471,6 +8960,7 @@
     if (i === aktuell) return "aktuell";
     return i > aktuell ? "kommend" : "vergangen";
   }
+  // Liefert die CSS-Klasse für aktuellen/kommenden Monat, leer bei vergangenen
   function finMonatKlasse(i) {
     const art = finMonatArt(i);
     return art === "vergangen" ? "" : `fin-m-${art}`;
@@ -8483,12 +8973,14 @@
     if (art === "kommend") return `color-mix(in srgb, var(--accent) 7%, ${basis})`;
     return "";
   }
+  // Erzeugt das style-Attribut für eine Monatszelle aus Monatsfarbe und Zusatzstil
   function finMonatStil(i, basis, zusatz = "") {
     const farbe = finMonatFarbe(finMonatArt(i), basis);
     const stil = (farbe ? `background:${farbe};` : "") + zusatz;
     return stil ? ` style="${stil}"` : "";
   }
 
+  // Erzeugt eine Fixkosten-Monatszelle; kommende Abweichungen zum Vormonat werden mit ↑/↓ markiert
   function fixkostenZelleHtml(f, i) {
     const m = FIN_MONATE[i];
     const wert = finZahl(f[m]);
@@ -8508,6 +9000,7 @@
     return `<td${k ? ` class="${k}"` : ""}${stil}${titel}>${wert ? pfeil + finEuro(wert) : "–"}</td>`;
   }
 
+  // Erzeugt eine Fixkosten-Tabellenzeile, wahlweise als Bearbeiten-Zeile mit Eingabefeldern
   function fixkostenZeileHtml(f, istBearbeitet) {
     const summe = FIN_MONATE.reduce((s, m) => s + finZahl(f[m]), 0);
     if (istBearbeitet) {
@@ -8534,6 +9027,7 @@
       </tr>`;
   }
 
+  // Erzeugt die Fixkosten-Tabelle eines Typs (Ausgabe/Einnahme) mit Monatssummen
   function fixkostenTabelleHtml(typ, titel) {
     const zeilen = fixkostenAktuell().filter((f) => f.typ === typ);
     const summenProMonat = FIN_MONATE.map((m) => zeilen.reduce((s, f) => s + finZahl(f[m]), 0));
@@ -8564,6 +9058,7 @@
       </div>`;
   }
 
+  // Rendert den Fixkosten-Reiter mit beiden Tabellen, Legende, Neu-Formular und Aufräumen-Knopf
   function renderFinFixkosten() {
     const el = document.getElementById("fin-fixkosten-bereich");
     el.innerHTML = `
@@ -8595,6 +9090,7 @@
     document.getElementById("btn-fixkosten-aufraeumen").addEventListener("click", finFixkostenAufraeumen);
   }
 
+  // Legt eine neue Fixkosten-Position mit gleichem Betrag für alle Monate an
   async function fixkostenHinzufuegen() {
     const bezeichnung = document.getElementById("neue-fk-bezeichnung").value.trim();
     if (!bezeichnung) return;
@@ -8607,14 +9103,17 @@
     renderFinanzen();
   }
 
+  // Öffnet die Bearbeiten-Zeile einer Fixkosten-Position
   window.fixkostenBearbeitenStart = function (id) {
     finBearbeitetesFixkosten = id;
     renderFinFixkosten();
   };
+  // Bricht das Bearbeiten einer Fixkosten-Position ab
   window.fixkostenBearbeitenAbbrechen = function () {
     finBearbeitetesFixkosten = null;
     renderFinFixkosten();
   };
+  // Speichert eine Fixkosten-Position; geänderte Beträge gelten optional auch für die Folgemonate
   window.fixkostenSpeichern = async function (id) {
     const bezeichnung = document.getElementById("fk-bez-" + id).value.trim();
     if (!bezeichnung) return;
@@ -8647,12 +9146,14 @@
     await ladeDaten();
     renderFinanzen();
   };
+  // Löscht eine Fixkosten-Position und rendert die Finanzen neu
   window.fixkostenLoeschen = async function (id) {
     await api("fixkosten_loeschen", { id });
     await ladeDaten();
     renderFinanzen();
   };
 
+  // Erzeugt die Karte einer Sonderausgabe, wahlweise in der Bearbeiten-Ansicht
   function sonderausgabeKarteHtml(s) {
     const bearbeitet = s.id === finBearbeiteteSonderausgabe;
     if (bearbeitet) {
@@ -8685,6 +9186,7 @@
       </div>`;
   }
 
+  // Rendert die Sonderausgaben des laufenden Jahres mit Summe und Neu-Formular
   function renderFinSonderausgaben() {
     const el = document.getElementById("fin-sonderausgaben-bereich");
     const jahr = new Date().getFullYear();
@@ -8717,6 +9219,7 @@
     document.getElementById("btn-sonderausgabe-anlegen").addEventListener("click", sonderausgabeHinzufuegen);
   }
 
+  // Legt eine neue Sonderausgabe für das laufende Jahr an
   async function sonderausgabeHinzufuegen() {
     const bezeichnung = document.getElementById("neue-sa-bezeichnung").value.trim();
     if (!bezeichnung) return;
@@ -8728,14 +9231,17 @@
     renderFinanzen();
   }
 
+  // Öffnet die Bearbeiten-Ansicht einer Sonderausgabe
   window.sonderausgabeBearbeitenStart = function (id) {
     finBearbeiteteSonderausgabe = id;
     renderFinSonderausgaben();
   };
+  // Bricht das Bearbeiten einer Sonderausgabe ab
   window.sonderausgabeBearbeitenAbbrechen = function () {
     finBearbeiteteSonderausgabe = null;
     renderFinSonderausgaben();
   };
+  // Speichert die bearbeitete Sonderausgabe und lädt die Daten neu
   window.sonderausgabeSpeichern = async function (id) {
     const s = sonderausgaben.find((x) => x.id === id);
     const bezeichnung = document.getElementById("sa-bez-" + id).value.trim();
@@ -8748,6 +9254,7 @@
     await ladeDaten();
     renderFinanzen();
   };
+  // Löscht eine Sonderausgabe und rendert die Finanzen neu
   window.sonderausgabeLoeschen = async function (id) {
     await api("sonderausgabe_loeschen", { id });
     await ladeDaten();
@@ -8763,15 +9270,18 @@
     return heuteISO();
   }
 
+  // Wählt Ausgabe/Einnahme für die Schnellerfassung und setzt die erste passende Kategorie
   window.buchungTypWaehlen = function (typ) {
     buchungTypAusgewaehlt = typ;
     buchungKategorieAusgewaehlt = (typ === "einnahme" ? FIN_KAT_EINNAHME : FIN_KAT_AUSGABE)[0];
     renderFinBuchungen();
   };
+  // Wählt die Kategorie für die Schnellerfassung einer Buchung
   window.buchungKategorieWaehlen = function (kat) {
     buchungKategorieAusgewaehlt = kat;
     renderFinBuchungen();
   };
+  // Blättert die Buchungsliste um delta Monate (mit Jahreswechsel)
   window.finBuchungMonatVerschieben = function (delta) {
     finBuchMonat += delta;
     if (finBuchMonat < 1) { finBuchMonat = 12; finBuchJahr--; }
@@ -8779,6 +9289,7 @@
     renderFinBuchungen();
   };
 
+  // Rendert den Buchungen-Reiter: Schnellerfassung, CSV-Import, Monatssummen und Buchungsliste
   function renderFinBuchungen() {
     const el = document.getElementById("fin-buchungen-bereich");
     const istAktuellerMonat = finBuchMonat === new Date().getMonth() + 1 && finBuchJahr === new Date().getFullYear();
@@ -8904,6 +9415,7 @@
     });
   }
 
+  // Speichert eine neue Buchung aus der Schnellerfassung (Betrag muss > 0 sein)
   async function buchungHinzufuegen() {
     const betragFeld = document.getElementById("neue-buchung-betrag");
     const betrag = betragFeld.value;
@@ -8920,14 +9432,17 @@
     renderFinanzen();
   }
 
+  // Öffnet die Bearbeiten-Ansicht einer Buchung
   window.buchungBearbeitenStart = function (id) {
     finBearbeiteteBuchung = id;
     renderFinBuchungen();
   };
+  // Bricht das Bearbeiten einer Buchung ab
   window.buchungBearbeitenAbbrechen = function () {
     finBearbeiteteBuchung = null;
     renderFinBuchungen();
   };
+  // Speichert die bearbeitete Buchung und lädt die Daten neu
   window.buchungAktualisieren = async function (id) {
     const datum = document.getElementById("edit-buchung-datum-" + id).value;
     const betrag = document.getElementById("edit-buchung-betrag-" + id).value;
@@ -8939,6 +9454,7 @@
     await ladeDaten();
     renderFinanzen();
   };
+  // Löscht eine Buchung und rendert die Finanzen neu
   window.buchungLoeschen = async function (id) {
     await api("buchung_loeschen", { id });
     await ladeDaten();
@@ -8954,6 +9470,7 @@
     return -1;
   }
 
+  // Zerlegt CSV-Text in Kopfzeile und Zeilen; Trennzeichen (; oder ,) wird automatisch erkannt
   function parseCsvText(text) {
     const erstenZeilen = text.split(/\r?\n/).slice(0, 5).join("\n");
     const anzahlSemikolon = (erstenZeilen.match(/;/g) || []).length;
@@ -8968,6 +9485,7 @@
     return { header, rows };
   }
 
+  // Wandelt einen CSV-Betrag (deutsches oder englisches Format) in eine Zahl um, sonst null
   function parseCsvBetrag(raw) {
     let s = (raw || "").trim();
     if (!s) return null;
@@ -8977,6 +9495,7 @@
     return Number.isFinite(n) ? n : null;
   }
 
+  // Wandelt ein CSV-Datum (TT.MM.JJJJ, TT.MM.JJ, JJJJ-MM-TT, TT/MM/JJJJ) in ISO um, sonst null
   function parseCsvDatum(raw) {
     const s = (raw || "").trim();
     let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
@@ -8990,6 +9509,7 @@
     return null;
   }
 
+  // Liest eine CSV-Datei als Text: UTF-8 (BOM entfernt), sonst Fallback auf Windows-1252
   function liesCsvDatei(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -9011,6 +9531,7 @@
     });
   }
 
+  // Importiert Bank-CSV als Buchungen, gleicht Fixkosten-Monate ab und schlägt wiederkehrende Posten vor
   async function csvImportieren(file) {
     const text = await liesCsvDatei(file);
     const { header, rows } = parseCsvText(text);
@@ -9099,6 +9620,7 @@
     "GUTSCHRIFT", "DAUERAUFTRAG", "ECHTZEITUEBERWEISUNG", "SEPA",
   ];
 
+  // Bildet aus einem Buchungstext einen Schlüssel: ohne Füllwörter/Zahlen, max. 4 Wörter
   function finNormalizeKey(notiz) {
     let text = (notiz || "").toUpperCase();
     FIN_NOISE_WORDS.forEach((w) => { text = text.split(w).join(" "); });
@@ -9108,6 +9630,7 @@
     return text.split(" ").filter(Boolean).slice(0, 4).join(" ");
   }
 
+  // Berechnet den Median einer Zahlenliste
   function finMedian(zahlen) {
     const sortiert = [...zahlen].sort((a, b) => a - b);
     const mitte = Math.floor(sortiert.length / 2);
@@ -9133,6 +9656,7 @@
     return String(f.erkennung || "").trim() || finNormalizeKey(f.bezeichnung);
   }
 
+  // Macht aus einem Erkennungsschlüssel einen lesbaren Namen (Wörter großgeschrieben)
   function finNameAusSchluessel(schluessel) {
     return String(schluessel || "").toLowerCase().split(" ").filter(Boolean)
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
@@ -9190,6 +9714,7 @@
     });
   }
 
+  // Plant den Fixkosten-Abgleich: Duplikate zusammenführen, Monatswerte aus Buchungen, Schlüssel, Kurznamen
   function finFixAbgleichPlanen({ zusammenfuehren }) {
     const jahr = new Date().getFullYear();
     const aktuellerMonat = new Date().getMonth();
@@ -9250,6 +9775,7 @@
     return { jahr, aenderungen, loeschen, zusammengelegt, monateAktualisiert, umbenannt };
   }
 
+  // Führt doppelte Fixkosten zusammen und aktualisiert Monatswerte nach Rückfrage über fixkosten_abgleich
   async function finFixkostenAufraeumen() {
     const plan = finFixAbgleichPlanen({ zusammenfuehren: true });
     if (!plan.zusammengelegt.length && !plan.monateAktualisiert && !plan.umbenannt.length) {
@@ -9293,6 +9819,7 @@
     }
   }
 
+  // Erkennt wiederkehrende Buchungen (gleicher Schlüssel in mehreren Monaten) als Fixkosten-Kandidaten
   function erkennKandidatenFin(alleBuchungen, fixkostenListe = [], minMonate = 2, varianzSchwelle = 0.2) {
     // Buchungen, die schon zu einer Fixkosten-Position passen, gar nicht erst
     // vorschlagen – über den Erkennungsschlüssel (seit Session 29) oder wie
@@ -9352,6 +9879,7 @@
 
   let finErkennungKandidaten = [];
 
+  // Öffnet das Modal mit den erkannten Fixkosten-Kandidaten
   function zeigeErkennungsModal(kandidaten) {
     finErkennungKandidaten = kandidaten;
     const overlay = document.createElement("div");
@@ -9361,6 +9889,7 @@
     renderErkennungsModal();
   }
 
+  // Rendert das Erkennungs-Modal mit editierbaren Kandidaten (Bezeichnung, Typ, Auswahl)
   function renderErkennungsModal() {
     const overlay = document.getElementById("fin-erkennung-overlay");
     if (!overlay) return;
@@ -9403,10 +9932,12 @@
     document.getElementById("fin-erkennung-uebernehmen").addEventListener("click", erkennungUebernehmen);
   }
 
+  // Schaltet die Auswahl eines Fixkosten-Kandidaten um
   window.finKandidatUmschalten = function (i) {
     finErkennungKandidaten[i].ausgewaehlt = !finErkennungKandidaten[i].ausgewaehlt;
   };
 
+  // Schließt das Erkennungs-Modal, leert die Kandidaten und rendert die Finanzen neu
   function schliesseErkennungsModal() {
     const overlay = document.getElementById("fin-erkennung-overlay");
     if (overlay) overlay.remove();
@@ -9414,6 +9945,7 @@
     renderFinanzen();
   }
 
+  // Legt die ausgewählten Kandidaten als Fixkosten an (mit Monatswerten und Erkennungsschlüssel)
   async function erkennungUebernehmen() {
     // Seit Session 27 werden hier keine Einzelbuchungen mehr gelöscht: Die
     // Übersicht rechnet nur mit Buchungen – gelöschte Kontozeilen fehlten
@@ -9458,6 +9990,7 @@
     renderFinUebersicht();
   };
 
+  // Lädt die Jahresübersicht der Finanzen des aktiven Bereichs und rendert Summen und Diagramme
   async function renderFinUebersicht() {
     const el = document.getElementById("fin-uebersicht-bereich");
     el.innerHTML = `<p class="empty-text">Lade Jahresübersicht …</p>`;
@@ -9573,6 +10106,7 @@
     return Array.from(new Set([...FIN_KAT_AUSGABE, ...FIN_KAT_EINNAHME])).sort((a, b) => a.localeCompare(b, "de"));
   }
 
+  // Baut das HTML für die Massenlöschung von Buchungen, Fixkosten und Sonderausgaben mit Filtern
   function finMassenloeschungHtml() {
     const kategorien = finMlAlleKategorien();
     return `
@@ -9616,6 +10150,7 @@
     `;
   }
 
+  // Liefert die in der Massenlöschung angehakten Datenarten
   function finMlAusgewaehlteBereiche() {
     const bereiche = [];
     if (document.getElementById("fin-ml-bereich-buchungen").checked) bereiche.push("buchungen");
@@ -9624,6 +10159,7 @@
     return bereiche;
   }
 
+  // Sammelt die aktuellen Filter der Massenlöschung inkl. aktivem Bereich
   function finMlAktuelleFilter() {
     return {
       bereiche: finMlAusgewaehlteBereiche(),
@@ -9637,6 +10173,7 @@
 
   const FIN_ML_LABELS = { buchungen: "Buchungen", fixkosten: "Fixkosten", sonderausgaben: "Sonderausgaben" };
 
+  // Bindet Vorschau- und Lösch-Buttons der Massenlöschung an die API finanzen_massenloeschung
   function finMassenloeschungBinden() {
     const vorschauBtn = document.getElementById("fin-ml-vorschau-btn");
     const ergebnisEl = document.getElementById("fin-ml-ergebnis");
@@ -9695,6 +10232,7 @@
     });
   }
 
+  // Zeichnet das SVG-Balkendiagramm Einnahmen vs. Ausgaben je Monat
   function finChartEinnahmenAusgaben(zeilen) {
     const breite = 700, hoehe = 220, unten = 30, oben = 12, linksrand = 6;
     const maxWert = Math.max(1, ...zeilen.map((z) => Math.max(finZahl(z.einnahmen_gesamt), finZahl(z.ausgaben_gesamt))));
@@ -9717,6 +10255,7 @@
     </svg>`;
   }
 
+  // Zeichnet das SVG-Liniendiagramm des Kontostands über das Jahr ab Startkapital
   function finChartKontostand(zeilen, startkapital) {
     const breite = 700, hoehe = 200, unten = 24, oben = 16;
     const werte = [startkapital, ...zeilen.map((z) => finZahl(z.kontostand_ende))];
@@ -9745,6 +10284,7 @@
     </svg>`;
   }
 
+  // Zeichnet die Top-8-Ausgabenkategorien des Jahres als SVG-Balkendiagramm
   function finChartKategorien(jahr) {
     const summenProKategorie = {};
     buchungenAktuell()
@@ -9814,14 +10354,18 @@
   let ernWocheLaedt = false;
   let ernWocheFehler = "";
 
+  // Liefert das gewählte Ernährungsdatum oder heute
   function ernAktDatum() { return ernDatum || heuteISO(); }
+  // Formatiert einen Grammwert, "–" wenn leer
   function ernGramm(v) { return v === null || v === undefined ? "–" : ernZahl(v) + " g"; }
 
+  // Formatiert eine Zahl deutsch mit max. n Nachkommastellen, "–" wenn leer
   function ernZahl(v, stellen = 1) {
     if (v === null || v === undefined || v === "") return "–";
     return Number(v).toLocaleString("de-DE", { maximumFractionDigits: stellen });
   }
 
+  // Liefert das Datumslabel (Heute/Gestern/Morgen oder Wochentag) für die Ernährungsansicht
   function ernDatumLabel(iso) {
     const diff = tageSeitIso(iso, heuteISO());
     const wochentag = new Date(iso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" });
@@ -9889,6 +10433,7 @@
       ${unvollstaendig ? `<p class="notiz-meta" style="margin:0.4rem 0 0;">* nur aus den Einträgen mit Wert (z. B. fehlen sie bei älteren Einträgen oder einzelnen Produkten) – die echte Menge liegt eher höher.</p>` : ""}`;
   }
 
+  // Lädt die Ernährungseinträge, zuletzt verwendete Lebensmittel und Vortag für das gewählte Datum
   async function ernTagLaden() {
     const datum = ernAktDatum();
     ernLaedt = true;
@@ -9915,12 +10460,14 @@
   function ernZugeklapptSpeichern() {
     try { localStorage.setItem("ern-zugeklappt", JSON.stringify([...ernZugeklappt])); } catch (_e) { /* egal */ }
   }
+  // Klappt eine Mahlzeit auf/zu, merkt den Zustand und rendert neu
   window.ernMahlzeitKlappen = function(schluessel) {
     if (ernZugeklappt.has(schluessel)) ernZugeklappt.delete(schluessel); else ernZugeklappt.add(schluessel);
     ernZugeklapptSpeichern();
     renderErnaehrung();
   };
 
+  // Rendert die Ernährungs-Tagesansicht (Summe, Ziele, Mahlzeiten); lädt Profil/Tag bei Bedarf nach
   function renderErnaehrung() {
     const kopfEl = document.getElementById("ern-summe");
     const listeEl = document.getElementById("ern-mahlzeiten");
@@ -9979,6 +10526,7 @@
     ernWocheRendern();
   }
 
+  // Baut das HTML eines Ernährungseintrags (oder dessen Bearbeitungsformular)
   function ernEintragHtml(e) {
     if (e.id === ernBearbeitenId) return ernBearbeitenHtml(e);
     const teile = [];
@@ -9997,6 +10545,7 @@
       </div>`;
   }
 
+  // Baut das Bearbeitungsformular eines Eintrags: Menge bzw. bei freien Einträgen alle Nährwerte
   function ernBearbeitenHtml(e) {
     const mahlzeitSelect = `<select id="ern-edit-mahlzeit" aria-label="Mahlzeit">${ERN_MAHLZEITEN.map(([k, n]) =>
       `<option value="${k}" ${k === e.mahlzeit ? "selected" : ""}>${n}</option>`).join("")}</select>`;
@@ -10039,6 +10588,7 @@
       </button>`;
   }
 
+  // Kopiert eine Mahlzeit vom Vortag auf das gewählte Datum
   window.ernKopieren = async function(mahlzeit, btn) {
     if (ernKopiertGerade) return;
     const nach = ernAktDatum();
@@ -10070,6 +10620,7 @@
   let ernKopStatus = "";
   let ernKopLaeuft = false;
 
+  // Liest Quelltag, Zieltag und Mahlzeit(en) aus dem Kopieren-Block
   function ernKopAuswahl() {
     const mahlzeit = document.getElementById("ern-kop-mahlzeit").value;
     return {
@@ -10094,6 +10645,7 @@
     return ernKopCache[datum] || null;
   }
 
+  // Lädt die Mahlzeiten-Übersicht eines Tages für den Kopieren-Block in den Cache
   async function ernKopLaden(datum) {
     ernKopLaedt = datum;
     ernKopFehler = "";
@@ -10110,6 +10662,7 @@
     }
   }
 
+  // Rendert den Block "Mahlzeiten kopieren" mit Vorschau von Quell- und Zieltag
   function ernKopRendern() {
     const block = document.getElementById("ern-kopieren-block");
     if (!block || !block.open) return;
@@ -10176,8 +10729,10 @@
     btn.textContent = `${anzahl} ${anzahl === 1 ? "Eintrag" : "Einträge"} kopieren`;
   }
 
+  // Leert Cache und Fehler des Kopieren-Blocks und rendert ihn neu
   window.ernKopNeu = function() { ernKopCache = {}; ernKopFehler = ""; ernKopRendern(); };
 
+  // Kopiert die gewählten Mahlzeiten auf den Zieltag, nach Rückfrage bei schon belegten Mahlzeiten
   async function ernKopAusfuehren() {
     if (ernKopLaeuft) return;
     const { von, nach, mahlzeit, zielMahlzeit } = ernKopAuswahl();
@@ -10252,6 +10807,7 @@
     }
   }
 
+  // Baut die Startseiten-Kachel mit kcal heute bzw. Rest zum Tagesziel (nur Privat)
   function ernStartKachelHtml() {
     if (aktiverBereich !== "privat" || !reiterIstSichtbar("privat", "ernaehrung")) return "";
     const datum = heuteISO();
@@ -10279,6 +10835,7 @@
       </button>`;
   }
 
+  // Öffnet beim Klick auf die Startkachel den Ernährungsreiter auf heute
   window.ernStartKachelKlick = function() {
     ernDatum = null;
     ernBearbeitenId = null;
@@ -10296,6 +10853,7 @@
     return Math.ceil(((d - jahrStart) / 86400000 + 1) / 7);
   }
 
+  // Lädt die Ernährungssummen einer Woche (Mo–So) und rendert die Wochenübersicht
   async function ernWocheLaden(start) {
     ernWocheLaedt = true;
     ernWocheFehler = "";
@@ -10310,6 +10868,7 @@
     }
   }
 
+  // Rendert die Wochenübersicht der Ernährung mit KW und Tageswerten
   function ernWocheRendern() {
     const block = document.getElementById("ern-woche-block");
     const el = document.getElementById("ern-woche");
@@ -10389,10 +10948,12 @@
     el.innerHTML = kopf + `<div class="ern-woche-liste">${zeilen.join("")}</div>`;
   }
 
+  // Springt aus der Wochenübersicht zum gewählten Tag
   window.ernWocheTag = function(iso) {
     ernDatumSetzen(iso);
     document.getElementById("ern-summe").scrollIntoView({ block: "start", behavior: "smooth" });
   };
+  // Verwirft die geladene Woche und lädt die Wochenübersicht neu
   window.ernWocheNeu = function() { ernWoche = null; ernWocheFehler = ""; ernWocheRendern(); };
   document.getElementById("ern-woche-block").addEventListener("toggle", (e) => {
     if (e.target.open) { ernWoche = null; ernWocheFehler = ""; ernWocheRendern(); }
@@ -10412,11 +10973,13 @@
     document.getElementById("ern-export-bis").value = bis;
   }
 
+  // Rundet einen Wert für den Excel-Export auf eine Nachkommastelle, leer wenn kein Wert
   function ernWert(v) {
     // leer statt 0, wenn kein Wert vorliegt; sonst echte Zahl (für Excel)
     return v === null || v === undefined || v === "" ? "" : Math.round(Number(v) * 10) / 10;
   }
 
+  // Baut die Excel-Mappe des Ernährungsexports (Einträge, Tagessummen, Gewicht)
   function ernExportMappe(von, bis, eintraege, gewichte) {
     const zeilenEintraege = eintraege.map((e) => ({
       Datum: e.datum,
@@ -10535,11 +11098,15 @@
     }
   });
 
+  // Erzwingt das Neuladen von Ernährungstag und Profil
   window.ernNeuLaden = function() { ernGeladenFuer = null; ernFehler = ""; ernProfilFehlgeschlagen = false; ernTagLaden(); };
 
+  // Öffnet einen Ernährungseintrag zum Bearbeiten
   window.ernBearbeiten = function(id) { ernBearbeitenId = id; renderErnaehrung(); };
+  // Bricht das Bearbeiten eines Ernährungseintrags ab
   window.ernBearbeitenAbbrechen = function() { ernBearbeitenId = null; renderErnaehrung(); };
 
+  // Speichert den bearbeiteten Ernährungseintrag (Menge bzw. freie Nährwerte)
   window.ernBearbeitenSpeichern = async function(id) {
     const e = ernEintraege.find((x) => x.id === id);
     if (!e) return;
@@ -10569,6 +11136,7 @@
     }
   };
 
+  // Löscht nach Rückfrage einen Eintrag aus dem Ernährungstagebuch
   window.ernLoeschen = async function(id) {
     const e = ernEintraege.find((x) => x.id === id);
     if (!e || !confirm(`„${e.name}“ aus dem Tagebuch löschen?`)) return;
@@ -10608,6 +11176,7 @@
     }
   }
 
+  // Schaltet im Hinzufügen-Panel zwischen Suche, Menge, frei, eigen und zuordnen um
   function ernAnsicht(welche) {
     // "suche" | "menge" | "frei"
     document.getElementById("ern-such-bereich").classList.toggle("hidden", welche !== "suche");
@@ -10617,6 +11186,7 @@
     document.getElementById("ern-zuordnen-bereich").classList.toggle("hidden", welche !== "zuordnen");
   }
 
+  // Öffnet das Hinzufügen-Panel für eine Mahlzeit (sonst Vorschlag nach Uhrzeit)
   window.ernHinzuOeffnen = function(mahlzeit) {
     ernHinzuMahlzeit = mahlzeit || ernStandardMahlzeit();
     if (mahlzeit && ernZugeklappt.delete(mahlzeit)) { ernZugeklapptSpeichern(); renderErnaehrung(); }
@@ -10635,6 +11205,7 @@
     suche.focus({ preventScroll: true });
   };
 
+  // Schließt das Hinzufügen-Panel und setzt die Auswahl zurück
   function ernHinzuSchliessen() {
     document.getElementById("ern-hinzu").classList.add("hidden");
     ernHinzuMahlzeit = null;
@@ -10650,6 +11221,7 @@
     if (!document.getElementById("ern-suche").value.trim()) ernZuletztZeigen();
   });
 
+  // Baut eine Trefferzeile eines Lebensmittels mit Nährwerten je 100 g
   function ernTrefferZeile(l, i) {
     const zusatz = [l.marke, ernQuelleLabel(l)].filter(Boolean).join(" · ");
     const marke = zusatz ? ` <span class="notiz-meta">(${escapeHtml(zusatz)})</span>` : "";
@@ -10660,6 +11232,7 @@
       </button>`;
   }
 
+  // Zeigt zuletzt verwendete Lebensmittel, passende zur gewählten Mahlzeit zuerst
   function ernZuletztZeigen() {
     const el = document.getElementById("ern-treffer");
     // Was in dieser Mahlzeit schon gegessen wurde, zuerst
@@ -10677,6 +11250,7 @@
     ernSucheTimer = setTimeout(() => ernSuchen(q), 250);
   });
 
+  // Sucht Lebensmittel über die API und zeigt die Treffer mit letzter Menge
   async function ernSuchen(q) {
     const nr = ++ernSucheNr;
     const el = document.getElementById("ern-treffer");
@@ -10694,6 +11268,7 @@
     }
   }
 
+  // Wählt ein Lebensmittel aus und öffnet die Mengeneingabe mit Schnellauswahl
   window.ernAuswaehlen = function(i) {
     const l = ernListe[i];
     if (!l) return;
@@ -10715,6 +11290,7 @@
     menge.select();
   };
 
+  // Zeigt die Nährwerte je 100 g des gewählten Lebensmittels; OFF-Nachladen bei fehlenden Werten
   function ernAuswahlInfoZeigen() {
     const l = ernAuswahl;
     if (!l) return;
@@ -10756,11 +11332,13 @@
     }
   });
 
+  // Setzt die Menge per Schnellauswahl und aktualisiert die Vorschau
   window.ernMengeSetzen = function(g) {
     document.getElementById("ern-menge").value = g;
     ernVorschau();
   };
 
+  // Zeigt eine Nährwert-Vorschau für die eingegebene Menge
   function ernVorschau() {
     const el = document.getElementById("ern-vorschau");
     const g = Number(String(document.getElementById("ern-menge").value).replace(",", "."));
@@ -10878,6 +11456,7 @@
   let ernSchritte = null;
   const ERN_SCHRITTE_SOCKEL_STANDARD = 5000;
 
+  // Lädt Ernährungsprofil, Gewichte, MET-Werte, Zielstände und Schritte
   async function ernProfilLaden() {
     ernProfilLaedt = true;
     try {
@@ -10912,6 +11491,7 @@
     return treffer || ernGewichte[0];
   }
 
+  // Berechnet das Alter an einem Datum aus dem Geburtsdatum
   function ernAlterAm(geburt, datum) {
     const [gj, gm, gt] = geburt.split("-").map(Number);
     const [j, m, t] = datum.split("-").map(Number);
@@ -10963,6 +11543,7 @@
     };
   }
 
+  // Berechnet die Tagesziele aus Profil, Gewicht, Trainings und Schritten
   function ernZiele(datum) {
     const g = ernGewichtFuer(datum);
     const trainings = ernTrainingsAm(datum);
@@ -10981,12 +11562,14 @@
   const ERN_SCHRITT_FAKTOR = 0.415;
   const ERN_KCAL_JE_KG_KM = 0.5;
 
+  // Liefert die eingetragenen Schritte eines Tages oder null
   function ernSchritteAm(datum) {
     if (!ernSchritte) return null;
     const e = ernSchritte.find((x) => x.datum === datum);
     return e ? Number(e.schritte) : null;
   }
 
+  // Liefert den Schritte-Sockel aus dem Profil oder den Standardwert
   function ernSockelVon(p) {
     return p && p.schritte_sockel !== undefined && p.schritte_sockel !== null ? Number(p.schritte_sockel) : ERN_SCHRITTE_SOCKEL_STANDARD;
   }
@@ -11013,6 +11596,7 @@
     return (training || []).filter((t) => t.bereich === "privat" && t.datum === datum && ERN_GEH_SPORT.test(String(t.sportart || "")));
   }
 
+  // Baut die Schritte-Zeile unter der Tagessumme mit geschätzten kcal und Zuschlag
   function ernSchritteZeileHtml(z) {
     const sc = z.schritte;
     if (!sc) return "";
@@ -11072,6 +11656,7 @@
     info.textContent = teile.join(" ");
   }
 
+  // Speichert (oder löscht bei leerem Feld) die Schritte des gewählten Tages
   async function ernSchritteSpeichern() {
     const feld = document.getElementById("ern-schritte-wert");
     const knopf = document.getElementById("btn-ern-schritte");
@@ -11117,6 +11702,7 @@
     return e ? Number(e.met) : null;
   }
 
+  // Ermittelt die kcal eines Trainings: eigener Wert oder Schätzung aus MET, Dauer und Gewicht
   function ernTrainingKcal(t) {
     if (t.kcal !== null && t.kcal !== undefined) return { kcal: Number(t.kcal), art: "eigen" };
     const met = ernMetFuer(t.sportart);
@@ -11135,6 +11721,7 @@
       .map((t) => ({ t, ...ernTrainingKcal(t) }));
   }
 
+  // Baut die Tagessummen-Karte mit kcal und Makros, mit Zielen falls vorhanden
   function ernSummeHtml(s, z) {
     if (!z) {
       const hinweis = !ernProfilGeladen ? ""
@@ -11178,6 +11765,7 @@
       </div>`;
   }
 
+  // Baut die Anzeige eines Makronährstoffs mit optionalem Ziel und Fortschrittsbalken
   function ernMakroHtml(label, g, ziel, klasse) {
     const mitZiel = ziel !== null && ziel > 0;
     const breite = mitZiel ? Math.min(100, Math.round((g / ziel) * 100)) : 0;
@@ -11205,6 +11793,7 @@
     };
   }
 
+  // Füllt das Profilformular mit dem heute gültigen Zielstand
   function ernProfilFormFuellen() {
     // Ziel-Einstellungen: der Stand, der heute gilt
     const p = ernProfilFuer(heuteISO());
@@ -11312,6 +11901,7 @@
       <p class="notiz-meta">Jeder Tag wird mit dem Stand gerechnet, der an diesem Tag galt – in der Tagessumme, der Woche und im Export. Geschlecht, Geburtsdatum und Größe gelten immer für alle Tage.</p>`;
   }
 
+  // Löscht nach Rückfrage einen Zielstand (gültig ab Datum) und rendert neu
   window.ernZielVersionLoeschen = async function(gueltigAb) {
     const i = (ernZielVersionen || []).findIndex((v) => v.gueltig_ab === gueltigAb);
     if (i < 0) return;
@@ -11359,6 +11949,7 @@
     if (e.key === "Enter") document.getElementById("btn-ern-gewicht").click();
   });
 
+  // Löscht nach Rückfrage einen Gewichtseintrag
   window.ernGewichtLoeschen = async function(datum) {
     if (!confirm(`Gewicht vom ${datumDe(datum)} löschen?`)) return;
     try {
@@ -11382,6 +11973,7 @@
     return { kg: Number(letzter.gewicht_kg) - Number(vorher.gewicht_kg), datum: vorher.datum };
   }
 
+  // Rendert den Gewichtsverlauf mit Veränderungen (7/30 Tage) und Diagramm der letzten 90 Tage
   function ernGewichtRendern() {
     document.getElementById("ern-g-datum").value = heuteISO();
     const el = document.getElementById("ern-gewicht-verlauf");
@@ -11426,6 +12018,7 @@
       <p class="notiz-meta">Tipp: morgens nach dem Aufstehen wiegen, gleiche Bedingungen. Einzelwerte schwanken um 1–2 kg (Wasser, Salz, Verdauung) – aussagekräftig ist der Trend über Wochen.</p>`;
   }
 
+  // Baut die Trainingszeile unter der Tagessumme mit kcal je Training und Zuschlag
   function ernTrainingZeileHtml(z) {
     if (!z.trainings.length) return "";
     const teile = z.trainings.map(({ t, kcal, art, grund }) => {
@@ -11454,6 +12047,7 @@
     [8.0, "Radfahren zügig (ca. 19–22 km/h)"],
   ];
 
+  // Sammelt alle Sportarten (Privat-Trainings, Stammdaten, MET-Werte) sortiert und ohne Dubletten
   function ernSportartenFuerMet() {
     const namen = new Map();
     const merken = (n) => {
@@ -11468,6 +12062,7 @@
     return [...namen.values()].sort((a, b) => a.localeCompare(b, "de"));
   }
 
+  // Rendert die MET-Liste je Sportart mit Vorschlägen und kcal pro Stunde
   function ernMetRendern() {
     const el = document.getElementById("ern-met-liste");
     if (!el) return;
@@ -11497,11 +12092,13 @@
     el.dataset.sportarten = JSON.stringify(sportarten);
   }
 
+  // Übernimmt einen MET-Vorschlag in das Eingabefeld der Sportart
   window.ernMetVorschlag = function(i, index) {
     if (index === "") return;
     document.getElementById(`ern-met-wert-${i}`).value = ERN_MET_VORSCHLAEGE[Number(index)][0];
   };
 
+  // Speichert oder entfernt den MET-Wert einer Sportart
   window.ernMetSpeichern = async function(i) {
     const el = document.getElementById("ern-met-liste");
     const sportart = JSON.parse(el.dataset.sportarten || "[]")[i];
@@ -11546,6 +12143,7 @@
   let ernScanHistorie = false;
   let ernScanZiel = null;         // "feld" = Scan füllt das Barcode-Feld im Eigen-Formular
 
+  // Liefert das Quellen-Label eines Lebensmittels (Open Food Facts/eigenes)
   function ernQuelleLabel(l) {
     return l.quelle === "off" ? "Open Food Facts" : l.quelle === "eigen" ? "eigenes" : "";
   }
@@ -11622,6 +12220,7 @@
     }
   });
 
+  // Sucht ein Open-Food-Facts-Treffer per Barcode
   window.ernOffTrefferWaehlen = function(code) { ernBarcodeSuchen(code); };
 
   // ---- Eigenes Lebensmittel anlegen / korrigieren ----
@@ -11717,6 +12316,7 @@
   let ernZuordnenListe = [];
   let ernZuordnenCode = null;
 
+  // Rendert die gefilterte Liste eigener Lebensmittel zum Zuordnen eines Barcodes
   function ernZuordnenRendern() {
     const el = document.getElementById("ern-zuordnen-liste");
     const q = document.getElementById("ern-zuordnen-filter").value.trim().toLowerCase();
@@ -11767,6 +12367,7 @@
     ernAnsicht("eigen");
   });
 
+  // Ordnet den gescannten Barcode einem eigenen Lebensmittel zu (nach Rückfrage bei vorhandenem)
   window.ernBarcodeZuordnen = async function(id) {
     const l = ernZuordnenListe.find((x) => x.id === id);
     const status = document.getElementById("ern-hinzu-status");
@@ -11815,6 +12416,7 @@
     return !!(b && b.open);
   }
 
+  // Lädt die eigenen Lebensmittel und rendert die Liste
   async function ernMeineLaden() {
     const el = document.getElementById("ern-meine-liste");
     if (ernMeineLaedt) return;
@@ -11831,6 +12433,7 @@
     }
   }
 
+  // Rendert die gefilterte Liste eigener Lebensmittel mit Zählern
   function ernMeineRendern() {
     const el = document.getElementById("ern-meine-liste");
     if (!ernMeineListe.length) {
@@ -11861,6 +12464,7 @@
     block.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
+  // Öffnet das Formular zum Anlegen/Bearbeiten eines eigenen Lebensmittels
   function ernMeineFormOeffnen(l) {
     window.ernHinzuOeffnen(null);
     ernMeineModus = true;
@@ -11871,6 +12475,7 @@
     document.getElementById("ern-hinzu").scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
+  // Öffnet ein eigenes Lebensmittel zum Bearbeiten
   window.ernMeineBearbeiten = function(id) {
     const l = ernMeineListe.find((x) => x.id === id);
     if (l) ernMeineFormOeffnen(l);
@@ -11907,6 +12512,7 @@
     if (ernScanHistorie) { ernScanHistorie = false; ernScannerSchliessen(true); }
   });
 
+  // Öffnet den Barcode-Scanner (Kamera + BarcodeDetector, sonst manuelle Eingabe)
   async function ernScannerOeffnen() {
     const overlay = document.getElementById("ern-scanner");
     const status = document.getElementById("ern-scanner-status");
@@ -12026,6 +12632,7 @@
     } catch (e) { /* ignorieren */ }
   });
 
+  // Stoppt die Kamera des Barcode-Scanners
   function ernKameraStoppen() {
     ernScanLaeuft = false;
     if (ernScanStream) { ernScanStream.getTracks().forEach((t) => t.stop()); ernScanStream = null; }
@@ -12033,6 +12640,7 @@
     video.srcObject = null;
   }
 
+  // Schließt den Barcode-Scanner und räumt den History-Eintrag auf
   function ernScannerSchliessen(ausPopstate) {
     ernKameraStoppen();
     ernScanZiel = null;
