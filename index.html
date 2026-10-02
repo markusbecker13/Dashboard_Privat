@@ -84,18 +84,18 @@
 
     <main>
       <div id="view-heute">
-        <div class="heute-datum" id="heute-datum"></div>
-        <h1 class="heute-gruss"><span id="heute-gruss">Moin.</span> <button class="hilfe-icon" data-hilfe="Zeigt oben Wetter und Überfälliges, darunter alles, was heute ansteht, als Zeitleiste – nach Tagen gruppiert und aufklappbar: Heute (offen), dann überfällige Aufgaben je Tag (Gestern, Vorgestern, …) und ab 8 Tagen „Älter“. Was gerade läuft, ist als „Jetzt“ hervorgehoben. Über den Kreis links hakst du Aufgaben und Termine direkt hier ab. Ein Tipp auf den Text öffnet Aufgaben bzw. Kalender – bearbeitet wird dort.">?</button></h1>
-        <figure class="tages-zitat hidden" id="tages-zitat" aria-label="Zitat des Tages"></figure>
-        <div class="heute-kacheln">
-          <div id="wetter-bereich"></div>
-          <button class="heute-kachel heute-kachel--dunkel" id="heute-ueberfaellig" onclick="tabWechseln('aufgaben')">
-            <span class="heute-kachel-titel">Überfällig</span>
-            <span class="heute-kachel-zahl" id="heute-ueberfaellig-zahl">0</span>
-          </button>
+        <div class="heute-kopf">
+          <div class="heute-datumzeile">
+            <span id="heute-datum"></span>
+            <span aria-hidden="true">·</span>
+            <button type="button" class="heute-wetter-knopf" id="heute-wetter" onclick="wetterKnopfKlick()" aria-expanded="false" aria-controls="wetter-ausblick">Wetter …</button>
+          </div>
+          <h1 class="heute-gruss"><span id="heute-gruss">Moin.</span> <button class="hilfe-icon" data-hilfe="Oben Datum und Wetter (antippen für den 5-Tage-Ausblick), darunter, wie viel heute ansteht. „Dein Tag“ zeigt deine freie Zeit, „Als Nächstes“ den laufenden oder nächsten Termin. In OGS, AWO und Business stehen die Module des Bereichs mit ihrem Stand. Die Liste „Heute“ hakst du über den Kreis ab, ein Tipp auf den Text öffnet Aufgaben bzw. Kalender. Überfälliges steht gesammelt im farbigen Streifen – „Alle auf heute“ verschiebt alles auf heute.">?</button></h1>
+          <p class="heute-status" id="heute-status"></p>
         </div>
-        <div id="wetter-ausblick"></div>
+        <div id="wetter-ausblick" class="hidden"></div>
         <div id="heute-bereich"></div>
+        <figure class="tages-zitat hidden" id="tages-zitat" aria-label="Zitat des Tages"></figure>
       </div>
 
       <div id="view-aufgaben" class="hidden">
@@ -728,17 +728,17 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Start</summary>
             <div class="anleitung-text">
-              <p>Startansicht beim Öffnen eines Bereichs.</p>
+              <p>Startansicht beim Öffnen eines Bereichs, seit Session 34 neu aufgebaut: oben das Wichtigste, jede Zahl nur noch einmal.</p>
               <ul>
-                <li><strong>Kopf:</strong> Datum und Gruß mit der Zahl offener Dinge heute (überfällige und heute fällige Aufgaben, fällige Erinnerungen, heutige Termine). Ist nichts offen: „Freie Bahn heute." Das „?“ für die Erklärung sitzt unten am rechten Rand, damit der Gruß mittig bleibt</li>
-                <li><strong>Zitat des Tages:</strong> unter dem Gruß steht ein Zitat mit Autor und Quelle. Jeder Bereich hat eine eigene Liste (Privat: Leben und Gelassenheit, OGS: Spielen, Lernen, Erziehung, AWO: Miteinander und Engagement, Business: Anpacken und Ideen). Das Zitat bleibt den ganzen Tag gleich und wechselt um Mitternacht. Es sind nur gemeinfreie Zitate mit Quellenangabe; Texte aus dem Lateinischen, Griechischen, Englischen und Chinesischen sind eigene Übersetzungen</li>
-                <li><strong>Wetter-Kachel:</strong> aktuelles Wetter am eingestellten Ort. Antippen klappt den 5-Tage-Ausblick auf bzw. zu; dort lässt sich über ✎ der Ort ändern</li>
-                <li><strong>Überfällig-Kachel:</strong> Anzahl überfälliger Aufgaben im Bereich, Antippen öffnet Aufgaben</li>
-                <li><strong>Zeitleiste:</strong> nach Tagen gruppiert, jede Gruppe lässt sich per Tipp auf- und zuklappen. Oben „Heute“ (standardmäßig offen): Ganztägiges, dann Termine und Aufgaben nach Uhrzeit, Aufgaben ohne Uhrzeit und Erinnerungen am Ende. Darunter überfällige Aufgaben je Fälligkeitstag – „Gestern“, „Vorgestern“, dann mit Wochentag und Datum – und alles, was mehr als 7 Tage überfällig ist, gesammelt unter „Älter“ (standardmäßig zugeklappt). Die Zahl im Gruppenkopf zeigt die offenen Einträge. Welche Gruppen offen sind, merkt sich die App, bis sie neu geladen wird. Was gerade läuft, steht als „Jetzt" farbig hervorgehoben. Erledigte Termine erscheinen durchgestrichen. Über den Kreis links auf jeder Karte hakst du direkt hier ab: Aufgaben verschwinden dann aus der Zeitleiste und stehen unter Aufgaben → Erledigt (wiederkehrende Aufgaben verhalten sich wie beim Abhaken unter Aufgaben), Termine bleiben durchgestrichen stehen und lassen sich per erneutem Tipp zurücknehmen. Ein Tipp auf den Text öffnet Aufgaben bzw. Kalender</li>
-                <li><strong>Freie Zeit:</strong> zeigt den heutigen Zeitrahmen (siehe Frei) als Farbleiste – belegt/frei/erledigt als Segmente, ein oranger Marker zeigt die aktuelle Uhrzeit. Antippen springt in den Frei-Tab. Darunter steht der nächste offene Termin</li>
-                <li><strong>Kacheln:</strong> fällige Aufgaben (inkl. fällige wiederkehrende Erinnerungen), aktive Ziele der laufenden Woche/Monat/Jahr, offene Artikel auf der Einkaufsliste – jede Kachel springt beim Antippen in den passenden Tab. In Privat zusätzlich „kcal übrig“ aus der Ernährung (nur wenn der Reiter eingeblendet ist)</li>
-                <li><strong>Ziel-Kacheln:</strong> darunter, falls für den aktuellen Zeitraum Ziele angelegt sind, mit Fortschritt</li>
-                <li>Ist in der Zeitleiste nichts, steht dort „Nichts Dringendes für heute – guter Tag."</li>
+                <li><strong>Kopf:</strong> Datum und Wetter in einer Zeile – das Wetter antippen klappt den 5-Tage-Ausblick auf (dort ✎ für den Ort). Darunter der Gruß und eine Statuszeile: wie viele Dinge heute anstehen (Termine, heute fällige Aufgaben, fällige Erinnerungen) und, rot, wie viele überfällig sind. Ist nichts offen: „Freie Bahn heute.“</li>
+                <li><strong>Dein Tag:</strong> der heutige Zeitrahmen (siehe Frei) als Band – kräftig belegt, hell frei, grau erledigt, der Strich ist jetzt. Rechts oben die Uhrzeit und wie viel Zeit heute noch frei ist. Termine aller Bereiche zählen mit. Antippen öffnet Frei</li>
+                <li><strong>Als Nächstes / Jetzt:</strong> die farbige Karte zeigt den laufenden oder nächsten Termin bzw. die nächste Aufgabe mit Uhrzeit, rechts „in 40 Min.“ bzw. „noch 20 Min.“. Antippen öffnet Kalender bzw. Aufgaben. Steht heute nichts mehr mit Uhrzeit an, fehlt die Karte</li>
+                <li><strong>Modul-Kacheln</strong> (OGS, AWO, Business): die eingeblendeten Reiter des Bereichsblocks mit ihrem Stand, z. B. „Ideen · 1 offen“, „Raumplanung · nächste: So 04.10.“, „Schlüssel · 2 ausgegeben · 1 überfällig“, „Inventar · 3 defekt“. Antippen öffnet den Reiter</li>
+                <li><strong>Heute:</strong> alles von heute in einer Liste – Ganztägiges, dann nach Uhrzeit, Aufgaben ohne Uhrzeit und Erinnerungen am Ende. Was gerade läuft, steht als „Jetzt“ leicht hinterlegt. Über den Kreis links hakst du ab: Aufgaben verschwinden dann (stehen unter Aufgaben → Erledigt, wiederkehrende verhalten sich wie dort), Termine bleiben durchgestrichen stehen und lassen sich per erneutem Tipp zurücknehmen. Ein Tipp auf den Text öffnet Aufgaben bzw. Kalender</li>
+                <li><strong>Überfällig:</strong> ein farbiger Streifen mit der Anzahl und wie alt das älteste ist. Antippen klappt die Liste auf (älteste zuerst, links das Fälligkeitsdatum). <strong>„Alle auf heute“</strong> setzt bei allen überfälligen Aufgaben des Bereichs das Fälligkeitsdatum auf heute – Uhrzeit, Projekt und Wiederholung bleiben. Im Verlauf steht danach je Aufgabe ein Eintrag „geändert“</li>
+                <li><strong>Kennzahlen:</strong> kleine Kacheln für „kcal übrig“ (Privat, wenn Ernährung eingeblendet), „Einkauf offen“ (wenn Einkauf eingeblendet) und „aktive Ziele“ (Privat, wenn Planung eingeblendet). Antippen öffnet den Reiter</li>
+                <li><strong>Ziele:</strong> darunter die Ziele der laufenden Woche, des Monats und des Jahres mit Fortschritt (nur Privat)</li>
+                <li><strong>Zitat des Tages:</strong> ganz unten, klein. Jeder Bereich hat eine eigene Liste (Privat: Leben und Gelassenheit, OGS: Spielen, Lernen, Erziehung, AWO: Miteinander und Engagement, Business: Anpacken und Ideen), es wechselt um Mitternacht. Nur gemeinfreie Zitate mit Quelle; Texte aus dem Lateinischen, Griechischen, Englischen und Chinesischen sind eigene Übersetzungen</li>
               </ul>
             </div>
           </details>
