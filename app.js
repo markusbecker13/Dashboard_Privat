@@ -333,6 +333,11 @@
   // Bereich -> Thema -> Reiter. Die Bereichswahl läuft über den
   // Bereichs-Knopf oben links (bzw. ⋮-Menü).
   // ==========================================================
+  // Linien-Icon aus dem Sprite in index.html (seit Session 35, Icons Etappe A).
+  // Rein dekorativ (aria-hidden) – die Beschriftung kommt vom Knopf (aria-label oder Text).
+  function ic(name, klasse = "") {
+    return `<svg class="ic${klasse ? " " + klasse : ""}" aria-hidden="true" focusable="false"><use href="#ic-${name}"></use></svg>`;
+  }
   const SVG_ATTR = 'width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
   const NAV_ICON = {
     heute: `<svg ${SVG_ATTR}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
@@ -743,8 +748,9 @@
     knopf.setAttribute("aria-expanded", String(offen));
     knopf.classList.toggle("aktiv", offen);
     if (knopf.classList.contains("reiter-neu")) {
-      if (!knopf.dataset.label) knopf.dataset.label = knopf.textContent;
-      knopf.textContent = offen ? "✕ Schließen" : knopf.dataset.label;
+      // Beschriftung samt Icon merken (innerHTML), damit „+“ nach dem Schließen wiederkommt
+      if (!knopf.dataset.label) knopf.dataset.label = knopf.innerHTML;
+      knopf.innerHTML = offen ? `${ic("x")}Schließen` : knopf.dataset.label;
     }
   }
   // Öffnet einen Formular-/Einstellungsbereich (z. B. beim Bearbeiten eines Eintrags)
@@ -772,7 +778,7 @@
     const knopf = document.getElementById("btn-hilfe-symbole");
     if (knopf) {
       knopf.setAttribute("aria-pressed", String(!aus));
-      knopf.textContent = aus ? "? Hilfe-Symbole einblenden" : "? Hilfe-Symbole ausblenden";
+      knopf.innerHTML = `${ic("hilfe")}<span>${aus ? "Hilfe-Symbole einblenden" : "Hilfe-Symbole ausblenden"}</span>`;
     }
   }
   document.getElementById("btn-hilfe-symbole").addEventListener("click", (e) => {
@@ -785,13 +791,13 @@
 
   // Einträge der früheren Gruppe „Verwalten“ (Export, Verlauf, Anleitung)
   // stehen seit Etappe 3 im ⋮-Menü – nur die im Bereich eingeblendeten.
-  const MENU_VERWALTEN = [["export", "⇩ Export"], ["verlauf", "↺ Verlauf"], ["anleitung", "? Anleitung"]];
+  const MENU_VERWALTEN = [["export", "Export", "export"], ["verlauf", "Verlauf", "verlauf"], ["anleitung", "Anleitung", "hilfe"]];
   function renderMenuVerwalten() {
     const el = document.getElementById("menu-verwalten");
     if (!el) return;
     const eintraege = aktiverBereich === "verwaltung" ? [] : MENU_VERWALTEN.filter(([tab]) => reiterIstSichtbar(aktiverBereich, tab));
-    el.innerHTML = eintraege.map(([tab, label]) =>
-      `<button class="link-btn${tab === aktiverTab ? " aktiv" : ""}" onclick="tabWechseln('${tab}')">${label}</button>`).join("");
+    el.innerHTML = eintraege.map(([tab, label, icon]) =>
+      `<button class="link-btn${tab === aktiverTab ? " aktiv" : ""}" onclick="tabWechseln('${tab}')">${ic(icon)}<span>${label}</span></button>`).join("");
     el.classList.toggle("hidden", eintraege.length === 0);
   }
 
@@ -1049,7 +1055,7 @@
     if (!done && a.erinnere_alle_tage) meta += badgeHtml("reminder", "alle " + a.erinnere_alle_tage + " Tage");
 
     const snoozeBtn = !done && a.erinnerungFaellig
-      ? `<button class="task-snooze" onclick="erinnerungVerschieben('${a.id}')" title="Später erneut erinnern">↻</button>`
+      ? `<button class="task-snooze" onclick="erinnerungVerschieben('${a.id}')" title="Später erneut erinnern" aria-label="Später erneut erinnern">${ic("wiederholen")}</button>`
       : "";
 
     return `
@@ -1060,8 +1066,8 @@
           <div class="task-meta">${meta}</div>
         </div>
         ${snoozeBtn}
-        <button class="task-edit-btn" onclick="aufgabeBearbeitenStart('${a.id}')" title="Bearbeiten">✎</button>
-        <button class="task-delete" onclick="loeschen('${a.id}')">×</button>
+        <button class="task-edit-btn" onclick="aufgabeBearbeitenStart('${a.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
+        <button class="task-delete" onclick="loeschen('${a.id}')" aria-label="Löschen">${ic("x")}</button>
       </div>`;
   }
 
@@ -1155,7 +1161,7 @@
     if (ohneProjekt.length > 0) html += aufgGruppeHtml("ohne", "Ohne Projekt", ohneProjekt, "");
     for (const g of gruppen) {
       // ✎ im Kopf darf die Gruppe nicht mit auf- oder zuklappen
-      const edit = `<button class="project-edit-btn" onclick="event.preventDefault(); event.stopPropagation(); projektUmbenennen('${g.projekt.id}')" title="Projekt umbenennen">✎</button>`;
+      const edit = `<button class="project-edit-btn" onclick="event.preventDefault(); event.stopPropagation(); projektUmbenennen('${g.projekt.id}')" title="Projekt umbenennen" aria-label="Projekt umbenennen">${ic("stift")}</button>`;
       html += aufgGruppeHtml(g.projekt.id, g.projekt.name, g.liste, edit);
     }
     const anzGruppen = gruppen.length + (ohneProjekt.length > 0 ? 1 : 0);
@@ -1752,19 +1758,20 @@
   // ==========================================================
   // Wetter (Start-Tab)
   // ==========================================================
-  // WMO-Wettercodes (von Open-Meteo) grob zusammengefasst.
+  // WMO-Wettercodes (von Open-Meteo) grob zusammengefasst. Erster Wert =
+  // Linien-Icon aus dem Sprite (seit Session 35, vorher Emoji).
   const WETTER_CODES = {
-    0: ["☀️", "Klar"], 1: ["🌤️", "Meist klar"], 2: ["⛅", "Teilweise bewölkt"], 3: ["☁️", "Bedeckt"],
-    45: ["🌫️", "Nebel"], 48: ["🌫️", "Reifnebel"],
-    51: ["🌦️", "Leichter Nieselregen"], 53: ["🌦️", "Nieselregen"], 55: ["🌦️", "Starker Nieselregen"],
-    61: ["🌧️", "Leichter Regen"], 63: ["🌧️", "Regen"], 65: ["🌧️", "Starker Regen"],
-    71: ["🌨️", "Leichter Schneefall"], 73: ["🌨️", "Schneefall"], 75: ["❄️", "Starker Schneefall"],
-    80: ["🌦️", "Regenschauer"], 81: ["🌧️", "Kräftiger Regenschauer"], 82: ["⛈️", "Heftiger Regenschauer"],
-    95: ["⛈️", "Gewitter"], 96: ["⛈️", "Gewitter mit Hagel"], 99: ["⛈️", "Starkes Gewitter mit Hagel"],
+    0: ["sonne", "Klar"], 1: ["sonne-wolke", "Meist klar"], 2: ["sonne-wolke", "Teilweise bewölkt"], 3: ["wolke", "Bedeckt"],
+    45: ["nebel", "Nebel"], 48: ["nebel", "Reifnebel"],
+    51: ["niesel", "Leichter Nieselregen"], 53: ["niesel", "Nieselregen"], 55: ["niesel", "Starker Nieselregen"],
+    61: ["regen", "Leichter Regen"], 63: ["regen", "Regen"], 65: ["regen", "Starker Regen"],
+    71: ["schnee", "Leichter Schneefall"], 73: ["schnee", "Schneefall"], 75: ["schnee", "Starker Schneefall"],
+    80: ["regen", "Regenschauer"], 81: ["regen", "Kräftiger Regenschauer"], 82: ["gewitter", "Heftiger Regenschauer"],
+    95: ["gewitter", "Gewitter"], 96: ["gewitter", "Gewitter mit Hagel"], 99: ["gewitter", "Starkes Gewitter mit Hagel"],
   };
-  // Liefert Icon und Beschreibung zu einem WMO-Wettercode
+  // Liefert Icon-Name und Beschreibung zu einem WMO-Wettercode
   function wetterCodeInfo(code) {
-    return WETTER_CODES[code] || ["🌡️", "Unbekannt"];
+    return WETTER_CODES[code] || ["thermometer", "Unbekannt"];
   }
   const WETTER_WOCHENTAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
@@ -1807,7 +1814,7 @@
       return `
         <div class="wetter-kachel" title="${escapeHtml(text)}">
           <span class="wetter-kachel-tag">${wochentag}</span>
-          <span class="wetter-kachel-icon">${icon}</span>
+          <span class="wetter-kachel-icon">${ic(icon)}<span class="nur-vorleser">${escapeHtml(text)}</span></span>
           <span class="wetter-kachel-max">${Math.round(t.max)}°</span>
           <span class="wetter-kachel-min">${Math.round(t.min)}°</span>
         </div>`;
@@ -1816,7 +1823,7 @@
     // Seit Session 34: kompakt in der Datumszeile, Tipp klappt den Ausblick auf
     const knopf = document.getElementById("heute-wetter");
     if (knopf) {
-      knopf.textContent = `${Math.round(wetterDaten.aktuelle_temperatur)}° ${aktIcon} ${aktText}`;
+      knopf.innerHTML = `${Math.round(wetterDaten.aktuelle_temperatur)}° ${ic(aktIcon, "ic-wetter")} ${escapeHtml(aktText)}`;
       knopf.title = `Wetter in ${wetterDaten.ort_gefunden || wetterOrt} – 5-Tage-Ausblick ${wetterAusblickOffen ? "schließen" : "öffnen"}`;
       knopf.setAttribute("aria-expanded", String(wetterAusblickOffen));
     }
@@ -1827,7 +1834,7 @@
         <div class="wetter-karte">
           <div class="wetter-ort-zeile">
             <span>5-Tage-Ausblick · ${escapeHtml(wetterDaten.ort_gefunden || wetterOrt)}</span>
-            <button class="project-edit-btn" onclick="wetterOrtBearbeiten()" title="Ort ändern">✎</button>
+            <button class="project-edit-btn" onclick="wetterOrtBearbeiten()" title="Ort ändern" aria-label="Ort ändern">${ic("stift")}</button>
           </div>
           <div class="wetter-kachel-grid">${tage}</div>
         </div>`;
@@ -2528,8 +2535,8 @@
           <div class="termin-item">
             <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
             <span class="termin-titel">${escapeHtml(t.titel)}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
-            <button class="task-snooze" onclick="terminBearbeitenStart('${t.id}')" title="Bearbeiten">✎</button>
-            <button class="task-delete" onclick="terminLoeschen('${t.id}')">×</button>
+            <button class="task-snooze" onclick="terminBearbeitenStart('${t.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
+            <button class="task-delete" onclick="terminLoeschen('${t.id}')" aria-label="Löschen">${ic("x")}</button>
           </div>`).join("");
 
     const formTitel = bearbeiteterTermin ? "Termin bearbeiten" : "";
@@ -2742,8 +2749,8 @@
       <div class="termin-item">
         <span class="termin-zeit">${b.start_zeit ? b.start_zeit.slice(0,5) : ""}${b.end_zeit ? "–" + b.end_zeit.slice(0,5) : ""}</span>
         <span class="termin-titel">${escapeHtml(b.titel)}<span class="termin-notiz">${blockzeitWiederholungText(b)}${b.notiz ? " · " + escapeHtml(b.notiz) : ""}</span></span>
-        <button class="task-snooze" onclick="blockzeitBearbeitenStart('${b.id}')" title="Bearbeiten">✎</button>
-        <button class="task-delete" onclick="blockzeitLoeschen('${b.id}')">×</button>
+        <button class="task-snooze" onclick="blockzeitBearbeitenStart('${b.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
+        <button class="task-delete" onclick="blockzeitLoeschen('${b.id}')" aria-label="Löschen">${ic("x")}</button>
       </div>`).join("");
   }
 
@@ -2933,10 +2940,10 @@
           ${checkboxHtml}
           <span class="frei-zeit">${e.start}–${e.ende}</span>
           <span class="frei-label">${escapeHtml(e.titel)}<span class="frei-typ">${e.typ}</span></span>
-          ${e.typ === "Termin" ? `<button class="task-snooze" onclick="freiTerminBearbeitenStart('${e.id}')" title="Bearbeiten">✎</button>` : ""}
-          ${e.typ === "Termin" ? `<button class="task-delete" onclick="freiTerminEntfernen('${e.id}')" title="Entfernen">×</button>` : ""}
-          ${e.typ === "Aufgabe" ? `<button class="task-snooze" onclick="freiAufgabeBearbeitenStart('${e.id}')" title="Bearbeiten">✎</button>` : ""}
-          ${e.typ === "Aufgabe" ? `<button class="task-delete" onclick="freiAufgabeEntfernen('${e.id}')" title="Entfernen">×</button>` : ""}
+          ${e.typ === "Termin" ? `<button class="task-snooze" onclick="freiTerminBearbeitenStart('${e.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>` : ""}
+          ${e.typ === "Termin" ? `<button class="task-delete" onclick="freiTerminEntfernen('${e.id}')" title="Entfernen" aria-label="Entfernen">${ic("x")}</button>` : ""}
+          ${e.typ === "Aufgabe" ? `<button class="task-snooze" onclick="freiAufgabeBearbeitenStart('${e.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>` : ""}
+          ${e.typ === "Aufgabe" ? `<button class="task-delete" onclick="freiAufgabeEntfernen('${e.id}')" title="Entfernen" aria-label="Entfernen">${ic("x")}</button>` : ""}
         </div>`;
     }).join("");
   }
@@ -3203,7 +3210,7 @@
             <span class="notiz-text">${escapeHtml(n.text)}</span>
             <span class="notiz-meta">${datum}${projekt ? " · " + escapeHtml(projekt.name) : ""}</span>
           </div>
-          <button class="task-delete" onclick="notizLoeschen('${n.id}')">×</button>
+          <button class="task-delete" onclick="notizLoeschen('${n.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }).join("");
     bereich.innerHTML = `<div class="notiz-list">${html}</div>`;
@@ -3257,7 +3264,7 @@
               <select onchange="ogsIdeeStatusAendern('${i.id}', this.value)" style="padding:0.2rem 0.4rem; font-size:0.78rem;">${statusOptions}</select>
             </div>
           </div>
-          <button class="task-delete" onclick="ogsIdeeLoeschen('${i.id}')">×</button>
+          <button class="task-delete" onclick="ogsIdeeLoeschen('${i.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }).join("");
     bereich.innerHTML = `<div class="notiz-list">${html}</div>`;
@@ -3687,7 +3694,7 @@
     overlay.innerHTML = `
       <div class="session-fokus-kopf">
         <span class="session-fokus-titel" id="koch-titel">👨‍🍳 ${escapeHtml(r.titel)}</span>
-        <button class="session-fokus-schliessen" onclick="kochmodusSchliessen()" aria-label="Kochmodus schließen">✕</button>
+        <button class="session-fokus-schliessen" onclick="kochmodusSchliessen()" aria-label="Kochmodus schließen">${ic("x")}</button>
       </div>
       <div class="session-fokus-inhalt koch-inhalt">
         <p class="notiz-meta" id="koch-wach"></p>
@@ -3810,7 +3817,7 @@
               ${heuteGekocht
                 ? `<button class="btn-secondary rezept-gekocht-btn erledigt" onclick="rezeptGekochtZuruecknehmen('${r.id}')">✓ Heute gekocht · zurücknehmen</button>`
                 : `<button class="btn-secondary rezept-gekocht-btn" onclick="rezeptHeuteGekocht('${r.id}')">✓ Heute gekocht</button>`}
-              <button class="btn-secondary" onclick="rezeptBearbeiten('${r.id}')">✎ Bearbeiten</button>
+              <button class="btn-secondary" onclick="rezeptBearbeiten('${r.id}')">${ic("stift")}Bearbeiten</button>
               <button class="link-btn" onclick="rezeptLoeschen('${r.id}')">Löschen</button>
             </div>
           </div>`;
@@ -4276,7 +4283,7 @@
               ${i.beschreibung ? `<span class="notiz-meta" style="display:block;">${escapeHtml(i.beschreibung)}</span>` : ""}
               ${ausleiheHinweis}
             </div>
-            <button class="task-delete" onclick="invLoeschen('${i.id}')">×</button>
+            <button class="task-delete" onclick="invLoeschen('${i.id}')" aria-label="Löschen">${ic("x")}</button>
           </div>`;
       }).join("");
       // Aufklappbar je Kategorie (seit Session 29), gleiche Optik wie bei den
@@ -4498,7 +4505,7 @@
         return `
               <div>📎 <span onclick="event.stopPropagation(); projDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
                 <span style="opacity:0.65;">(${hochgeladen})</span>
-                <span onclick="event.stopPropagation(); projDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen">×</span></div>`;
+                <span onclick="event.stopPropagation(); projDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen" aria-label="Datei entfernen">${ic("x")}</span></div>`;
       }).join("");
 
       const unterprojekte = istUnterprojekt ? [] : projekteAktuellOgs.filter((u) => u.hauptprojekt_id === p.id);
@@ -4523,7 +4530,7 @@
             </div>
             ${unterprojekteHtml}
           </div>
-          <button class="task-delete" onclick="projLoeschen('${p.id}')">×</button>
+          <button class="task-delete" onclick="projLoeschen('${p.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }
 
@@ -4771,7 +4778,7 @@
             </span>
           </div>
           ${offen ? `<button class="btn-primary" style="white-space:nowrap;" onclick="event.stopPropagation(); verleihRueckgabe('${v.id}')">Zurück (heute)</button>` : ""}
-          <button class="task-delete" onclick="event.stopPropagation(); verleihLoeschen('${v.id}')">×</button>
+          <button class="task-delete" onclick="event.stopPropagation(); verleihLoeschen('${v.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }
 
@@ -4943,7 +4950,7 @@
         <input type="number" id="${praefix}-ueb-sekunden-${i}" value="${u.sekunden ?? ""}" placeholder="Sek." min="0" title="Sekunden (statt Wdh., z.B. für Plank)" style="width:4.3rem;">
         <input type="number" id="${praefix}-ueb-gewicht-${i}" value="${u.gewicht_kg ?? ""}" placeholder="kg" min="0" step="0.5" style="width:4.3rem;">
         <input type="text" id="${praefix}-ueb-progression-${i}" value="${escapeAttr(u.progression || "")}" placeholder="Variante (z.B. unterstützt)" style="flex:1; min-width:110px;">
-        <button class="task-delete" type="button" onclick="trainingUebungZeileEntfernen('${praefix}', ${i})">×</button>
+        <button class="task-delete" type="button" onclick="trainingUebungZeileEntfernen('${praefix}', ${i})" aria-label="Löschen">${ic("x")}</button>
       </div>`;
   }
 
@@ -5242,7 +5249,7 @@
             </span>
             ${uebungenAnzeige(uebungenListe, t)}
           </div>
-          <button class="task-delete" onclick="event.stopPropagation(); trainingLoeschen('${t.id}')">×</button>
+          <button class="task-delete" onclick="event.stopPropagation(); trainingLoeschen('${t.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }
 
@@ -5449,8 +5456,8 @@
           <div class="row plan-item-aktionen" style="flex-wrap:wrap;">
             <button class="link-btn" onclick="planStarten('${p.id}')" ${uebungen.length ? "" : "disabled"}>▶ Starten</button>
             <button class="link-btn" onclick="planExportieren('${p.id}')">⇩ Export</button>
-            <button class="task-edit-btn" onclick="planBearbeitenStart('${p.id}')" title="Bearbeiten">✎</button>
-            <button class="task-delete" onclick="planLoeschen('${p.id}')">×</button>
+            <button class="task-edit-btn" onclick="planBearbeitenStart('${p.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
+            <button class="task-delete" onclick="planLoeschen('${p.id}')" aria-label="Löschen">${ic("x")}</button>
           </div>
         </details>`;
     }
@@ -5866,8 +5873,8 @@
             <span class="notiz-text">${escapeHtml(s.name)}${s.kategorie ? ` <span class="notiz-meta">· ${escapeHtml(s.kategorie)}</span>` : ""}</span>
             ${s.beschreibung ? `<span class="notiz-meta" style="white-space:pre-wrap;">${escapeHtml(s.beschreibung)}</span>` : ""}
           </div>
-          <button class="task-edit-btn" onclick="stammdatenBearbeitenStart('${s.id}')" title="Bearbeiten">✎</button>
-          <button class="task-delete" onclick="stammdatenLoeschen('${s.id}')">×</button>
+          <button class="task-edit-btn" onclick="stammdatenBearbeitenStart('${s.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
+          <button class="task-delete" onclick="stammdatenLoeschen('${s.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }
 
@@ -5889,8 +5896,8 @@
             <span class="notiz-text">${escapeHtml(s.name)}</span>
             ${s.beschreibung ? `<span class="notiz-meta uebung-zeile-beschreibung">${escapeHtml(s.beschreibung)}</span>` : ""}
           </div>
-          <button class="task-edit-btn" onclick="stammdatenBearbeitenStart('${s.id}')" title="Bearbeiten">✎</button>
-          <button class="task-delete" onclick="stammdatenLoeschen('${s.id}')">×</button>
+          <button class="task-edit-btn" onclick="stammdatenBearbeitenStart('${s.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
+          <button class="task-delete" onclick="stammdatenLoeschen('${s.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }
 
@@ -6255,7 +6262,7 @@
           return `
             <div class="notiz-item">
               <span style="flex:1;">${escapeHtml(z.sportart)}: <strong>${anzahl} von ${z.wochenziel}</strong> diese Woche${erreicht ? " ✓" : ""}</span>
-              <button class="task-delete" data-sportart="${escapeAttr(z.sportart)}" onclick="trainingSportartZielLoeschen(this.dataset.sportart)">×</button>
+              <button class="task-delete" data-sportart="${escapeAttr(z.sportart)}" onclick="trainingSportartZielLoeschen(this.dataset.sportart)" aria-label="Löschen">${ic("x")}</button>
             </div>`;
         }).join("")
       : "";
@@ -6604,7 +6611,7 @@
       <div class="session-fokus-kopf">
         <span class="session-fokus-titel">${escapeHtml(trainingSession.planName)} · Übung ${i + 1} von ${gesamt}</span>
         <span class="session-gesamtzeit" title="Gesamtzeit">⏱ <span id="session-gesamtzeit">${zeitFormat((Date.now() - trainingSession.startMs) / 1000, true)}</span></span>
-        <button class="session-fokus-schliessen" onclick="trainingSessionAbbrechen()" aria-label="Schließen">×</button>
+        <button class="session-fokus-schliessen" onclick="trainingSessionAbbrechen()" aria-label="Schließen">${ic("x")}</button>
       </div>
       <div class="session-fokus-inhalt">
         <div class="row" style="flex-wrap:wrap; gap:0.5rem;">
@@ -6681,8 +6688,8 @@
             <span class="notiz-meta">${t.arbeit_sekunden}s Arbeit${t.pause_sekunden ? ` / ${t.pause_sekunden}s Pause` : ""} × ${t.runden} Runde${t.runden === 1 ? "" : "n"}${t.vorbereitung_sekunden ? ` · ${t.vorbereitung_sekunden}s Vorbereitung` : ""}</span>
           </div>
           <button class="link-btn" onclick="timerStarten('${t.id}')">▶ Starten</button>
-          <button class="task-edit-btn" onclick="timerBearbeitenStart('${t.id}')" title="Bearbeiten">✎</button>
-          <button class="task-delete" onclick="timerLoeschen('${t.id}')">×</button>
+          <button class="task-edit-btn" onclick="timerBearbeitenStart('${t.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
+          <button class="task-delete" onclick="timerLoeschen('${t.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }
 
@@ -6927,7 +6934,7 @@
     overlay.innerHTML = `
       <div class="session-fokus-kopf">
         <span class="session-fokus-titel">${escapeHtml(t.name)} · Runde ${Math.min(t.rundeAktuell, t.runden)} von ${t.runden}</span>
-        <button class="session-fokus-schliessen" onclick="timerAbbrechen()" aria-label="Schließen">×</button>
+        <button class="session-fokus-schliessen" onclick="timerAbbrechen()" aria-label="Schließen">${ic("x")}</button>
       </div>
       <div class="session-fokus-inhalt timer-fokus-mitte timer-phase-${t.phase}">
         <div class="timer-phase-label">${phaseLabel}</div>
@@ -7005,8 +7012,8 @@
             ${z.beschreibung ? `<span class="notiz-meta" style="white-space:pre-wrap;">${escapeHtml(z.beschreibung)}</span>` : ""}
           </div>
           ${z.plan_id ? `<button class="link-btn" onclick="planStarten('${z.plan_id}')">▶ Starten</button>` : ""}
-          <button class="task-edit-btn" onclick="zieleventBearbeitenStart('${z.id}')" title="Bearbeiten">✎</button>
-          <button class="task-delete" onclick="zieleventLoeschen('${z.id}')">×</button>
+          <button class="task-edit-btn" onclick="zieleventBearbeitenStart('${z.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
+          <button class="task-delete" onclick="zieleventLoeschen('${z.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }
 
@@ -7415,7 +7422,7 @@
           return `
                 <div>📎 <span onclick="spielDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
                   <span style="opacity:0.65;">(${hochgeladen})</span>
-                  <span onclick="spielDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen">×</span></div>`;
+                  <span onclick="spielDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen" aria-label="Datei entfernen">${ic("x")}</span></div>`;
         }).join("");
 
         const meta = spielMetaZeile(s);
@@ -7437,8 +7444,8 @@
               </div>
             </div>
             <div class="spiel-karte-knoepfe">
-              <button class="task-edit-btn" onclick="spielBearbeitenStart('${s.id}')" aria-label="Spiel bearbeiten" title="Bearbeiten">✎</button>
-              <button class="task-delete" onclick="spielLoeschen('${s.id}')" aria-label="Spiel löschen" title="Löschen">×</button>
+              <button class="task-edit-btn" onclick="spielBearbeitenStart('${s.id}')" aria-label="Spiel bearbeiten" title="Bearbeiten">${ic("stift")}</button>
+              <button class="task-delete" onclick="spielLoeschen('${s.id}')" aria-label="Spiel löschen" title="Löschen">${ic("x")}</button>
             </div>
           </div>`;
       }).join("");
@@ -7626,7 +7633,7 @@
           <span class="link-url">${escapeHtml(l.url)}</span>
           ${l.notiz ? `<span class="link-notiz">${escapeHtml(l.notiz)}</span>` : ""}
         </div>
-        <button class="task-delete" onclick="linkLoeschen('${l.id}')">×</button>
+        <button class="task-delete" onclick="linkLoeschen('${l.id}')" aria-label="Löschen">${ic("x")}</button>
       </div>`;
   }
 
@@ -7715,8 +7722,8 @@
         <div class="reflex-datum">
           <span>${formatDatumLang(r.datum)}</span>
           <span>
-            <button class="task-snooze" style="padding:0.2rem 0.5rem;" onclick="reflexionBearbeitenStart('${r.id}')" title="Bearbeiten">✎</button>
-            <button class="task-delete" style="font-size:1rem;" onclick="reflexionLoeschen('${r.id}')">×</button>
+            <button class="task-snooze" style="padding:0.2rem 0.5rem;" onclick="reflexionBearbeitenStart('${r.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
+            <button class="task-delete" style="font-size:1rem;" onclick="reflexionLoeschen('${r.id}')" aria-label="Löschen">${ic("x")}</button>
           </span>
         </div>
         <div class="reflex-text">${escapeHtml(r.text)}</div>
@@ -8121,7 +8128,7 @@
         <div class="task">
           <button class="task-check" onclick="einkaufUmschalten('${e.id}')"></button>
           <div class="task-info"><span class="task-titel">${escapeHtml(e.text)}</span></div>
-          <button class="task-delete" onclick="einkaufLoeschen('${e.id}')">×</button>
+          <button class="task-delete" onclick="einkaufLoeschen('${e.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`).join("") + '</div>';
 
       if (erledigt.length > 0) {
@@ -8130,7 +8137,7 @@
             <div class="task">
               <button class="task-check done" onclick="einkaufUmschalten('${e.id}')">✓</button>
               <div class="task-info"><span class="task-titel done">${escapeHtml(e.text)}</span></div>
-              <button class="task-delete" onclick="einkaufLoeschen('${e.id}')">×</button>
+              <button class="task-delete" onclick="einkaufLoeschen('${e.id}')" aria-label="Löschen">${ic("x")}</button>
             </div>`).join("") + '</div>';
       }
     }
@@ -8353,7 +8360,7 @@
           <button class="ziel-toggle" onclick="zielKarteUmschalten('${z.id}')" title="${offen ? "Einklappen" : "Ausklappen"}">${offen ? "▾" : "▸"}</button>
           <span class="ziel-titel" onclick="zielKarteUmschalten('${z.id}')" style="cursor:pointer;">${escapeHtml(z.titel)}</span>
           <span class="ziel-fortschritt">${schritte.length > 0 ? erledigtCount + "/" + schritte.length : ""}</span>
-          <button class="task-delete" onclick="zielLoeschen('${z.id}')">×</button>
+          <button class="task-delete" onclick="zielLoeschen('${z.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>
         ${parent ? `<div class="ziel-uebergeordnet">→ ${escapeHtml(parent.titel)}</div>` : ""}
         <div class="ziel-details ${offen ? "" : "hidden"}">
@@ -8362,7 +8369,7 @@
               <div class="ziel-schritt">
                 <button class="task-check ${s.erledigt ? "done" : ""}" onclick="zielSchrittUmschalten('${s.id}')">${s.erledigt ? "✓" : ""}</button>
                 <span class="ziel-schritt-text ${s.erledigt ? "done" : ""}">${escapeHtml(s.text)}</span>
-                <button class="task-delete" style="margin-left:auto;" onclick="zielSchrittLoeschen('${s.id}')">×</button>
+                <button class="task-delete" style="margin-left:auto;" onclick="zielSchrittLoeschen('${s.id}')" aria-label="Löschen">${ic("x")}</button>
               </div>`).join("")}
           </div>
           <div class="ziel-schritt-add">
@@ -8532,8 +8539,8 @@
                 <span class="notiz-text">🚪 ${escapeHtml(z.name)}</span>
                 <span class="notiz-meta" style="display:block;">${z.beschreibung ? escapeHtml(z.beschreibung) + " · " : ""}${anzahl} Schlüssel/Key${anzahl === 1 ? "" : "s"}</span>
               </div>
-              <button class="task-edit-btn" onclick="zugangBearbeiten('${z.id}')" aria-label="Zugang bearbeiten" title="Bearbeiten">✎</button>
-              <button class="task-delete" onclick="zugangLoeschen('${z.id}')" aria-label="Zugang löschen">×</button>
+              <button class="task-edit-btn" onclick="zugangBearbeiten('${z.id}')" aria-label="Zugang bearbeiten" title="Bearbeiten">${ic("stift")}</button>
+              <button class="task-delete" onclick="zugangLoeschen('${z.id}')" aria-label="Zugang löschen">${ic("x")}</button>
             </div>`;
         }).join("")}</div>`
       : `<p class="empty-text">Noch keine Zugänge.</p>`;
@@ -8611,7 +8618,7 @@
             ${schluesselStatusHtml(k)}
           </div>
           <div style="display:flex; flex-direction:column; gap:0.3rem; align-items:flex-end;">${schluesselKnoepfeHtml(k)}</div>
-          <button class="task-delete" onclick="event.stopPropagation(); schluesselLoeschen('${k.id}')" aria-label="Eintrag löschen">×</button>
+          <button class="task-delete" onclick="event.stopPropagation(); schluesselLoeschen('${k.id}')" aria-label="Eintrag löschen">${ic("x")}</button>
         </div>`;
     };
 
@@ -9168,7 +9175,7 @@
           <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeDrucken('${a.id}')" aria-label="Protokoll drucken" title="Drucken">📄</button>
           <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabePdf('${a.id}')" aria-label="Protokoll als PDF herunterladen" title="PDF herunterladen">⬇</button>
           ${mailEingerichtet ? `<button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeMailen('${a.id}')" aria-label="Protokoll per Mail senden" title="Per Mail senden">✉️</button>` : ""}
-          <button class="task-delete" onclick="event.stopPropagation(); ausgabeLoeschen('${a.id}')" aria-label="Protokoll löschen">×</button>
+          <button class="task-delete" onclick="event.stopPropagation(); ausgabeLoeschen('${a.id}')" aria-label="Protokoll löschen">${ic("x")}</button>
         </div>`;
     }).join("")}</div>`;
     ziel.innerHTML = html;
@@ -9416,7 +9423,7 @@
             ${v.notiz ? `<span class="notiz-meta" style="display:block;">${escapeHtml(v.notiz)}</span>` : ""}
             ${raumMailStatusHtml(v)}
           </div>
-          <button class="task-delete" onclick="event.stopPropagation(); raumVermietungLoeschen('${v.id}')" aria-label="Vermietung löschen">×</button>
+          <button class="task-delete" onclick="event.stopPropagation(); raumVermietungLoeschen('${v.id}')" aria-label="Vermietung löschen">${ic("x")}</button>
         </div>`;
     };
 
@@ -9481,8 +9488,8 @@
                 <span class="notiz-text">${escapeHtml(r.name)}</span>
                 <span class="notiz-meta" style="display:block;">${r.beschreibung ? escapeHtml(r.beschreibung) + " · " : ""}${anzahl} kommende Vermietung${anzahl === 1 ? "" : "en"}</span>
               </div>
-              <button class="task-edit-btn" onclick="raumUmbenennen('${r.id}')" aria-label="Raum bearbeiten" title="Bearbeiten">✎</button>
-              <button class="task-delete" onclick="raumLoeschen('${r.id}')" aria-label="Raum löschen">×</button>
+              <button class="task-edit-btn" onclick="raumUmbenennen('${r.id}')" aria-label="Raum bearbeiten" title="Bearbeiten">${ic("stift")}</button>
+              <button class="task-delete" onclick="raumLoeschen('${r.id}')" aria-label="Raum löschen">${ic("x")}</button>
             </div>`;
         }).join("")}</div>`
       : `<p class="empty-text">Noch keine Räume.</p>`;
@@ -9495,7 +9502,7 @@
               <span class="notiz-text">${escapeHtml(e.email)}</span>
               ${e.name ? `<span class="notiz-meta" style="display:block;">${escapeHtml(e.name)}</span>` : ""}
             </div>
-            <button class="task-delete" onclick="raumEmpfaengerLoeschen('${e.id}')" aria-label="Adresse entfernen">×</button>
+            <button class="task-delete" onclick="raumEmpfaengerLoeschen('${e.id}')" aria-label="Adresse entfernen">${ic("x")}</button>
           </div>`).join("")}</div>
         <p class="notiz-meta">${empfaenger.length} Adresse${empfaenger.length === 1 ? "" : "n"} im Verteiler.</p>`
       : `<p class="empty-text">Noch keine Adressen.</p>`;
@@ -9596,9 +9603,9 @@
 
     el.innerHTML = `
       <div class="cal-header" style="margin-top:1.2rem;">
-        <div class="cal-nav"><button type="button" onclick="raumKalBlaettern(-1)" aria-label="Vormonat">‹</button></div>
+        <div class="cal-nav"><button type="button" onclick="raumKalBlaettern(-1)" aria-label="Vormonat">${ic("zurueck")}</button></div>
         <h2 style="cursor:pointer;" onclick="raumKalHeute()" title="Zum aktuellen Monat">${RAUM_MONATE[monat]} ${jahr}</h2>
-        <div class="cal-nav"><button type="button" onclick="raumKalBlaettern(1)" aria-label="Nächster Monat">›</button></div>
+        <div class="cal-nav"><button type="button" onclick="raumKalBlaettern(1)" aria-label="Nächster Monat">${ic("weiter")}</button></div>
       </div>
       <p class="notiz-meta" style="margin:-0.5rem 0 0.6rem; text-align:center;">${belegteTage ? `${belegteTage} belegte${belegteTage === 1 ? "r Tag" : " Tage"}` : "Kein Tag belegt"}</p>
       <div class="cal-grid" style="margin-bottom:1rem;">${zellen}</div>
@@ -10081,7 +10088,7 @@
           <td>${finEuro(summe)}</td>
           <td>
             <button class="fin-loesch-btn" onclick="fixkostenSpeichern('${f.id}')" title="Speichern">✓</button>
-            <button class="fin-loesch-btn" onclick="fixkostenBearbeitenAbbrechen()" title="Abbrechen">×</button>
+            <button class="fin-loesch-btn" onclick="fixkostenBearbeitenAbbrechen()" title="Abbrechen" aria-label="Abbrechen">${ic("x")}</button>
           </td>
         </tr>`;
     }
@@ -10090,7 +10097,7 @@
         <td class="fin-bez" style="cursor:pointer;" onclick="fixkostenBearbeitenStart('${f.id}')">${escapeHtml(f.bezeichnung)}</td>
         ${FIN_MONATE.map((_m, i) => fixkostenZelleHtml(f, i)).join("")}
         <td><strong>${finEuro(summe)}</strong></td>
-        <td><button class="fin-loesch-btn" onclick="fixkostenLoeschen('${f.id}')" title="Löschen">×</button></td>
+        <td><button class="fin-loesch-btn" onclick="fixkostenLoeschen('${f.id}')" title="Löschen" aria-label="Löschen">${ic("x")}</button></td>
       </tr>`;
   }
 
@@ -10238,7 +10245,7 @@
             </div>
           </div>
           <button class="fin-loesch-btn" onclick="sonderausgabeSpeichern('${s.id}')" title="Speichern">✓</button>
-          <button class="fin-loesch-btn" onclick="sonderausgabeBearbeitenAbbrechen()" title="Abbrechen">×</button>
+          <button class="fin-loesch-btn" onclick="sonderausgabeBearbeitenAbbrechen()" title="Abbrechen" aria-label="Abbrechen">${ic("x")}</button>
         </div>`;
     }
     const monatLabel = s.monat ? FIN_MONATSNAMEN_KURZ[s.monat - 1] + " " + s.jahr : String(s.jahr);
@@ -10249,7 +10256,7 @@
           <div class="fin-card-meta">${monatLabel}${s.notiz ? " · " + escapeHtml(s.notiz) : ""}</div>
         </div>
         <div class="fin-betrag">${finEuro(s.betrag)}</div>
-        <button class="fin-loesch-btn" onclick="sonderausgabeLoeschen('${s.id}')" title="Löschen">×</button>
+        <button class="fin-loesch-btn" onclick="sonderausgabeLoeschen('${s.id}')" title="Löschen" aria-label="Löschen">${ic("x")}</button>
       </div>`;
   }
 
@@ -10392,7 +10399,7 @@
                   </div>
                 </div>
                 <button class="fin-loesch-btn" onclick="buchungAktualisieren('${b.id}')" title="Speichern">✓</button>
-                <button class="fin-loesch-btn" onclick="buchungBearbeitenAbbrechen()" title="Abbrechen">×</button>
+                <button class="fin-loesch-btn" onclick="buchungBearbeitenAbbrechen()" title="Abbrechen" aria-label="Abbrechen">${ic("x")}</button>
               </div>`;
           }
           return `
@@ -10403,7 +10410,7 @@
                 ${b.notiz ? `<div class="fin-buchung-notiz">${escapeHtml(b.notiz)}</div>` : ""}
               </div>
               <div class="fin-betrag ${istEinnahme ? "fin-betrag-einnahme" : ""}">${istEinnahme ? "+" : "−"}${finEuro(b.betrag)}</div>
-              <button class="fin-loesch-btn" onclick="buchungLoeschen('${b.id}')" title="Löschen">×</button>
+              <button class="fin-loesch-btn" onclick="buchungLoeschen('${b.id}')" title="Löschen" aria-label="Löschen">${ic("x")}</button>
             </div>`;
         }).join("")
       : `<p class="empty-text">Keine Buchungen in ${MONATSNAMEN_FIN[finBuchMonat - 1]} ${finBuchJahr}.</p>`;
@@ -10449,9 +10456,9 @@
       </div>
 
       <div class="cal-header">
-        <div class="cal-nav"><button onclick="finBuchungMonatVerschieben(-1)">‹</button></div>
+        <div class="cal-nav"><button onclick="finBuchungMonatVerschieben(-1)" aria-label="Vormonat">${ic("zurueck")}</button></div>
         <h2>${MONATSNAMEN_FIN[finBuchMonat - 1]} ${finBuchJahr}${istAktuellerMonat ? " · aktuell" : ""}</h2>
-        <div class="cal-nav"><button onclick="finBuchungMonatVerschieben(1)">›</button></div>
+        <div class="cal-nav"><button onclick="finBuchungMonatVerschieben(1)" aria-label="Nächster Monat">${ic("weiter")}</button></div>
       </div>
 
       ${listeHtml}
@@ -11081,9 +11088,9 @@
 
     el.innerHTML = `
       <div class="cal-header">
-        <div class="cal-nav"><button onclick="finUebJahrVerschieben(-1)">‹</button></div>
+        <div class="cal-nav"><button onclick="finUebJahrVerschieben(-1)" aria-label="Vorjahr">${ic("zurueck")}</button></div>
         <h2>${finUebJahr}</h2>
-        <div class="cal-nav"><button onclick="finUebJahrVerschieben(1)">›</button></div>
+        <div class="cal-nav"><button onclick="finUebJahrVerschieben(1)" aria-label="Nächstes Jahr">${ic("weiter")}</button></div>
       </div>
 
       <div class="fin-startkapital-row">
@@ -11607,8 +11614,8 @@
           <span class="notiz-meta">${teile.join(" · ")}</span>
         </div>
         <span class="ern-eintrag-kcal">${ernZahl(e.kcal, 0)} kcal</span>
-        <button class="task-edit-btn" onclick="ernBearbeiten('${e.id}')" aria-label="Bearbeiten">✎</button>
-        <button class="task-delete" onclick="ernLoeschen('${e.id}')" aria-label="Löschen">×</button>
+        <button class="task-edit-btn" onclick="ernBearbeiten('${e.id}')" aria-label="Bearbeiten">${ic("stift")}</button>
+        <button class="task-delete" onclick="ernLoeschen('${e.id}')" aria-label="Löschen">${ic("x")}</button>
       </div>`;
   }
 
@@ -12950,7 +12957,7 @@
       const bis = naechster ? ` bis ${datumDe(addTage(naechster.gueltig_ab, -1))}` : "";
       const markierung = v === aktuell ? " <span class=\"badge\">gilt heute</span>" : (v.gueltig_ab > heute ? " <span class=\"badge\">geplant</span>" : "");
       const loeschen = ernZielVersionen.length > 1
-        ? `<button class="task-delete" onclick="ernZielVersionLoeschen('${v.gueltig_ab}')" aria-label="Stand ab ${datumDe(v.gueltig_ab)} löschen">×</button>`
+        ? `<button class="task-delete" onclick="ernZielVersionLoeschen('${v.gueltig_ab}')" aria-label="Stand ab ${datumDe(v.gueltig_ab)} löschen">${ic("x")}</button>`
         : "";
       return `
         <div class="ern-ziel-stand">
@@ -13072,7 +13079,7 @@
     const liste = ernGewichte.slice(-8).reverse().map((g) => `
       <div class="ern-gewicht-zeile">
         <span>${datumDe(g.datum)}</span><strong>${ernZahl(g.gewicht_kg)} kg</strong>
-        <button class="task-delete" onclick="ernGewichtLoeschen('${g.datum}')" aria-label="Gewicht vom ${datumDe(g.datum)} löschen">×</button>
+        <button class="task-delete" onclick="ernGewichtLoeschen('${g.datum}')" aria-label="Gewicht vom ${datumDe(g.datum)} löschen">${ic("x")}</button>
       </div>`).join("");
     el.innerHTML = `
       <p class="ern-gewicht-aktuell">Zuletzt <strong>${ernZahl(letzter.gewicht_kg)} kg</strong> am ${datumDe(letzter.datum)}${vText}</p>
