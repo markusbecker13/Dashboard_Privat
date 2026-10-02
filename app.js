@@ -7954,12 +7954,16 @@
     if (!zugaenge.length) {
       return `<span class="notiz-meta">Noch keine Zugänge – unten unter „Zugänge verwalten“ anlegen.</span>`;
     }
-    return `<div id="${containerId}" style="display:flex; flex-wrap:wrap; gap:0.3rem 0.9rem;">${zugaenge.map((z) => `
-      <label style="display:flex; align-items:center; gap:0.3rem; font-weight:normal;">
-        <input type="checkbox" value="${z.id}" ${gewaehlt.includes(z.id) ? "checked" : ""}> ${escapeHtml(z.name)}
-      </label>`).join("")}</div>`;
+    // Saubere Liste untereinander: je Zugang eine Zeile mit Häkchen links (Breite fest, sonst
+    // zieht .ern-feld input die Checkbox auf 100 %), Beschreibung klein darunter
+    const zeilen = zugaenge.map((z, i) => `
+      <label style="display:flex; align-items:center; gap:0.7rem; padding:0.5rem 0.75rem; margin:0; cursor:pointer; font-weight:normal; color:var(--ink);${i < zugaenge.length - 1 ? " border-bottom:1px solid var(--border);" : ""}">
+        <input type="checkbox" value="${z.id}" ${gewaehlt.includes(z.id) ? "checked" : ""} style="width:1.15rem; height:1.15rem; margin:0; flex:0 0 auto; accent-color:var(--accent);">
+        <span style="flex:1; min-width:0; line-height:1.3;">🚪 ${escapeHtml(z.name)}${z.beschreibung ? `<span class="notiz-meta" style="display:block; margin:0;">${escapeHtml(z.beschreibung)}</span>` : ""}</span>
+      </label>`).join("");
+    return `<div id="${containerId}" style="display:flex; flex-direction:column; border:1px solid var(--border); border-radius:8px; background:var(--panel); max-height:16rem; overflow-y:auto;">${zeilen}</div>`;
   }
-  // Liest die angekreuzten Zugang-IDs aus einem Container; null, wenn keine Zugänge angelegt sind
+  // Liest die angekreuzten Zugänge eines Auswahlfelds (null, wenn es keins gibt)
   function schluesselZugangAuswahlLesen(containerId) {
     const el = document.getElementById(containerId);
     if (!el) return null; // keine Zugänge angelegt → Feld nicht mitschicken
@@ -8350,12 +8354,13 @@
         <div class="task-edit-felder">
           <label class="ern-feld">Name *<input type="text" id="sa-name-${id}" value="${escapeAttr(k.inhaber || "")}" maxlength="120" list="schluessel-namen-vorschlaege"></label>
           <label class="ern-feld">Verein<input type="text" id="sa-verein-${id}" value="${escapeAttr(k.verein || "")}" maxlength="120" list="schluessel-vereine-vorschlaege"></label>
-          <label class="ern-feld">Kontakt (Tel./Mail)<input type="text" id="sa-kontakt-${id}" maxlength="200"></label>
+          <label class="ern-feld">Kontakt (Tel./Mail)<input type="text" id="sa-kontakt-${id}" maxlength="200" oninput="schluesselKontaktZuMail('${id}')"></label>
           <label class="ern-feld">Ausgegeben am<input type="date" id="sa-am-${id}" value="${heuteISO()}"></label>
           <label class="ern-feld">Ausgegeben von<input type="text" id="sa-von-${id}" value="${escapeAttr(letzterAusgeber())}" maxlength="120"></label>
           <label class="ern-feld">Rückgabe bis (optional)<input type="date" id="sa-bis-${id}"></label>
           <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="sa-notiz-${id}" maxlength="500"></label>
           ${unterschriftFeldHtml("sa-sig-" + id, "Unterschrift Empfänger/in")}
+          ${mailFeldHtml("sa-mail-" + id, "")}
         </div>
         <p class="notiz-meta" style="margin:0.3rem 0;">Ohne Unterschrift hier: „Ausgeben &amp; drucken“ und das Protokoll auf Papier unterschreiben lassen.</p>
         <div class="row" style="margin:0.4rem 0 0; flex-wrap:wrap;">
@@ -8375,6 +8380,7 @@
           <label class="ern-feld">Zurück am<input type="date" id="sr-am-${id}" value="${heuteISO()}"></label>
           <label class="ern-feld">Zurückgenommen von<input type="text" id="sr-von-${id}" value="${escapeAttr(letzterAusgeber())}" maxlength="120"></label>
           ${unterschriftFeldHtml("sr-sig-" + id, "Unterschrift (Rückgabe bestätigt)")}
+          ${mailFeldHtml("sr-mail-" + id, mailAusText(a.kontakt))}
         </div>
         <div class="row" style="margin:0.4rem 0 0; flex-wrap:wrap;">
           <button class="btn-primary" onclick="schluesselZuruecknehmenSpeichern('${id}', '${a.id}', false)">Zurücknehmen</button>
@@ -8401,7 +8407,8 @@
     const a = offeneAusgabe(k);
     const knopf = (text, aufruf, titel) => `<button class="btn-secondary" style="white-space:nowrap; padding:0.25rem 0.6rem;" title="${titel}" onclick="event.stopPropagation(); ${aufruf}">${text}</button>`;
     if (a) return knopf("Zurück", `schluesselAktionStart('${k.id}', 'zuruecknehmen')`, "Schlüssel zurücknehmen") +
-      knopf("📄", `ausgabeDrucken('${a.id}')`, "Protokoll drucken / als PDF");
+      knopf("📄", `ausgabeDrucken('${a.id}')`, "Protokoll drucken / als PDF") +
+      (mailEingerichtet ? knopf("✉️", `ausgabeMailen('${a.id}')`, "Protokoll per Mail senden") : "");
     if (schluesselStatus(k) === "zugeordnet") return knopf("✍️ Protokoll", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Ausgabeprotokoll mit Unterschrift nachtragen");
     return knopf("Ausgeben", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Schlüssel ausgeben");
   }
@@ -8411,10 +8418,20 @@
     if (!liste.length) return "";
     return `<div class="ern-feld ern-feld-breit"><span>Ausgaben</span>${liste.map((a) => `
       <span class="notiz-meta" style="display:block;">${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""} · ${datumDE(a.ausgegeben_am)} – ${a.zurueck_am ? datumDE(a.zurueck_am) : "heute"}
-        <button class="link-btn" onclick="ausgabeDrucken('${a.id}')">📄 Protokoll</button></span>`).join("")}</div>`;
+        <button class="link-btn" onclick="ausgabeDrucken('${a.id}')">📄 Protokoll</button>${mailEingerichtet ? ` <button class="link-btn" onclick="ausgabeMailen('${a.id}')">✉️ Mail</button>` : ""}</span>`).join("")}</div>`;
   }
 
   // Öffnet am Schlüssel das Formular zum Ausgeben bzw. Zurücknehmen
+  // Übernimmt eine Mailadresse aus „Kontakt“ ins Mailfeld, solange dort nichts Eigenes steht
+  window.schluesselKontaktZuMail = function(id) {
+    const mailEl = document.getElementById("sa-mail-" + id);
+    const kontakt = document.getElementById("sa-kontakt-" + id);
+    if (!mailEl || !kontakt) return;
+    if (!mailEl.value || mailEl.dataset.auto === "1") {
+      mailEl.value = mailAusText(kontakt.value);
+      mailEl.dataset.auto = "1";
+    }
+  };
   window.schluesselAktionStart = function(id, modus) {
     schluesselAktion = { id, modus };
     schluesselBearbeitenId = null;
@@ -8448,10 +8465,13 @@
     };
     if (!daten.inhaber) { alert("Bitte den Namen der Person angeben."); return; }
     try {
+      const mailEl = document.getElementById("sa-mail-" + id);
+      const mail = mailEl ? mailEl.value.trim() : "";
       const antwort = await api("schluessel_ausgeben", daten);
       ausgeberMerken(daten.ausgegeben_von);
       schluesselAktion = null;
       await ladeDaten();
+      if (antwort && antwort.id) await mailNachSpeichern(antwort.id, mail);
       if (drucken && antwort && antwort.id) await window.ausgabeDrucken(antwort.id);
     } catch (fehler) {
       alert(fehler.message);
@@ -8465,11 +8485,14 @@
       zurueck_von: document.getElementById(`sr-von-${id}`).value.trim(),
       unterschrift: unterschriftLesen("sr-sig-" + id),
     };
+    const mailEl = document.getElementById("sr-mail-" + id);
+    const mail = mailEl ? mailEl.value.trim() : "";
     try {
       await api("schluessel_zuruecknehmen", daten);
       ausgeberMerken(daten.zurueck_von);
       schluesselAktion = null;
       await ladeDaten();
+      await mailNachSpeichern(ausgabeId, mail);
       if (drucken) await window.ausgabeDrucken(ausgabeId);
     } catch (fehler) {
       alert(fehler.message);
@@ -8542,6 +8565,47 @@
     }
   };
 
+  // ---------- Protokoll per Mail (seit Session 33) ----------
+  // Erste Mailadresse aus einem Freitext (z. B. Feld Kontakt) oder ""
+  function mailAusText(text) {
+    const treffer = String(text || "").match(/[^\s@<>,;"']+@[^\s@<>,;"']+\.[^\s@<>,;"']{2,}/);
+    return treffer ? treffer[0] : "";
+  }
+  // Schickt ein Protokoll an eine Adresse (Kopie geht an das eigene Postfach); liefert true bei Erfolg
+  async function protokollMailSenden(id, email) {
+    const organisation = (BEREICH_LOGO[aktiverBereich] || {}).alt || "";
+    const antwort = await api("schluessel_protokoll_senden", { id, email, organisation });
+    return antwort;
+  }
+  // Fragt die Adresse ab (Vorschlag aus Kontakt) und verschickt das Protokoll
+  window.ausgabeMailen = async function(id) {
+    if (!mailEingerichtet) { alert("Der Mail-Versand ist noch nicht eingerichtet (Secrets SMTP_USER und SMTP_PASS, siehe Anleitung Raumplanung)."); return; }
+    const a = schluesselAusgaben.find((x) => x.id === id);
+    const email = prompt("Protokoll per Mail senden an:", a ? mailAusText(a.kontakt) : "");
+    if (email === null || !email.trim()) return;
+    try {
+      const antwort = await protokollMailSenden(id, email.trim());
+      alert(`Protokoll an ${email.trim()} verschickt.${antwort && antwort.kopie ? " Eine Kopie ging an dein Postfach." : ""}`);
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+  // Feld „Protokoll per Mail an“ für die Formulare Ausgeben/Zurücknehmen
+  function mailFeldHtml(id, vorschlag) {
+    if (!mailEingerichtet) return "";
+    return `<label class="ern-feld ern-feld-breit">Protokoll per Mail an (optional)<input type="email" id="${id}" value="${escapeAttr(vorschlag || "")}" autocomplete="off" placeholder="leer lassen = keine Mail"></label>`;
+  }
+  // Nach dem Speichern: Protokoll verschicken, wenn eine Adresse eingetragen ist (Fehler nur melden)
+  async function mailNachSpeichern(ausgabeId, email) {
+    if (!email) return;
+    try {
+      const antwort = await protokollMailSenden(ausgabeId, email);
+      alert(`Gespeichert. Protokoll an ${email} verschickt.${antwort && antwort.kopie ? " Eine Kopie ging an dein Postfach." : ""}`);
+    } catch (fehler) {
+      alert("Gespeichert, aber die Mail ging nicht raus: " + fehler.message + " – über ✉️ in den Ausgabeprotokollen erneut versuchen.");
+    }
+  }
+
   // ---------- Protokoll-Liste ----------
   // Rendert die Liste aller Ausgabeprotokolle des Bereichs (offene zuerst) inkl. Hinweis auf alte Protokolle
   function renderAusgabeProtokolle() {
@@ -8568,6 +8632,7 @@
             <span class="notiz-meta" style="display:block;">ausgegeben ${datumDE(a.ausgegeben_am)}${a.hat_unterschrift_ausgabe ? " ✍️" : ""}${a.ausgegeben_von ? " von " + escapeHtml(a.ausgegeben_von) : ""} · ${status}${ausgabeIstAlt(a) ? " · älter als 1 Jahr" : ""}</span>
           </div>
           <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeDrucken('${a.id}')" aria-label="Protokoll drucken" title="Drucken / PDF">📄</button>
+          ${mailEingerichtet ? `<button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeMailen('${a.id}')" aria-label="Protokoll per Mail senden" title="Per Mail senden">✉️</button>` : ""}
           <button class="task-delete" onclick="event.stopPropagation(); ausgabeLoeschen('${a.id}')" aria-label="Protokoll löschen">×</button>
         </div>`;
     }).join("")}</div>`;
