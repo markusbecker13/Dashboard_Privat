@@ -1278,3 +1278,62 @@
   /* Zitat klein am Ende */
   #view-heute .tages-zitat { margin: 0.3rem 0 0; border-left-width: 2px; }
   #view-heute .tages-zitat-text { font-size: 0.9rem; color: var(--ink-dim); }
+
+  /* ==========================================================
+     Schnellerfassung über „+“ (seit Session 34, Redesign Etappe 3)
+     ========================================================== */
+  .bottom-nav-plus {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 3.5rem; height: 3.5rem; border: none; border-radius: 999px; cursor: pointer;
+    background: var(--accent); color: #fff;
+    box-shadow: 0 0 0 3px var(--nav-bg), 0 4px 12px rgba(0, 0, 0, 0.25);
+  }
+  .bottom-nav-plus:active { transform: scale(0.95); }
+  .bottom-nav-plus:focus-visible { outline: 3px solid var(--nav-ink); outline-offset: 2px; }
+
+  .menu-verwalten { display: flex; flex-direction: column; gap: 0.55rem; padding-bottom: 0.55rem; border-bottom: 1px solid var(--border); }
+  .menu-verwalten .link-btn.aktiv { font-weight: 800; }
+
+  .app-hinweis {
+    position: fixed; z-index: 45; left: 50%; transform: translateX(-50%);
+    bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100% - 2rem); padding: 0.6rem 1.1rem; border-radius: 999px;
+    background: var(--ink); color: var(--bg); font-size: 0.9rem; font-weight: 600;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  }
+
+  .schnell-sheet {
+    width: min(100%, 520px); max-width: 100%; max-height: 92vh; margin: auto auto 0; padding: 1rem 1.2rem calc(1.2rem + env(safe-area-inset-bottom, 0px));
+    border: none; border-radius: 22px 22px 0 0; background: var(--panel); color: var(--ink);
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.2); overflow-y: auto;
+  }
+  .schnell-sheet::backdrop { background: rgba(10, 12, 16, 0.45); }
+  @media (min-width: 600px) { .schnell-sheet { margin: auto; border-radius: 22px; } }
+  .schnell-kopf { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.7rem; }
+  .schnell-kopf h2 { font-family: var(--font-display); font-size: 1.2rem; margin: 0; }
+  .schnell-zu {
+    width: 2.75rem; height: 2.75rem; border: none; border-radius: 999px; cursor: pointer;
+    background: none; color: var(--ink-dim); font-size: 1.1rem;
+  }
+  .schnell-text { width: 100%; box-sizing: border-box; font-size: 1.05rem; padding: 0.85rem 0.9rem; }
+  .schnell-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-dim); margin: 0.9rem 0 0.4rem; }
+  .schnell-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .schnell-chip {
+    display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.75rem; padding: 0 0.95rem;
+    border: 1.5px solid var(--border); border-radius: 999px; cursor: pointer;
+    background: var(--panel); color: var(--ink); font-weight: 600; font-size: 0.9rem;
+  }
+  .schnell-chip.aktiv { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  .schnell-punkt { width: 0.7rem; height: 0.7rem; border-radius: 999px; display: inline-block; }
+  .schnell-chip.aktiv .schnell-punkt { box-shadow: 0 0 0 2px var(--bg) !important; }
+  .schnell-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 0.6rem; }
+  .schnell-feld { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--ink-dim); font-size: 0.9rem; }
+  .schnell-feld input, .schnell-feld select { color: var(--ink); }
+  .schnell-feld input[type="number"] { width: 4.5rem; }
+  .schnell-details-knopf { display: block; margin: 0.9rem 0 0.2rem; min-height: 2.75rem; }
+  .schnell-details { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+  .schnell-feld-block { width: 100%; }
+  .schnell-notiz { width: 100%; box-sizing: border-box; resize: vertical; }
+  .schnell-status { min-height: 1.2em; margin: 0.6rem 0 0.4rem; font-size: 0.88rem; color: var(--ink-dim); }
+  .schnell-status.fehler { color: var(--overdue-text); font-weight: 600; }
+  .schnell-speichern { width: 100%; min-height: 3rem; font-size: 1rem; }
