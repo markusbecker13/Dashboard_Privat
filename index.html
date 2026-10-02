@@ -66,10 +66,7 @@
 
   <div id="app" class="hidden app-shell">
     <header class="content-topbar">
-      <button class="bereich-knopf" id="content-bereich-btn" title="Bereich wechseln" aria-label="Bereich wechseln">
-        <span id="content-bereich-text">Bereich</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
+      <div class="bereich-umschalter" id="bereich-umschalter" role="group" aria-label="Bereich wechseln"></div>
       <img class="topbar-logo hidden" id="topbar-logo" src="" alt="">
       <span class="brand" id="brand-name">Dashboard</span>
       <span class="brand-sub" id="brand-sub">Aufgaben</span>
@@ -78,7 +75,8 @@
     <div class="account-menu hidden" id="account-menu">
       <button class="link-btn" onclick="dashboardNameBearbeiten()">✎ Name ändern</button>
       <button class="link-btn" onclick="untertitelBearbeiten()">✎ Untertitel ändern</button>
-      <button class="link-btn" id="btn-bereich-wechseln">↔ Bereich wechseln</button>
+      <button class="link-btn" id="btn-bereich-wechseln">▦ Bereichsübersicht</button>
+      <button class="link-btn" id="btn-verwaltung-oeffnen">⚙ Reiter verwalten</button>
       <button class="link-btn" id="btn-abmelden">Abmelden</button>
     </div>
 
@@ -712,10 +710,11 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Das Dashboard trennt vier Lebensbereiche sauber voneinander: <strong>Privat</strong>, <strong>OGS Rapunzel</strong> (Beruf), <strong>AWO OV Liblar</strong> (Ehrenamt) und <strong>Business</strong> (zwischenkaffeeundchaos). Ein weiterer Bereich <strong>Verwaltung</strong> (⚙️) hat keine eigenen Daten, sondern enthält nur die Reiter-Verwaltung.</p>
               <ul>
-                <li><strong>Nach dem Login:</strong> die Willkommensseite mit Datum und farbigen Bereichs-Karten (Bereich wählen). Verwaltung öffnet direkt die Reiter-Verwaltung; Privat/OGS/AWO/Business öffnen direkt den Start-Screen (Heute)</li>
+                <li><strong>Nach dem Öffnen und nach dem Login</strong> (seit Session 34): die App startet direkt im zuletzt genutzten Bereich auf dem Start-Screen (Heute) – ohne Umweg über die Willkommensseite. Beim allerersten Start ist das Privat. Verwaltung zählt dabei nicht als „zuletzt genutzt“</li>
+                <li><strong>Bereichsumschalter oben links:</strong> vier Punkte in den Bereichsfarben (Privat blau, OGS blau mit gelbem Ring, AWO rot, Business orange). Der aktive Bereich ist als Pille mit Namen hervorgehoben. Ein Tipp auf einen anderen Punkt wechselt sofort dorthin, ein Tipp auf den aktiven Bereich bringt dich zu seinem Start</li>
                 <li><strong>Leiste unten:</strong> die Themen Heute, Planen, Sammeln, der bereichsspezifische Block (Glühbirne, z.B. Ideen/Inventar/Projekte/Verleih) und Verwalten (Raster-Symbol). Das aktive Thema ist hervorgehoben und beschriftet. Ein Tipp auf ein Thema öffnet den Reiter, den du darin zuletzt offen hattest (beim ersten Mal den ersten)</li>
                 <li><strong>Reiter-Leiste oben:</strong> hat das aktive Thema mehrere sichtbare Reiter, stehen sie als Knöpfe unter der Kopfzeile (seitlich wischbar). Thema mit nur einem Reiter (z.B. Heute): keine Reiter-Leiste</li>
-                <li><strong>Bereich wechseln:</strong> über den Bereichs-Knopf oben links (z.B. „Privat ▾") oder „↔ Bereich wechseln" im ⋮-Menü – beides führt zur Willkommensseite, ohne dich abzumelden</li>
+                <li><strong>⋮-Menü:</strong> „▦ Bereichsübersicht“ öffnet die Willkommensseite mit den großen Bereichs-Karten (ohne Abmelden), „⚙ Reiter verwalten“ öffnet direkt die Verwaltung. Aus der Verwaltung kommst du über den Umschalter oben zurück</li>
               </ul>
               <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen, Training, Verlauf sowie Inventar, Projekte und Verleih haben ebenfalls ein eigenes bereich-Feld. <strong>Ernährung</strong> gibt es nur in Privat (keine bereich-Spalte, in anderen Bereichen nicht einschaltbar).</p>
               <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS-, AWO- und Business-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Reflexion/Einkauf/Rezepte/Ernährung/Export sind standardmäßig nur im Privat-Bereich eingeblendet, Links in Privat und Business.</p>
