@@ -911,6 +911,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Monatskalender</strong> (unter dem Formular): belegte Tage sind in der Akzentfarbe des Bereichs gefüllt (in AWO Rot) mit weißem Punkt, Zeiträume an allen ihren Tagen, heute ist umrandet, der angetippte Tag ist dunkel. ‹ › blättern, Tipp auf den Monatsnamen springt zum aktuellen Monat. Einen Tag antippen zeigt darunter seine Vermietungen (auch dort bearbeitbar); „＋ Neue Vermietung an diesem Tag“ übernimmt das Datum ins Formular. Nochmal antippen schließt den Tag</li>
                 <li><strong>Liste:</strong> kommende Vermietungen nach Monat, jeder Monat auf- und zuklappbar (Kopf zeigt die Anzahl und ggf. „x ohne Mail“). Beim ersten Öffnen ist nur der aktuelle Monat offen, danach merkt sich das Gerät deine Wahl. „Alle aufklappen“ / „Alle zuklappen“ darüber. Darunter „Vergangene Vermietungen“ (aufklappbar). Jede zeigt, ob die Mail rausging. Fehlgeschlagen oder Verteiler leer? „Erneut senden“ direkt am Eintrag</li>
                 <li><strong>Bearbeiten:</strong> auf einen Eintrag tippen. Bei einem einzelnen Eintrag lässt sich ein „Bis Datum“ setzen oder leeren. Bei einer Serie ändert sich nur dieser Termin; dort gibt es zusätzlich „Ganze Serie löschen“. Das × löscht bei einer Serie nur den einen Termin. Änderungen und Löschen verschicken bewusst keine Mail</li>
+                <li><strong>Export:</strong> unter der Liste „Excel“ oder „Word“ – alle Vermietungen des aktiven Bereichs (auch vergangene) mit Raum, Datum, Uhrzeit, Anlass, Kontakt, Zweck, Notiz, Serie und Mail-Status</li>
                 <li><strong>Räume verwalten</strong> (unten, aufklappen): Räume anlegen, mit ✎ umbenennen, mit × löschen – vorhandene Vermietungen bleiben dann ohne Raum erhalten</li>
                 <li><strong>Mail-Verteiler</strong> (unten, aufklappen): beliebig viele Adressen, optional mit Namen. Die Mail geht in BCC raus, niemand sieht die anderen Adressen</li>
                 <li><strong>Versand:</strong> direkt über ein web.de-Postfach (SMTP mit SSL, Port 465). Einmal einrichten: bei web.de unter Einstellungen → POP3/IMAP den Zugriff per SMTP erlauben, dann in Supabase die Secrets <code>SMTP_USER</code> (die web.de-Adresse) und <code>SMTP_PASS</code> (das Passwort) hinterlegen, optional <code>MAIL_ABSENDER_NAME</code>. Andere Anbieter über <code>SMTP_HOST</code>/<code>SMTP_PORT</code>. Brevo geht weiterhin, braucht aber eine eigene, authentifizierte Domain. Ohne Secrets lässt sich trotzdem alles eintragen, oben steht dann ein Hinweis</li>
@@ -931,6 +932,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Liste:</strong> nach Verein gruppiert und aufklappbar, im Kopf die Anzahl 🔑/📡, unter jedem Eintrag 🚪 seine Zugänge. Darüber die Suche (Nummer, Name, Verein, Zugang, Notiz), die Auswahl „nur Schlüssel“ / „nur Keys“ und – sobald es Zugänge gibt – ein Zugangsfilter: zeigt z. B. alle, die in die Küche kommen</li>
                 <li><strong>Bearbeiten:</strong> auf einen Eintrag tippen, z. B. wenn ein Key an eine andere Person geht oder eine Tür dazukommt (Zugänge an- oder abhaken). × löscht ihn (z. B. verloren oder zurückgegeben)</li>
                 <li><strong>Verlauf:</strong> dort stehen nur Art und Seriennummer, keine Namen</li>
+                <li><strong>Export:</strong> unter der Liste „Excel“ oder „Word“ – exportiert alle Schlüssel und Keys des aktiven Bereichs (Verein, Name, Art, Seriennummer, Zugänge, Notiz) und als zweite Tabelle je Zugang, wer ihn öffnen kann. Filter und Suche spielen dabei keine Rolle. Die Datei enthält Namen – nicht offen herumschicken</li>
               </ul>
             </div>
           </details>
@@ -1105,7 +1107,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Export <span class="anleitung-nur">(Standard: nur Privat)</span></summary>
             <div class="anleitung-text">
-              <p>Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen. Läuft komplett im Browser, ohne dass Daten an Dritte gehen. Bei „Alles" gibt es bei Excel ein Tabellenblatt pro Bereich, bei Word alle Tabellen untereinander in einem Dokument.</p>
+              <p>Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen. Läuft komplett im Browser, ohne dass Daten an Dritte gehen. Bei „Alles" gibt es bei Excel ein Tabellenblatt pro Bereich, bei Word alle Tabellen untereinander in einem Dokument. Raumplanung, Schlüssel und Zugänge sind seit Session 32 dabei (über alle Bereiche, mit Spalte „Bereich“). Nur einen Bereich gibt es direkt im jeweiligen Reiter über die Knöpfe unter der Liste.</p>
             </div>
           </details>
 
@@ -1354,6 +1356,11 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
 
         <div id="raum-kalender"></div>
         <div id="raum-vermietungen-liste" style="margin-top:0.4rem;"></div>
+        <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-top:0.8rem;">
+          <span class="notiz-meta" style="margin:0;">⬇ Vermietungen exportieren (alle, auch vergangene – nur dieser Bereich)</span>
+          <button class="btn-secondary" onclick="reiterExport('raumplanung', 'excel')">Excel</button>
+          <button class="btn-secondary" onclick="reiterExport('raumplanung', 'word')">Word</button>
+        </div>
 
         <details class="anleitung-abschnitt" style="margin-top:0.8rem;" id="raum-raeume-block">
           <summary>Räume verwalten</summary>
@@ -1416,6 +1423,11 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         </div>
         <p class="notiz-meta" id="schluessel-zusammenfassung"></p>
         <div id="schluessel-liste"></div>
+        <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-top:0.8rem;">
+          <span class="notiz-meta" style="margin:0;">⬇ Liste exportieren (Schlüssel + Zugänge, nur dieser Bereich)</span>
+          <button class="btn-secondary" onclick="reiterExport('schluessel', 'excel')">Excel</button>
+          <button class="btn-secondary" onclick="reiterExport('schluessel', 'word')">Word</button>
+        </div>
 
         <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
           <summary>Zugänge verwalten</summary>
