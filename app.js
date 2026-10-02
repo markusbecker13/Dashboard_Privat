@@ -8418,7 +8418,7 @@
     if (!liste.length) return "";
     return `<div class="ern-feld ern-feld-breit"><span>Ausgaben</span>${liste.map((a) => `
       <span class="notiz-meta" style="display:block;">${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""} · ${datumDE(a.ausgegeben_am)} – ${a.zurueck_am ? datumDE(a.zurueck_am) : "heute"}
-        <button class="link-btn" onclick="ausgabeDrucken('${a.id}')">📄 Protokoll</button>${mailEingerichtet ? ` <button class="link-btn" onclick="ausgabeMailen('${a.id}')">✉️ Mail</button>` : ""}</span>`).join("")}</div>`;
+        <button class="link-btn" onclick="ausgabeDrucken('${a.id}')">📄 Drucken</button> <button class="link-btn" onclick="ausgabePdf('${a.id}')">⬇ PDF</button>${mailEingerichtet ? ` <button class="link-btn" onclick="ausgabeMailen('${a.id}')">✉️ Mail</button>` : ""}</span>`).join("")}</div>`;
   }
 
   // Öffnet am Schlüssel das Formular zum Ausgeben bzw. Zurücknehmen
@@ -8581,11 +8581,24 @@
   window.ausgabeMailen = async function(id) {
     if (!mailEingerichtet) { alert("Der Mail-Versand ist noch nicht eingerichtet (Secrets SMTP_USER und SMTP_PASS, siehe Anleitung Raumplanung)."); return; }
     const a = schluesselAusgaben.find((x) => x.id === id);
-    const email = prompt("Protokoll per Mail senden an:", a ? mailAusText(a.kontakt) : "");
+    const email = prompt("Protokoll als PDF per Mail senden an:", a ? mailAusText(a.kontakt) : "");
     if (email === null || !email.trim()) return;
     try {
       const antwort = await protokollMailSenden(id, email.trim());
-      alert(`Protokoll an ${email.trim()} verschickt.${antwort && antwort.kopie ? " Eine Kopie ging an dein Postfach." : ""}`);
+      alert(`Protokoll als PDF an ${email.trim()} verschickt.${antwort && antwort.kopie ? " Eine Kopie ging an dein Postfach." : ""}`);
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+  // Lädt das Protokoll als PDF vom Server und speichert es (gleiches PDF wie im Mail-Anhang)
+  window.ausgabePdf = async function(id) {
+    try {
+      const organisation = (BEREICH_LOGO[aktiverBereich] || {}).alt || "";
+      const antwort = await api("schluessel_protokoll_pdf", { id, organisation });
+      const bin = atob(antwort.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      downloadDatei(antwort.dateiname || "Schluesselprotokoll.pdf", bytes, "application/pdf");
     } catch (fehler) {
       alert(fehler.message);
     }
@@ -8600,7 +8613,7 @@
     if (!email) return;
     try {
       const antwort = await protokollMailSenden(ausgabeId, email);
-      alert(`Gespeichert. Protokoll an ${email} verschickt.${antwort && antwort.kopie ? " Eine Kopie ging an dein Postfach." : ""}`);
+      alert(`Gespeichert. Protokoll als PDF an ${email} verschickt.${antwort && antwort.kopie ? " Eine Kopie ging an dein Postfach." : ""}`);
     } catch (fehler) {
       alert("Gespeichert, aber die Mail ging nicht raus: " + fehler.message + " – über ✉️ in den Ausgabeprotokollen erneut versuchen.");
     }
@@ -8631,7 +8644,8 @@
             <span class="notiz-text">${icon} ${escapeHtml(a.seriennummer)} · ${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""}</span>
             <span class="notiz-meta" style="display:block;">ausgegeben ${datumDE(a.ausgegeben_am)}${a.hat_unterschrift_ausgabe ? " ✍️" : ""}${a.ausgegeben_von ? " von " + escapeHtml(a.ausgegeben_von) : ""} · ${status}${ausgabeIstAlt(a) ? " · älter als 1 Jahr" : ""}</span>
           </div>
-          <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeDrucken('${a.id}')" aria-label="Protokoll drucken" title="Drucken / PDF">📄</button>
+          <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeDrucken('${a.id}')" aria-label="Protokoll drucken" title="Drucken">📄</button>
+          <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabePdf('${a.id}')" aria-label="Protokoll als PDF herunterladen" title="PDF herunterladen">⬇</button>
           ${mailEingerichtet ? `<button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeMailen('${a.id}')" aria-label="Protokoll per Mail senden" title="Per Mail senden">✉️</button>` : ""}
           <button class="task-delete" onclick="event.stopPropagation(); ausgabeLoeschen('${a.id}')" aria-label="Protokoll löschen">×</button>
         </div>`;
