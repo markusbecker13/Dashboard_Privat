@@ -1412,9 +1412,9 @@
 
   // Lädt das Wetter für den gewählten Ort (30-Min-Cache) und zeigt Lade-/Fehlerkachel
   async function ladeWetter(erzwingen = false) {
-    const container = document.getElementById("wetter-bereich");
+    const container = document.getElementById("heute-wetter");
     if (!container) {
-      console.error("[Wetter] Container #wetter-bereich nicht im DOM gefunden – index.html nicht aktuell?");
+      console.error("[Wetter] Knopf #heute-wetter nicht im DOM gefunden – index.html nicht aktuell?");
       return;
     }
     const jetzigerOrt = wetterOrt;
@@ -1422,7 +1422,7 @@
       renderWetter();
       return;
     }
-    container.innerHTML = `<div class="heute-kachel heute-kachel--wetter"><span class="heute-kachel-titel">Wetter</span><span class="heute-kachel-text">wird geladen …</span></div>`;
+    container.textContent = "Wetter lädt …";
     try {
       const daten = await api("wetter_abrufen", { ort: jetzigerOrt });
       // Falls der Ort zwischenzeitlich geändert wurde, veraltete Antwort verwerfen.
@@ -1432,11 +1432,9 @@
       renderWetter();
     } catch (fehler) {
       console.error("[Wetter] Laden fehlgeschlagen:", fehler);
-      container.innerHTML =
-        `<button class="heute-kachel heute-kachel--wetter" onclick="ladeWetter(true)" title="${escapeHtml(fehler.message || "Fehler")}">
-          <span class="heute-kachel-titel">Wetter</span>
-          <span class="heute-kachel-text">nicht geladen – tippen für neuen Versuch</span>
-        </button>`;
+      wetterDaten = null;
+      container.textContent = "Wetter nicht geladen · nochmal";
+      container.title = fehler.message || "Fehler";
     }
   }
 
@@ -1457,12 +1455,13 @@
         </div>`;
     }).join("");
 
-    // Kompakte Kachel oben (aktuelles Wetter), Tipp klappt den Ausblick auf
-    document.getElementById("wetter-bereich").innerHTML = `
-      <button class="heute-kachel heute-kachel--wetter" onclick="wetterAusblickUmschalten()" aria-expanded="${wetterAusblickOffen}" aria-controls="wetter-ausblick">
-        <span class="heute-kachel-titel">Wetter · ${escapeHtml(wetterDaten.ort_gefunden || wetterOrt)}</span>
-        <span class="heute-kachel-zahl">${Math.round(wetterDaten.aktuelle_temperatur)}° <span class="heute-kachel-text">${aktIcon} ${escapeHtml(aktText)}</span></span>
-      </button>`;
+    // Seit Session 34: kompakt in der Datumszeile, Tipp klappt den Ausblick auf
+    const knopf = document.getElementById("heute-wetter");
+    if (knopf) {
+      knopf.textContent = `${Math.round(wetterDaten.aktuelle_temperatur)}° ${aktIcon} ${aktText}`;
+      knopf.title = `Wetter in ${wetterDaten.ort_gefunden || wetterOrt} – 5-Tage-Ausblick ${wetterAusblickOffen ? "schließen" : "öffnen"}`;
+      knopf.setAttribute("aria-expanded", String(wetterAusblickOffen));
+    }
     const ausblick = document.getElementById("wetter-ausblick");
     if (ausblick) {
       ausblick.classList.toggle("hidden", !wetterAusblickOffen);
@@ -1476,6 +1475,12 @@
         </div>`;
     }
   }
+
+  // Tipp auf das Wetter in der Datumszeile: Ausblick auf/zu, nach einem Fehler neu laden
+  window.wetterKnopfKlick = function () {
+    if (!wetterDaten) { ladeWetter(true); return; }
+    window.wetterAusblickUmschalten();
+  };
 
   // Klappt den 5-Tage-Wetterausblick auf oder zu
   window.wetterAusblickUmschalten = function () {
@@ -1690,234 +1695,344 @@
       `<figcaption class="tages-zitat-quelle">${escapeHtml(z.autor)} · <cite>${escapeHtml(z.quelle)}</cite></figcaption>`;
   }
 
-  // Rendert den Heute-Screen: Kopf mit Gruß, Zeitleiste (Überfälliges, Termine, Aufgaben) und Kacheln
-  function renderHeute() {
-    bereichAnwenden();
-    const heuteIso = heuteISO();
-    const aufgabenBereich = aufgaben.filter((a) => bereichVon(a) === aktiverBereich);
-    const offenEnriched = aufgabenBereich.filter((a) => !a.erledigt).map(enrich);
-    const faelligHeute = offenEnriched.filter((a) => a.status === "ueberfaellig" || a.status === "heute");
-    const erinnerungenHeute = offenEnriched.filter((a) => a.erinnerungFaellig);
-    const termineGanztags = termine
+  // ==========================================================
+  // Start-Screen „Heute“ – seit Session 34 (Redesign Etappe 2).
+  // Reihenfolge: Kopf (Datum · Wetter, Gruß, Statuszeile) → „Dein Tag“
+  // (freie Zeit als Band) → „Als Nächstes“ → Modul-Kacheln des Bereichs
+  // (OGS/AWO/Business) → Liste „Heute“ → Überfällig-Streifen mit „Alle auf
+  // heute“ → Kennzahlen → Ziele → Zitat (steht in index.html ganz unten).
+  // Jede Zahl erscheint nur noch einmal (früher: Gruß, Überfällig-Kachel,
+  // Gruppenköpfe und „Aufgaben fällig“ zeigten dasselbe).
+  // ==========================================================
+
+  // Linien-Icons der Modul-Kacheln (statt Emoji)
+  const HEUTE_MODUL_ICON = {
+    ogsideen: `<svg ${SVG_ATTR}><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>`,
+    ogsinventar: `<svg ${SVG_ATTR}><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>`,
+    ogsprojekte: `<svg ${SVG_ATTR}><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>`,
+    verleih: `<svg ${SVG_ATTR}><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>`,
+    raumplanung: `<svg ${SVG_ATTR}><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
+    schluessel: `<svg ${SVG_ATTR}><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>`,
+  };
+
+  // Minuten als kurzer Text: „40 Min.“, „2 Std.“, „2 Std. 15 Min.“
+  function dauerText(min) {
+    const m = Math.max(0, Math.round(min));
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    if (h === 0) return `${r} Min.`;
+    return r ? `${h} Std. ${r} Min.` : `${h} Std.`;
+  }
+
+  // Sammelt alles, was heute im aktiven Bereich ansteht (ohne Überfälliges), nach Uhrzeit sortiert
+  function heuteEintraegeSammeln(heuteIso, offenEnriched) {
+    const liste = [];
+    termine
       .filter((t) => t.datum === heuteIso && !t.uhrzeit && bereichVon(t) === aktiverBereich)
-      .sort((a, b) => a.titel.localeCompare(b.titel));
-    const einkaufOffen = aktiverBereich === "privat" ? einkaufsliste.filter((e) => !e.erledigt) : [];
-
-    const jetztDate = new Date();
-    const jetztMinuten = jetztDate.getHours() * 60 + jetztDate.getMinutes();
-    const jetztLabel = String(jetztDate.getHours()).padStart(2,"0") + ":" + String(jetztDate.getMinutes()).padStart(2,"0");
-    const heuteWtIndex = wochentagIndex(jetztDate);
-    const rahmen = freiRahmenFuerWochentag(heuteWtIndex);
-    const heuteEintraege = freiTagEintraege(heuteIso, heuteWtIndex);
-
-    let html = "";
-
-    // ---- Kopf: Datum + Gruß mit Anzahl + Überfällig-Kachel ----
-    const datumEl = document.getElementById("heute-datum");
-    if (datumEl) datumEl.textContent = jetztDate.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
-
-    // ---- Zeitleiste: Überfälliges, heutige Termine und Aufgaben ----
-    const ueberfaellig = offenEnriched
-      .filter((a) => a.status === "ueberfaellig")
-      .sort((a, b) => (a.faellig_am || "").localeCompare(b.faellig_am || ""));
-    const ueberfaelligZahl = document.getElementById("heute-ueberfaellig-zahl");
-    if (ueberfaelligZahl) ueberfaelligZahl.textContent = ueberfaellig.length;
-
-    const zlEintraege = [];
-    // Überfälliges wird nach Fälligkeitstag gruppiert (Gestern, Vorgestern, …,
-    // ab 8 Tagen „Älter“); alles Heutige steht in der Gruppe „Heute“.
-    const zlUeberfaellig = ueberfaellig.map((a) => {
-      const tage = tageSeitIso(a.faellig_am, heuteIso);
-      const aelter = tage > 7;
-      const start = a.uhrzeit ? a.uhrzeit.slice(0, 5) : null;
-      return {
-        id: a.id, typ: "aufgabe", gruppe: aelter ? "aelter" : a.faellig_am,
-        zeit: aelter ? formatDatumKurz(a.faellig_am) : (start || "–"),
-        titel: a.titel, chip: "Überfällig", art: "ueberfaellig", tab: "aufgaben",
-        sort: start ? zeitZuMinuten(start) : 24 * 60,
-      };
-    });
-    termineGanztags.forEach((t) => zlEintraege.push({
-      id: t.id, typ: "termin",
-      zeit: "ganzt.", titel: t.titel, chip: "Termin · ganztägig", art: "termin", tab: "kalender", sort: -1, erledigt: !!t.erledigt,
-    }));
+      .sort((a, b) => a.titel.localeCompare(b.titel))
+      .forEach((t) => liste.push({
+        id: t.id, typ: "termin", zeit: "ganzt.", titel: t.titel, meta: "Termin · ganztägig",
+        tab: "kalender", sort: -1, erledigt: !!t.erledigt,
+      }));
     termine
       .filter((t) => t.datum === heuteIso && t.uhrzeit && bereichVon(t) === aktiverBereich)
       .forEach((t) => {
         const start = t.uhrzeit.slice(0, 5);
-        const ende = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0, 5) : null;
-        zlEintraege.push({
-          id: t.id, typ: "termin",
-          zeit: start, start, ende: ende || minutenZuZeit(zeitZuMinuten(start) + 30), titel: t.titel,
-          chip: "Termin · " + start + (ende ? "–" + ende : ""), art: "termin", tab: "kalender",
+        const endeEcht = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0, 5) : null;
+        liste.push({
+          id: t.id, typ: "termin", zeit: start, start, ende: endeEcht || minutenZuZeit(zeitZuMinuten(start) + 30), endeEcht,
+          titel: t.titel, meta: "Termin" + (endeEcht ? ` bis ${endeEcht}` : ""), tab: "kalender",
           sort: zeitZuMinuten(start), erledigt: !!t.erledigt,
         });
       });
-    const schonDrin = new Set(ueberfaellig.map((a) => a.id));
     offenEnriched
-      .filter((a) => !schonDrin.has(a.id) && (a.status === "heute" || a.erinnerungFaellig))
+      .filter((a) => a.status !== "ueberfaellig" && (a.status === "heute" || a.erinnerungFaellig))
       .forEach((a) => {
         const start = a.status === "heute" && a.uhrzeit ? a.uhrzeit.slice(0, 5) : null;
-        const ende = start ? (a.ende_uhrzeit ? a.ende_uhrzeit.slice(0, 5) : minutenZuZeit(zeitZuMinuten(start) + 30)) : null;
-        zlEintraege.push({
-          id: a.id, typ: "aufgabe",
-          zeit: start || "Heute", start, ende, titel: a.titel,
-          chip: a.status === "heute" ? "Aufgabe" + (start ? " · " + start + (a.ende_uhrzeit ? "–" + a.ende_uhrzeit.slice(0, 5) : "") : "") : "Erinnerung",
-          art: "aufgabe", tab: "aufgaben", sort: start ? zeitZuMinuten(start) : 24 * 60,
+        const endeEcht = start && a.ende_uhrzeit ? a.ende_uhrzeit.slice(0, 5) : null;
+        liste.push({
+          id: a.id, typ: "aufgabe", zeit: start || "–", start,
+          ende: start ? (endeEcht || minutenZuZeit(zeitZuMinuten(start) + 30)) : null, endeEcht,
+          titel: a.titel, meta: a.status === "heute" ? "Aufgabe" + (endeEcht ? ` bis ${endeEcht}` : "") : "Erinnerung",
+          tab: "aufgaben", sort: start ? zeitZuMinuten(start) : 24 * 60,
         });
       });
-    zlEintraege.sort((a, b) => a.sort - b.sort);
+    return liste.sort((a, b) => a.sort - b.sort);
+  }
 
-    const offeneDinge = zlEintraege.filter((e) => !e.erledigt).length + zlUeberfaellig.length;
+  // Rendert den Start-Screen (Heute) des aktiven Bereichs
+  function renderHeute() {
+    bereichAnwenden();
+    const heuteIso = heuteISO();
+    const jetztDate = new Date();
+    const jetztMinuten = jetztDate.getHours() * 60 + jetztDate.getMinutes();
+    const offenEnriched = aufgaben
+      .filter((a) => bereichVon(a) === aktiverBereich && !a.erledigt)
+      .map(enrich);
+    const eintraege = heuteEintraegeSammeln(heuteIso, offenEnriched);
+    const ueberfaellig = offenEnriched
+      .filter((a) => a.status === "ueberfaellig")
+      .sort((a, b) => (a.faellig_am || "").localeCompare(b.faellig_am || "") || (a.uhrzeit || "99").localeCompare(b.uhrzeit || "99"));
+
+    // ---- Kopf ----
+    const datumEl = document.getElementById("heute-datum");
+    if (datumEl) datumEl.textContent = jetztDate.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
     const grussEl = document.getElementById("heute-gruss");
-    if (grussEl) {
-      grussEl.innerHTML = offeneDinge > 0
-        ? `${escapeHtml(GRUSS)}<br><span class="heute-gruss-akzent">${offeneDinge} ${offeneDinge === 1 ? "Ding" : "Dinge"}</span> heute.`
-        : `${escapeHtml(GRUSS)}<br>Freie Bahn heute.`;
+    if (grussEl) grussEl.textContent = GRUSS;
+    const offenHeute = eintraege.filter((e) => !e.erledigt).length;
+    const statusEl = document.getElementById("heute-status");
+    if (statusEl) {
+      let text = offenHeute > 0
+        ? `${offenHeute} ${offenHeute === 1 ? "Ding" : "Dinge"} heute`
+        : (ueberfaellig.length ? "Heute nichts Neues" : "Freie Bahn heute.");
+      if (ueberfaellig.length) text = `${escapeHtml(text)} · <span class="heute-status-warn">${ueberfaellig.length} überfällig</span>`;
+      else text = escapeHtml(text);
+      statusEl.innerHTML = text;
     }
     renderTagesZitat();
 
-    html += `<h2 class="heute-abschnitt">Zeitleiste</h2>`;
-    if (zlEintraege.length === 0 && zlUeberfaellig.length === 0) {
-      html += `<p class="empty-text">Nichts Dringendes für heute – guter Tag.</p>`;
-    } else {
-      const zlKarte = (e) => {
-        const laeuftJetzt = !e.erledigt && e.start && e.ende &&
-          zeitZuMinuten(e.start) <= jetztMinuten && jetztMinuten < zeitZuMinuten(e.ende);
-        const klassen = ["zl-eintrag"];
-        if (laeuftJetzt) klassen.push("jetzt");
-        if (e.erledigt) klassen.push("erledigt");
-        return `
-          <div class="${klassen.join(" ")}">
-            <span class="zl-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
-            <div class="zl-karte">
-              <button class="task-check zl-check ${e.erledigt ? "done" : ""}" onclick="zeitleisteUmschalten('${e.typ}','${e.id}', this)"
-                title="${e.erledigt ? "Wieder offen" : "Erledigt"}" aria-label="${escapeHtml(e.titel)} ${e.erledigt ? "wieder öffnen" : "als erledigt markieren"}"></button>
-              <button class="zl-inhalt" onclick="tabWechseln('${e.tab}')" title="${e.tab === "kalender" ? "Im Kalender öffnen" : "In Aufgaben öffnen"}">
-                <span class="zl-chip zl-chip--${e.art}">${escapeHtml(e.chip)}</span>
-                <span class="zl-titel">${escapeHtml(e.titel)}</span>
-              </button>
-            </div>
-          </div>`;
-      };
-      // Gruppen: Heute zuerst, dann überfällige Tage (neueste zuerst), dann „Älter“
-      const gruppen = [{
-        key: "heute", label: "Heute", eintraege: zlEintraege, ueberfaellig: false,
-      }];
-      const tagKeys = [...new Set(zlUeberfaellig.filter((e) => e.gruppe !== "aelter").map((e) => e.gruppe))]
-        .sort((a, b) => b.localeCompare(a));
-      tagKeys.forEach((iso) => gruppen.push({
-        key: iso, label: zlTagLabel(iso, heuteIso), ueberfaellig: true,
-        eintraege: zlUeberfaellig.filter((e) => e.gruppe === iso).sort((a, b) => a.sort - b.sort),
-      }));
-      const aelter = zlUeberfaellig.filter((e) => e.gruppe === "aelter");
-      if (aelter.length) gruppen.push({ key: "aelter", label: "Älter", ueberfaellig: true, eintraege: aelter });
-
-      html += `<div class="zl-gruppen">` + gruppen.map((g) => {
-        const offen = g.eintraege.filter((e) => !e.erledigt).length;
-        const inhalt = g.eintraege.length
-          ? `<div class="zeitleiste">${g.eintraege.map(zlKarte).join("")}</div>`
-          : `<p class="empty-text">Nichts Weiteres für heute.</p>`;
-        return `
-          <details class="zl-gruppe${g.ueberfaellig ? " zl-gruppe--ueberfaellig" : ""}" ${zlGruppenOffen.has(g.key) ? "open" : ""}
-            ontoggle="zlGruppeUmschalten('${g.key}', this.open)">
-            <summary class="zl-gruppe-kopf">
-              <span class="zl-gruppe-titel">${escapeHtml(g.label)}</span>
-              <span class="zl-gruppe-zahl" aria-label="${offen} offen">${offen}</span>
-            </summary>
-            ${inhalt}
-          </details>`;
-      }).join("") + `</div>`;
-    }
-
-    // ---- Jetzt-Zeitleiste ----
-    if (rahmen.aktiv && heuteEintraege) {
-      const rStart = zeitZuMinuten(rahmen.start_zeit);
-      const rEnde = zeitZuMinuten(rahmen.end_zeit);
-      const spanne = Math.max(1, rEnde - rStart);
-      const segmente = heuteEintraege.map((e) => {
-        const s = Math.max(rStart, zeitZuMinuten(e.start));
-        const en = Math.min(rEnde, zeitZuMinuten(e.ende));
-        if (en <= s) return "";
-        const breite = ((en - s) / spanne) * 100;
-        const art = e.art === "frei" ? "frei" : (e.art === "erledigt" ? "erledigt" : "belegt");
-        return `<div class="jetzt-segment ${art}" style="width:${breite}%;" title="${e.start}–${e.ende}${e.titel ? " · " + escapeHtml(e.titel) : ""}"></div>`;
-      }).join("");
-      const markerPos = Math.min(100, Math.max(0, ((jetztMinuten - rStart) / spanne) * 100));
-      const markerSichtbar = jetztMinuten >= rStart && jetztMinuten <= rEnde;
-
-      const naechsterTermin = heuteEintraege.find((e) => e.typ === "Termin" && e.art !== "erledigt" && zeitZuMinuten(e.ende) > jetztMinuten);
-
-      html += `
-        <div class="jetzt-leiste-wrap">
-          <div class="jetzt-leiste-kopf">
-            <span class="jetzt-leiste-titel">Freie Zeit</span>
-            <span class="jetzt-leiste-zeit">${jetztLabel} Uhr</span>
-          </div>
-          <div class="jetzt-leiste" onclick="heuteFreiOeffnen()" style="cursor:pointer;">
-            ${segmente}
-            ${markerSichtbar ? `<div class="jetzt-marker" style="left:${markerPos}%;"></div>` : ""}
-          </div>
-          <div class="jetzt-leiste-labels"><span>${rahmen.start_zeit}</span><span>${rahmen.end_zeit}</span></div>
-          <div class="jetzt-naechster">${naechsterTermin ? `Nächster Termin: <strong>${naechsterTermin.start} · ${escapeHtml(naechsterTermin.titel)}</strong>` : "Kein weiterer Termin heute."}</div>
-        </div>`;
-    }
-
-    // ---- Kacheln ----
-    const TYP_LABEL = { woche: "Woche", monat: "Monat", jahr: "Jahr" };
+    // ---- Inhalt ----
+    const einkaufOffen = einkaufsliste.filter((e) => bereichVon(e) === aktiverBereich && !e.erledigt);
     const aktuelleZiele = aktiverBereich === "privat" ? ["woche", "monat", "jahr"].flatMap((typ) => {
       const startIso = dateToISO(periodStart(typ, new Date()));
       return ziele.filter((z) => z.zeitraum_typ === typ && z.zeitraum_start === startIso);
     }) : [];
 
-    const aufgabenZahl = faelligHeute.length + erinnerungenHeute.length;
-
-    if (aktiverBereich === "privat") {
-      html += `<div class="start-kachel-grid">
-        <button class="start-kachel mod-aufgaben" onclick="tabWechseln('aufgaben')">
-          <span class="start-kachel-zahl">${aufgabenZahl}</span>
-          <span class="start-kachel-label">${aufgabenZahl === 1 ? "Aufgabe fällig" : "Aufgaben fällig"}</span>
-        </button>
-        <button class="start-kachel mod-planung" onclick="tabWechseln('planung')">
-          <span class="start-kachel-zahl">${aktuelleZiele.length}</span>
-          <span class="start-kachel-label">aktive Ziele</span>
-        </button>
-        <button class="start-kachel mod-einkauf" onclick="tabWechseln('einkauf')">
-          <span class="start-kachel-zahl">${einkaufOffen.length}</span>
-          <span class="start-kachel-label">${einkaufOffen.length === 1 ? "Artikel offen" : "Artikel offen"}</span>
-        </button>
-        ${ernStartKachelHtml()}
-      </div>`;
-    } else {
-      const ideenOffen = ogsIdeen.filter((i) => bereichVon(i) === aktiverBereich && (i.status === "offen" || i.status === "in_arbeit")).length;
-      html += `<div class="start-kachel-grid">
-        <button class="start-kachel mod-aufgaben" onclick="tabWechseln('aufgaben')">
-          <span class="start-kachel-zahl">${aufgabenZahl}</span>
-          <span class="start-kachel-label">${aufgabenZahl === 1 ? "Aufgabe fällig" : "Aufgaben fällig"}</span>
-        </button>
-        <button class="start-kachel mod-planung" onclick="tabWechseln('ogsideen')">
-          <span class="start-kachel-zahl">${ideenOffen}</span>
-          <span class="start-kachel-label">${ideenOffen === 1 ? "offene Idee" : "offene Ideen"}</span>
-        </button>
-      </div>`;
-    }
-
-    if (aktuelleZiele.length > 0) {
-      html += `<div class="project-heading">Ziele</div><div class="ziel-kachel-grid">` +
-        aktuelleZiele.map((z) => {
-          const schritte = zielSchritte.filter((s) => s.ziel_id === z.id);
-          const erledigtCount = schritte.filter((s) => s.erledigt).length;
-          return `
-            <button class="ziel-kachel" onclick="zielKachelKlick('${z.id}')">
-              <span class="ziel-kachel-typ">${TYP_LABEL[z.zeitraum_typ]}</span>
-              <span class="ziel-kachel-titel">${escapeHtml(z.titel)}</span>
-              <span class="ziel-kachel-fortschritt">${schritte.length > 0 ? erledigtCount + " / " + schritte.length + " Schritte" : "keine Schritte"}</span>
-            </button>`;
-        }).join("") +
-        `</div>`;
-    }
-
+    let html = "";
+    html += heuteDeinTagHtml(heuteIso, jetztDate, jetztMinuten);
+    html += heuteNaechstesHtml(eintraege, jetztMinuten);
+    html += heuteModuleHtml(heuteIso);
+    html += heuteListeHtml(eintraege, jetztMinuten);
+    html += heuteUeberfaelligHtml(ueberfaellig, heuteIso);
+    html += heuteKennzahlenHtml(einkaufOffen, aktuelleZiele);
+    html += heuteZieleHtml(aktuelleZiele);
     document.getElementById("heute-bereich").innerHTML = html;
+  }
+
+  // „Dein Tag“: heutiger Zeitrahmen als Band (frei/belegt/erledigt) mit Jetzt-Marker; Tipp öffnet Frei
+  function heuteDeinTagHtml(heuteIso, jetztDate, jetztMinuten) {
+    const wt = wochentagIndex(jetztDate);
+    const rahmen = freiRahmenFuerWochentag(wt);
+    const tag = freiTagEintraege(heuteIso, wt);
+    if (!rahmen.aktiv || !tag || tag.length === 0) return "";
+    const rStart = zeitZuMinuten(rahmen.start_zeit);
+    const rEnde = zeitZuMinuten(rahmen.end_zeit);
+    const spanne = Math.max(1, rEnde - rStart);
+    const segmente = tag.map((e) => {
+      const s = Math.max(rStart, zeitZuMinuten(e.start));
+      const en = Math.min(rEnde, zeitZuMinuten(e.ende));
+      if (en <= s) return "";
+      const art = e.art === "frei" ? "frei" : (e.art === "erledigt" ? "erledigt" : "belegt");
+      return `<span class="dt-seg ${art}" style="width:${((en - s) / spanne) * 100}%;" title="${e.start}–${e.ende}${e.titel ? " · " + escapeAttr(e.titel) : ""}"></span>`;
+    }).join("");
+    let restFrei = 0;
+    tag.filter((e) => e.art === "frei").forEach((e) => {
+      const s = Math.max(zeitZuMinuten(e.start), jetztMinuten);
+      const en = zeitZuMinuten(e.ende);
+      if (en > s) restFrei += en - s;
+    });
+    const jetztLabel = minutenZuZeit(jetztMinuten);
+    const freiText = jetztMinuten >= rEnde ? "Zeitrahmen vorbei"
+      : restFrei === 0 ? "heute nichts mehr frei"
+      : `noch ${dauerText(restFrei)} frei`;
+    const marker = jetztMinuten >= rStart && jetztMinuten <= rEnde
+      ? `<span class="dein-tag-marker" style="left:${((jetztMinuten - rStart) / spanne) * 100}%;"></span>` : "";
+    return `
+      <button type="button" class="heute-karte dein-tag" onclick="heuteFreiOeffnen()" aria-label="Dein Tag: ${freiText}. Öffnet die Ansicht Frei">
+        <span class="dein-tag-kopf"><span class="heute-label">Dein Tag</span><span class="dein-tag-frei">${jetztLabel} · ${freiText}</span></span>
+        <span class="dein-tag-band"><span class="dein-tag-segmente">${segmente}</span>${marker}</span>
+        <span class="dein-tag-skala"><span>${rahmen.start_zeit}</span><span>${rahmen.end_zeit}</span></span>
+      </button>`;
+  }
+
+  // „Als Nächstes“ bzw. „Jetzt“: der laufende oder nächste Eintrag mit Uhrzeit, in Bereichsfarbe
+  function heuteNaechstesHtml(eintraege, jetztMinuten) {
+    const mitZeit = eintraege.filter((e) => !e.erledigt && e.start && e.ende);
+    const laufend = mitZeit.find((e) => zeitZuMinuten(e.start) <= jetztMinuten && jetztMinuten < zeitZuMinuten(e.ende));
+    const naechster = laufend || mitZeit
+      .filter((e) => zeitZuMinuten(e.start) > jetztMinuten)
+      .sort((a, b) => zeitZuMinuten(a.start) - zeitZuMinuten(b.start))[0];
+    if (!naechster) return "";
+    const s = zeitZuMinuten(naechster.start);
+    const en = zeitZuMinuten(naechster.ende);
+    const zeit = naechster.start + (naechster.endeEcht ? "–" + naechster.endeEcht : "");
+    const hinweis = laufend ? `noch ${dauerText(en - jetztMinuten)}` : `in ${dauerText(s - jetztMinuten)}`;
+    return `
+      <button type="button" class="heute-naechstes" onclick="tabWechseln('${naechster.tab}')">
+        <span class="heute-naechstes-text">
+          <span class="heute-naechstes-label">${laufend ? "Jetzt" : "Als Nächstes"} · ${zeit}</span>
+          <span class="heute-naechstes-titel">${escapeHtml(naechster.titel)}</span>
+        </span>
+        <span class="heute-naechstes-chip">${hinweis}</span>
+      </button>`;
+  }
+
+  // Kurzer Stand je Modul des Bereichsblocks (Ideen, Inventar, Projekte, Verleih, Raumplanung, Schlüssel)
+  function heuteModulInfo(tab, heuteIso) {
+    const warn = (t) => `<span class="heute-warn">${t}</span>`;
+    if (tab === "ogsideen") {
+      const n = ogsIdeen.filter((i) => bereichVon(i) === aktiverBereich && (i.status === "offen" || i.status === "in_arbeit")).length;
+      return n ? `${n} offen` : "keine offenen";
+    }
+    if (tab === "ogsinventar") {
+      const items = ogsInventarAktuell();
+      const defekt = items.filter((i) => i.zustand === "defekt").length;
+      return `${items.length} ${items.length === 1 ? "Gegenstand" : "Gegenstände"}` + (defekt ? ` · ${warn(`${defekt} defekt`)}` : "");
+    }
+    if (tab === "ogsprojekte") {
+      const n = ogsProjekteAktuell().length;
+      return `${n} ${n === 1 ? "Projekt" : "Projekte"}`;
+    }
+    if (tab === "verleih") {
+      const n = verleihAktuell().filter((v) => !v.rueckgabe_am).reduce((s, v) => s + (Number(v.menge) || 1), 0);
+      return n ? `${n} verliehen` : "nichts verliehen";
+    }
+    if (tab === "raumplanung") {
+      const kommend = raumVermietungenAktuell()
+        .filter((v) => (v.datum_bis || v.datum) >= heuteIso)
+        .sort((a, b) => a.datum.localeCompare(b.datum));
+      if (kommend.some((v) => v.datum <= heuteIso)) return "heute belegt";
+      if (!kommend.length) return "nichts geplant";
+      const n = kommend[0];
+      const [j, m, t] = n.datum.split("-").map(Number);
+      const wt = new Date(j, m - 1, t).toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
+      return `nächste: ${wt} ${formatDatumKurz(n.datum)}`;
+    }
+    if (tab === "schluessel") {
+      const offen = ausgabenAktuell().filter((a) => !a.zurueck_am);
+      const ueber = offen.filter(ausgabeUeberfaellig).length;
+      return `${offen.length} ausgegeben` + (ueber ? ` · ${warn(`${ueber} überfällig`)}` : "");
+    }
+    return "";
+  }
+
+  // Modul-Kacheln: die sichtbaren Reiter des Bereichsblocks mit ihrem Stand
+  function heuteModuleHtml(heuteIso) {
+    const gruppe = hauptkategorien().find((g) => g.schluessel === "arbeit");
+    const tabs = gruppe ? sichtbareTabsInGruppe(gruppe) : [];
+    if (!tabs.length) return "";
+    return `<div class="heute-module">` + tabs.map((tab) => {
+      const eintrag = ALLE_REITER.find(([s]) => s === tab);
+      return `
+        <button type="button" class="heute-modul" onclick="tabWechseln('${tab}')">
+          <span class="heute-modul-icon">${HEUTE_MODUL_ICON[tab] || ""}</span>
+          <span class="heute-modul-name">${escapeHtml(eintrag ? eintrag[1] : tab)}</span>
+          <span class="heute-modul-info">${heuteModulInfo(tab, heuteIso)}</span>
+        </button>`;
+    }).join("") + `</div>`;
+  }
+
+  // Eine Zeile der Liste „Heute“ bzw. „Überfällig“: Abhak-Kreis, Zeit, Titel, Art
+  function heuteZeileHtml(e, jetztMinuten) {
+    const laeuftJetzt = !e.erledigt && e.start && e.ende &&
+      zeitZuMinuten(e.start) <= jetztMinuten && jetztMinuten < zeitZuMinuten(e.ende);
+    const klassen = ["heute-zeile"];
+    if (laeuftJetzt) klassen.push("jetzt");
+    if (e.erledigt) klassen.push("erledigt");
+    return `
+      <div class="${klassen.join(" ")}">
+        <button class="zl-check ${e.erledigt ? "done" : ""}" onclick="zeitleisteUmschalten('${e.typ}','${e.id}', this)"
+          title="${e.erledigt ? "Wieder offen" : "Erledigt"}" aria-label="${escapeAttr(e.titel)} ${e.erledigt ? "wieder öffnen" : "als erledigt markieren"}"></button>
+        <span class="heute-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
+        <button class="heute-zeile-inhalt" onclick="tabWechseln('${e.tab}')" title="${e.tab === "kalender" ? "Im Kalender öffnen" : "In Aufgaben öffnen"}">
+          <span class="heute-zeile-titel">${escapeHtml(e.titel)}</span>
+          <span class="heute-zeile-meta">${escapeHtml(e.meta)}</span>
+        </button>
+      </div>`;
+  }
+
+  // Liste „Heute“ in einer gemeinsamen Karte
+  function heuteListeHtml(eintraege, jetztMinuten) {
+    const offen = eintraege.filter((e) => !e.erledigt).length;
+    const inhalt = eintraege.length
+      ? eintraege.map((e) => heuteZeileHtml(e, jetztMinuten)).join("")
+      : `<p class="heute-leer">Nichts mehr für heute – guter Tag.</p>`;
+    return `
+      <section class="heute-block" aria-labelledby="heute-liste-titel">
+        <div class="heute-block-kopf"><h2 class="heute-label" id="heute-liste-titel">Heute</h2>${eintraege.length ? `<span class="heute-block-zahl">${offen} offen</span>` : ""}</div>
+        <div class="heute-liste">${inhalt}</div>
+      </section>`;
+  }
+
+  // Überfällig-Streifen: aufklappbar, mit „Alle auf heute“
+  function heuteUeberfaelligHtml(liste, heuteIso) {
+    if (!liste.length) return "";
+    const tage = tageSeitIso(liste[0].faellig_am, heuteIso);
+    const seit = tage === 1 ? "seit gestern" : `ältestes seit ${tage} Tagen`;
+    const zeilen = liste.map((a) => {
+      const t = tageSeitIso(a.faellig_am, heuteIso);
+      return heuteZeileHtml({
+        id: a.id, typ: "aufgabe", zeit: formatDatumKurz(a.faellig_am), titel: a.titel, tab: "aufgaben",
+        meta: "fällig " + (t === 1 ? "gestern" : t === 2 ? "vorgestern" : `vor ${t} Tagen`),
+      }, -1);
+    }).join("");
+    return `
+      <details class="heute-ueberfaellig" ${zlGruppenOffen.has("ueberfaellig") ? "open" : ""} ontoggle="zlGruppeUmschalten('ueberfaellig', this.open)">
+        <summary class="heute-ueberfaellig-kopf">
+          <span class="heute-ueberfaellig-text"><strong>${liste.length} überfällig</strong><span>${seit} · antippen zum Anzeigen</span></span>
+          <button type="button" class="heute-ueberfaellig-knopf" onclick="event.preventDefault(); event.stopPropagation(); ueberfaelligAufHeute(this)">Alle auf heute</button>
+        </summary>
+        <div class="heute-liste">${zeilen}</div>
+      </details>`;
+  }
+
+  // Verschiebt alle überfälligen Aufgaben des aktiven Bereichs auf heute (Uhrzeit, Projekt und Wiederholung bleiben)
+  window.ueberfaelligAufHeute = async function(knopf) {
+    const heute = heuteISO();
+    const liste = aufgaben.filter((a) => bereichVon(a) === aktiverBereich && !a.erledigt && a.faellig_am && a.faellig_am < heute);
+    if (!liste.length) return;
+    if (knopf) { knopf.disabled = true; knopf.textContent = "Verschiebe …"; }
+    let fehler = 0;
+    for (const a of liste) {
+      try {
+        await api("aufgabe_aktualisieren", {
+          id: a.id, titel: a.titel, projekt_id: a.projekt_id || null, faellig_am: heute,
+          uhrzeit: a.uhrzeit || null, ende_uhrzeit: a.ende_uhrzeit || null, erinnere_alle_tage: a.erinnere_alle_tage || null,
+        });
+      } catch (e) {
+        fehler++;
+      }
+    }
+    await ladeDaten();
+    if (fehler) alert(`${fehler} von ${liste.length} Aufgaben konnten nicht verschoben werden. Bitte nochmal versuchen.`);
+  };
+
+  // Eine Kennzahl-Kachel (Zahl + Beschriftung, Tipp öffnet den Reiter)
+  function kennzahlHtml(zahl, label, onclick) {
+    return `
+      <button type="button" class="heute-kennzahl" onclick="${onclick}">
+        <span class="heute-kennzahl-zahl">${zahl}</span>
+        <span class="heute-kennzahl-label">${escapeHtml(label)}</span>
+      </button>`;
+  }
+
+  // Kennzahlen: kcal übrig (Privat), Einkauf offen, aktive Ziele (Privat) – nur sichtbare Reiter
+  function heuteKennzahlenHtml(einkaufOffen, aktuelleZiele) {
+    const k = [];
+    const kcal = ernStartKachelHtml();
+    if (kcal) k.push(kcal);
+    if (reiterIstSichtbar(aktiverBereich, "einkauf")) k.push(kennzahlHtml(einkaufOffen.length, "Einkauf offen", "tabWechseln('einkauf')"));
+    if (aktiverBereich === "privat" && reiterIstSichtbar("privat", "planung")) {
+      k.push(kennzahlHtml(aktuelleZiele.length, aktuelleZiele.length === 1 ? "aktives Ziel" : "aktive Ziele", "tabWechseln('planung')"));
+    }
+    return k.length ? `<div class="heute-kennzahlen">${k.join("")}</div>` : "";
+  }
+
+  // Ziel-Kacheln der laufenden Woche/Monat/Jahr mit Fortschritt (nur Privat)
+  function heuteZieleHtml(aktuelleZiele) {
+    if (!aktuelleZiele.length) return "";
+    const TYP_LABEL = { woche: "Woche", monat: "Monat", jahr: "Jahr" };
+    return `<section class="heute-block"><div class="heute-block-kopf"><h2 class="heute-label">Ziele</h2></div><div class="ziel-kachel-grid">` +
+      aktuelleZiele.map((z) => {
+        const schritte = zielSchritte.filter((s) => s.ziel_id === z.id);
+        const erledigtCount = schritte.filter((s) => s.erledigt).length;
+        return `
+          <button class="ziel-kachel" onclick="zielKachelKlick('${z.id}')">
+            <span class="ziel-kachel-typ">${TYP_LABEL[z.zeitraum_typ]}</span>
+            <span class="ziel-kachel-titel">${escapeHtml(z.titel)}</span>
+            <span class="ziel-kachel-fortschritt">${schritte.length > 0 ? erledigtCount + " / " + schritte.length + " Schritte" : "keine Schritte"}</span>
+          </button>`;
+      }).join("") + `</div></section>`;
   }
 
   // ==========================================================
@@ -11419,11 +11534,7 @@
     } else if (kcal !== null) {
       zahl = ernZahl(kcal, 0);
     }
-    return `
-      <button class="start-kachel mod-ernaehrung" onclick="ernStartKachelKlick()">
-        <span class="start-kachel-zahl">${zahl}</span>
-        <span class="start-kachel-label">${label}</span>
-      </button>`;
+    return kennzahlHtml(zahl, label, "ernStartKachelKlick()");
   }
 
   // Öffnet beim Klick auf die Startkachel den Ernährungsreiter auf heute
