@@ -88,6 +88,7 @@
   // Schlüsselverwaltung (seit Session 32)
   let schluesselListe = [];
   let schluesselZugaenge = [];
+  let schluesselAusgaben = []; // Ausgabeprotokolle ohne Unterschriftsbilder (seit Session 33)
   let mailEingerichtet = false;
   let zielEventBearbeitenId = null;
   let auswertungJahr = new Date().getFullYear();
@@ -544,6 +545,7 @@
     raumVermietungen = data.raum_vermietungen || [];
     schluesselListe = data.schluessel || [];
     schluesselZugaenge = data.schluessel_zugaenge || [];
+    schluesselAusgaben = data.schluessel_ausgaben || [];
     raumMailEmpfaenger = data.raum_mail_empfaenger || [];
     mailEingerichtet = data.mail_eingerichtet === true;
     bereichAnwenden();
@@ -7407,6 +7409,28 @@
       }));
   }
 
+  // Bereitet die Ausgabeprotokolle (ohne Unterschriftsbilder) als Tabellenzeilen für den Export auf
+  function fAusg(bereich) {
+    return schluesselAusgaben.filter((a) => exportImBereich(a, bereich))
+      .sort((a, b) => (b.ausgegeben_am || "").localeCompare(a.ausgegeben_am || ""))
+      .map((a) => ({
+        Bereich: BEREICH_KNOPF_TEXT[bereichVon(a)] || bereichVon(a),
+        Art: a.art === "key" ? "Elektronischer Key" : "Schlüssel",
+        Seriennummer: a.seriennummer,
+        Name: a.inhaber,
+        Verein: a.verein || "",
+        Kontakt: a.kontakt || "",
+        "Ausgegeben am": a.ausgegeben_am || "",
+        "Ausgegeben von": a.ausgegeben_von || "",
+        "Rückgabe bis": a.rueckgabe_bis || "",
+        "Zurück am": a.zurueck_am || "",
+        "Zurückgenommen von": a.zurueck_von || "",
+        "Unterschrift Ausgabe": a.hat_unterschrift_ausgabe ? "digital" : "",
+        "Unterschrift Rückgabe": a.hat_unterschrift_rueckgabe ? "digital" : "",
+        Notiz: a.notiz || "",
+      }));
+  }
+
   // Bereitet die Zugänge mit allen Schlüsseln/Keys, die sie öffnen, für den Export auf
   function fZug(bereich) {
     return schluesselZugaenge.filter((z) => exportImBereich(z, bereich))
@@ -7434,6 +7458,7 @@
     { id: "raumplanung", name: "Raumplanung", daten: () => fRaum() },
     { id: "schluessel", name: "Schlüssel", daten: () => fSchl() },
     { id: "zugaenge", name: "Zugänge", daten: () => fZug() },
+    { id: "schluesselausgaben", name: "Schlüsselausgaben", daten: () => fAusg() },
     { id: "verlauf", name: "Verlauf", daten: fV },
     { id: "ziele", name: "Ziele", daten: fZ },
   ];
@@ -7512,7 +7537,7 @@
   // (Schlüssel: zwei Tabellen – Schlüssel und Zugänge)
   const REITER_EXPORTE = {
     raumplanung: { datei: "Raumplanung", teile: [["Raumplanung", fRaum]] },
-    schluessel: { datei: "Schluessel", teile: [["Schlüssel", fSchl], ["Zugänge", fZug]] },
+    schluessel: { datei: "Schluessel", teile: [["Schlüssel", fSchl], ["Zugänge", fZug], ["Ausgaben", fAusg]] },
   };
   // Exportiert die Daten eines Reiters im aktiven Bereich als Excel- oder Word-Datei
   window.reiterExport = function(reiter, format) {
@@ -7970,6 +7995,7 @@
       ? `${anzSchl} Schlüssel · ${anzKey} elektronische Key${anzKey === 1 ? "" : "s"}`
       : "";
     renderSchluesselListe();
+    renderAusgabeProtokolle();
 
     // Zugänge verwalten
     document.getElementById("schluessel-zugaenge-liste").innerHTML = zugaenge.length
@@ -8001,6 +8027,10 @@
     const gefiltert = alle.filter((k) => {
       if (schluesselFilterArt !== "alle" && (k.art || "schluessel") !== schluesselFilterArt) return false;
       if (schluesselFilterZugang !== "alle" && !(k.zugaenge || []).includes(schluesselFilterZugang)) return false;
+      if (schluesselFilterStatus === "ausgegeben" && !offeneAusgabe(k)) return false;
+      if (schluesselFilterStatus === "ueberfaellig" && !ausgabeUeberfaellig(offeneAusgabe(k))) return false;
+      if (schluesselFilterStatus === "bestand" && schluesselStatus(k) !== "bestand") return false;
+      if (schluesselFilterStatus === "ohneprotokoll" && schluesselStatus(k) !== "zugeordnet") return false;
       if (!suche) return true;
       return [k.seriennummer, k.inhaber, k.verein, k.notiz, ...schluesselZugangNamen(k)].some((t) => (t || "").toLowerCase().includes(suche));
     });
@@ -8011,27 +8041,33 @@
 
     const gruppen = {};
     gefiltert.forEach((k) => {
-      const v = (k.verein || "").trim() || SCHLUESSEL_OHNE_VEREIN;
+      const v = schluesselStatus(k) === "bestand" ? SCHLUESSEL_BESTAND : ((k.verein || "").trim() || SCHLUESSEL_OHNE_VEREIN);
       (gruppen[v] = gruppen[v] || []).push(k);
     });
-    const namen = Object.keys(gruppen).sort((a, b) => {
-      if (a === SCHLUESSEL_OHNE_VEREIN) return 1;
-      if (b === SCHLUESSEL_OHNE_VEREIN) return -1;
-      return a.localeCompare(b, "de");
-    });
+    // Reihenfolge: Vereine alphabetisch, dann „Ohne Verein“, zuletzt der Bestand
+    const rang = (n) => (n === SCHLUESSEL_BESTAND ? 2 : n === SCHLUESSEL_OHNE_VEREIN ? 1 : 0);
+    const namen = Object.keys(gruppen).sort((a, b) => rang(a) - rang(b) || a.localeCompare(b, "de"));
 
     const karte = (k) => {
       const art = SCHLUESSEL_ART[k.art] || SCHLUESSEL_ART.schluessel;
+      if (schluesselAktion && schluesselAktion.id === k.id) {
+        const offen = offeneAusgabe(k);
+        if (schluesselAktion.modus === "zuruecknehmen" && offen) return ruecknahmeFormularHtml(k, offen);
+        if (schluesselAktion.modus === "ausgeben" && !offen) return ausgabeFormularHtml(k);
+      }
       if (schluesselBearbeitenId === k.id) {
+        // Ist der Schlüssel ausgegeben, ändern sich Name/Verein nur über das Protokoll
+        const gesperrt = offeneAusgabe(k) ? ' readonly title="Ausgegeben – bitte im Ausgabeprotokoll ändern"' : "";
         return `
           <div class="notiz-item" style="display:block;">
             <div class="task-edit-felder">
               <label class="ern-feld">Art<select id="schl-edit-art-${k.id}">${schluesselArtOptionen(k.art)}</select></label>
               <label class="ern-feld">Seriennummer<input type="text" id="schl-edit-nr-${k.id}" value="${escapeAttr(k.seriennummer)}" maxlength="100"></label>
-              <label class="ern-feld">Name<input type="text" id="schl-edit-name-${k.id}" value="${escapeAttr(k.inhaber || "")}" maxlength="120" list="schluessel-namen-vorschlaege"></label>
-              <label class="ern-feld">Verein<input type="text" id="schl-edit-verein-${k.id}" value="${escapeAttr(k.verein || "")}" maxlength="120" list="schluessel-vereine-vorschlaege"></label>
+              <label class="ern-feld">Name<input type="text" id="schl-edit-name-${k.id}" value="${escapeAttr(k.inhaber || "")}" maxlength="120" list="schluessel-namen-vorschlaege"${gesperrt}></label>
+              <label class="ern-feld">Verein<input type="text" id="schl-edit-verein-${k.id}" value="${escapeAttr(k.verein || "")}" maxlength="120" list="schluessel-vereine-vorschlaege"${gesperrt}></label>
               <div class="ern-feld ern-feld-breit">Zugänge${schluesselZugangAuswahlHtml("schl-edit-zug-" + k.id, k.zugaenge || [])}</div>
               <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="schl-edit-notiz-${k.id}" value="${escapeAttr(k.notiz || "")}" maxlength="500"></label>
+              ${schluesselHistorieHtml(k)}
             </div>
             <div class="row" style="margin:0.4rem 0 0;">
               <button class="btn-primary" onclick="schluesselSpeichern('${k.id}')">Speichern</button>
@@ -8044,10 +8080,12 @@
       return `
         <div class="notiz-item">
           <div style="flex:1; cursor:pointer;" onclick="schluesselBearbeitenStart('${k.id}')">
-            <span class="notiz-text">${art.icon} ${k.inhaber ? escapeHtml(k.inhaber) : `<em>ohne Name</em>`}</span>
+            <span class="notiz-text">${art.icon} ${k.inhaber ? escapeHtml(k.inhaber) : (schluesselStatus(k) === "bestand" ? "frei" : `<em>ohne Name</em>`)}</span>
             <span class="notiz-meta" style="display:block;">Nr. <strong>${escapeHtml(k.seriennummer)}</strong> · ${meta}</span>
             ${zug.length ? `<span class="notiz-meta" style="display:block;">🚪 ${zug.map(escapeHtml).join(", ")}</span>` : ""}
+            ${schluesselStatusHtml(k)}
           </div>
+          <div style="display:flex; flex-direction:column; gap:0.3rem; align-items:flex-end;">${schluesselKnoepfeHtml(k)}</div>
           <button class="task-delete" onclick="event.stopPropagation(); schluesselLoeschen('${k.id}')" aria-label="Eintrag löschen">×</button>
         </div>`;
     };
@@ -8066,6 +8104,8 @@
           <div class="notiz-list">${eintraege.map(karte).join("")}</div>
         </details>`;
     }).join("");
+    // Offenes Ausgabe-/Rücknahme-Formular: Unterschriftsfeld wieder zeichenbereit machen
+    if (schluesselAktion) unterschriftAktivieren((schluesselAktion.modus === "ausgeben" ? "sa-sig-" : "sr-sig-") + schluesselAktion.id);
   }
 
   document.getElementById("btn-schluessel-neu").addEventListener("click", async () => {
@@ -8099,6 +8139,10 @@
     schluesselFilterArt = e.target.value;
     renderSchluesselListe();
   });
+  document.getElementById("schluessel-filter-status").addEventListener("change", (e) => {
+    schluesselFilterStatus = e.target.value;
+    renderSchluesselListe();
+  });
   document.getElementById("schluessel-filter-zugang").addEventListener("change", (e) => {
     schluesselFilterZugang = e.target.value;
     renderSchluesselListe();
@@ -8106,6 +8150,7 @@
   // Öffnet die Bearbeiten-Ansicht für einen Schlüssel
   window.schluesselBearbeitenStart = function(id) {
     schluesselBearbeitenId = id;
+    schluesselAktion = null;
     renderSchluesselListe();
   };
   // Bricht das Bearbeiten eines Schlüssels ab
@@ -8130,7 +8175,9 @@
   // Löscht einen Schlüssel/Key nach Rückfrage und lädt die Daten neu
   window.schluesselLoeschen = async function(id) {
     const k = schluesselListe.find((x) => x.id === id);
-    if (!confirm(`${k && k.art === "key" ? "Key" : "Schlüssel"} Nr. ${k ? k.seriennummer : ""} löschen?`)) return;
+    const protokolle = k ? ausgabenVonSchluessel(k).length : 0;
+    if (!confirm(`${k && k.art === "key" ? "Key" : "Schlüssel"} Nr. ${k ? k.seriennummer : ""} löschen?` +
+      (protokolle ? ` Die ${protokolle} Ausgabeprotokoll${protokolle === 1 ? "" : "e"} bleiben erhalten (unten unter „Ausgabeprotokolle“).` : ""))) return;
     try {
       await api("schluessel_loeschen", { id });
       if (schluesselBearbeitenId === id) schluesselBearbeitenId = null;
@@ -8175,6 +8222,405 @@
     if (!confirm(text)) return;
     try {
       await api("zugang_loeschen", { id });
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+
+  // ==========================================================
+  // Schlüsselausgabe mit Protokoll (seit Session 33): Ausgeben und
+  // Zurücknehmen mit optionaler Unterschrift (Finger/Maus) und
+  // druckbarem Protokoll. Ohne digitale Unterschrift: Protokoll drucken
+  // und auf Papier unterschreiben lassen.
+  // ==========================================================
+  let schluesselAktion = null; // { id: schluessel-id, modus: "ausgeben" | "zuruecknehmen" }
+  let ausgabeBearbeitenId = null;
+  let schluesselFilterStatus = "alle";
+  const SCHLUESSEL_BESTAND = "📥 Im Bestand";
+  const PROTOKOLL_ALT_TAGE = 365;
+
+  // Offene (noch nicht zurückgegebene) Ausgabe eines Schlüssels oder undefined
+  function offeneAusgabe(k) {
+    return schluesselAusgaben.find((a) => a.schluessel_id === k.id && !a.zurueck_am);
+  }
+  // Alle Ausgaben eines Schlüssels, neueste zuerst
+  function ausgabenVonSchluessel(k) {
+    return schluesselAusgaben.filter((a) => a.schluessel_id === k.id)
+      .sort((a, b) => (b.ausgegeben_am || "").localeCompare(a.ausgegeben_am || ""));
+  }
+  // Ausgaben des aktiven Bereichs
+  function ausgabenAktuell() {
+    return schluesselAusgaben.filter((a) => bereichVon(a) === aktiverBereich);
+  }
+  // Status: "ausgegeben" (offenes Protokoll), "zugeordnet" (Name/Verein ohne Protokoll) oder "bestand"
+  function schluesselStatus(k) {
+    if (offeneAusgabe(k)) return "ausgegeben";
+    return (k.inhaber || k.verein) ? "zugeordnet" : "bestand";
+  }
+  // Rückgabedatum überschritten?
+  function ausgabeUeberfaellig(a) {
+    return !!(a && !a.zurueck_am && a.rueckgabe_bis && a.rueckgabe_bis < heuteISO());
+  }
+  // JJJJ-MM-TT → TT.MM.JJJJ
+  function datumDE(iso) {
+    return iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : "";
+  }
+  // Protokoll gilt als alt, wenn die Rückgabe länger als PROTOKOLL_ALT_TAGE her ist
+  function ausgabeIstAlt(a) {
+    if (!a.zurueck_am) return false;
+    return (new Date(heuteISO() + "T00:00:00") - new Date(a.zurueck_am + "T00:00:00")) / 86400000 > PROTOKOLL_ALT_TAGE;
+  }
+  // Merkt sich, wer zuletzt ausgegeben hat (nur auf diesem Gerät)
+  function letzterAusgeber() {
+    try { return localStorage.getItem("schluessel-ausgeber") || ""; } catch (_e) { return ""; }
+  }
+  // Speichert den Namen der/des Ausgebenden für das nächste Formular (nur dieses Gerät)
+  function ausgeberMerken(name) {
+    try { if (name) localStorage.setItem("schluessel-ausgeber", name); } catch (_e) { /* egal */ }
+  }
+
+  // ---------- Unterschriftsfeld (Canvas) ----------
+  // HTML für ein Unterschriftsfeld; weißer Hintergrund, damit es auch im Dunkelmodus und im Druck passt
+  function unterschriftFeldHtml(id, titel) {
+    return `
+      <div class="ern-feld ern-feld-breit">
+        <span>${escapeHtml(titel)} <span class="notiz-meta">(optional – mit Finger oder Maus)</span></span>
+        <canvas id="${id}" width="600" height="180" style="width:100%; max-width:600px; height:auto; aspect-ratio:600/180; background:#fff; border:1px solid var(--border, #999); border-radius:6px; touch-action:none; cursor:crosshair; display:block;"></canvas>
+        <button type="button" class="link-btn" style="align-self:flex-start;" onclick="unterschriftLeeren('${id}')">Unterschrift löschen</button>
+      </div>`;
+  }
+  // Schaltet das Zeichnen auf einem Unterschriftsfeld frei
+  function unterschriftAktivieren(id) {
+    const c = document.getElementById(id);
+    if (!c || c.dataset.aktiv) return;
+    c.dataset.aktiv = "1";
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.strokeStyle = "#111"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    let zeichnet = false;
+    const punkt = (e) => {
+      const r = c.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) };
+    };
+    c.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); zeichnet = true; c.setPointerCapture(e.pointerId);
+      const p = punkt(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + 0.1, p.y + 0.1); ctx.stroke();
+      c.dataset.bemalt = "1";
+    });
+    c.addEventListener("pointermove", (e) => {
+      if (!zeichnet) return;
+      e.preventDefault(); const p = punkt(e); ctx.lineTo(p.x, p.y); ctx.stroke();
+    });
+    const ende = () => { zeichnet = false; };
+    c.addEventListener("pointerup", ende);
+    c.addEventListener("pointercancel", ende);
+  }
+  // Leert ein Unterschriftsfeld wieder auf Weiß
+  window.unterschriftLeeren = function(id) {
+    const c = document.getElementById(id);
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    delete c.dataset.bemalt;
+  };
+  // Liefert die Unterschrift als PNG-Data-URL oder null, wenn nichts gezeichnet wurde
+  function unterschriftLesen(id) {
+    const c = document.getElementById(id);
+    if (!c || !c.dataset.bemalt) return null;
+    return c.toDataURL("image/png");
+  }
+
+  // ---------- Formulare Ausgeben / Zurücknehmen ----------
+  // Formular zum Ausgeben eines Schlüssels (in der Karte)
+  function ausgabeFormularHtml(k) {
+    const id = k.id;
+    return `
+      <div class="notiz-item" style="display:block;">
+        <p class="notiz-text" style="margin:0 0 0.4rem;">📤 ${escapeHtml((SCHLUESSEL_ART[k.art] || SCHLUESSEL_ART.schluessel).text)} Nr. ${escapeHtml(k.seriennummer)} ausgeben</p>
+        <div class="task-edit-felder">
+          <label class="ern-feld">Name *<input type="text" id="sa-name-${id}" value="${escapeAttr(k.inhaber || "")}" maxlength="120" list="schluessel-namen-vorschlaege"></label>
+          <label class="ern-feld">Verein<input type="text" id="sa-verein-${id}" value="${escapeAttr(k.verein || "")}" maxlength="120" list="schluessel-vereine-vorschlaege"></label>
+          <label class="ern-feld">Kontakt (Tel./Mail)<input type="text" id="sa-kontakt-${id}" maxlength="200"></label>
+          <label class="ern-feld">Ausgegeben am<input type="date" id="sa-am-${id}" value="${heuteISO()}"></label>
+          <label class="ern-feld">Ausgegeben von<input type="text" id="sa-von-${id}" value="${escapeAttr(letzterAusgeber())}" maxlength="120"></label>
+          <label class="ern-feld">Rückgabe bis (optional)<input type="date" id="sa-bis-${id}"></label>
+          <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="sa-notiz-${id}" maxlength="500"></label>
+          ${unterschriftFeldHtml("sa-sig-" + id, "Unterschrift Empfänger/in")}
+        </div>
+        <p class="notiz-meta" style="margin:0.3rem 0;">Ohne Unterschrift hier: „Ausgeben &amp; drucken“ und das Protokoll auf Papier unterschreiben lassen.</p>
+        <div class="row" style="margin:0.4rem 0 0; flex-wrap:wrap;">
+          <button class="btn-primary" onclick="schluesselAusgebenSpeichern('${id}', false)">Ausgeben</button>
+          <button class="btn-secondary" onclick="schluesselAusgebenSpeichern('${id}', true)">Ausgeben &amp; drucken</button>
+          <button class="link-btn" onclick="schluesselAktionAbbrechen()">Abbrechen</button>
+        </div>
+      </div>`;
+  }
+  // Formular zum Zurücknehmen (in der Karte)
+  function ruecknahmeFormularHtml(k, a) {
+    const id = k.id;
+    return `
+      <div class="notiz-item" style="display:block;">
+        <p class="notiz-text" style="margin:0 0 0.4rem;">📥 Nr. ${escapeHtml(k.seriennummer)} von ${escapeHtml(a.inhaber)} zurücknehmen</p>
+        <div class="task-edit-felder">
+          <label class="ern-feld">Zurück am<input type="date" id="sr-am-${id}" value="${heuteISO()}"></label>
+          <label class="ern-feld">Zurückgenommen von<input type="text" id="sr-von-${id}" value="${escapeAttr(letzterAusgeber())}" maxlength="120"></label>
+          ${unterschriftFeldHtml("sr-sig-" + id, "Unterschrift (Rückgabe bestätigt)")}
+        </div>
+        <div class="row" style="margin:0.4rem 0 0; flex-wrap:wrap;">
+          <button class="btn-primary" onclick="schluesselZuruecknehmenSpeichern('${id}', '${a.id}', false)">Zurücknehmen</button>
+          <button class="btn-secondary" onclick="schluesselZuruecknehmenSpeichern('${id}', '${a.id}', true)">Zurücknehmen &amp; drucken</button>
+          <button class="link-btn" onclick="schluesselAktionAbbrechen()">Abbrechen</button>
+        </div>
+      </div>`;
+  }
+  // Statuszeile einer Karte (ausgegeben / überfällig / im Bestand / ohne Protokoll)
+  function schluesselStatusHtml(k) {
+    const a = offeneAusgabe(k);
+    if (a) {
+      const sig = a.hat_unterschrift_ausgabe ? " · ✍️" : "";
+      if (ausgabeUeberfaellig(a)) {
+        return `<span class="notiz-meta" style="display:block; color:var(--accent); font-weight:600;">⚠️ Rückgabe überfällig seit ${datumDE(a.rueckgabe_bis)} · ausgegeben ${datumDE(a.ausgegeben_am)}${sig}</span>`;
+      }
+      return `<span class="notiz-meta" style="display:block;">📤 ausgegeben seit ${datumDE(a.ausgegeben_am)}${a.rueckgabe_bis ? " · bis " + datumDE(a.rueckgabe_bis) : ""}${sig}</span>`;
+    }
+    if (schluesselStatus(k) === "zugeordnet") return `<span class="notiz-meta" style="display:block;">ohne Ausgabeprotokoll</span>`;
+    return `<span class="notiz-meta" style="display:block;">📥 im Bestand</span>`;
+  }
+  // Knöpfe einer Karte je nach Status
+  function schluesselKnoepfeHtml(k) {
+    const a = offeneAusgabe(k);
+    const knopf = (text, aufruf, titel) => `<button class="btn-secondary" style="white-space:nowrap; padding:0.25rem 0.6rem;" title="${titel}" onclick="event.stopPropagation(); ${aufruf}">${text}</button>`;
+    if (a) return knopf("Zurück", `schluesselAktionStart('${k.id}', 'zuruecknehmen')`, "Schlüssel zurücknehmen") +
+      knopf("📄", `ausgabeDrucken('${a.id}')`, "Protokoll drucken / als PDF");
+    if (schluesselStatus(k) === "zugeordnet") return knopf("Protokoll", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Ausgabeprotokoll nachtragen");
+    return knopf("Ausgeben", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Schlüssel ausgeben");
+  }
+  // Ausgabe-Historie eines Schlüssels (für das Bearbeiten-Feld)
+  function schluesselHistorieHtml(k) {
+    const liste = ausgabenVonSchluessel(k);
+    if (!liste.length) return "";
+    return `<div class="ern-feld ern-feld-breit"><span>Ausgaben</span>${liste.map((a) => `
+      <span class="notiz-meta" style="display:block;">${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""} · ${datumDE(a.ausgegeben_am)} – ${a.zurueck_am ? datumDE(a.zurueck_am) : "heute"}
+        <button class="link-btn" onclick="ausgabeDrucken('${a.id}')">📄 Protokoll</button></span>`).join("")}</div>`;
+  }
+
+  // Öffnet am Schlüssel das Formular zum Ausgeben bzw. Zurücknehmen
+  window.schluesselAktionStart = function(id, modus) {
+    schluesselAktion = { id, modus };
+    schluesselBearbeitenId = null;
+    renderSchluesselListe();
+    unterschriftAktivieren((modus === "ausgeben" ? "sa-sig-" : "sr-sig-") + id);
+  };
+  // Schließt das Ausgabe-/Rücknahme-Formular ohne zu speichern
+  window.schluesselAktionAbbrechen = function() {
+    schluesselAktion = null;
+    renderSchluesselListe();
+  };
+  // Gibt den Schlüssel aus (legt das Protokoll an) und druckt es auf Wunsch gleich
+  window.schluesselAusgebenSpeichern = async function(id, drucken) {
+    const wert = (f) => document.getElementById(`sa-${f}-${id}`).value.trim();
+    const daten = {
+      schluessel_id: id, inhaber: wert("name"), verein: wert("verein"), kontakt: wert("kontakt"),
+      ausgegeben_am: wert("am"), ausgegeben_von: wert("von"), rueckgabe_bis: wert("bis"), notiz: wert("notiz"),
+      unterschrift: unterschriftLesen("sa-sig-" + id),
+    };
+    if (!daten.inhaber) { alert("Bitte den Namen der Person angeben."); return; }
+    try {
+      const antwort = await api("schluessel_ausgeben", daten);
+      ausgeberMerken(daten.ausgegeben_von);
+      schluesselAktion = null;
+      await ladeDaten();
+      if (drucken && antwort && antwort.id) await window.ausgabeDrucken(antwort.id);
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+  // Nimmt den Schlüssel zurück (Rückgabe ins Protokoll, Schlüssel wieder im Bestand)
+  window.schluesselZuruecknehmenSpeichern = async function(id, ausgabeId, drucken) {
+    const daten = {
+      id: ausgabeId,
+      zurueck_am: document.getElementById(`sr-am-${id}`).value,
+      zurueck_von: document.getElementById(`sr-von-${id}`).value.trim(),
+      unterschrift: unterschriftLesen("sr-sig-" + id),
+    };
+    try {
+      await api("schluessel_zuruecknehmen", daten);
+      ausgeberMerken(daten.zurueck_von);
+      schluesselAktion = null;
+      await ladeDaten();
+      if (drucken) await window.ausgabeDrucken(ausgabeId);
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+
+  // ---------- Protokoll drucken ----------
+  // Baut das Protokoll als HTML (Muster-Texte – vom Vorstand prüfen lassen)
+  function protokollHtml(a) {
+    const org = (BEREICH_LOGO[bereichVon(a)] || {}).alt || (BEREICH_KNOPF_TEXT[bereichVon(a)] || "");
+    const art = a.art === "key" ? "Elektronischer Key" : "Schlüssel";
+    const zeile = (l, w) => `<tr><th style="text-align:left; width:38%; padding:4px 8px; border:1px solid #999; background:#f2f2f2;">${escapeHtml(l)}</th><td style="padding:4px 8px; border:1px solid #999;">${escapeHtml(w || "")}&nbsp;</td></tr>`;
+    const tabelle = (zeilen) => `<table style="width:100%; border-collapse:collapse; margin:0 0 10px; font-size:12pt;">${zeilen}</table>`;
+    const sigBox = (bild, beschriftung) => `
+      <div style="flex:1; min-width:45%;">
+        <div style="height:70px; border-bottom:1px solid #000; display:flex; align-items:flex-end;">${bild ? `<img src="${bild}" alt="Unterschrift" style="max-height:68px; max-width:100%;">` : ""}</div>
+        <div style="font-size:10pt; margin-top:2px;">${escapeHtml(beschriftung)}</div>
+      </div>`;
+    return `
+      <div style="font-family:Arial, Helvetica, sans-serif; color:#000; background:#fff; padding:10px; max-width:780px; margin:0 auto;">
+        <div style="font-size:11pt;">${escapeHtml(org)}</div>
+        <h1 style="font-size:18pt; margin:4px 0 12px;">Schlüsselausgabeprotokoll</h1>
+        <h2 style="font-size:13pt; margin:8px 0 4px;">Schlüssel</h2>
+        ${tabelle(zeile("Art", art) + zeile("Seriennummer", a.seriennummer) + zeile("Zugänge", a.zugaenge_text))}
+        <h2 style="font-size:13pt; margin:8px 0 4px;">Empfänger/in</h2>
+        ${tabelle(zeile("Name", a.inhaber) + zeile("Verein", a.verein) + zeile("Kontakt", a.kontakt))}
+        <h2 style="font-size:13pt; margin:8px 0 4px;">Ausgabe</h2>
+        ${tabelle(zeile("Ausgegeben am", datumDE(a.ausgegeben_am)) + zeile("Ausgegeben von", a.ausgegeben_von) + zeile("Rückgabe bis", datumDE(a.rueckgabe_bis)) + (a.notiz ? zeile("Notiz", a.notiz) : ""))}
+        <p style="font-size:10.5pt; margin:8px 0;">Ich bestätige, den oben genannten Schlüssel bzw. Key erhalten zu haben. Ich gebe ihn nicht an Dritte weiter, lasse keine Nachschlüssel anfertigen, melde einen Verlust unverzüglich dem Vorstand und gebe ihn auf Verlangen, spätestens zum vereinbarten Rückgabedatum, zurück.</p>
+        <div style="display:flex; gap:24px; margin:14px 0 6px; flex-wrap:wrap;">
+          ${sigBox(a.unterschrift_ausgabe, "Ort, Datum, Unterschrift Empfänger/in")}
+          ${sigBox(null, "Unterschrift Ausgebende/r")}
+        </div>
+        <h2 style="font-size:13pt; margin:18px 0 4px;">Rückgabe</h2>
+        ${tabelle(zeile("Zurück am", datumDE(a.zurueck_am)) + zeile("Zurückgenommen von", a.zurueck_von))}
+        <div style="display:flex; gap:24px; margin:14px 0 6px; flex-wrap:wrap;">
+          ${sigBox(a.unterschrift_rueckgabe, "Unterschrift Empfänger/in (Rückgabe)")}
+          ${sigBox(null, "Unterschrift Zurücknehmende/r")}
+        </div>
+        <p style="font-size:9pt; color:#333; margin-top:16px;">Datenschutz: Die Angaben werden ausschließlich zur Verwaltung der Schlüssel durch ${escapeHtml(org || "den Verein")} verarbeitet und gelöscht, sobald sie dafür nach der Rückgabe nicht mehr benötigt werden.</p>
+      </div>`;
+  }
+  // Lädt ein Protokoll (mit Unterschriften) und öffnet den Druckdialog (dort auch „Als PDF speichern“)
+  window.ausgabeDrucken = async function(id) {
+    try {
+      const antwort = await api("schluessel_ausgabe_laden", { id });
+      let bereich = document.getElementById("druck-bereich");
+      if (!bereich) {
+        bereich = document.createElement("div");
+        bereich.id = "druck-bereich";
+        document.body.appendChild(bereich);
+      }
+      if (!document.getElementById("druck-stil")) {
+        const stil = document.createElement("style");
+        stil.id = "druck-stil";
+        stil.textContent = "@media screen { #druck-bereich { display:none; } } " +
+          "@media print { body.druckmodus > *:not(#druck-bereich) { display:none !important; } " +
+          "body.druckmodus { background:#fff !important; } #druck-bereich { display:block !important; } " +
+          "@page { margin: 15mm; } }";
+        document.head.appendChild(stil);
+      }
+      bereich.innerHTML = protokollHtml(antwort.ausgabe);
+      document.body.classList.add("druckmodus");
+      const aufraeumen = () => { document.body.classList.remove("druckmodus"); window.removeEventListener("afterprint", aufraeumen); };
+      window.addEventListener("afterprint", aufraeumen);
+      // kurz warten, bis das Unterschriftsbild geladen ist
+      setTimeout(() => { window.print(); setTimeout(aufraeumen, 1000); }, 150);
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+
+  // ---------- Protokoll-Liste ----------
+  // Rendert die Liste aller Ausgabeprotokolle des Bereichs (offene zuerst) inkl. Hinweis auf alte Protokolle
+  function renderAusgabeProtokolle() {
+    const ziel = document.getElementById("schluessel-protokolle");
+    if (!ziel) return;
+    const alle = ausgabenAktuell().sort((a, b) =>
+      (a.zurueck_am ? 1 : 0) - (b.zurueck_am ? 1 : 0) || (b.ausgegeben_am || "").localeCompare(a.ausgegeben_am || ""));
+    document.getElementById("schluessel-protokolle-zahl").textContent = alle.length ? `(${alle.length})` : "";
+    if (!alle.length) { ziel.innerHTML = `<p class="empty-text">Noch keine Ausgaben protokolliert.</p>`; return; }
+    const alt = alle.filter(ausgabeIstAlt);
+    let html = alt.length ? `
+      <p class="notiz-meta" style="color:var(--accent);">${alt.length} Protokoll${alt.length === 1 ? " ist" : "e sind"} seit mehr als einem Jahr abgeschlossen. Nicht mehr benötigte Protokolle bitte löschen (Datenschutz).
+        <button class="link-btn" onclick="alteProtokolleLoeschen()">Alte löschen</button></p>` : "";
+    html += `<div class="notiz-list">${alle.map((a) => {
+      if (ausgabeBearbeitenId === a.id) return ausgabeBearbeitenHtml(a);
+      const icon = a.art === "key" ? "📡" : "🔑";
+      const status = a.zurueck_am
+        ? `zurück ${datumDE(a.zurueck_am)}${a.hat_unterschrift_rueckgabe ? " ✍️" : ""}`
+        : (ausgabeUeberfaellig(a) ? `<strong style="color:var(--accent);">überfällig seit ${datumDE(a.rueckgabe_bis)}</strong>` : "noch ausgegeben");
+      return `
+        <div class="notiz-item">
+          <div style="flex:1; cursor:pointer;" onclick="ausgabeBearbeitenStart('${a.id}')">
+            <span class="notiz-text">${icon} ${escapeHtml(a.seriennummer)} · ${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""}</span>
+            <span class="notiz-meta" style="display:block;">ausgegeben ${datumDE(a.ausgegeben_am)}${a.hat_unterschrift_ausgabe ? " ✍️" : ""}${a.ausgegeben_von ? " von " + escapeHtml(a.ausgegeben_von) : ""} · ${status}${ausgabeIstAlt(a) ? " · älter als 1 Jahr" : ""}</span>
+          </div>
+          <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeDrucken('${a.id}')" aria-label="Protokoll drucken" title="Drucken / PDF">📄</button>
+          <button class="task-delete" onclick="event.stopPropagation(); ausgabeLoeschen('${a.id}')" aria-label="Protokoll löschen">×</button>
+        </div>`;
+    }).join("")}</div>`;
+    ziel.innerHTML = html;
+  }
+  // Bearbeiten-Formular eines Protokolls (Tippfehler korrigieren; Unterschriften bleiben)
+  function ausgabeBearbeitenHtml(a) {
+    const id = a.id;
+    const feld = (f, label, wert, typ = "text", max = 120) =>
+      `<label class="ern-feld">${label}<input type="${typ}" id="sp-${f}-${id}" value="${escapeAttr(wert || "")}"${typ === "text" ? ` maxlength="${max}"` : ""}></label>`;
+    return `
+      <div class="notiz-item" style="display:block;">
+        <div class="task-edit-felder">
+          ${feld("name", "Name *", a.inhaber)}
+          ${feld("verein", "Verein", a.verein)}
+          ${feld("kontakt", "Kontakt", a.kontakt, "text", 200)}
+          ${feld("am", "Ausgegeben am", a.ausgegeben_am, "date")}
+          ${feld("von", "Ausgegeben von", a.ausgegeben_von)}
+          ${feld("bis", "Rückgabe bis", a.rueckgabe_bis, "date")}
+          ${a.zurueck_am ? feld("zam", "Zurück am", a.zurueck_am, "date") + feld("zvon", "Zurückgenommen von", a.zurueck_von) : ""}
+          ${feld("notiz", "Notiz", a.notiz, "text", 500)}
+        </div>
+        <p class="notiz-meta" style="margin:0.3rem 0;">Unterschriften und Schlüsseldaten lassen sich nicht ändern.</p>
+        <div class="row" style="margin:0.4rem 0 0;">
+          <button class="btn-primary" onclick="ausgabeSpeichern('${id}')">Speichern</button>
+          <button class="link-btn" onclick="ausgabeBearbeitenAbbrechen()">Abbrechen</button>
+        </div>
+      </div>`;
+  }
+  // Öffnet ein Protokoll in der Liste zum Korrigieren
+  window.ausgabeBearbeitenStart = function(id) {
+    ausgabeBearbeitenId = id;
+    renderAusgabeProtokolle();
+  };
+  // Schließt das Korrigieren eines Protokolls ohne zu speichern
+  window.ausgabeBearbeitenAbbrechen = function() {
+    ausgabeBearbeitenId = null;
+    renderAusgabeProtokolle();
+  };
+  // Speichert die korrigierten Protokolldaten (Unterschriften bleiben unverändert)
+  window.ausgabeSpeichern = async function(id) {
+    const wert = (f) => { const el = document.getElementById(`sp-${f}-${id}`); return el ? el.value.trim() : ""; };
+    try {
+      await api("schluessel_ausgabe_aktualisieren", {
+        id, inhaber: wert("name"), verein: wert("verein"), kontakt: wert("kontakt"), ausgegeben_am: wert("am"),
+        ausgegeben_von: wert("von"), rueckgabe_bis: wert("bis"), zurueck_am: wert("zam"), zurueck_von: wert("zvon"), notiz: wert("notiz"),
+      });
+      ausgabeBearbeitenId = null;
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+  // Löscht ein Protokoll inkl. Unterschriften nach Rückfrage
+  window.ausgabeLoeschen = async function(id) {
+    const a = schluesselAusgaben.find((x) => x.id === id);
+    const offen = a && !a.zurueck_am;
+    if (!confirm(`Protokoll ${a ? a.seriennummer + " · " + a.inhaber : ""} inkl. Unterschriften löschen?` +
+      (offen ? " Der Schlüssel ist noch ausgegeben – er steht danach wieder im Bestand." : ""))) return;
+    try {
+      await api("schluessel_ausgabe_loeschen", { id });
+      await ladeDaten();
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
+  // Löscht alle Protokolle, deren Rückgabe über ein Jahr zurückliegt
+  window.alteProtokolleLoeschen = async function() {
+    const alt = ausgabenAktuell().filter(ausgabeIstAlt);
+    if (!alt.length) return;
+    if (!confirm(`${alt.length} abgeschlossene Protokoll${alt.length === 1 ? "" : "e"} (Rückgabe vor über einem Jahr) inkl. Unterschriften löschen?`)) return;
+    try {
+      await api("schluessel_ausgabe_loeschen", { id: alt.map((a) => a.id) });
       await ladeDaten();
     } catch (fehler) {
       alert(fehler.message);
