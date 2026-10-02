@@ -13,6 +13,33 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Linien-Icons (seit Session 35, Icons Etappe A). Eigene Zeichnungen, 24er-Raster,
+       Strich in currentColor – folgen damit Bereichsfarbe und Hell/Dunkel.
+       Einbinden: <svg class="ic"><use href="#ic-NAME"></use></svg>, in app.js über ic("NAME"). -->
+  <svg class="ic-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <symbol id="ic-stift" viewBox="0 0 24 24"><path d="M4 20h4L19.2 8.8a2.8 2.8 0 00-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></symbol>
+    <symbol id="ic-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="ic-menue" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="ic-zahnrad" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z"/></symbol>
+    <symbol id="ic-zurueck" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="ic-weiter" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="ic-wiederholen" viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.4-5.7"/><path d="M20 4v5h-5"/></symbol>
+    <symbol id="ic-export" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="ic-verlauf" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 102.5-6"/><path d="M3.5 4v4.5H8"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="ic-hilfe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 014.9.8c0 1.7-2.5 2.2-2.5 3.8"/><path d="M12 17.3v.1"/></symbol>
+    <symbol id="ic-raster" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></symbol>
+    <symbol id="ic-abmelden" viewBox="0 0 24 24"><path d="M10 4H6a2 2 0 00-2 2v12a2 2 0 002 2h4"/><path d="M15 7l5 5-5 5M20 12H9"/></symbol>
+    <symbol id="ic-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="ic-sonne-wolke" viewBox="0 0 24 24"><path d="M9 2.5V4M3.3 4.8l1 1M14.7 4.8l-1 1M1.5 10.5H3"/><path d="M5.3 13.3A4 4 0 0112.6 8"/><path d="M9 21h8.5a3.5 3.5 0 00.3-7A5 5 0 008.3 15.1 3 3 0 009 21z"/></symbol>
+    <symbol id="ic-wolke" viewBox="0 0 24 24"><path d="M7 19h10.5a4.5 4.5 0 00.4-9A6 6 0 006.3 11.4 4 4 0 007 19z"/></symbol>
+    <symbol id="ic-nebel" viewBox="0 0 24 24"><path d="M7 11h10.5a3.5 3.5 0 00.3-7A5 5 0 007.4 5.4 3 3 0 007 11z"/><path d="M4 15h16M6 19h12"/></symbol>
+    <symbol id="ic-niesel" viewBox="0 0 24 24"><path d="M7 14h10.5a4.5 4.5 0 00.4-9A6 6 0 006.3 6.4 4 4 0 007 14z"/><path d="M8.5 18v.5M12 19.5v.5M15.5 18v.5"/></symbol>
+    <symbol id="ic-regen" viewBox="0 0 24 24"><path d="M7 14h10.5a4.5 4.5 0 00.4-9A6 6 0 006.3 6.4 4 4 0 007 14z"/><path d="M9 17.5l-1 3M13 17.5l-1 3M17 17.5l-1 3"/></symbol>
+    <symbol id="ic-schnee" viewBox="0 0 24 24"><path d="M7 14h10.5a4.5 4.5 0 00.4-9A6 6 0 006.3 6.4 4 4 0 007 14z"/><path d="M8 18h.01M12 18h.01M16 18h.01M10 21h.01M14 21h.01"/></symbol>
+    <symbol id="ic-gewitter" viewBox="0 0 24 24"><path d="M7 14h10.5a4.5 4.5 0 00.4-9A6 6 0 006.3 6.4 4 4 0 007 14z"/><path d="M13 14.5l-2.5 3.5h3.5L11.5 22"/></symbol>
+    <symbol id="ic-thermometer" viewBox="0 0 24 24"><path d="M14 14.8V5a2 2 0 00-4 0v9.8a4 4 0 104 0z"/></symbol>
+  </svg>
 
   <div id="login-screen">
     <svg class="login-logo" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logo">
@@ -71,7 +98,7 @@
       <img class="topbar-logo hidden" id="topbar-logo" src="" alt="">
       <span class="brand" id="brand-name">Dashboard</span>
       <span class="brand-sub" id="brand-sub">Aufgaben</span>
-      <button class="content-topbar-btn content-menu-btn" id="menu-toggle" aria-label="Menü öffnen" aria-expanded="false">⋮</button>
+      <button class="content-topbar-btn content-menu-btn" id="menu-toggle" aria-label="Menü öffnen" aria-expanded="false"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-menue"></use></svg></button>
     </header>
     <div class="account-menu hidden" id="account-menu">
       <div class="menu-verwalten" id="menu-verwalten"></div>
@@ -83,12 +110,12 @@
           <button type="button" class="menu-schema-knopf" data-schema-wahl="dunkel" aria-pressed="false">Dunkel</button>
         </div>
       </div>
-      <button class="link-btn" id="btn-hilfe-symbole" aria-pressed="true">? Hilfe-Symbole ausblenden</button>
-      <button class="link-btn" onclick="dashboardNameBearbeiten()">✎ Name ändern</button>
-      <button class="link-btn" onclick="untertitelBearbeiten()">✎ Untertitel ändern</button>
-      <button class="link-btn" id="btn-bereich-wechseln">▦ Bereichsübersicht</button>
-      <button class="link-btn" id="btn-verwaltung-oeffnen">⚙ Reiter verwalten</button>
-      <button class="link-btn" id="btn-abmelden">Abmelden</button>
+      <button class="link-btn" id="btn-hilfe-symbole" aria-pressed="true"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-hilfe"></use></svg><span>Hilfe-Symbole ausblenden</span></button>
+      <button class="link-btn" onclick="dashboardNameBearbeiten()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-stift"></use></svg><span>Name ändern</span></button>
+      <button class="link-btn" onclick="untertitelBearbeiten()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-stift"></use></svg><span>Untertitel ändern</span></button>
+      <button class="link-btn" id="btn-bereich-wechseln"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-raster"></use></svg><span>Bereichsübersicht</span></button>
+      <button class="link-btn" id="btn-verwaltung-oeffnen"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg><span>Reiter verwalten</span></button>
+      <button class="link-btn" id="btn-abmelden"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-abmelden"></use></svg><span>Abmelden</span></button>
     </div>
 
     <nav class="reiter-leiste hidden" id="reiter-leiste" aria-label="Reiter"></nav>
@@ -113,7 +140,7 @@
       <h1>Aufgaben <button class="hilfe-icon" data-hilfe="Alle Aufgaben, gruppiert nach Projekt. Fälligkeitsdatum, Uhrzeit und ein Wiederholungs-Intervall sind optional. Erledigte Aufgaben wandern nach unten in den Bereich 'Erledigt'.">?</button></h1>
       <p class="hero-text">Nach Projekten sortiert, mit Fälligkeit und wiederkehrender Erinnerung.</p>
 
-      <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-aufgaben" aria-expanded="false" aria-controls="form-aufgaben">+ Neue Aufgabe</button><button type="button" class="reiter-zahnrad" data-formular="einst-aufgaben" aria-expanded="false" aria-controls="einst-aufgaben" aria-label="Projekte verwalten" title="Projekte verwalten"><span aria-hidden="true">⚙</span></button></div>
+      <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-aufgaben" aria-expanded="false" aria-controls="form-aufgaben"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neue Aufgabe</button><button type="button" class="reiter-zahnrad" data-formular="einst-aufgaben" aria-expanded="false" aria-controls="einst-aufgaben" aria-label="Projekte verwalten" title="Projekte verwalten"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg></button></div>
 
       <div class="reiter-formular hidden" id="form-aufgaben">
       <div class="row">
@@ -150,7 +177,7 @@
       <div id="view-kalender" class="hidden">
         <h1>Kalender <button class="hilfe-icon" data-hilfe="Termine im Monatsüberblick. Bei verbundenem Google-Kalender läuft der Abgleich automatisch alle 15 Minuten in beide Richtungen; neuere Änderung gewinnt bei Konflikten. Blockzeiten (über ⚙) sind feste, wiederkehrende oder einmalige 'nicht stören'-Zeiten.">?</button></h1>
         <p class="hero-text">Termine eintragen und im Monatsüberblick behalten.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-zahnrad" data-formular="einst-kalender" aria-expanded="false" aria-controls="einst-kalender" aria-label="Blockzeiten verwalten" title="Blockzeiten verwalten"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-zahnrad" data-formular="einst-kalender" aria-expanded="false" aria-controls="einst-kalender" aria-label="Blockzeiten verwalten" title="Blockzeiten verwalten"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg></button></div>
         <div class="reiter-einstellungen hidden" id="einst-kalender">
         <div class="project-heading" style="margin-top:0;">Blockzeiten <button type="button" class="hilfe-icon" data-hilfe="Wiederkehrend: an bestimmten Wochentagen jede Woche aktiv. Einmalig: nur an einem konkreten Datum. Blockzeiten werden im Reiter 'Frei' bei der Berechnung freier Zeiten mit ausgeschlossen.">?</button></div>
         <p class="hero-text" style="margin:0 0 0.8rem;">Feste "nicht stören"-Zeiten – wiederkehrend oder einmalig. Der Reiter Frei zieht sie bei den freien Zeiten ab.</p>
@@ -189,9 +216,9 @@
         <div id="upcoming-bereich"></div>
 
         <div class="cal-header">
-          <div class="cal-nav"><button id="cal-prev">‹</button></div>
+          <div class="cal-nav"><button id="cal-prev" aria-label="Vormonat" title="Vormonat"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zurueck"></use></svg></button></div>
           <h2 id="cal-monat-label"></h2>
-          <div class="cal-nav"><button id="cal-next">›</button></div>
+          <div class="cal-nav"><button id="cal-next" aria-label="Nächster Monat" title="Nächster Monat"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-weiter"></use></svg></button></div>
         </div>
         <div class="cal-grid" id="cal-grid"></div>
 
@@ -202,12 +229,12 @@
       <div id="view-frei" class="hidden">
         <h1>Frei <button class="hilfe-icon" data-hilfe="Berechnet automatisch, was an diesem Tag noch frei ist: Termine, Aufgaben mit Uhrzeit und Blockzeiten werden vom Zeitrahmen (über ⚙ einstellbar) abgezogen. Reine Berechnung – Termine/Aufgaben selbst bearbeitest du in den jeweiligen Reitern.">?</button></h1>
         <p class="hero-text">Freie Zeiten an einem Tag – berechnet aus Terminen, Aufgaben mit Uhrzeit, Blockzeiten und deinem Zeitrahmen für diesen Wochentag.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-zahnrad" data-formular="einst-frei" aria-expanded="false" aria-controls="einst-frei" aria-label="Zeitrahmen einstellen" title="Zeitrahmen einstellen"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-zahnrad" data-formular="einst-frei" aria-expanded="false" aria-controls="einst-frei" aria-label="Zeitrahmen einstellen" title="Zeitrahmen einstellen"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg></button></div>
 
         <div class="cal-header">
-          <div class="cal-nav"><button id="frei-prev">‹</button></div>
+          <div class="cal-nav"><button id="frei-prev" aria-label="Vortag" title="Vortag"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zurueck"></use></svg></button></div>
           <h2 id="frei-tag-label"></h2>
-          <div class="cal-nav"><button id="frei-next">›</button></div>
+          <div class="cal-nav"><button id="frei-next" aria-label="Folgetag" title="Folgetag"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-weiter"></use></svg></button></div>
         </div>
 
         <div class="reiter-einstellungen hidden" id="einst-frei">
@@ -246,7 +273,7 @@
       <div id="view-links" class="hidden">
         <h1>Links <button class="hilfe-icon" data-hilfe="Adressen und Materialien mit Titel, URL und optionaler Notiz – optional einem Projekt zugeordnet, damit du sie dort wiederfindest.">?</button></h1>
         <p class="hero-text">Wichtige Adressen und Materialien, schnell wiederfindbar.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-links" aria-expanded="false" aria-controls="form-links">+ Neuer Link</button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-links" aria-expanded="false" aria-controls="form-links"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neuer Link</button></div>
 
         <div class="reiter-formular hidden" id="form-links">
         <div class="row">
@@ -267,7 +294,7 @@
       <div id="view-reflexion" class="hidden">
         <h1>Reflexion <button class="hilfe-icon" data-hilfe="Persönliche, kurze Einträge mit Datum – z.B. Rückblick auf eine Einheit oder einen Tag. Rein privat gedacht, nicht für den Export oder zum Teilen.">?</button></h1>
         <p class="hero-text">Kurze Einträge nach Einheiten oder Tagen – zum Rückblättern, nicht zum Teilen.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-reflexion" aria-expanded="false" aria-controls="form-reflexion">+ Neuer Eintrag</button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-reflexion" aria-expanded="false" aria-controls="form-reflexion"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neuer Eintrag</button></div>
 
         <div class="reiter-formular hidden" id="form-reflexion">
         <div class="reflex-form">
@@ -292,7 +319,7 @@
       <div id="view-spiele" class="hidden">
         <h1>Spiele <button class="hilfe-icon" data-hilfe="Deine Spielekartei für die Jugendarbeit – eine gemeinsame Kartei, griffbereit egal ob OGS, Jugendwerk oder unterwegs. Die Kategorien lassen sich auf- und zuklappen. Mit den Sternen bewertest du ein Spiel (1–5, denselben Stern nochmal antippen entfernt die Bewertung). Oben nach Kategorie und Bewertung filtern, „Beste zuerst“ sortiert nach Sternen. ✎ bearbeitet, × löscht.">?</button></h1>
         <p class="hero-text">Spielbeschreibungen für die Jugendarbeit – nach Kategorie aufklappbar, mit Sternen bewertet.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-spiele" aria-expanded="false" aria-controls="form-spiele">+ Neues Spiel</button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-spiele" aria-expanded="false" aria-controls="form-spiele"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neues Spiel</button></div>
 
         <div class="reiter-formular hidden" id="form-spiele">
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
@@ -372,9 +399,9 @@
         <p class="hero-text">Was du isst – Kalorien, Eiweiß, Fett und Kohlenhydrate pro Tag.</p>
 
         <div class="ern-datum-leiste">
-          <button class="btn-secondary ern-pfeil" id="ern-tag-zurueck" aria-label="Vortag">‹</button>
+          <button class="btn-secondary ern-pfeil" id="ern-tag-zurueck" aria-label="Vortag"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zurueck"></use></svg></button>
           <button class="ern-datum-text" id="ern-datum-text" title="Zu heute springen">Heute</button>
-          <button class="btn-secondary ern-pfeil" id="ern-tag-vor" aria-label="Folgetag">›</button>
+          <button class="btn-secondary ern-pfeil" id="ern-tag-vor" aria-label="Folgetag"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-weiter"></use></svg></button>
           <span class="ern-kalender">
             <button class="btn-secondary ern-pfeil" id="ern-kalender-btn" aria-label="Datum wählen" title="Datum wählen">📅</button>
             <input type="date" id="ern-datum-wahl" tabindex="-1" aria-hidden="true">
@@ -509,7 +536,7 @@
         <div id="ern-scanner" class="session-fokus-overlay hidden" role="dialog" aria-modal="true" aria-label="Barcode scannen">
           <div class="session-fokus-kopf">
             <span class="session-fokus-titel">Barcode scannen</span>
-            <button class="session-fokus-schliessen" id="btn-ern-scanner-zu" aria-label="Schließen">✕</button>
+            <button class="session-fokus-schliessen" id="btn-ern-scanner-zu" aria-label="Schließen"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-x"></use></svg></button>
           </div>
           <div class="ern-scanner-inhalt">
             <video id="ern-scanner-video" class="ern-scanner-video" playsinline muted></video>
@@ -561,9 +588,9 @@
           <summary>📊 Woche</summary>
           <div class="anleitung-text">
             <div class="ern-woche-nav">
-              <button class="btn-secondary ern-pfeil" id="ern-woche-zurueck" aria-label="Vorwoche">‹</button>
+              <button class="btn-secondary ern-pfeil" id="ern-woche-zurueck" aria-label="Vorwoche"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zurueck"></use></svg></button>
               <strong id="ern-woche-titel">Woche</strong>
-              <button class="btn-secondary ern-pfeil" id="ern-woche-vor" aria-label="Nächste Woche">›</button>
+              <button class="btn-secondary ern-pfeil" id="ern-woche-vor" aria-label="Nächste Woche"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-weiter"></use></svg></button>
             </div>
             <div id="ern-woche"></div>
           </div>
@@ -757,6 +784,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <p><strong>Business:</strong> startet mit Start, Aufgaben, Kalender, Notizen, Links, Ideen, Verlauf und Anleitung. Weitere Reiter (z.B. Finanzen, Projekte) lassen sich in der Reiter-Verwaltung einblenden – wie in den anderen Bereichen bereichsgetrennt.</p>
               <p><strong>Farbwelt je Bereich:</strong> Jeder Bereich hat eigene Farben – Privat Blautöne, OGS Rapunzel Gelb/Blau aus dem Rapunzel-Logo, AWO OV Liblar Rottöne, Business Marineblau/Orange aus dem Markenkit von zwischenkaffeeundchaos. In Privat, OGS, AWO und Business steht oben in der Kopfzeile das jeweilige Logo statt des Dashboard-Namens. Login, Willkommensseite und Verwaltung sind neutral gehalten. So ist auf einen Blick klar, in welchem Bereich du gerade bist. In AWO sind überfällige Einträge orange statt rot markiert, damit sie sich vom AWO-Rot abheben.</p>
               <p><strong>Hell und Dunkel:</strong> im ⋮-Menü unter „Darstellung“ – <em>Auto</em> (Standard, folgt der Einstellung von Handy bzw. PC), <em>Hell</em> oder <em>Dunkel</em>. Gilt pro Gerät. Im Dunkeln hat jeder Bereich eigene, aufgehellte Akzente (Privat Hellblau, OGS Himmelblau mit Rapunzel-Gelb, AWO Hellrot, Business Markenorange), auf farbigen Flächen steht dunkle Schrift. Die Logos oben stehen dann auf einer hellen Plakette. Druck und PDF bleiben immer hell.</p>
+              <p><strong>Icons</strong> (seit Session 35): Bedienknöpfe zeigen schlichte Linien-Icons statt Zeichen – Stift zum Bearbeiten, X zum Löschen oder Schließen, Pfeile zum Blättern, drei Punkte fürs Menü, Zahnrad für Einstellungen, Plus vor „Neue …“, Kreispfeil zum Verschieben einer Erinnerung. Auch das ⋮-Menü und das Wetter (oben und im 5-Tage-Ausblick) haben eigene Icons. Sie nehmen die Farbe des Bereichs an und passen zu Hell und Dunkel. Die Emojis in einzelnen Reitern (z. B. Schlüssel, Ernährung, Rezepte) folgen in einem zweiten Schritt.</p>
               <p><strong>Welche Reiter tatsächlich sichtbar sind</strong>, lässt sich zusätzlich pro Bereich ein-/ausschalten – siehe Reiter unten. Das hier Beschriebene ist die technische Obergrenze, nicht zwingend das, was gerade angezeigt wird.</p>
             </div>
           </details>
@@ -1226,9 +1254,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         </div>
 
         <div class="cal-header">
-          <div class="cal-nav"><button id="plan-prev">‹</button></div>
+          <div class="cal-nav"><button id="plan-prev" aria-label="Zurück" title="Zurück"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zurueck"></use></svg></button></div>
           <h2 id="plan-zeitraum-label"></h2>
-          <div class="cal-nav"><button id="plan-next">›</button></div>
+          <div class="cal-nav"><button id="plan-next" aria-label="Weiter" title="Weiter"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-weiter"></use></svg></button></div>
         </div>
 
         <div style="margin-bottom:1.6rem;">
@@ -1280,7 +1308,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <div id="view-ogs-inventar" class="hidden">
         <h1>Inventar <button class="hilfe-icon" data-hilfe="Material und Ausstattung, nach Kategorie sortiert, auf- und zuklappbar und filterbar. Antippen auf einen Gegenstand öffnet die Bearbeitung.">?</button></h1>
         <p class="hero-text">Material und Ausstattung der OGS Rapunzel – nach Kategorie sortiert.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-ogsinventar" aria-expanded="false" aria-controls="form-ogsinventar">+ Neuer Gegenstand</button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-ogsinventar" aria-expanded="false" aria-controls="form-ogsinventar"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neuer Gegenstand</button></div>
 
         <div class="reiter-formular hidden" id="form-ogsinventar">
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
@@ -1308,7 +1336,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <div id="view-ogs-projekte" class="hidden">
         <h1>Projekte <button class="hilfe-icon" data-hilfe="Ausgearbeitete Konzepte mit Datei-Ablage. Hauptprojekte können Unterprojekte enthalten – praktisch für ein größeres Thema mit mehreren kleineren Teilprojekten darin. Nur im Bereich OGS verfügbar.">?</button></h1>
         <p class="hero-text">Ausgearbeitete Konzepte und Projekte der OGS Rapunzel – mit Datei-Ablage und Unterprojekten.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-ogsprojekte" aria-expanded="false" aria-controls="form-ogsprojekte">+ Neues Projekt</button><button type="button" class="reiter-zahnrad" data-formular="einst-ogsprojekte" aria-expanded="false" aria-controls="einst-ogsprojekte" aria-label="Mehrere Projekte importieren" title="Mehrere Projekte importieren"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-ogsprojekte" aria-expanded="false" aria-controls="form-ogsprojekte"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neues Projekt</button><button type="button" class="reiter-zahnrad" data-formular="einst-ogsprojekte" aria-expanded="false" aria-controls="einst-ogsprojekte" aria-label="Mehrere Projekte importieren" title="Mehrere Projekte importieren"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg></button></div>
         <div class="reiter-einstellungen hidden" id="einst-ogsprojekte">
         <div>
           <h3 style="margin-top: 0; font-size:0.95rem;">Mehrere Projekte auf einmal importieren <button type="button" class="hilfe-icon" data-hilfe="Legt für jede Zeile der CSV ein neues Hauptprojekt an, noch ohne Datei und ohne Unterprojekt-Zuordnung. Dateien und Unterprojekt-Zuordnung reichst du danach einzeln nach.">?</button></h3>
@@ -1347,7 +1375,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <div id="view-verleih" class="hidden">
         <h1>Verleih <button class="hilfe-icon" data-hilfe="Verleih-Historie für Inventar-Gegenstände: wer hat was wann bekommen, und ist es schon zurück? Zeigt getrennt an, was gerade ausgeliehen ist und was bereits zurückgegeben wurde. Zum Bearbeiten (auch für ein nachträgliches Rückgabedatum) auf einen Eintrag tippen.">?</button></h1>
         <p class="hero-text">Wer hat gerade welchen Inventar-Gegenstand – und wann kam er zurück?</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-verleih" aria-expanded="false" aria-controls="form-verleih">+ Neu verleihen</button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-verleih" aria-expanded="false" aria-controls="form-verleih"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neu verleihen</button></div>
 
         <div class="reiter-formular hidden" id="form-verleih">
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
@@ -1367,7 +1395,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <div id="view-raumplanung" class="hidden">
         <h1>Raumplanung <button class="hilfe-icon" data-hilfe="Vermietungen der Räume eintragen. Bei jedem neuen Eintrag geht automatisch eine Mail an alle Adressen im Mail-Verteiler (über ⚙). Überschneidet sich eine Vermietung im selben Raum, fragt die App nach. Der Monatskalender markiert belegte Tage – Tag antippen zeigt die Vermietungen dieses Tages. Die Liste darunter ist nach Monaten auf- und zuklappbar. Zum Bearbeiten auf einen Eintrag tippen – Änderungen verschicken keine Mail.">?</button></h1>
         <p class="hero-text">Vermietungen eintragen – bei jedem neuen Eintrag geht eine Mail an den Verteiler.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-raumplanung" aria-expanded="false" aria-controls="form-raumplanung">+ Neue Vermietung</button><button type="button" class="reiter-zahnrad" data-formular="einst-raumplanung" aria-expanded="false" aria-controls="einst-raumplanung" aria-label="Räume und Mail-Verteiler" title="Räume und Mail-Verteiler"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-raumplanung" aria-expanded="false" aria-controls="form-raumplanung"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neue Vermietung</button><button type="button" class="reiter-zahnrad" data-formular="einst-raumplanung" aria-expanded="false" aria-controls="einst-raumplanung" aria-label="Räume und Mail-Verteiler" title="Räume und Mail-Verteiler"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg></button></div>
         <div class="reiter-einstellungen hidden" id="einst-raumplanung">
           <div class="reiter-einstellungen-titel">Räume und Mail-Verteiler</div>
         <details class="anleitung-abschnitt" style="margin-top:0;" id="raum-raeume-block">
@@ -1451,7 +1479,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <div id="view-schluessel" class="hidden">
         <h1>Schlüssel <button class="hilfe-icon" data-hilfe="Schlüssel und elektronische Keys mit Seriennummer, Name und Verein eintragen und ankreuzen, welche Zugänge (Türen) sie öffnen – auch mehrere. Die Zugänge legst du einmal über ⚙ unter „Zugänge verwalten“ an. Die Liste ist nach Verein gruppiert (ohne Verein steht unten). Suche findet Seriennummer, Name, Verein, Zugang und Notiz; die Auswahlfelder zeigen nur Schlüssel oder nur Keys, einen Status (ausgegeben, überfällig, im Bestand) bzw. nur einen Zugang („Wer kommt in die Küche?“). Ausgeben und Zurücknehmen über die Knöpfe am Eintrag – mit Unterschrift auf dem Bildschirm oder per Ausdruck auf Papier; das Protokoll lässt sich auch per Mail verschicken (✉️). Alle Protokolle stehen unten unter „Ausgabeprotokolle“. Zum Bearbeiten auf einen Eintrag tippen, × löscht ihn. Name und Verein schlagen beim Tippen schon Eingetragenes vor.">?</button></h1>
         <p class="hero-text">Wer hat welchen Schlüssel oder Key – mit Seriennummer und Verein.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-schluessel" aria-expanded="false" aria-controls="form-schluessel">+ Neuer Schlüssel</button><button type="button" class="reiter-zahnrad" data-formular="einst-schluessel" aria-expanded="false" aria-controls="einst-schluessel" aria-label="Zugänge verwalten" title="Zugänge verwalten"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-schluessel" aria-expanded="false" aria-controls="form-schluessel"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neuer Schlüssel</button><button type="button" class="reiter-zahnrad" data-formular="einst-schluessel" aria-expanded="false" aria-controls="einst-schluessel" aria-label="Zugänge verwalten" title="Zugänge verwalten"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg></button></div>
         <div class="reiter-einstellungen hidden" id="einst-schluessel">
           <div class="reiter-einstellungen-titel">Zugänge</div>
         <details class="anleitung-abschnitt" style="margin-top:0;" open>
@@ -1528,7 +1556,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <div id="view-training" class="hidden">
         <h1>Training <button class="hilfe-icon" data-hilfe="Trainingsverlauf: Datum, Sportart, Ort, Dauer und optional einzelne Übungen mit Sätzen/Wiederholungen/Gewicht (v.a. für Kraft-Training). Oben der Wochenziel-Vergleich (Gesamt + je Sportart), Filter nach Sportart/Ort/Zeitraum, darunter die Liste gruppiert nach Woche. Trainingspläne (benannte Übungs-Vorlagen) über ⚙ verwalten und beim Eintragen per Auswahl anwenden. Zum Bearbeiten auf einen Eintrag tippen.">?</button></h1>
         <p class="hero-text">Trainingsverlauf und Fortschritt – offen für beliebige Sportarten und Orte, die Häufigkeit darf sich jederzeit ändern.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-training" aria-expanded="false" aria-controls="form-training">+ Neues Training</button><button type="button" class="reiter-zahnrad" data-formular="einst-training einst-training-ziel" aria-expanded="false" aria-controls="einst-training einst-training-ziel" aria-label="Ziele, Sportarten, Übungen, Pläne, Timer" title="Ziele, Sportarten, Übungen, Pläne, Timer"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-training" aria-expanded="false" aria-controls="form-training"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neues Training</button><button type="button" class="reiter-zahnrad" data-formular="einst-training einst-training-ziel" aria-expanded="false" aria-controls="einst-training einst-training-ziel" aria-label="Ziele, Sportarten, Übungen, Pläne, Timer" title="Ziele, Sportarten, Übungen, Pläne, Timer"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg></button></div>
         <div class="reiter-einstellungen hidden" id="einst-training-ziel">
           <div class="reiter-einstellungen-titel">Wochenziele je Sportart</div>
         <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-bottom:0;">
@@ -1711,7 +1739,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
     <dialog class="schnell-sheet" id="schnell-dialog" aria-labelledby="schnell-titel">
       <div class="schnell-kopf">
         <h2 id="schnell-titel">Schnell erfassen</h2>
-        <button type="button" class="schnell-zu" onclick="schnellSchliessen()" aria-label="Schließen">✕</button>
+        <button type="button" class="schnell-zu" onclick="schnellSchliessen()" aria-label="Schließen"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-x"></use></svg></button>
       </div>
       <button type="button" class="link-btn schnell-reiterform hidden" id="schnell-reiterform" onclick="schnellZumReiterformular()"></button>
       <input type="text" id="schnell-text" class="schnell-text" autocomplete="off" enterkeyhint="done" aria-label="Text">
