@@ -224,8 +224,7 @@
   function farbweltAnwenden(bereich) {
     const welt = BEREICH_FARBWELT.includes(bereich) ? bereich : "neutral";
     document.documentElement.dataset.bereich = welt;
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", BEREICH_THEME_FARBE[welt]);
+    statusleisteFaerben();
     const logo = document.getElementById("topbar-logo");
     const name = document.getElementById("brand-name");
     const eintrag = BEREICH_LOGO[welt];
@@ -242,6 +241,57 @@
     // Mit Logo ersetzt das Logo den Dashboard-Namen in der Kopfzeile
     if (name) name.classList.toggle("hidden", !!eintrag);
   }
+
+  // Statusleiste (theme-color): hell in der dunklen Leistenfarbe des Bereichs,
+  // im Dunkelmodus in der Hintergrundfarbe – beides aus style.css gelesen
+  function statusleisteFaerben() {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    const welt = document.documentElement.dataset.bereich || "neutral";
+    let farbe = BEREICH_THEME_FARBE[welt] || BEREICH_THEME_FARBE.neutral;
+    if (document.documentElement.dataset.schema === "dunkel") {
+      farbe = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || farbe;
+    }
+    meta.setAttribute("content", farbe);
+  }
+
+  // ==========================================================
+  // Darstellung Hell/Dunkel (seit Session 34, Redesign Etappe 4).
+  // farbschema.js setzt data-schema schon im <head>; hier die Auswahl im
+  // ⋮-Menü und das Mitgehen, wenn das Gerät bei „Auto“ umschaltet.
+  // ==========================================================
+  function farbschemaWahl() {
+    let wahl = "auto";
+    try { wahl = localStorage.getItem("farbschema") || "auto"; } catch (e) { /* privater Modus */ }
+    return ["auto", "hell", "dunkel"].includes(wahl) ? wahl : "auto";
+  }
+  const dunkelAbfrage = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+  // Setzt data-schema nach Auswahl (Auto = Gerät) und markiert die Knöpfe im Menü
+  function farbschemaAnwenden() {
+    const wahl = farbschemaWahl();
+    const dunkel = wahl === "dunkel" || (wahl === "auto" && !!dunkelAbfrage && dunkelAbfrage.matches);
+    document.documentElement.dataset.schema = dunkel ? "dunkel" : "hell";
+    document.querySelectorAll(".menu-schema-knopf").forEach((k) => {
+      const an = k.dataset.schemaWahl === wahl;
+      k.classList.toggle("aktiv", an);
+      k.setAttribute("aria-pressed", String(an));
+    });
+    statusleisteFaerben();
+  }
+  window.farbschemaSetzen = function(wahl) {
+    try { localStorage.setItem("farbschema", wahl); } catch (e) { /* privater Modus */ }
+    farbschemaAnwenden();
+  };
+  document.querySelectorAll(".menu-schema-knopf").forEach((k) => {
+    k.addEventListener("click", (e) => { e.stopPropagation(); window.farbschemaSetzen(k.dataset.schemaWahl); });
+  });
+  if (dunkelAbfrage) {
+    const mitgehen = () => { if (farbschemaWahl() === "auto") farbschemaAnwenden(); };
+    if (dunkelAbfrage.addEventListener) dunkelAbfrage.addEventListener("change", mitgehen);
+    else if (dunkelAbfrage.addListener) dunkelAbfrage.addListener(mitgehen);
+  }
+  farbschemaAnwenden();
 
   // Zeigt das heutige Datum ausgeschrieben auf der Willkommensseite an
   function willkommenDatumAnzeigen() {
@@ -7872,7 +7922,7 @@
     if (daten.length === 0) return `<h2>${escapeHtml(titel)}</h2><p>Keine Einträge.</p>`;
     const spalten = Object.keys(daten[0]);
     let html = `<h2>${escapeHtml(titel)}</h2><table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:13px;">`;
-    html += `<tr>${spalten.map((s) => `<th style="background:#eee;text-align:left;">${escapeHtml(s)}</th>`).join("")}</tr>`;
+    html += `<tr>${spalten.map((s) => `<th style="background:var(--bg);text-align:left;">${escapeHtml(s)}</th>`).join("")}</tr>`;
     for (const row of daten) {
       html += `<tr>${spalten.map((s) => `<td>${escapeHtml(String(row[s] ?? ""))}</td>`).join("")}</tr>`;
     }
@@ -9438,7 +9488,7 @@
       if (iso === raumKalTag) {
         stil += " background:var(--nav-bg); color:var(--nav-ink); border-color:var(--nav-bg); font-weight:700;";
       } else if (liste.length) {
-        stil += " background:var(--accent); color:#fff; border-color:var(--accent); font-weight:700;";
+        stil += " background:var(--accent); color:var(--on-accent); border-color:var(--accent); font-weight:700;";
         if (iso === heute) stil += " box-shadow:inset 0 0 0 2px var(--panel);";
       }
       stil = ` style="${stil}"`;
@@ -10980,7 +11030,7 @@
         <h3>Einnahmen &amp; Ausgaben pro Monat</h3>
         ${finChartEinnahmenAusgaben(zeilen)}
         <div class="fin-chart-legende">
-          <span><span class="fin-legende-punkt" style="background:#2f9e6f;"></span>Einnahmen</span>
+          <span><span class="fin-legende-punkt" style="background:var(--einnahme);"></span>Einnahmen</span>
           <span><span class="fin-legende-punkt" style="background:var(--mod-finanzen);"></span>Ausgaben</span>
         </div>
       </div>
