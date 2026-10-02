@@ -369,6 +369,7 @@
   // Rendert untere Themenleiste und obere Reiter-Leiste; in der Verwaltung ohne Navigation
   function renderNavigation() {
     renderBereichUmschalter();
+    renderMenuVerwalten();
 
     const nav = document.getElementById("bottom-nav");
     const leiste = document.getElementById("reiter-leiste");
@@ -386,13 +387,18 @@
     if (main) main.classList.add("mit-nav");
 
     const aktiveGruppe = gruppeVonTab(aktiverTab);
-    nav.innerHTML = sichtbareGruppen().map((g) => {
+    // „Verwalten“ steht seit Etappe 3 im ⋮-Menü; sein Platz geht an „+“ in der Mitte
+    const gruppen = sichtbareGruppen().filter((g) => g.schluessel !== "verwalten");
+    const knoepfe = gruppen.map((g) => {
       const aktiv = aktiveGruppe && aktiveGruppe.schluessel === g.schluessel;
       return `<button class="bottom-nav-btn${aktiv ? " aktiv" : ""}" onclick="gruppeOeffnen('${g.schluessel}')"
         aria-label="${escapeHtml(g.label)}" title="${escapeHtml(g.label)}"${aktiv ? ' aria-current="page"' : ""}>
         ${NAV_ICON[g.schluessel] || NAV_ICON.verwalten}${aktiv ? `<span class="bottom-nav-label">${escapeHtml(g.label)}</span>` : ""}
       </button>`;
-    }).join("");
+    });
+    const plus = `<button class="bottom-nav-plus" id="btn-schnell" onclick="schnellOeffnen()" aria-label="Schnell erfassen" title="Schnell erfassen" aria-haspopup="dialog">${SCHNELL_PLUS_ICON}</button>`;
+    knoepfe.splice(Math.ceil(knoepfe.length / 2), 0, plus);
+    nav.innerHTML = knoepfe.join("");
 
     const reiter = aktiveGruppe ? sichtbareTabsInGruppe(aktiveGruppe) : [];
     if (reiter.length > 1) {
@@ -436,6 +442,230 @@
       tabWechseln(ersterSichtbarerReiter());
     }
   };
+
+  // ==========================================================
+  // Schnellerfassung (seit Session 34, Redesign Etappe 3): der „+“-Knopf
+  // in der Mitte der Leiste unten öffnet ein Blatt mit Text, Art, Bereich
+  // und Wann. Zusatzfelder (Ende, Projekt, Wiederholung, Notiz,
+  // Beschreibung) stehen hinter „Details“. Gespeichert wird über dieselben
+  // Aktionen wie in den Reitern – kein neues Backend. Angeboten werden nur
+  // Arten, deren Reiter im gewählten Bereich eingeblendet ist (Aufgabe
+  // immer), damit nichts in einem ausgeblendeten Reiter verschwindet.
+  // ==========================================================
+  const SCHNELL_ARTEN = [
+    { art: "aufgabe", label: "Aufgabe", tab: "aufgaben", platzhalter: "Was ist zu tun?" },
+    { art: "termin", label: "Termin", tab: "kalender", platzhalter: "Welcher Termin?" },
+    { art: "notiz", label: "Notiz", tab: "notizen", platzhalter: "Notiz …" },
+    { art: "einkauf", label: "Einkauf", tab: "einkauf", platzhalter: "Was fehlt?" },
+    { art: "idee", label: "Idee", tab: "ogsideen", platzhalter: "Welche Idee?" },
+  ];
+  // Welche Art ist beim Öffnen vorgewählt? Passend zum gerade offenen Reiter
+  const SCHNELL_ART_VON_TAB = { kalender: "termin", frei: "termin", notizen: "notiz", einkauf: "einkauf", ogsideen: "idee" };
+  const SCHNELL_PLUS_ICON = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
+  let schnell = { art: "aufgabe", bereich: "privat", wann: "ohne", details: false };
+
+  // Arten, die im Bereich angeboten werden (Aufgabe immer)
+  function schnellArtenFuer(bereich) {
+    return SCHNELL_ARTEN.filter((a) => a.art === "aufgabe" || reiterIstSichtbar(bereich, a.tab));
+  }
+
+  // Öffnet die Schnellerfassung im aktiven Bereich; Art passend zum offenen Reiter
+  window.schnellOeffnen = function() {
+    const dlg = document.getElementById("schnell-dialog");
+    if (!dlg) return;
+    const bereich = BEREICH_FARBWELT.includes(aktiverBereich) ? aktiverBereich : "privat";
+    const wunsch = SCHNELL_ART_VON_TAB[aktiverTab] || "aufgabe";
+    const art = schnellArtenFuer(bereich).some((a) => a.art === wunsch) ? wunsch : "aufgabe";
+    schnell = { art, bereich, wann: art === "termin" ? "heute" : "ohne", details: false };
+    document.getElementById("schnell-text").value = "";
+    ["schnell-datum", "schnell-uhrzeit", "schnell-ende", "schnell-intervall", "schnell-notiz"].forEach((id) => {
+      document.getElementById(id).value = "";
+    });
+    schnellMeldung("", false);
+    schnellRendern();
+    if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    document.getElementById("schnell-text").focus();
+  };
+
+  // Schließt die Schnellerfassung ohne zu speichern
+  window.schnellSchliessen = function() {
+    const dlg = document.getElementById("schnell-dialog");
+    if (!dlg) return;
+    if (typeof dlg.close === "function" && dlg.open) dlg.close(); else dlg.removeAttribute("open");
+  };
+
+  // Setzt Art, Bereich oder Wann und zeichnet das Blatt neu
+  window.schnellSetzen = function(feld, wert) {
+    schnell[feld] = wert;
+    if (feld === "bereich" && !schnellArtenFuer(wert).some((a) => a.art === schnell.art)) schnell.art = "aufgabe";
+    if (feld === "art") {
+      if (wert === "termin" && schnell.wann === "ohne") schnell.wann = "heute";
+    }
+    if (feld === "wann" && wert === "datum") {
+      const datum = document.getElementById("schnell-datum");
+      if (!datum.value) datum.value = heuteISO();
+    }
+    schnellRendern();
+    if (feld === "wann" && wert === "datum") document.getElementById("schnell-datum").focus();
+  };
+
+  // Klappt die Zusatzfelder auf bzw. zu
+  window.schnellDetailsUmschalten = function() {
+    schnell.details = !schnell.details;
+    schnellRendern();
+  };
+
+  // Chip-Knopf für Art, Bereich und Wann (aria-pressed zeigt die Auswahl)
+  function schnellChip(feld, wert, label, aktiv, extra = "") {
+    return `<button type="button" class="schnell-chip${aktiv ? " aktiv" : ""}" aria-pressed="${aktiv}"
+      onclick="schnellSetzen('${feld}','${wert}')"${extra}>${label}</button>`;
+  }
+
+  // Zeichnet Chips und Felder passend zur aktuellen Auswahl
+  function schnellRendern() {
+    const arten = schnellArtenFuer(schnell.bereich);
+    const artInfo = SCHNELL_ARTEN.find((a) => a.art === schnell.art);
+    document.getElementById("schnell-text").placeholder = artInfo.platzhalter;
+
+    document.getElementById("schnell-arten").innerHTML = arten
+      .map((a) => schnellChip("art", a.art, a.label, a.art === schnell.art)).join("");
+
+    document.getElementById("schnell-bereiche").innerHTML = BEREICH_UMSCHALTER.map((b) =>
+      schnellChip("bereich", b.bereich, `<span class="schnell-punkt" style="background:${b.farbe}; box-shadow:0 0 0 2px ${b.ring};" aria-hidden="true"></span>${escapeHtml(b.name)}`,
+        b.bereich === schnell.bereich, ` title="${escapeHtml(b.lang)}"`)).join("");
+
+    // Wann: nur bei Aufgabe und Termin; Termin braucht ein Datum
+    const mitWann = schnell.art === "aufgabe" || schnell.art === "termin";
+    document.getElementById("schnell-wann-block").classList.toggle("hidden", !mitWann);
+    if (mitWann) {
+      const optionen = [["heute", "Heute"], ["morgen", "Morgen"], ["datum", "Datum"]];
+      if (schnell.art === "aufgabe") optionen.unshift(["ohne", "Ohne"]);
+      document.getElementById("schnell-wann").innerHTML = optionen
+        .map(([w, l]) => schnellChip("wann", w, l, w === schnell.wann)).join("");
+      document.getElementById("schnell-datum").classList.toggle("hidden", schnell.wann !== "datum");
+      // Uhrzeit nur mit Datum sinnvoll
+      document.getElementById("schnell-zeit-zeile").classList.toggle("hidden", schnell.wann === "ohne");
+      document.getElementById("schnell-zeile").classList.toggle("hidden", schnell.wann === "ohne");
+    }
+
+    // Details je Art
+    const hatDetails = schnell.art !== "einkauf";
+    const detailsKnopf = document.getElementById("schnell-details-knopf");
+    detailsKnopf.classList.toggle("hidden", !hatDetails);
+    detailsKnopf.setAttribute("aria-expanded", String(schnell.details && hatDetails));
+    detailsKnopf.textContent = (schnell.details && hatDetails ? "▾" : "▸") + " Details";
+    const zeigen = schnell.details && hatDetails;
+    document.getElementById("schnell-details").classList.toggle("hidden", !zeigen);
+    const ohneZeit = schnell.wann === "ohne";
+    document.getElementById("schnell-ende-zeile").classList.toggle("hidden", !(zeigen && mitWann && !ohneZeit));
+    document.getElementById("schnell-projekt-zeile").classList.toggle("hidden", !(zeigen && (schnell.art === "aufgabe" || schnell.art === "notiz")));
+    document.getElementById("schnell-intervall-zeile").classList.toggle("hidden", !(zeigen && schnell.art === "aufgabe"));
+    document.getElementById("schnell-notiz-zeile").classList.toggle("hidden", !(zeigen && (schnell.art === "termin" || schnell.art === "idee")));
+    document.getElementById("schnell-notiz").placeholder = schnell.art === "idee" ? "Beschreibung (optional)" : "Notiz zum Termin (optional)";
+
+    // Projekte des gewählten Bereichs
+    const select = document.getElementById("schnell-projekt");
+    const bisher = select.value;
+    const liste = projekte.filter((p) => bereichVon(p) === schnell.bereich);
+    select.innerHTML = `<option value="">Kein Projekt</option>` +
+      liste.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join("");
+    if (liste.some((p) => String(p.id) === bisher)) select.value = bisher;
+  }
+
+  // Zeigt eine Meldung im Blatt (Fehler rot)
+  function schnellMeldung(text, fehler) {
+    const el = document.getElementById("schnell-status");
+    el.textContent = text;
+    el.classList.toggle("fehler", !!fehler);
+  }
+
+  // Liefert das gewählte Datum als ISO-Text (oder null bei „Ohne“)
+  function schnellDatum() {
+    if (schnell.wann === "ohne") return null;
+    if (schnell.wann === "datum") return document.getElementById("schnell-datum").value || null;
+    const d = new Date();
+    if (schnell.wann === "morgen") d.setDate(d.getDate() + 1);
+    return dateToISO(d);
+  }
+
+  // Speichert den Eintrag über die passende Aktion, schließt das Blatt und lädt neu
+  window.schnellSpeichern = async function() {
+    const text = document.getElementById("schnell-text").value.trim();
+    if (!text) { schnellMeldung("Bitte erst etwas eintragen.", true); document.getElementById("schnell-text").focus(); return; }
+    const bereich = schnell.bereich;
+    const datum = schnellDatum();
+    if (schnell.art === "termin" && !datum) { schnellMeldung("Ein Termin braucht ein Datum.", true); return; }
+    const mitZeit = schnell.wann !== "ohne";
+    const uhrzeit = (mitZeit && document.getElementById("schnell-uhrzeit").value) || null;
+    const zeigeDetails = schnell.details;
+    const ende_uhrzeit = (zeigeDetails && uhrzeit && document.getElementById("schnell-ende").value) || null;
+    const projekt_id = (zeigeDetails && document.getElementById("schnell-projekt").value) || null;
+    const intervall = zeigeDetails ? document.getElementById("schnell-intervall").value : "";
+    const notiz = (zeigeDetails && document.getElementById("schnell-notiz").value.trim()) || null;
+    // Verlauf-Eintrag dem Zielbereich zuordnen, nicht dem gerade offenen
+    const basis = { bereich, aktiver_bereich: bereich };
+
+    const knopf = document.getElementById("schnell-speichern");
+    knopf.disabled = true;
+    schnellMeldung("Speichere …", false);
+    try {
+      if (schnell.art === "aufgabe") {
+        await api("aufgabe_hinzufuegen", { ...basis, titel: text, projekt_id, faellig_am: datum, uhrzeit, ende_uhrzeit, erinnere_alle_tage: intervall || null });
+      } else if (schnell.art === "termin") {
+        await api("termin_hinzufuegen", { ...basis, titel: text, datum, uhrzeit, ende_uhrzeit, notiz });
+      } else if (schnell.art === "notiz") {
+        await api("notiz_hinzufuegen", { ...basis, text, projekt_id });
+      } else if (schnell.art === "einkauf") {
+        await api("einkauf_hinzufuegen", { ...basis, text });
+      } else if (schnell.art === "idee") {
+        await api("ogs_idee_hinzufuegen", { ...basis, titel: text, beschreibung: notiz });
+      }
+    } catch (e) {
+      schnellMeldung("Nicht gespeichert: " + (e.message || "Fehler"), true);
+      knopf.disabled = false;
+      return;
+    }
+    knopf.disabled = false;
+    const artLabel = SCHNELL_ARTEN.find((a) => a.art === schnell.art).label;
+    const bereichName = (BEREICH_UMSCHALTER.find((b) => b.bereich === bereich) || {}).name || bereich;
+    window.schnellSchliessen();
+    hinweisZeigen(`${artLabel} gespeichert${bereich !== aktiverBereich ? ` · ${bereichName}` : ""}`);
+    await ladeDaten();
+    if (schnell.art === "termin") renderKalender();
+  };
+
+  // Kurze Rückmeldung unten über der Leiste, verschwindet nach 3 Sekunden
+  let hinweisTimer = null;
+  function hinweisZeigen(text) {
+    const el = document.getElementById("app-hinweis");
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove("hidden");
+    clearTimeout(hinweisTimer);
+    hinweisTimer = setTimeout(() => el.classList.add("hidden"), 3000);
+  }
+
+  // Dialog: Tipp neben das Blatt schließt, Enter im Textfeld speichert
+  (function schnellEinrichten() {
+    const dlg = document.getElementById("schnell-dialog");
+    if (!dlg) return;
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) window.schnellSchliessen(); });
+    document.getElementById("schnell-text").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.schnellSpeichern(); }
+    });
+  })();
+
+  // Einträge der früheren Gruppe „Verwalten“ (Export, Verlauf, Anleitung)
+  // stehen seit Etappe 3 im ⋮-Menü – nur die im Bereich eingeblendeten.
+  const MENU_VERWALTEN = [["export", "⇩ Export"], ["verlauf", "↺ Verlauf"], ["anleitung", "? Anleitung"]];
+  function renderMenuVerwalten() {
+    const el = document.getElementById("menu-verwalten");
+    if (!el) return;
+    const eintraege = aktiverBereich === "verwaltung" ? [] : MENU_VERWALTEN.filter(([tab]) => reiterIstSichtbar(aktiverBereich, tab));
+    el.innerHTML = eintraege.map(([tab, label]) =>
+      `<button class="link-btn${tab === aktiverTab ? " aktiv" : ""}" onclick="tabWechseln('${tab}')">${label}</button>`).join("");
+    el.classList.toggle("hidden", eintraege.length === 0);
+  }
 
   // Zeigt den im Browser gespeicherten Dashboard-Namen in der Kopfzeile an
   function dashboardNameAnzeigen() {
