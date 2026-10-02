@@ -321,10 +321,54 @@
     tabWechseln(sichtbar.includes(gemerkt) ? gemerkt : sichtbar[0]);
   };
 
+  // ==========================================================
+  // Bereichsumschalter oben links (seit Session 34): vier Punkte in den
+  // Bereichsfarben, der aktive Bereich ist beschriftet. Ein Tipp wechselt
+  // direkt den Bereich – ohne Umweg über die Willkommensseite. Die Farben
+  // sind fest (nicht aus der Farbwelt), damit jeder Punkt in jedem Bereich
+  // gleich aussieht. Weiße Schrift auf allen vier Farben: Kontrast 5,1–5,9:1.
+  // ==========================================================
+  const BEREICH_UMSCHALTER = [
+    { bereich: "privat", name: "Privat", lang: "Privat", farbe: "#2a5bd7", ring: "#2a5bd7" },
+    { bereich: "ogs", name: "OGS", lang: "OGS Rapunzel", farbe: "#1872b8", ring: "#ffcc00" },
+    { bereich: "awo", name: "AWO", lang: "AWO OV Liblar", farbe: "#c8102e", ring: "#c8102e" },
+    { bereich: "business", name: "Business", lang: "Business (zwischenkaffeeundchaos)", farbe: "#c2410c", ring: "#c2410c" },
+  ];
+
+  // Zeichnet den Bereichsumschalter in der Kopfzeile neu (aktiver Bereich mit Namen)
+  function renderBereichUmschalter() {
+    const el = document.getElementById("bereich-umschalter");
+    if (!el) return;
+    el.innerHTML = BEREICH_UMSCHALTER.map((b) => {
+      const aktiv = b.bereich === aktiverBereich;
+      const titel = aktiv ? `${b.lang} – zum Start` : `Zu ${b.lang} wechseln`;
+      return `<button type="button" class="bu-knopf${aktiv ? " aktiv" : ""}" style="--bu-farbe:${b.farbe}; --bu-ring:${b.ring};"
+        onclick="bereichDirektWechseln('${b.bereich}')" title="${escapeHtml(titel)}" aria-label="${escapeHtml(titel)}"${aktiv ? ' aria-current="true"' : ""}>
+        <span class="bu-punkt" aria-hidden="true"></span>${aktiv ? `<span class="bu-name">${escapeHtml(b.name)}</span>` : ""}
+      </button>`;
+    }).join("");
+  }
+
+  // Wechselt per Umschalter den Bereich; ein Tipp auf den aktiven Bereich führt zu seinem Start
+  window.bereichDirektWechseln = function(bereich) {
+    if (bereich === aktiverBereich) {
+      tabWechseln(ersterSichtbarerReiter());
+      return;
+    }
+    window.bereichAuswaehlen(bereich);
+  };
+
+  // Öffnet die App direkt im zuletzt genutzten Bereich (Verwaltung zählt nicht, dann Privat)
+  function appImLetztenBereichOeffnen() {
+    const gemerkt = localStorage.getItem("aktiver-bereich");
+    const bereich = BEREICH_FARBWELT.includes(gemerkt) ? gemerkt : "privat";
+    zeigeApp();
+    window.bereichAuswaehlen(bereich);
+  }
+
   // Rendert untere Themenleiste und obere Reiter-Leiste; in der Verwaltung ohne Navigation
   function renderNavigation() {
-    const bereichKnopf = document.getElementById("content-bereich-text");
-    if (bereichKnopf) bereichKnopf.textContent = BEREICH_KNOPF_TEXT[aktiverBereich] || "Bereich";
+    renderBereichUmschalter();
 
     const nav = document.getElementById("bottom-nav");
     const leiste = document.getElementById("reiter-leiste");
@@ -466,7 +510,8 @@
         appDirektOeffnen();
         geteiltenInhaltVerarbeiten();
       } else {
-        zeigeBereichAuswahl();
+        // Seit Session 34: ohne Umweg über die Willkommensseite
+        appImLetztenBereichOeffnen();
       }
     } catch (e) {
       zeigeLogin("Verbindung fehlgeschlagen.");
@@ -1031,7 +1076,8 @@
         if (googleCode || gewuenschterTab || geteiltAnstehend()) {
           appDirektOeffnen();
         } else {
-          zeigeBereichAuswahl();
+          // Seit Session 34: direkt im zuletzt genutzten Bereich starten
+          appImLetztenBereichOeffnen();
         }
 
         if (googleCode) {
@@ -1287,8 +1333,8 @@
   }
   window.tabWechseln = tabWechseln;
 
-  // Bereichs-Knopf oben links: zurück zur Willkommensseite (Bereichswahl)
-  document.getElementById("content-bereich-btn").addEventListener("click", zeigeBereichAuswahl);
+  // ⋮-Menü „Reiter verwalten“: öffnet den Bereich Verwaltung (seit Session 34 nur noch hier und auf der Bereichsübersicht)
+  document.getElementById("btn-verwaltung-oeffnen").addEventListener("click", () => window.bereichAuswaehlen("verwaltung"));
 
   // Konto-/Einstellungs-Menü (⋮ oben rechts): Name/Untertitel ändern,
   // Bereich wechseln, Abmelden – ersetzt die frühere Sidebar-Ecke.
