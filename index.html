@@ -926,6 +926,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li><strong>Zuerst Zugänge anlegen:</strong> unten unter „Zugänge verwalten“ die Türen eintragen (z. B. Haupteingang, Saal, Küche), optional mit Beschreibung. ✎ benennt um, × löscht – der Zugang verschwindet dann auch bei allen Schlüsseln, die ihn hatten</li>
                 <li><strong>Eintragen:</strong> Art (🔑 Schlüssel oder 📡 elektronischer Key), Seriennummer (Pflicht), Name, Verein, die Zugänge ankreuzen (beliebig viele) und optional eine Notiz, dann „+ Eintragen“. Art, Verein und Zugänge bleiben danach stehen – praktisch, wenn mehrere gleiche Keys an denselben Verein gehen</li>
+                <li><strong>Neu mit Name/Verein:</strong> Trägst du oben beim Anlegen schon Name oder Verein ein, öffnet sich nach „+ Eintragen“ direkt das Ausgabeprotokoll mit Unterschriftsfeld am neuen Eintrag. „Abbrechen“, wenn kein Protokoll nötig ist – dann steht er als „ohne Ausgabeprotokoll“ in der Liste und lässt sich mit „✍️ Protokoll“ später nachtragen</li>
                 <li><strong>Ausgeben (seit Session 33):</strong> Einen freien Schlüssel (Gruppe „📥 Im Bestand“) mit „Ausgeben“ öffnen, Name (Pflicht), Verein, Kontakt, Datum, „Ausgegeben von“ (merkt sich das Gerät), optional „Rückgabe bis“ und Notiz eintragen. Die Person kann im weißen Feld mit dem Finger unterschreiben. „Ausgeben &amp; drucken“ öffnet danach gleich das Protokoll. Ohne digitale Unterschrift: Protokoll drucken und auf Papier unterschreiben lassen (auch die Zeile für dich als Ausgebende/n)</li>
                 <li><strong>Zurücknehmen:</strong> am ausgegebenen Schlüssel „Zurück“, Datum und „Zurückgenommen von“ prüfen, optional Unterschrift. Der Schlüssel steht danach wieder im Bestand, das Protokoll bekommt den Rückgabe-Teil</li>
                 <li><strong>Status am Eintrag:</strong> 📤 ausgegeben seit … (bis …), ⚠️ überfällig (Rückgabedatum überschritten), 📥 im Bestand oder „ohne Ausgabeprotokoll“ (Name/Verein eingetragen, aber kein Protokoll – mit „Protokoll“ nachtragen, Ausgabedatum lässt sich zurückdatieren). ✍️ = digital unterschrieben. Statusfilter über der Liste</li>
@@ -1409,6 +1410,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="ern-feld ern-feld-breit">Zugänge<div id="schluessel-neu-zugaenge"></div></div>
             <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="schluessel-neu-notiz" maxlength="500" placeholder="z. B. Ersatzschlüssel, Pfand bezahlt"></label>
           </div>
+          <p class="notiz-meta" style="margin:0.3rem 0;">Ohne Name und Verein landet der Schlüssel im Bestand. Mit Name oder Verein öffnet sich nach dem Eintragen direkt das Ausgabeprotokoll mit Unterschriftsfeld.</p>
           <datalist id="schluessel-namen-vorschlaege"></datalist>
           <datalist id="schluessel-vereine-vorschlaege"></datalist>
           <div class="row" style="margin-bottom:0;">
