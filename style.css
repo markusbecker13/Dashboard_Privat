@@ -1148,3 +1148,133 @@
   .spiel-beschreibung > summary::before { content: "▸ "; color: var(--accent); margin-right: 0.2rem; }
   .spiel-beschreibung[open] > summary::before { content: "▾ "; }
   .spiel-beschreibung-text { white-space: pre-wrap; margin-top: 0.1rem; font-size: 0.85rem; line-height: 1.5; }
+
+  /* ==========================================================
+     Start-Screen neu (seit Session 34, Redesign Etappe 2).
+     Steht bewusst am Ende, damit diese Regeln die älteren
+     Start-Regeln weiter oben überschreiben.
+     ========================================================== */
+  #view-heute:not(.hidden) { display: flex; flex-direction: column; gap: 0.9rem; }
+  .heute-kopf { display: flex; flex-direction: column; gap: 0.2rem; }
+  .heute-datumzeile {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0 0.4rem;
+    font-size: 0.88rem; font-weight: 600; color: var(--ink-dim);
+  }
+  .heute-wetter-knopf {
+    min-height: 44px; padding: 0 0.1rem; border: none; background: none; cursor: pointer;
+    font: inherit; color: inherit; text-decoration: underline dotted; text-underline-offset: 3px;
+  }
+  .heute-wetter-knopf:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .heute-gruss { font-size: 2.2rem; line-height: 1.05; margin: 0; text-align: left; }
+  .heute-gruss .hilfe-icon { position: static; margin-left: 0.35rem; vertical-align: middle; }
+  .heute-status { margin: 0.15rem 0 0; font-size: 1rem; color: var(--ink); }
+  .heute-status-warn { color: var(--overdue-text); font-weight: 700; }
+  #wetter-ausblick .wetter-karte { margin-bottom: 0; }
+  #heute-bereich { display: flex; flex-direction: column; gap: 0.9rem; }
+  #heute-bereich:empty { display: none; }
+  .heute-label {
+    margin: 0; font-family: var(--font-text); font-size: 0.75rem; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim);
+  }
+
+  /* „Dein Tag“ */
+  .heute-karte {
+    display: flex; flex-direction: column; gap: 0.6rem; width: 100%; text-align: left;
+    padding: 0.9rem 1rem; border: none; border-radius: 18px; background: var(--panel);
+    color: var(--ink); cursor: pointer; font-family: var(--font-text);
+  }
+  .heute-karte:focus-visible, .heute-naechstes:focus-visible, .heute-modul:focus-visible,
+  .heute-kennzahl:focus-visible, .heute-zeile-inhalt:focus-visible, .heute-ueberfaellig-kopf:focus-visible {
+    outline: 3px solid var(--accent); outline-offset: 2px;
+  }
+  .dein-tag-kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+  .dein-tag-frei { font-size: 0.8rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; text-align: right; }
+  .dein-tag-band { position: relative; display: block; }
+  .dein-tag-segmente { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--bg); }
+  .dt-seg { display: block; height: 100%; }
+  .dt-seg.frei { background: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
+  .dt-seg.belegt { background: var(--accent); }
+  .dt-seg.erledigt { background: var(--ink-dim); opacity: 0.35; }
+  .dein-tag-marker {
+    position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px;
+    border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px var(--panel);
+  }
+  .dein-tag-skala { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+
+  /* „Als Nächstes“ / „Jetzt“ – weiße Schrift auf Bereichsfarbe (Kontrast ≥ 5,1:1) */
+  .heute-naechstes {
+    display: flex; align-items: center; gap: 0.75rem; width: 100%; text-align: left;
+    padding: 0.9rem 1rem; border: none; border-radius: 18px; background: var(--accent);
+    color: #ffffff; cursor: pointer; font-family: var(--font-text);
+  }
+  .heute-naechstes-text { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 0; }
+  .heute-naechstes-label { font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .heute-naechstes-titel { font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere; }
+  .heute-naechstes-chip {
+    flex-shrink: 0; padding: 0.3rem 0.65rem; border-radius: 999px; white-space: nowrap;
+    background: rgba(0, 0, 0, 0.22); font-size: 0.78rem; font-weight: 700;
+  }
+
+  /* Modul-Kacheln (OGS, AWO, Business) */
+  .heute-module { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .heute-modul {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem; min-height: 44px;
+    padding: 0.85rem 0.95rem; border: none; border-radius: 18px; background: var(--panel);
+    color: var(--ink); text-align: left; cursor: pointer; font-family: var(--font-text);
+  }
+  .heute-modul-icon { display: inline-flex; color: var(--accent); }
+  .heute-modul-name { font-size: 0.95rem; font-weight: 700; }
+  .heute-modul-info { font-size: 0.8rem; color: var(--ink-dim); }
+  .heute-warn { color: var(--overdue-text); font-weight: 700; }
+
+  /* Liste „Heute“ */
+  .heute-block { display: flex; flex-direction: column; gap: 0.45rem; }
+  .heute-block-kopf { display: flex; justify-content: space-between; align-items: baseline; padding: 0 0.15rem; }
+  .heute-block-zahl { font-size: 0.78rem; color: var(--ink-dim); }
+  .heute-liste { background: var(--panel); border-radius: 18px; overflow: hidden; }
+  .heute-zeile { display: flex; align-items: center; gap: 0.15rem; padding: 0.1rem 0.4rem 0.1rem 0.15rem; border-top: 1px solid var(--border); }
+  .heute-zeile:first-child { border-top: none; }
+  .heute-zeit { width: 3.2rem; flex-shrink: 0; font-size: 0.82rem; font-weight: 600; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+  .heute-zeile-inhalt {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem;
+    padding: 0.6rem 0.3rem; border: none; background: none; text-align: left; cursor: pointer;
+    color: inherit; font-family: var(--font-text);
+  }
+  .heute-zeile-titel { font-size: 0.98rem; font-weight: 600; overflow-wrap: anywhere; }
+  .heute-zeile-meta { font-size: 0.75rem; color: var(--ink-dim); }
+  .heute-zeile.jetzt { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .heute-zeile.jetzt .heute-zeit { color: var(--ink); font-weight: 800; }
+  .heute-zeile.erledigt .heute-zeile-titel { text-decoration: line-through; color: var(--ink-dim); }
+  .heute-leer { margin: 0; padding: 0.9rem 1rem; color: var(--ink-dim); }
+
+  /* Überfällig-Streifen */
+  .heute-ueberfaellig { border-radius: 18px; background: var(--overdue-bg); color: var(--overdue-text); overflow: hidden; }
+  .heute-ueberfaellig-kopf {
+    display: flex; align-items: center; gap: 0.6rem; min-height: 52px; padding: 0.5rem 0.6rem 0.5rem 1rem;
+    cursor: pointer; list-style: none;
+  }
+  .heute-ueberfaellig-kopf::-webkit-details-marker { display: none; }
+  .heute-ueberfaellig-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.05rem; font-size: 0.98rem; }
+  .heute-ueberfaellig-text span { font-size: 0.78rem; font-weight: 600; }
+  .heute-ueberfaellig-knopf {
+    flex-shrink: 0; min-height: 40px; padding: 0 0.9rem; border: none; border-radius: 999px;
+    background: var(--panel); color: var(--overdue-text); cursor: pointer;
+    font-family: var(--font-text); font-size: 0.82rem; font-weight: 700;
+  }
+  .heute-ueberfaellig-knopf:disabled { opacity: 0.6; cursor: wait; }
+  .heute-ueberfaellig .heute-liste { margin: 0 0.5rem 0.5rem; color: var(--ink); }
+
+  /* Kennzahlen */
+  .heute-kennzahlen { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: 0.6rem; }
+  .heute-kennzahl {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; min-height: 44px;
+    padding: 0.7rem 0.85rem; border: none; border-radius: 14px; background: var(--panel);
+    color: var(--ink); text-align: left; cursor: pointer; font-family: var(--font-text);
+  }
+  .heute-kennzahl-zahl { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; line-height: 1.1; }
+  .heute-kennzahl-label { font-size: 0.75rem; color: var(--ink-dim); }
+  #heute-bereich .ziel-kachel { border: none; border-radius: 14px; }
+
+  /* Zitat klein am Ende */
+  #view-heute .tages-zitat { margin: 0.3rem 0 0; border-left-width: 2px; }
+  #view-heute .tages-zitat-text { font-size: 0.9rem; color: var(--ink-dim); }
