@@ -513,6 +513,12 @@
   const SCHNELL_ART_VON_TAB = { kalender: "termin", frei: "termin", notizen: "notiz", einkauf: "einkauf", ogsideen: "idee" };
   const SCHNELL_PLUS_ICON = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
   let schnell = { art: "aufgabe", bereich: "privat", wann: "ohne", details: false };
+  // Reiter mit eigenem Formular, das die Schnellerfassung nicht abdeckt (seit Etappe 5)
+  const SCHNELL_REITERFORMULAR = {
+    links: "Neuer Link", reflexion: "Neuer Reflexions-Eintrag", spiele: "Neues Spiel", ogsinventar: "Neuer Gegenstand",
+    ogsprojekte: "Neues Projekt", verleih: "Neu verleihen", raumplanung: "Neue Vermietung", schluessel: "Neuer Schlüssel",
+    training: "Neues Training",
+  };
 
   // Arten, die im Bereich angeboten werden (Aufgabe immer)
   function schnellArtenFuer(bereich) {
@@ -532,9 +538,23 @@
       document.getElementById(id).value = "";
     });
     schnellMeldung("", false);
+    const reiterform = document.getElementById("schnell-reiterform");
+    const formText = SCHNELL_REITERFORMULAR[aktiverTab];
+    reiterform.classList.toggle("hidden", !formText);
+    if (formText) reiterform.textContent = `Oder: ${formText} – ganzes Formular im Reiter →`;
     schnellRendern();
     if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
     document.getElementById("schnell-text").focus();
+  };
+
+  // Schließt das Blatt und öffnet stattdessen das Formular des offenen Reiters
+  window.schnellZumReiterformular = function() {
+    window.schnellSchliessen();
+    const id = "form-" + aktiverTab;
+    if (!document.getElementById(id)) return;
+    reiterFormularOeffnen(id, true);
+    const knopf = reiterKnopfFuer(id);
+    if (knopf && knopf.scrollIntoView) knopf.scrollIntoView({ block: "start", behavior: "smooth" });
   };
 
   // Schließt die Schnellerfassung ohne zu speichern
@@ -704,6 +724,64 @@
       if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.schnellSpeichern(); }
     });
   })();
+
+  // ==========================================================
+  // Reiter-Formulare hinter „+ Neu …“ und Einstellungen hinter ⚙ (seit
+  // Session 34, Redesign Etappe 5). Die Knöpfe stehen in .reiter-aktionen
+  // unter der Überschrift; data-formular nennt die ID(s) der Bereiche, die
+  // sie auf- und zuklappen. Zustand gilt bis zum Neuladen.
+  // ==========================================================
+  function reiterKnopfFuer(id) {
+    return [...document.querySelectorAll(".reiter-neu, .reiter-zahnrad")]
+      .find((k) => (k.dataset.formular || "").split(" ").includes(id));
+  }
+  // Klappt die Bereiche eines Knopfs auf oder zu; beim Öffnen eines Formulars Fokus aufs erste Feld
+  function reiterBereichSetzen(knopf, offen) {
+    if (!knopf) return;
+    const ids = (knopf.dataset.formular || "").split(" ").filter(Boolean);
+    ids.forEach((id) => { const el = document.getElementById(id); if (el) el.classList.toggle("hidden", !offen); });
+    knopf.setAttribute("aria-expanded", String(offen));
+    knopf.classList.toggle("aktiv", offen);
+    if (knopf.classList.contains("reiter-neu")) {
+      if (!knopf.dataset.label) knopf.dataset.label = knopf.textContent;
+      knopf.textContent = offen ? "✕ Schließen" : knopf.dataset.label;
+    }
+  }
+  // Öffnet einen Formular-/Einstellungsbereich (z. B. beim Bearbeiten eines Eintrags)
+  function reiterFormularOeffnen(id, fokus) {
+    reiterBereichSetzen(reiterKnopfFuer(id), true);
+    if (fokus) {
+      const feld = document.getElementById(id) && document.getElementById(id).querySelector("input:not([type=hidden]):not([type=checkbox]):not([type=file]), textarea, select");
+      if (feld) feld.focus();
+    }
+  }
+  window.reiterFormularOeffnen = reiterFormularOeffnen;
+  document.querySelectorAll(".reiter-neu, .reiter-zahnrad").forEach((knopf) => {
+    knopf.addEventListener("click", () => {
+      const offen = knopf.getAttribute("aria-expanded") !== "true";
+      reiterBereichSetzen(knopf, offen);
+      if (offen && knopf.classList.contains("reiter-neu")) reiterFormularOeffnen(knopf.dataset.formular, true);
+    });
+  });
+
+  // „?“-Hilfesymbole ein-/ausblenden (⋮-Menü); farbschema.js setzt die Klasse schon beim Laden
+  function hilfeSymboleAnwenden() {
+    let aus = false;
+    try { aus = localStorage.getItem("hilfe-symbole") === "aus"; } catch (e) { /* privater Modus */ }
+    document.documentElement.classList.toggle("ohne-hilfe", aus);
+    const knopf = document.getElementById("btn-hilfe-symbole");
+    if (knopf) {
+      knopf.setAttribute("aria-pressed", String(!aus));
+      knopf.textContent = aus ? "? Hilfe-Symbole einblenden" : "? Hilfe-Symbole ausblenden";
+    }
+  }
+  document.getElementById("btn-hilfe-symbole").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const aus = document.documentElement.classList.contains("ohne-hilfe");
+    try { localStorage.setItem("hilfe-symbole", aus ? "an" : "aus"); } catch (err) { /* privater Modus */ }
+    hilfeSymboleAnwenden();
+  });
+  hilfeSymboleAnwenden();
 
   // Einträge der früheren Gruppe „Verwalten“ (Export, Verlauf, Anleitung)
   // stehen seit Etappe 3 im ⋮-Menü – nur die im Bereich eingeblendeten.
@@ -2584,6 +2662,7 @@
     const b = blockzeiten.find((bb) => bb.id === id);
     if (!b) return;
     blockzeitBearbeiteterId = id;
+    reiterFormularOeffnen("einst-kalender");
     document.getElementById("blockzeit-form").classList.remove("hidden");
     document.getElementById("toggle-blockzeit-form").textContent = "▾ Neue Blockzeit anlegen";
     document.getElementById("blockzeit-titel").value = b.titel;
@@ -2824,13 +2903,13 @@
     const eintraege = freiTagEintraege(iso, wtIndex);
 
     if (!eintraege) {
-      timelineEl.innerHTML = '<p class="empty-text">Für diesen Wochentag ist kein Zeitrahmen aktiv.</p>';
+      timelineEl.innerHTML = '<p class="empty-text">Für diesen Wochentag ist kein Zeitrahmen aktiv – einschalten über ⚙ oben.</p>';
       freiFormularSchliessen();
       return;
     }
 
     if (eintraege.length === 0) {
-      timelineEl.innerHTML = '<p class="empty-text">Kein Zeitrahmen für diesen Tag eingestellt.</p>';
+      timelineEl.innerHTML = '<p class="empty-text">Kein Zeitrahmen für diesen Tag eingestellt – über ⚙ oben festlegen.</p>';
       return;
     }
 
@@ -7658,6 +7737,7 @@
     const r = reflexionen.find((rr) => rr.id === id);
     if (!r) return;
     reflexBearbeiteterId = id;
+    reiterFormularOeffnen("form-reflexion");
     document.getElementById("reflex-datum").value = r.datum;
     document.getElementById("reflex-text").value = r.text;
     document.getElementById("btn-reflex-hinzufuegen").textContent = "Speichern";
@@ -8393,7 +8473,7 @@
   function schluesselZugangAuswahlHtml(containerId, gewaehlt) {
     const zugaenge = zugaengeAktuell();
     if (!zugaenge.length) {
-      return `<span class="notiz-meta">Noch keine Zugänge – unten unter „Zugänge verwalten“ anlegen.</span>`;
+      return `<span class="notiz-meta">Noch keine Zugänge – über ⚙ oben („Zugänge verwalten“) anlegen.</span>`;
     }
     // Saubere Liste untereinander: je Zugang eine Zeile mit Häkchen links (Breite fest, sonst
     // zieht .ern-feld input die Checkbox auf 100 %), Beschreibung klein darunter
@@ -9269,8 +9349,8 @@
     // Hinweise oben
     const hinweise = [];
     if (!mailEingerichtet) hinweise.push("Der Mail-Versand ist noch nicht eingerichtet (Secrets SMTP_USER und SMTP_PASS in der Edge Function, siehe Anleitung). Vermietungen lassen sich trotzdem eintragen.");
-    if (!empfaenger.length) hinweise.push("Der Mail-Verteiler ist noch leer – unten unter „Mail-Verteiler“ Adressen eintragen.");
-    if (!raeumeListe.length) hinweise.push("Noch keine Räume angelegt – unten unter „Räume verwalten“ anlegen.");
+    if (!empfaenger.length) hinweise.push("Der Mail-Verteiler ist noch leer – über ⚙ oben unter „Mail-Verteiler“ Adressen eintragen.");
+    if (!raeumeListe.length) hinweise.push("Noch keine Räume angelegt – über ⚙ oben unter „Räume verwalten“ anlegen.");
     document.getElementById("raum-hinweise").innerHTML = hinweise
       .map((h) => `<p class="notiz-meta" style="color:var(--accent); margin:0 0 0.5rem;">${escapeHtml(h)}</p>`).join("");
 
@@ -9545,6 +9625,7 @@
   };
   // Datum ins Formular oben übernehmen und dorthin springen
   window.raumKalTagUebernehmen = function(iso) {
+    reiterFormularOeffnen("form-raumplanung");
     document.getElementById("raum-neu-datum").value = iso;
     const formular = document.getElementById("raum-formular");
     if (formular) formular.scrollIntoView({ behavior: "smooth", block: "start" });
