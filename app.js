@@ -8126,6 +8126,14 @@
       ["schluessel-neu-nr", "schluessel-neu-name", "schluessel-neu-notiz"].forEach((id) => { document.getElementById(id).value = ""; });
       status.textContent = `Eingetragen: Nr. ${felder.seriennummer}.`;
       await ladeDaten();
+      // Mit Name oder Verein: gleich das Ausgabeprotokoll (mit Unterschriftsfeld) am neuen Eintrag öffnen
+      const neu = (felder.inhaber || felder.verein) && schluesselAktuell().find((k) =>
+        k.art === felder.art && (k.seriennummer || "").toLowerCase() === felder.seriennummer.toLowerCase());
+      if (neu) {
+        schluesselProtokollOeffnen(neu.id);
+        status.textContent = `Eingetragen: Nr. ${felder.seriennummer}. Jetzt unten das Ausgabeprotokoll ausfüllen und unterschreiben lassen – oder „Abbrechen“, wenn kein Protokoll nötig ist.`;
+        return;
+      }
       document.getElementById("schluessel-neu-nr").focus();
     } catch (fehler) {
       status.textContent = fehler.message;
@@ -8394,7 +8402,7 @@
     const knopf = (text, aufruf, titel) => `<button class="btn-secondary" style="white-space:nowrap; padding:0.25rem 0.6rem;" title="${titel}" onclick="event.stopPropagation(); ${aufruf}">${text}</button>`;
     if (a) return knopf("Zurück", `schluesselAktionStart('${k.id}', 'zuruecknehmen')`, "Schlüssel zurücknehmen") +
       knopf("📄", `ausgabeDrucken('${a.id}')`, "Protokoll drucken / als PDF");
-    if (schluesselStatus(k) === "zugeordnet") return knopf("Protokoll", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Ausgabeprotokoll nachtragen");
+    if (schluesselStatus(k) === "zugeordnet") return knopf("✍️ Protokoll", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Ausgabeprotokoll mit Unterschrift nachtragen");
     return knopf("Ausgeben", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Schlüssel ausgeben");
   }
   // Ausgabe-Historie eines Schlüssels (für das Bearbeiten-Feld)
@@ -8414,6 +8422,18 @@
     unterschriftAktivieren((modus === "ausgeben" ? "sa-sig-" : "sr-sig-") + id);
   };
   // Schließt das Ausgabe-/Rücknahme-Formular ohne zu speichern
+  // Öffnet das Ausgabeformular eines Schlüssels sichtbar: Filter/Suche zurücksetzen, hinscrollen
+  function schluesselProtokollOeffnen(id) {
+    schluesselSuche = ""; schluesselFilterArt = "alle"; schluesselFilterStatus = "alle"; schluesselFilterZugang = "alle";
+    [["schluessel-suche", ""], ["schluessel-filter-art", "alle"], ["schluessel-filter-status", "alle"], ["schluessel-filter-zugang", "alle"]]
+      .forEach(([elId, wert]) => { const el = document.getElementById(elId); if (el) el.value = wert; });
+    window.schluesselAktionStart(id, "ausgeben");
+    const feld = document.getElementById("sa-kontakt-" + id);
+    if (feld) {
+      const karte = feld.closest(".notiz-item");
+      if (karte && karte.scrollIntoView) karte.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
   window.schluesselAktionAbbrechen = function() {
     schluesselAktion = null;
     renderSchluesselListe();
