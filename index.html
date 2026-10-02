@@ -73,6 +73,7 @@
       <button class="content-topbar-btn content-menu-btn" id="menu-toggle" aria-label="Menü öffnen" aria-expanded="false">⋮</button>
     </header>
     <div class="account-menu hidden" id="account-menu">
+      <div class="menu-verwalten" id="menu-verwalten"></div>
       <button class="link-btn" onclick="dashboardNameBearbeiten()">✎ Name ändern</button>
       <button class="link-btn" onclick="untertitelBearbeiten()">✎ Untertitel ändern</button>
       <button class="link-btn" id="btn-bereich-wechseln">▦ Bereichsübersicht</button>
@@ -712,9 +713,10 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li><strong>Nach dem Öffnen und nach dem Login</strong> (seit Session 34): die App startet direkt im zuletzt genutzten Bereich auf dem Start-Screen (Heute) – ohne Umweg über die Willkommensseite. Beim allerersten Start ist das Privat. Verwaltung zählt dabei nicht als „zuletzt genutzt“</li>
                 <li><strong>Bereichsumschalter oben links:</strong> vier Punkte in den Bereichsfarben (Privat blau, OGS blau mit gelbem Ring, AWO rot, Business orange). Der aktive Bereich ist als Pille mit Namen hervorgehoben. Ein Tipp auf einen anderen Punkt wechselt sofort dorthin, ein Tipp auf den aktiven Bereich bringt dich zu seinem Start</li>
-                <li><strong>Leiste unten:</strong> die Themen Heute, Planen, Sammeln, der bereichsspezifische Block (Glühbirne, z.B. Ideen/Inventar/Projekte/Verleih) und Verwalten (Raster-Symbol). Das aktive Thema ist hervorgehoben und beschriftet. Ein Tipp auf ein Thema öffnet den Reiter, den du darin zuletzt offen hattest (beim ersten Mal den ersten)</li>
+                <li><strong>Leiste unten:</strong> die Themen Heute, Planen, Sammeln und der bereichsspezifische Block (Glühbirne, z.B. Ideen/Inventar/Projekte/Verleih), in der Mitte der runde „+“-Knopf für die Schnellerfassung. Das aktive Thema ist hervorgehoben und beschriftet. Ein Tipp auf ein Thema öffnet den Reiter, den du darin zuletzt offen hattest (beim ersten Mal den ersten)</li>
+                <li><strong>„+“ – Schnell erfassen:</strong> öffnet von überall ein Blatt: Text eintippen, Art wählen (Aufgabe, Termin, Notiz, Einkauf, Idee – nur was im gewählten Bereich eingeblendet ist; vorgewählt passend zum offenen Reiter), Bereich wählen (auch ein anderer als der aktive, z.B. AWO-Termin aus Privat heraus), bei Aufgabe und Termin „Wann“ (Ohne/Heute/Morgen/Datum, optional Uhrzeit). „▸ Details“ zeigt bei Bedarf Ende, Projekt, Wiederholung, Notiz bzw. Beschreibung. Speichern oder Enter – unten erscheint kurz eine Bestätigung. Schließen mit ✕, Escape oder Tipp daneben</li>
                 <li><strong>Reiter-Leiste oben:</strong> hat das aktive Thema mehrere sichtbare Reiter, stehen sie als Knöpfe unter der Kopfzeile (seitlich wischbar). Thema mit nur einem Reiter (z.B. Heute): keine Reiter-Leiste</li>
-                <li><strong>⋮-Menü:</strong> „▦ Bereichsübersicht“ öffnet die Willkommensseite mit den großen Bereichs-Karten (ohne Abmelden), „⚙ Reiter verwalten“ öffnet direkt die Verwaltung. Aus der Verwaltung kommst du über den Umschalter oben zurück</li>
+                <li><strong>⋮-Menü:</strong> oben Export, Verlauf und Anleitung (früher „Verwalten“ in der Leiste unten; nur die im Bereich eingeblendeten), darunter „▦ Bereichsübersicht“ öffnet die Willkommensseite mit den großen Bereichs-Karten (ohne Abmelden), „⚙ Reiter verwalten“ öffnet direkt die Verwaltung. Aus der Verwaltung kommst du über den Umschalter oben zurück</li>
               </ul>
               <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen, Training, Verlauf sowie Inventar, Projekte und Verleih haben ebenfalls ein eigenes bereich-Feld. <strong>Ernährung</strong> gibt es nur in Privat (keine bereich-Spalte, in anderen Bereichen nicht einschaltbar).</p>
               <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS-, AWO- und Business-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Reflexion/Einkauf/Rezepte/Ernährung/Export sind standardmäßig nur im Privat-Bereich eingeblendet, Links in Privat und Business.</p>
@@ -1637,6 +1639,37 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
     </main>
 
     <nav class="bottom-nav hidden" id="bottom-nav" aria-label="Hauptnavigation"></nav>
+    <div class="app-hinweis hidden" id="app-hinweis" role="status" aria-live="polite"></div>
+
+    <!-- Schnellerfassung über „+“ (seit Session 34, Redesign Etappe 3) -->
+    <dialog class="schnell-sheet" id="schnell-dialog" aria-labelledby="schnell-titel">
+      <div class="schnell-kopf">
+        <h2 id="schnell-titel">Schnell erfassen</h2>
+        <button type="button" class="schnell-zu" onclick="schnellSchliessen()" aria-label="Schließen">✕</button>
+      </div>
+      <input type="text" id="schnell-text" class="schnell-text" autocomplete="off" enterkeyhint="done" aria-label="Text">
+      <div class="schnell-label" id="schnell-art-label">Art</div>
+      <div class="schnell-chips" id="schnell-arten" role="group" aria-labelledby="schnell-art-label"></div>
+      <div class="schnell-label" id="schnell-bereich-label">Bereich</div>
+      <div class="schnell-chips" id="schnell-bereiche" role="group" aria-labelledby="schnell-bereich-label"></div>
+      <div id="schnell-wann-block">
+        <div class="schnell-label" id="schnell-wann-label">Wann</div>
+        <div class="schnell-chips" id="schnell-wann" role="group" aria-labelledby="schnell-wann-label"></div>
+        <div class="schnell-zeile" id="schnell-zeile">
+          <input type="date" id="schnell-datum" class="hidden" aria-label="Datum">
+          <label class="schnell-feld" id="schnell-zeit-zeile">um <input type="time" id="schnell-uhrzeit" aria-label="Uhrzeit (optional)"></label>
+        </div>
+      </div>
+      <button type="button" class="link-btn schnell-details-knopf" id="schnell-details-knopf" onclick="schnellDetailsUmschalten()" aria-expanded="false" aria-controls="schnell-details">▸ Details</button>
+      <div class="schnell-details hidden" id="schnell-details">
+        <label class="schnell-feld" id="schnell-ende-zeile">bis <input type="time" id="schnell-ende" aria-label="Ende (optional)"></label>
+        <label class="schnell-feld" id="schnell-projekt-zeile">Projekt <select id="schnell-projekt"></select></label>
+        <label class="schnell-feld" id="schnell-intervall-zeile">wiederholen alle <input type="number" id="schnell-intervall" min="1" inputmode="numeric" aria-label="Wiederholen alle X Tage"> Tage</label>
+        <div class="schnell-feld-block" id="schnell-notiz-zeile"><textarea id="schnell-notiz" class="schnell-notiz" rows="2" aria-label="Notiz oder Beschreibung"></textarea></div>
+      </div>
+      <p class="schnell-status" id="schnell-status" role="status" aria-live="polite"></p>
+      <button type="button" class="btn-primary schnell-speichern" id="schnell-speichern" onclick="schnellSpeichern()">Speichern</button>
+    </dialog>
   </div>
 
 <script src="app.js"></script>
