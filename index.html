@@ -83,6 +83,7 @@
           <button type="button" class="menu-schema-knopf" data-schema-wahl="dunkel" aria-pressed="false">Dunkel</button>
         </div>
       </div>
+      <button class="link-btn" id="btn-hilfe-symbole" aria-pressed="true">? Hilfe-Symbole ausblenden</button>
       <button class="link-btn" onclick="dashboardNameBearbeiten()">✎ Name ändern</button>
       <button class="link-btn" onclick="untertitelBearbeiten()">✎ Untertitel ändern</button>
       <button class="link-btn" id="btn-bereich-wechseln">▦ Bereichsübersicht</button>
@@ -112,6 +113,9 @@
       <h1>Aufgaben <button class="hilfe-icon" data-hilfe="Alle Aufgaben, gruppiert nach Projekt. Fälligkeitsdatum, Uhrzeit und ein Wiederholungs-Intervall sind optional. Erledigte Aufgaben wandern nach unten in den Bereich 'Erledigt'.">?</button></h1>
       <p class="hero-text">Nach Projekten sortiert, mit Fälligkeit und wiederkehrender Erinnerung.</p>
 
+      <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-aufgaben" aria-expanded="false" aria-controls="form-aufgaben">+ Neue Aufgabe</button><button type="button" class="reiter-zahnrad" data-formular="einst-aufgaben" aria-expanded="false" aria-controls="einst-aufgaben" aria-label="Projekte verwalten" title="Projekte verwalten"><span aria-hidden="true">⚙</span></button></div>
+
+      <div class="reiter-formular hidden" id="form-aufgaben">
       <div class="row">
         <input type="text" id="neue-aufgabe" placeholder="Neue Aufgabe eintragen …">
         <select id="aufgabe-projekt"><option value="">Ohne Projekt</option></select>
@@ -124,14 +128,18 @@
         <button type="button" class="hilfe-icon" data-hilfe="Wiederkehrende Erinnerung: Zahl der Tage bis zur nächsten fälligen Wiederholung, z.B. 7 für wöchentlich. Nach dem Erledigen wird die Aufgabe automatisch um dieses Intervall verschoben statt abgehakt.">?</button>
         <button class="btn-primary" id="btn-hinzufuegen">Hinzufügen</button>
       </div>
+      </div>
 
-      <div style="margin-bottom:1.8rem;">
+      <div class="reiter-einstellungen hidden" id="einst-aufgaben">
+        <div class="reiter-einstellungen-titel">Projekte</div>
+      <div>
         <button class="link-btn" id="toggle-projekt-form">▸ Neues Projekt anlegen</button>
         <button type="button" class="hilfe-icon" data-hilfe="Ein neues Projekt gilt nur im gerade aktiven Bereich. Der gleiche Projektname kann in Privat, OGS und AWO unabhängig voneinander existieren.">?</button>
         <div class="row hidden" id="projekt-form" style="margin-top:0.5rem;">
           <input type="text" id="neues-projekt" placeholder="Projektname">
           <button class="btn-secondary" id="btn-projekt-anlegen">Anlegen</button>
         </div>
+      </div>
       </div>
 
       <div id="listen-bereich"></div>
@@ -140,24 +148,12 @@
       </div>
 
       <div id="view-kalender" class="hidden">
-        <h1>Kalender <button class="hilfe-icon" data-hilfe="Termine im Monatsüberblick. Bei verbundenem Google-Kalender läuft der Abgleich automatisch alle 15 Minuten in beide Richtungen; neuere Änderung gewinnt bei Konflikten. Blockzeiten unten sind feste, wiederkehrende oder einmalige 'nicht stören'-Zeiten.">?</button></h1>
+        <h1>Kalender <button class="hilfe-icon" data-hilfe="Termine im Monatsüberblick. Bei verbundenem Google-Kalender läuft der Abgleich automatisch alle 15 Minuten in beide Richtungen; neuere Änderung gewinnt bei Konflikten. Blockzeiten (über ⚙) sind feste, wiederkehrende oder einmalige 'nicht stören'-Zeiten.">?</button></h1>
         <p class="hero-text">Termine eintragen und im Monatsüberblick behalten.</p>
-
-        <div id="google-sync-karte" class="sync-karte"></div>
-
-        <div id="upcoming-bereich"></div>
-
-        <div class="cal-header">
-          <div class="cal-nav"><button id="cal-prev">‹</button></div>
-          <h2 id="cal-monat-label"></h2>
-          <div class="cal-nav"><button id="cal-next">›</button></div>
-        </div>
-        <div class="cal-grid" id="cal-grid"></div>
-
-        <div id="cal-day-panel"></div>
-
-        <div class="project-heading" style="margin-top:2rem;">Blockzeiten <button type="button" class="hilfe-icon" data-hilfe="Wiederkehrend: an bestimmten Wochentagen jede Woche aktiv. Einmalig: nur an einem konkreten Datum. Blockzeiten werden im Reiter 'Frei' bei der Berechnung freier Zeiten mit ausgeschlossen.">?</button></div>
-        <p class="hero-text" style="margin:0 0 0.8rem;">Feste "nicht stören"-Zeiten – wiederkehrend oder einmalig. Werden ab der nächsten Etappe bei der Lücken-Berechnung mitgezählt.</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-zahnrad" data-formular="einst-kalender" aria-expanded="false" aria-controls="einst-kalender" aria-label="Blockzeiten verwalten" title="Blockzeiten verwalten"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-einstellungen hidden" id="einst-kalender">
+        <div class="project-heading" style="margin-top:0;">Blockzeiten <button type="button" class="hilfe-icon" data-hilfe="Wiederkehrend: an bestimmten Wochentagen jede Woche aktiv. Einmalig: nur an einem konkreten Datum. Blockzeiten werden im Reiter 'Frei' bei der Berechnung freier Zeiten mit ausgeschlossen.">?</button></div>
+        <p class="hero-text" style="margin:0 0 0.8rem;">Feste "nicht stören"-Zeiten – wiederkehrend oder einmalig. Der Reiter Frei zieht sie bei den freien Zeiten ab.</p>
         <div id="blockzeiten-liste"></div>
         <div style="margin:0.8rem 0 1.6rem;">
           <button class="link-btn" id="toggle-blockzeit-form">▸ Neue Blockzeit anlegen</button>
@@ -186,11 +182,27 @@
             </div>
           </div>
         </div>
+        </div>
+
+        <div id="google-sync-karte" class="sync-karte"></div>
+
+        <div id="upcoming-bereich"></div>
+
+        <div class="cal-header">
+          <div class="cal-nav"><button id="cal-prev">‹</button></div>
+          <h2 id="cal-monat-label"></h2>
+          <div class="cal-nav"><button id="cal-next">›</button></div>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+
+        <div id="cal-day-panel"></div>
+
       </div>
 
       <div id="view-frei" class="hidden">
-        <h1>Frei <button class="hilfe-icon" data-hilfe="Berechnet automatisch, was an diesem Tag noch frei ist: Termine, Aufgaben mit Uhrzeit und Blockzeiten werden vom Zeitrahmen unten abgezogen. Reine Berechnung – Termine/Aufgaben selbst bearbeitest du in den jeweiligen Reitern.">?</button></h1>
+        <h1>Frei <button class="hilfe-icon" data-hilfe="Berechnet automatisch, was an diesem Tag noch frei ist: Termine, Aufgaben mit Uhrzeit und Blockzeiten werden vom Zeitrahmen (über ⚙ einstellbar) abgezogen. Reine Berechnung – Termine/Aufgaben selbst bearbeitest du in den jeweiligen Reitern.">?</button></h1>
         <p class="hero-text">Freie Zeiten an einem Tag – berechnet aus Terminen, Aufgaben mit Uhrzeit, Blockzeiten und deinem Zeitrahmen für diesen Wochentag.</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-zahnrad" data-formular="einst-frei" aria-expanded="false" aria-controls="einst-frei" aria-label="Zeitrahmen einstellen" title="Zeitrahmen einstellen"><span aria-hidden="true">⚙</span></button></div>
 
         <div class="cal-header">
           <div class="cal-nav"><button id="frei-prev">‹</button></div>
@@ -198,7 +210,8 @@
           <div class="cal-nav"><button id="frei-next">›</button></div>
         </div>
 
-        <div class="cal-day-panel" style="margin-bottom:1.2rem;">
+        <div class="reiter-einstellungen hidden" id="einst-frei">
+        <div class="cal-day-panel" style="margin:0;">
           <div class="project-heading" style="margin:0 0 0.6rem;">Zeitrahmen für diesen Wochentag <button type="button" class="hilfe-icon" data-hilfe="Start/Ende gelten für diesen Wochentag (z.B. Mo–Fr anders als Sa/So). 'Aktiv' ausschalten markiert den ganzen Tag als nicht verfügbar, ohne den Zeitrahmen zu löschen.">?</button></div>
           <div class="row" style="align-items:center;">
             <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.88rem;">
@@ -208,6 +221,7 @@
             <input type="time" id="frei-rahmen-ende" style="width:8rem;">
             <button class="btn-secondary" id="btn-frei-rahmen-speichern">Speichern</button>
           </div>
+        </div>
         </div>
 
         <div id="frei-timeline"></div>
@@ -232,7 +246,9 @@
       <div id="view-links" class="hidden">
         <h1>Links <button class="hilfe-icon" data-hilfe="Adressen und Materialien mit Titel, URL und optionaler Notiz – optional einem Projekt zugeordnet, damit du sie dort wiederfindest.">?</button></h1>
         <p class="hero-text">Wichtige Adressen und Materialien, schnell wiederfindbar.</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-links" aria-expanded="false" aria-controls="form-links">+ Neuer Link</button></div>
 
+        <div class="reiter-formular hidden" id="form-links">
         <div class="row">
           <input type="text" id="neuer-link-titel" placeholder="Titel">
           <input type="text" id="neuer-link-url" placeholder="URL (z.B. beispiel.de/seite)">
@@ -243,6 +259,7 @@
         <div class="row" style="margin-top:-0.5rem;">
           <input type="text" id="neuer-link-notiz" placeholder="Notiz (optional)" style="flex:1;">
         </div>
+        </div>
 
         <div id="links-bereich" style="margin-top:1rem;"></div>
       </div>
@@ -250,7 +267,9 @@
       <div id="view-reflexion" class="hidden">
         <h1>Reflexion <button class="hilfe-icon" data-hilfe="Persönliche, kurze Einträge mit Datum – z.B. Rückblick auf eine Einheit oder einen Tag. Rein privat gedacht, nicht für den Export oder zum Teilen.">?</button></h1>
         <p class="hero-text">Kurze Einträge nach Einheiten oder Tagen – zum Rückblättern, nicht zum Teilen.</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-reflexion" aria-expanded="false" aria-controls="form-reflexion">+ Neuer Eintrag</button></div>
 
+        <div class="reiter-formular hidden" id="form-reflexion">
         <div class="reflex-form">
           <input type="date" id="reflex-datum">
           <textarea id="reflex-text" rows="4" placeholder="Was ist dir heute aufgefallen …"></textarea>
@@ -258,6 +277,7 @@
             <button class="btn-primary" id="btn-reflex-hinzufuegen">Eintragen</button>
             <button class="btn-secondary hidden" id="btn-reflex-abbrechen">Abbrechen</button>
           </div>
+        </div>
         </div>
 
         <div id="reflexion-bereich" style="margin-top:1.4rem;"></div>
@@ -272,7 +292,9 @@
       <div id="view-spiele" class="hidden">
         <h1>Spiele <button class="hilfe-icon" data-hilfe="Deine Spielekartei für die Jugendarbeit – eine gemeinsame Kartei, griffbereit egal ob OGS, Jugendwerk oder unterwegs. Die Kategorien lassen sich auf- und zuklappen. Mit den Sternen bewertest du ein Spiel (1–5, denselben Stern nochmal antippen entfernt die Bewertung). Oben nach Kategorie und Bewertung filtern, „Beste zuerst“ sortiert nach Sternen. ✎ bearbeitet, × löscht.">?</button></h1>
         <p class="hero-text">Spielbeschreibungen für die Jugendarbeit – nach Kategorie aufklappbar, mit Sternen bewertet.</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-spiele" aria-expanded="false" aria-controls="form-spiele">+ Neues Spiel</button></div>
 
+        <div class="reiter-formular hidden" id="form-spiele">
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
           <input type="text" id="neu-spiel-titel" placeholder="Titel">
           <input type="text" id="neu-spiel-kategorie" placeholder="Kategorie" list="spiel-kategorie-liste">
@@ -293,6 +315,7 @@
           <button class="btn-primary" id="btn-spiel-hinzufuegen">Speichern</button>
         </div>
         <p class="empty-text" style="margin-top:0.3rem;">PDF oder Word (.docx), max. 5 MB. Datei ist optional.</p>
+        </div>
 
         <div id="spiel-filter-bereich" style="margin-top:0.8rem;"></div>
         <div id="spiel-liste-bereich"></div>
@@ -725,7 +748,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Leiste unten:</strong> die Themen Heute, Planen, Sammeln und der bereichsspezifische Block (Glühbirne, z.B. Ideen/Inventar/Projekte/Verleih), in der Mitte der runde „+“-Knopf für die Schnellerfassung. Das aktive Thema ist hervorgehoben und beschriftet. Ein Tipp auf ein Thema öffnet den Reiter, den du darin zuletzt offen hattest (beim ersten Mal den ersten)</li>
                 <li><strong>„+“ – Schnell erfassen:</strong> öffnet von überall ein Blatt: Text eintippen, Art wählen (Aufgabe, Termin, Notiz, Einkauf, Idee – nur was im gewählten Bereich eingeblendet ist; vorgewählt passend zum offenen Reiter), Bereich wählen (auch ein anderer als der aktive, z.B. AWO-Termin aus Privat heraus), bei Aufgabe und Termin „Wann“ (Ohne/Heute/Morgen/Datum, optional Uhrzeit). „▸ Details“ zeigt bei Bedarf Ende, Projekt, Wiederholung, Notiz bzw. Beschreibung. Speichern oder Enter – unten erscheint kurz eine Bestätigung. Schließen mit ✕, Escape oder Tipp daneben</li>
                 <li><strong>Reiter-Leiste oben:</strong> hat das aktive Thema mehrere sichtbare Reiter, stehen sie als Knöpfe unter der Kopfzeile (seitlich wischbar). Thema mit nur einem Reiter (z.B. Heute): keine Reiter-Leiste</li>
-                <li><strong>⋮-Menü:</strong> oben Export, Verlauf und Anleitung (früher „Verwalten“ in der Leiste unten; nur die im Bereich eingeblendeten), darunter „▦ Bereichsübersicht“ öffnet die Willkommensseite mit den großen Bereichs-Karten (ohne Abmelden), „⚙ Reiter verwalten“ öffnet direkt die Verwaltung. Aus der Verwaltung kommst du über den Umschalter oben zurück</li>
+                <li><strong>„+ Neu …“ und ⚙ in den Reitern:</strong> unter der Überschrift klappt „+ Neu …“ das Eingabeformular auf (z.B. „+ Neue Aufgabe“, „+ Neuer Schlüssel“, „+ Neues Training“), ⚙ selten gebrauchte Einstellungen und Stammdaten (z.B. Projekte, Blockzeiten, Zeitrahmen, Räume und Mail-Verteiler, Zugänge, Sportarten/Übungen/Pläne). Einzeilige Eingaben (Notizen, Einkauf, Ideen) stehen weiter direkt da. Beim Bearbeiten eines Eintrags klappt das Formular von selbst auf. Im „+“-Blatt unten führt in diesen Reitern ein Link „ganzes Formular im Reiter“ direkt zum Formular</li>
+                <li><strong>⋮-Menü:</strong> oben Export, Verlauf und Anleitung (früher „Verwalten“ in der Leiste unten; nur die im Bereich eingeblendeten), darunter „▦ Bereichsübersicht“ öffnet die Willkommensseite mit den großen Bereichs-Karten (ohne Abmelden), „⚙ Reiter verwalten“ öffnet direkt die Verwaltung. „? Hilfe-Symbole ausblenden“ blendet alle „?“ aus (und wieder ein), Darstellung Auto/Hell/Dunkel stellt das Farbschema ein. Aus der Verwaltung kommst du über den Umschalter oben zurück</li>
               </ul>
               <p><strong>Getrennt je Bereich:</strong> Aufgaben, Notizen, Termine und Projekte gehören jeweils zu genau einem Bereich – ein in OGS angelegtes Projekt taucht z.B. nicht bei Privat oder AWO auf, auch bei gleichem Namen. Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen, Training, Verlauf sowie Inventar, Projekte und Verleih haben ebenfalls ein eigenes bereich-Feld. <strong>Ernährung</strong> gibt es nur in Privat (keine bereich-Spalte, in anderen Bereichen nicht einschaltbar).</p>
               <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS-, AWO- und Business-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Reflexion/Einkauf/Rezepte/Ernährung/Export sind standardmäßig nur im Privat-Bereich eingeblendet, Links in Privat und Business.</p>
@@ -935,7 +959,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Übersicht, wer welchen Schlüssel oder elektronischen Key hat (seit Session 32).</p>
               <ul>
-                <li><strong>Zuerst Zugänge anlegen:</strong> unten unter „Zugänge verwalten“ die Türen eintragen (z. B. Haupteingang, Saal, Küche), optional mit Beschreibung. ✎ benennt um, × löscht – der Zugang verschwindet dann auch bei allen Schlüsseln, die ihn hatten</li>
+                <li><strong>Zuerst Zugänge anlegen:</strong> über ⚙ oben im Reiter unter „Zugänge verwalten“ die Türen eintragen (z. B. Haupteingang, Saal, Küche), optional mit Beschreibung. ✎ benennt um, × löscht – der Zugang verschwindet dann auch bei allen Schlüsseln, die ihn hatten</li>
                 <li><strong>Eintragen:</strong> Art (🔑 Schlüssel oder 📡 elektronischer Key), Seriennummer (Pflicht), Name, Verein, die Zugänge ankreuzen (beliebig viele) und optional eine Notiz, dann „+ Eintragen“. Art, Verein und Zugänge bleiben danach stehen – praktisch, wenn mehrere gleiche Keys an denselben Verein gehen</li>
                 <li><strong>Neu mit Name/Verein:</strong> Trägst du oben beim Anlegen schon Name oder Verein ein, öffnet sich nach „+ Eintragen“ direkt das Ausgabeprotokoll mit Unterschriftsfeld am neuen Eintrag. „Abbrechen“, wenn kein Protokoll nötig ist – dann steht er als „ohne Ausgabeprotokoll“ in der Liste und lässt sich mit „✍️ Protokoll“ später nachtragen</li>
                 <li><strong>Ausgeben (seit Session 33):</strong> Einen freien Schlüssel (Gruppe „📥 Im Bestand“) mit „Ausgeben“ öffnen, Name (Pflicht), Verein, Kontakt, Datum, „Ausgegeben von“ (merkt sich das Gerät), optional „Rückgabe bis“ und Notiz eintragen. Die Person kann im weißen Feld mit dem Finger unterschreiben. „Ausgeben &amp; drucken“ öffnet danach gleich das Protokoll. Ohne digitale Unterschrift: Protokoll drucken und auf Papier unterschreiben lassen (auch die Zeile für dich als Ausgebende/n)</li>
@@ -1256,7 +1280,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <div id="view-ogs-inventar" class="hidden">
         <h1>Inventar <button class="hilfe-icon" data-hilfe="Material und Ausstattung, nach Kategorie sortiert, auf- und zuklappbar und filterbar. Antippen auf einen Gegenstand öffnet die Bearbeitung.">?</button></h1>
         <p class="hero-text">Material und Ausstattung der OGS Rapunzel – nach Kategorie sortiert.</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-ogsinventar" aria-expanded="false" aria-controls="form-ogsinventar">+ Neuer Gegenstand</button></div>
 
+        <div class="reiter-formular hidden" id="form-ogsinventar">
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
           <input type="text" id="neu-inv-name" placeholder="Gegenstand">
           <input type="text" id="neu-inv-kategorie" placeholder="Kategorie" list="inv-kategorie-liste">
@@ -1273,6 +1299,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <button type="button" class="hilfe-icon" data-hilfe="Zustand wird als farbiges Label in der Liste angezeigt und lässt sich später filtern – z.B. um defekte oder eingeschränkt nutzbare Gegenstände schnell zu finden.">?</button>
           <button class="btn-primary" id="btn-inv-hinzufuegen">Speichern</button>
         </div>
+        </div>
 
         <div id="inv-filter-bereich" style="margin-top:0.8rem;"></div>
         <div id="inv-liste-bereich"></div>
@@ -1281,7 +1308,20 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <div id="view-ogs-projekte" class="hidden">
         <h1>Projekte <button class="hilfe-icon" data-hilfe="Ausgearbeitete Konzepte mit Datei-Ablage. Hauptprojekte können Unterprojekte enthalten – praktisch für ein größeres Thema mit mehreren kleineren Teilprojekten darin. Nur im Bereich OGS verfügbar.">?</button></h1>
         <p class="hero-text">Ausgearbeitete Konzepte und Projekte der OGS Rapunzel – mit Datei-Ablage und Unterprojekten.</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-ogsprojekte" aria-expanded="false" aria-controls="form-ogsprojekte">+ Neues Projekt</button><button type="button" class="reiter-zahnrad" data-formular="einst-ogsprojekte" aria-expanded="false" aria-controls="einst-ogsprojekte" aria-label="Mehrere Projekte importieren" title="Mehrere Projekte importieren"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-einstellungen hidden" id="einst-ogsprojekte">
+        <div>
+          <h3 style="margin-top: 0; font-size:0.95rem;">Mehrere Projekte auf einmal importieren <button type="button" class="hilfe-icon" data-hilfe="Legt für jede Zeile der CSV ein neues Hauptprojekt an, noch ohne Datei und ohne Unterprojekt-Zuordnung. Dateien und Unterprojekt-Zuordnung reichst du danach einzeln nach.">?</button></h3>
+          <p class="empty-text">CSV-Datei mit Spalten <code>Titel</code>, <code>Beschreibung</code>, <code>Kategorie</code> (Beschreibung/Kategorie optional). Dateien pro Projekt können danach einzeln nachgereicht werden.</p>
+          <div class="row" style="flex-wrap:wrap; align-items:center;">
+            <input type="file" id="proj-csv-datei" accept=".csv">
+            <button class="btn-primary" id="btn-proj-csv-import">Importieren</button>
+          </div>
+          <div id="proj-csv-status" class="empty-text"></div>
+        </div>
+        </div>
 
+        <div class="reiter-formular hidden" id="form-ogsprojekte">
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
           <input type="text" id="neu-proj-titel" placeholder="Titel">
           <input type="text" id="neu-proj-kategorie" placeholder="Kategorie (optional)" list="proj-kategorie-liste">
@@ -1298,16 +1338,8 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <button class="btn-primary" id="btn-proj-hinzufuegen">Speichern</button>
         </div>
         <p class="empty-text" style="margin-top:0.3rem;">PDF oder Word (.docx), max. 5 MB. Datei ist optional.</p>
-
-        <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-top:1.4rem;">
-          <h3 style="margin-top: 0; font-size:0.95rem;">Mehrere Projekte auf einmal importieren <button type="button" class="hilfe-icon" data-hilfe="Legt für jede Zeile der CSV ein neues Hauptprojekt an, noch ohne Datei und ohne Unterprojekt-Zuordnung. Dateien und Unterprojekt-Zuordnung reichst du danach einzeln nach.">?</button></h3>
-          <p class="empty-text">CSV-Datei mit Spalten <code>Titel</code>, <code>Beschreibung</code>, <code>Kategorie</code> (Beschreibung/Kategorie optional). Dateien pro Projekt können danach einzeln nachgereicht werden.</p>
-          <div class="row" style="flex-wrap:wrap; align-items:center;">
-            <input type="file" id="proj-csv-datei" accept=".csv">
-            <button class="btn-primary" id="btn-proj-csv-import">Importieren</button>
-          </div>
-          <div id="proj-csv-status" class="empty-text"></div>
         </div>
+
 
         <div id="proj-liste-bereich" style="margin-top:1.2rem;"></div>
       </div>
@@ -1315,7 +1347,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <div id="view-verleih" class="hidden">
         <h1>Verleih <button class="hilfe-icon" data-hilfe="Verleih-Historie für Inventar-Gegenstände: wer hat was wann bekommen, und ist es schon zurück? Zeigt getrennt an, was gerade ausgeliehen ist und was bereits zurückgegeben wurde. Zum Bearbeiten (auch für ein nachträgliches Rückgabedatum) auf einen Eintrag tippen.">?</button></h1>
         <p class="hero-text">Wer hat gerade welchen Inventar-Gegenstand – und wann kam er zurück?</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-verleih" aria-expanded="false" aria-controls="form-verleih">+ Neu verleihen</button></div>
 
+        <div class="reiter-formular hidden" id="form-verleih">
         <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
           <select id="verleih-inventar"></select>
           <input type="text" id="verleih-an" placeholder="An wen (Name)">
@@ -1325,16 +1359,46 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <button class="btn-primary" id="btn-verleih-hinzufuegen">Verleihen</button>
         </div>
         <p class="empty-text" style="margin-top:0.3rem;">Neue Gegenstände zuerst im Inventar-Reiter anlegen – hier nur auswählen und verleihen.</p>
+        </div>
 
         <div id="verleih-liste-bereich"></div>
       </div>
 
       <div id="view-raumplanung" class="hidden">
-        <h1>Raumplanung <button class="hilfe-icon" data-hilfe="Vermietungen der Räume eintragen. Bei jedem neuen Eintrag geht automatisch eine Mail an alle Adressen im Mail-Verteiler (unten). Überschneidet sich eine Vermietung im selben Raum, fragt die App nach. Der Monatskalender markiert belegte Tage – Tag antippen zeigt die Vermietungen dieses Tages. Die Liste darunter ist nach Monaten auf- und zuklappbar. Zum Bearbeiten auf einen Eintrag tippen – Änderungen verschicken keine Mail.">?</button></h1>
+        <h1>Raumplanung <button class="hilfe-icon" data-hilfe="Vermietungen der Räume eintragen. Bei jedem neuen Eintrag geht automatisch eine Mail an alle Adressen im Mail-Verteiler (über ⚙). Überschneidet sich eine Vermietung im selben Raum, fragt die App nach. Der Monatskalender markiert belegte Tage – Tag antippen zeigt die Vermietungen dieses Tages. Die Liste darunter ist nach Monaten auf- und zuklappbar. Zum Bearbeiten auf einen Eintrag tippen – Änderungen verschicken keine Mail.">?</button></h1>
         <p class="hero-text">Vermietungen eintragen – bei jedem neuen Eintrag geht eine Mail an den Verteiler.</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-raumplanung" aria-expanded="false" aria-controls="form-raumplanung">+ Neue Vermietung</button><button type="button" class="reiter-zahnrad" data-formular="einst-raumplanung" aria-expanded="false" aria-controls="einst-raumplanung" aria-label="Räume und Mail-Verteiler" title="Räume und Mail-Verteiler"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-einstellungen hidden" id="einst-raumplanung">
+          <div class="reiter-einstellungen-titel">Räume und Mail-Verteiler</div>
+        <details class="anleitung-abschnitt" style="margin-top:0;" id="raum-raeume-block">
+          <summary>Räume verwalten</summary>
+          <div class="anleitung-text">
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+              <input type="text" id="raum-raum-name" placeholder="Name (z. B. Saal)" maxlength="120">
+              <input type="text" id="raum-raum-beschreibung" placeholder="Beschreibung (optional)" maxlength="500" style="flex:1; min-width:12rem;">
+              <button class="btn-primary" id="btn-raum-raum">+ Raum</button>
+            </div>
+            <div id="raum-raeume-liste" style="margin-top:0.6rem;"></div>
+          </div>
+        </details>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;" id="raum-verteiler-block">
+          <summary>Mail-Verteiler</summary>
+          <div class="anleitung-text">
+            <p class="empty-text" style="margin-top:0;">An alle Adressen hier geht bei jeder neuen Vermietung eine Mail. Die Empfänger stehen in BCC und sehen die anderen Adressen nicht.</p>
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+              <input type="email" id="raum-empf-email" placeholder="Mailadresse" autocomplete="off" style="flex:1; min-width:12rem;">
+              <input type="text" id="raum-empf-name" placeholder="Name (optional)" maxlength="120">
+              <button class="btn-primary" id="btn-raum-empf">+ Adresse</button>
+            </div>
+            <div id="raum-empfaenger-liste" style="margin-top:0.6rem;"></div>
+          </div>
+        </details>
+        </div>
 
         <div id="raum-hinweise"></div>
 
+        <div class="reiter-formular hidden" id="form-raumplanung">
         <div class="rezept-form" id="raum-formular">
           <div class="task-edit-felder">
             <label class="ern-feld">Raum<select id="raum-neu-raum"></select></label>
@@ -1372,6 +1436,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </div>
           <p class="notiz-meta" id="raum-status" role="status"></p>
         </div>
+        </div>
 
         <div id="raum-kalender"></div>
         <div id="raum-vermietungen-liste" style="margin-top:0.4rem;"></div>
@@ -1381,36 +1446,29 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <button class="btn-secondary" onclick="reiterExport('raumplanung', 'word')">Word</button>
         </div>
 
-        <details class="anleitung-abschnitt" style="margin-top:0.8rem;" id="raum-raeume-block">
-          <summary>Räume verwalten</summary>
-          <div class="anleitung-text">
-            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
-              <input type="text" id="raum-raum-name" placeholder="Name (z. B. Saal)" maxlength="120">
-              <input type="text" id="raum-raum-beschreibung" placeholder="Beschreibung (optional)" maxlength="500" style="flex:1; min-width:12rem;">
-              <button class="btn-primary" id="btn-raum-raum">+ Raum</button>
-            </div>
-            <div id="raum-raeume-liste" style="margin-top:0.6rem;"></div>
-          </div>
-        </details>
-
-        <details class="anleitung-abschnitt" style="margin-top:0.8rem;" id="raum-verteiler-block">
-          <summary>Mail-Verteiler</summary>
-          <div class="anleitung-text">
-            <p class="empty-text" style="margin-top:0;">An alle Adressen hier geht bei jeder neuen Vermietung eine Mail. Die Empfänger stehen in BCC und sehen die anderen Adressen nicht.</p>
-            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
-              <input type="email" id="raum-empf-email" placeholder="Mailadresse" autocomplete="off" style="flex:1; min-width:12rem;">
-              <input type="text" id="raum-empf-name" placeholder="Name (optional)" maxlength="120">
-              <button class="btn-primary" id="btn-raum-empf">+ Adresse</button>
-            </div>
-            <div id="raum-empfaenger-liste" style="margin-top:0.6rem;"></div>
-          </div>
-        </details>
       </div>
 
       <div id="view-schluessel" class="hidden">
-        <h1>Schlüssel <button class="hilfe-icon" data-hilfe="Schlüssel und elektronische Keys mit Seriennummer, Name und Verein eintragen und ankreuzen, welche Zugänge (Türen) sie öffnen – auch mehrere. Die Zugänge legst du einmal unten unter „Zugänge verwalten“ an. Die Liste ist nach Verein gruppiert (ohne Verein steht unten). Suche findet Seriennummer, Name, Verein, Zugang und Notiz; die Auswahlfelder zeigen nur Schlüssel oder nur Keys, einen Status (ausgegeben, überfällig, im Bestand) bzw. nur einen Zugang („Wer kommt in die Küche?“). Ausgeben und Zurücknehmen über die Knöpfe am Eintrag – mit Unterschrift auf dem Bildschirm oder per Ausdruck auf Papier; das Protokoll lässt sich auch per Mail verschicken (✉️). Alle Protokolle stehen unten unter „Ausgabeprotokolle“. Zum Bearbeiten auf einen Eintrag tippen, × löscht ihn. Name und Verein schlagen beim Tippen schon Eingetragenes vor.">?</button></h1>
+        <h1>Schlüssel <button class="hilfe-icon" data-hilfe="Schlüssel und elektronische Keys mit Seriennummer, Name und Verein eintragen und ankreuzen, welche Zugänge (Türen) sie öffnen – auch mehrere. Die Zugänge legst du einmal über ⚙ unter „Zugänge verwalten“ an. Die Liste ist nach Verein gruppiert (ohne Verein steht unten). Suche findet Seriennummer, Name, Verein, Zugang und Notiz; die Auswahlfelder zeigen nur Schlüssel oder nur Keys, einen Status (ausgegeben, überfällig, im Bestand) bzw. nur einen Zugang („Wer kommt in die Küche?“). Ausgeben und Zurücknehmen über die Knöpfe am Eintrag – mit Unterschrift auf dem Bildschirm oder per Ausdruck auf Papier; das Protokoll lässt sich auch per Mail verschicken (✉️). Alle Protokolle stehen unten unter „Ausgabeprotokolle“. Zum Bearbeiten auf einen Eintrag tippen, × löscht ihn. Name und Verein schlagen beim Tippen schon Eingetragenes vor.">?</button></h1>
         <p class="hero-text">Wer hat welchen Schlüssel oder Key – mit Seriennummer und Verein.</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-schluessel" aria-expanded="false" aria-controls="form-schluessel">+ Neuer Schlüssel</button><button type="button" class="reiter-zahnrad" data-formular="einst-schluessel" aria-expanded="false" aria-controls="einst-schluessel" aria-label="Zugänge verwalten" title="Zugänge verwalten"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-einstellungen hidden" id="einst-schluessel">
+          <div class="reiter-einstellungen-titel">Zugänge</div>
+        <details class="anleitung-abschnitt" style="margin-top:0;" open>
+          <summary>Zugänge verwalten</summary>
+          <div class="anleitung-text">
+            <p class="empty-text" style="margin-top:0;">Türen und Zugänge, die beim Eintragen eines Schlüssels oder Keys zum Ankreuzen erscheinen.</p>
+            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+              <input type="text" id="schluessel-zugang-name" placeholder="Name (z. B. Haupteingang)" maxlength="120">
+              <input type="text" id="schluessel-zugang-beschreibung" placeholder="Beschreibung (optional)" maxlength="300" style="flex:1; min-width:12rem;">
+              <button class="btn-primary" id="btn-schluessel-zugang">+ Zugang</button>
+            </div>
+            <div id="schluessel-zugaenge-liste" style="margin-top:0.6rem;"></div>
+          </div>
+        </details>
+        </div>
 
+        <div class="reiter-formular hidden" id="form-schluessel">
         <div class="rezept-form">
           <div class="task-edit-felder">
             <label class="ern-feld">Art<select id="schluessel-neu-art">
@@ -1430,6 +1488,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <button class="btn-primary" id="btn-schluessel-neu">+ Eintragen</button>
           </div>
           <p class="notiz-meta" id="schluessel-status" role="status"></p>
+        </div>
         </div>
 
         <div class="row" style="flex-wrap:wrap; align-items:center; margin-top:0.6rem;">
@@ -1464,82 +1523,23 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </div>
         </details>
 
-        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
-          <summary>Zugänge verwalten</summary>
-          <div class="anleitung-text">
-            <p class="empty-text" style="margin-top:0;">Türen und Zugänge, die beim Eintragen eines Schlüssels oder Keys zum Ankreuzen erscheinen.</p>
-            <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
-              <input type="text" id="schluessel-zugang-name" placeholder="Name (z. B. Haupteingang)" maxlength="120">
-              <input type="text" id="schluessel-zugang-beschreibung" placeholder="Beschreibung (optional)" maxlength="300" style="flex:1; min-width:12rem;">
-              <button class="btn-primary" id="btn-schluessel-zugang">+ Zugang</button>
-            </div>
-            <div id="schluessel-zugaenge-liste" style="margin-top:0.6rem;"></div>
-          </div>
-        </details>
       </div>
 
       <div id="view-training" class="hidden">
-        <h1>Training <button class="hilfe-icon" data-hilfe="Trainingsverlauf: Datum, Sportart, Ort, Dauer und optional einzelne Übungen mit Sätzen/Wiederholungen/Gewicht (v.a. für Kraft-Training). Oben der Wochenziel-Vergleich (Gesamt + je Sportart), Filter nach Sportart/Ort/Zeitraum, darunter die Liste gruppiert nach Woche. Trainingspläne (benannte Übungs-Vorlagen) unten verwalten und beim Eintragen per Auswahl anwenden. Zum Bearbeiten auf einen Eintrag tippen.">?</button></h1>
+        <h1>Training <button class="hilfe-icon" data-hilfe="Trainingsverlauf: Datum, Sportart, Ort, Dauer und optional einzelne Übungen mit Sätzen/Wiederholungen/Gewicht (v.a. für Kraft-Training). Oben der Wochenziel-Vergleich (Gesamt + je Sportart), Filter nach Sportart/Ort/Zeitraum, darunter die Liste gruppiert nach Woche. Trainingspläne (benannte Übungs-Vorlagen) über ⚙ verwalten und beim Eintragen per Auswahl anwenden. Zum Bearbeiten auf einen Eintrag tippen.">?</button></h1>
         <p class="hero-text">Trainingsverlauf und Fortschritt – offen für beliebige Sportarten und Orte, die Häufigkeit darf sich jederzeit ändern.</p>
-
-        <p id="training-wochenziel-anzeige" style="margin-bottom:0.6rem;"></p>
-
-        <div id="training-sportart-ziele-liste" style="margin-bottom:0.6rem;"></div>
-        <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-bottom:1.2rem;">
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-training" aria-expanded="false" aria-controls="form-training">+ Neues Training</button><button type="button" class="reiter-zahnrad" data-formular="einst-training einst-training-ziel" aria-expanded="false" aria-controls="einst-training einst-training-ziel" aria-label="Ziele, Sportarten, Übungen, Pläne, Timer" title="Ziele, Sportarten, Übungen, Pläne, Timer"><span aria-hidden="true">⚙</span></button></div>
+        <div class="reiter-einstellungen hidden" id="einst-training-ziel">
+          <div class="reiter-einstellungen-titel">Wochenziele je Sportart</div>
+        <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-bottom:0;">
           <select id="training-sportart-ziel-auswahl" style="min-width:140px;"></select>
           <input type="number" id="training-sportart-ziel-wert" placeholder="Ziel/Woche" min="0" style="width:8rem;">
           <button class="link-btn" id="btn-training-sportart-ziel-speichern">+ Sportart-Ziel</button>
         </div>
-
-        <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-bottom:0.6rem;">
-          <select id="training-filter-sportart"><option value="">Alle Sportarten</option></select>
-          <select id="training-filter-ort"><option value="">Alle Orte</option></select>
-          <input type="date" id="training-filter-von" title="Zeitraum von">
-          <input type="date" id="training-filter-bis" title="Zeitraum bis">
-          <button class="link-btn" id="btn-training-filter-zuruecksetzen">Filter zurücksetzen</button>
         </div>
-
-        <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
-          <input type="date" id="training-datum" title="Datum (leer = heute)">
-          <input type="text" id="training-sportart" placeholder="Sportart (z.B. Rücken)" list="training-sportart-liste">
-          <datalist id="training-sportart-liste"></datalist>
-          <input type="text" id="training-ort" placeholder="Ort (z.B. Zuhause)" list="training-ort-liste">
-          <datalist id="training-ort-liste"></datalist>
-          <datalist id="training-uebung-namen-liste"></datalist>
-          <input type="number" id="training-dauer" placeholder="Minuten" min="0" style="width:6rem;">
-          <input type="number" id="training-strecke" placeholder="km" min="0" step="0.1" style="width:5.5rem;" title="Strecke in km">
-          <input type="number" id="training-hoehenmeter" placeholder="Höhenmeter" min="0" style="width:6.5rem;" title="Höhenmeter">
-          <input type="number" id="training-kcal" placeholder="kcal (Uhr)" min="0" max="5000" style="width:7rem;" title="Kalorien, z. B. von der Sportuhr – leer lassen, dann schätzt die App über den MET-Wert der Sportart">
-          <input type="text" id="training-notiz" placeholder="Notiz (optional)" style="flex:1; min-width:150px;">
-          <select id="training-plan-auswahl" title="Plan anwenden (füllt Übungen unten aus)" onchange="planAufTrainingAnwenden(this.value)">
-            <option value="">Kein Plan</option>
-          </select>
-        </div>
-        <div style="margin:0.6rem 0 1rem;">
-          <div id="training-neu-uebungen"></div>
-        </div>
-        <button class="btn-primary" id="btn-training-hinzufuegen">Training speichern</button>
-
-        <div id="training-liste-bereich" style="margin-top:1.6rem;"></div>
-
-        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
-          <summary>Übungsverlauf</summary>
-          <div class="anleitung-text">
-            <select id="verlauf-uebung-auswahl" style="width:100%;"></select>
-            <div id="verlauf-chart-bereich" style="margin-top:0.8rem;"></div>
-          </div>
-        </details>
-
-        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
-          <summary>Auswertung nach Kategorie</summary>
-          <div class="anleitung-text">
-            <select id="auswertung-jahr-auswahl" onchange="auswertungJahrGewaehlt(this.value)" style="width:100%;"></select>
-            <div id="auswertung-kategorie-bereich" style="margin-top:0.8rem;"></div>
-            <p class="empty-text" style="margin-top:0.6rem;">Kategorie wird bei „Sportarten verwalten" je Sportart hinterlegt; Trainings ohne zugeordnete Kategorie laufen unter „Ohne Kategorie".</p>
-          </div>
-        </details>
-
-        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
+        <div class="reiter-einstellungen hidden" id="einst-training">
+          <div class="reiter-einstellungen-titel">Verwalten</div>
+        <details class="anleitung-abschnitt" style="margin-top:0;">
           <summary>Sportarten verwalten</summary>
           <div class="anleitung-text">
             <p class="empty-text" style="margin-top:0;">Freitext bleibt überall möglich – diese Liste liefert nur die Vorschläge bei der Autovervollständigung.</p>
@@ -1645,6 +1645,62 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div id="zielevent-liste" style="margin-top:1.2rem;"></div>
           </div>
         </details>
+        </div>
+
+        <p id="training-wochenziel-anzeige" style="margin-bottom:0.6rem;"></p>
+
+        <div id="training-sportart-ziele-liste" style="margin-bottom:0.6rem;"></div>
+
+        <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-bottom:0.6rem;">
+          <select id="training-filter-sportart"><option value="">Alle Sportarten</option></select>
+          <select id="training-filter-ort"><option value="">Alle Orte</option></select>
+          <input type="date" id="training-filter-von" title="Zeitraum von">
+          <input type="date" id="training-filter-bis" title="Zeitraum bis">
+          <button class="link-btn" id="btn-training-filter-zuruecksetzen">Filter zurücksetzen</button>
+        </div>
+
+        <div class="reiter-formular hidden" id="form-training">
+        <div class="row" style="flex-wrap:wrap; align-items:flex-start;">
+          <input type="date" id="training-datum" title="Datum (leer = heute)">
+          <input type="text" id="training-sportart" placeholder="Sportart (z.B. Rücken)" list="training-sportart-liste">
+          <datalist id="training-sportart-liste"></datalist>
+          <input type="text" id="training-ort" placeholder="Ort (z.B. Zuhause)" list="training-ort-liste">
+          <datalist id="training-ort-liste"></datalist>
+          <datalist id="training-uebung-namen-liste"></datalist>
+          <input type="number" id="training-dauer" placeholder="Minuten" min="0" style="width:6rem;">
+          <input type="number" id="training-strecke" placeholder="km" min="0" step="0.1" style="width:5.5rem;" title="Strecke in km">
+          <input type="number" id="training-hoehenmeter" placeholder="Höhenmeter" min="0" style="width:6.5rem;" title="Höhenmeter">
+          <input type="number" id="training-kcal" placeholder="kcal (Uhr)" min="0" max="5000" style="width:7rem;" title="Kalorien, z. B. von der Sportuhr – leer lassen, dann schätzt die App über den MET-Wert der Sportart">
+          <input type="text" id="training-notiz" placeholder="Notiz (optional)" style="flex:1; min-width:150px;">
+          <select id="training-plan-auswahl" title="Plan anwenden (füllt Übungen unten aus)" onchange="planAufTrainingAnwenden(this.value)">
+            <option value="">Kein Plan</option>
+          </select>
+        </div>
+        <div style="margin:0.6rem 0 1rem;">
+          <div id="training-neu-uebungen"></div>
+        </div>
+        <button class="btn-primary" id="btn-training-hinzufuegen">Training speichern</button>
+        </div>
+
+        <div id="training-liste-bereich" style="margin-top:1.6rem;"></div>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
+          <summary>Übungsverlauf</summary>
+          <div class="anleitung-text">
+            <select id="verlauf-uebung-auswahl" style="width:100%;"></select>
+            <div id="verlauf-chart-bereich" style="margin-top:0.8rem;"></div>
+          </div>
+        </details>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
+          <summary>Auswertung nach Kategorie</summary>
+          <div class="anleitung-text">
+            <select id="auswertung-jahr-auswahl" onchange="auswertungJahrGewaehlt(this.value)" style="width:100%;"></select>
+            <div id="auswertung-kategorie-bereich" style="margin-top:0.8rem;"></div>
+            <p class="empty-text" style="margin-top:0.6rem;">Kategorie wird bei „Sportarten verwalten" je Sportart hinterlegt; Trainings ohne zugeordnete Kategorie laufen unter „Ohne Kategorie".</p>
+          </div>
+        </details>
+
       </div>
     </main>
 
@@ -1657,6 +1713,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <h2 id="schnell-titel">Schnell erfassen</h2>
         <button type="button" class="schnell-zu" onclick="schnellSchliessen()" aria-label="Schließen">✕</button>
       </div>
+      <button type="button" class="link-btn schnell-reiterform hidden" id="schnell-reiterform" onclick="schnellZumReiterformular()"></button>
       <input type="text" id="schnell-text" class="schnell-text" autocomplete="off" enterkeyhint="done" aria-label="Text">
       <div class="schnell-label" id="schnell-art-label">Art</div>
       <div class="schnell-chips" id="schnell-arten" role="group" aria-labelledby="schnell-art-label"></div>
