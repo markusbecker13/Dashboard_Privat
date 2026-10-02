@@ -699,6 +699,42 @@
     outline: 3px solid var(--accent); outline-offset: 2px;
   }
 
+  /* Bereichsumschalter (seit Session 34): ersetzt den Knopf „Bereich ▾“.
+     Farben kommen je Knopf über --bu-farbe/--bu-ring (app.js), damit jeder
+     Punkt in jeder Farbwelt gleich aussieht. */
+  .bereich-umschalter {
+    display: inline-flex; align-items: center; gap: 0.1rem; flex-shrink: 0;
+    padding: 0.2rem; border-radius: 999px; background: var(--panel); border: 1px solid var(--border);
+  }
+  .bu-knopf {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
+    min-width: 2.5rem; height: 2.5rem; padding: 0; border: none; border-radius: 999px;
+    background: transparent; color: var(--ink); cursor: pointer;
+    font-family: var(--font-text); font-size: 0.85rem; font-weight: 700;
+  }
+  .bu-knopf.aktiv { background: var(--bu-farbe); color: #ffffff; padding: 0 0.85rem 0 0.75rem; }
+  .bu-punkt {
+    width: 0.75rem; height: 0.75rem; border-radius: 50%; flex-shrink: 0;
+    background: var(--bu-farbe); box-shadow: 0 0 0 2px var(--bu-ring);
+  }
+  .bu-knopf.aktiv .bu-punkt { background: #ffffff; }
+  .bu-knopf:not(.aktiv):hover .bu-punkt { transform: scale(1.2); }
+  .bu-knopf:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .bu-punkt { transition: transform 0.12s ease; }
+  }
+  /* Schmale Handys: Untertitel ausblenden, damit Umschalter, Logo und ⋮ in eine Zeile passen */
+  @media (max-width: 560px) {
+    .brand-sub { display: none; }
+  }
+  /* Sehr schmale Handys (z. B. 360 px): Abstände und Logo etwas kleiner, damit nichts umbricht */
+  @media (max-width: 400px) {
+    .content-topbar { gap: 0.4rem; }
+    .bu-knopf { min-width: 2.3rem; }
+    .bu-knopf.aktiv { padding: 0 0.65rem 0 0.55rem; }
+    .topbar-logo { height: 2rem; max-width: 5.5rem; object-fit: contain; }
+  }
+
   .reiter-leiste {
     display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.8rem 1.2rem 0.2rem;
     max-width: 700px; margin: 0 auto; scrollbar-width: none;
