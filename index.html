@@ -926,13 +926,18 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li><strong>Zuerst Zugänge anlegen:</strong> unten unter „Zugänge verwalten“ die Türen eintragen (z. B. Haupteingang, Saal, Küche), optional mit Beschreibung. ✎ benennt um, × löscht – der Zugang verschwindet dann auch bei allen Schlüsseln, die ihn hatten</li>
                 <li><strong>Eintragen:</strong> Art (🔑 Schlüssel oder 📡 elektronischer Key), Seriennummer (Pflicht), Name, Verein, die Zugänge ankreuzen (beliebig viele) und optional eine Notiz, dann „+ Eintragen“. Art, Verein und Zugänge bleiben danach stehen – praktisch, wenn mehrere gleiche Keys an denselben Verein gehen</li>
+                <li><strong>Ausgeben (seit Session 33):</strong> Einen freien Schlüssel (Gruppe „📥 Im Bestand“) mit „Ausgeben“ öffnen, Name (Pflicht), Verein, Kontakt, Datum, „Ausgegeben von“ (merkt sich das Gerät), optional „Rückgabe bis“ und Notiz eintragen. Die Person kann im weißen Feld mit dem Finger unterschreiben. „Ausgeben &amp; drucken“ öffnet danach gleich das Protokoll. Ohne digitale Unterschrift: Protokoll drucken und auf Papier unterschreiben lassen (auch die Zeile für dich als Ausgebende/n)</li>
+                <li><strong>Zurücknehmen:</strong> am ausgegebenen Schlüssel „Zurück“, Datum und „Zurückgenommen von“ prüfen, optional Unterschrift. Der Schlüssel steht danach wieder im Bestand, das Protokoll bekommt den Rückgabe-Teil</li>
+                <li><strong>Status am Eintrag:</strong> 📤 ausgegeben seit … (bis …), ⚠️ überfällig (Rückgabedatum überschritten), 📥 im Bestand oder „ohne Ausgabeprotokoll“ (Name/Verein eingetragen, aber kein Protokoll – mit „Protokoll“ nachtragen, Ausgabedatum lässt sich zurückdatieren). ✍️ = digital unterschrieben. Statusfilter über der Liste</li>
+                <li><strong>Protokoll drucken / PDF:</strong> 📄 am Eintrag oder in der Protokoll-Liste öffnet den Druckdialog – dort „Als PDF speichern“ wählen, wenn du eine Datei willst. Das Protokoll enthält Schlüssel, Zugänge, Empfänger/in, Ausgabe, eine Erklärung (keine Weitergabe, keine Nachschlüssel, Verlust melden, Rückgabe), Unterschriftsfelder, Rückgabe-Teil und einen kurzen Datenschutzhinweis. Erklärung und Datenschutzhinweis sind <strong>Muster</strong> – bitte vom Vorstand prüfen lassen</li>
+                <li><strong>Ausgabeprotokolle</strong> (unten, aufklappen): alle Ausgaben, offene zuerst. Antippen korrigiert Tippfehler (Unterschriften und Schlüsseldaten bleiben unverändert). × löscht ein Protokoll inkl. Unterschriften. Nichts wird automatisch gelöscht; Protokolle, deren Rückgabe über ein Jahr her ist, werden markiert und lassen sich mit „Alte löschen“ auf einmal entfernen. Im Bearbeiten-Feld eines Schlüssels steht seine Ausgabe-Historie</li>
                 <li><strong>Personen und/oder Vereine:</strong> Name und Verein sind beide optional. Ein Key, der nur einem Verein gehört, bekommt keinen Namen; ein Schlüssel einer Einzelperson keinen Verein (steht dann unter „Ohne Verein“)</li>
                 <li><strong>Vorschläge:</strong> Beim Tippen von Name und Verein schlägt das Feld schon Eingetragenes vor – so bleibt die Schreibweise gleich und die Gruppierung stimmt</li>
                 <li><strong>Seriennummer doppelt?</strong> Dieselbe Nummer lässt sich je Art nur einmal eintragen, die App meldet das</li>
                 <li><strong>Liste:</strong> nach Verein gruppiert und aufklappbar, im Kopf die Anzahl 🔑/📡, unter jedem Eintrag 🚪 seine Zugänge. Darüber die Suche (Nummer, Name, Verein, Zugang, Notiz), die Auswahl „nur Schlüssel“ / „nur Keys“ und – sobald es Zugänge gibt – ein Zugangsfilter: zeigt z. B. alle, die in die Küche kommen</li>
-                <li><strong>Bearbeiten:</strong> auf einen Eintrag tippen, z. B. wenn ein Key an eine andere Person geht oder eine Tür dazukommt (Zugänge an- oder abhaken). × löscht ihn (z. B. verloren oder zurückgegeben)</li>
+                <li><strong>Bearbeiten:</strong> auf einen Eintrag tippen, z. B. wenn eine Tür dazukommt (Zugänge an- oder abhaken) oder sich die Seriennummer als falsch herausstellt. Bei ausgegebenen Schlüsseln sind Name und Verein gesperrt – die ändern sich über das Protokoll. × löscht den Schlüssel (z. B. verloren oder ausgemustert), seine Protokolle bleiben erhalten</li>
                 <li><strong>Verlauf:</strong> dort stehen nur Art und Seriennummer, keine Namen</li>
-                <li><strong>Export:</strong> unter der Liste „Excel“ oder „Word“ – exportiert alle Schlüssel und Keys des aktiven Bereichs (Verein, Name, Art, Seriennummer, Zugänge, Notiz) und als zweite Tabelle je Zugang, wer ihn öffnen kann. Filter und Suche spielen dabei keine Rolle. Die Datei enthält Namen – nicht offen herumschicken</li>
+                <li><strong>Export:</strong> unter der Liste „Excel“ oder „Word“ – exportiert alle Schlüssel und Keys des aktiven Bereichs (Verein, Name, Art, Seriennummer, Zugänge, Notiz), als zweite Tabelle je Zugang, wer ihn öffnen kann, und als dritte alle Ausgaben (ohne Unterschriftsbilder). Filter und Suche spielen dabei keine Rolle. Die Datei enthält Namen – nicht offen herumschicken</li>
               </ul>
             </div>
           </details>
@@ -1107,7 +1112,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Export <span class="anleitung-nur">(Standard: nur Privat)</span></summary>
             <div class="anleitung-text">
-              <p>Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen. Läuft komplett im Browser, ohne dass Daten an Dritte gehen. Bei „Alles" gibt es bei Excel ein Tabellenblatt pro Bereich, bei Word alle Tabellen untereinander in einem Dokument. Raumplanung, Schlüssel und Zugänge sind seit Session 32 dabei (über alle Bereiche, mit Spalte „Bereich“). Nur einen Bereich gibt es direkt im jeweiligen Reiter über die Knöpfe unter der Liste.</p>
+              <p>Alles oder einzelne Bereiche als Excel- oder Word-Datei herunterladen. Läuft komplett im Browser, ohne dass Daten an Dritte gehen. Bei „Alles" gibt es bei Excel ein Tabellenblatt pro Bereich, bei Word alle Tabellen untereinander in einem Dokument. Raumplanung, Schlüssel, Zugänge und Schlüsselausgaben sind seit Session 32/33 dabei (über alle Bereiche, mit Spalte „Bereich“). Nur einen Bereich gibt es direkt im jeweiligen Reiter über die Knöpfe unter der Liste.</p>
             </div>
           </details>
 
@@ -1159,7 +1164,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li>Aktuell werden nur eigene Daten gespeichert (keine Daten Dritter) – das fällt unter die private Haushaltsausnahme der DSGVO</li>
                 <li><strong>Wetter:</strong> die Abfrage läuft serverseitig über die Edge Function bei Open-Meteo (ohne API-Schlüssel). Open-Meteo bekommt nur den eingestellten Ort, nicht deine IP-Adresse</li>
                 <li><strong>Raumplanung (AWO):</strong> Grundsätzlich ohne personenbezogene Daten – im Pflichtfeld steht nur der Anlass, die Mail geht nur an den Verteiler (Vorsitz und Stellvertretung). Das Feld Kontakt ist optional: Wird dort eine Telefonnummer oder Mailadresse eingetragen, sind das Daten Dritter, die in Supabase liegen und per Mail über das web.de-Postfach an den Verteiler gehen. Dann gilt die private Haushaltsausnahme nicht mehr, und der Ortsverein sollte kurz prüfen: Information der Betroffenen, Löschfrist für alte Vermietungen, Auftragsverarbeitung mit Supabase (Einschätzung, keine Rechtsprüfung)</li>
-                <li><strong>Schlüssel (AWO):</strong> Name plus Seriennummer ist ein personenbezogenes Datum Dritter. Das ist für eine Schlüsselübersicht üblich und sachlich nötig, fällt aber nicht mehr unter die private Haushaltsausnahme – verantwortlich ist dann der Ortsverein. Empfehlung: nur Name, keine Adressen oder Telefonnummern, Einträge bei Rückgabe löschen, und im Vorstand kurz klären, dass die Liste hier geführt wird (Supabase, EU-Region Frankfurt; Auftragsverarbeitung prüfen). Einschätzung, keine Rechtsprüfung</li>
+                <li><strong>Schlüssel (AWO):</strong> Name plus Seriennummer ist ein personenbezogenes Datum Dritter. Das ist für eine Schlüsselübersicht üblich und sachlich nötig, fällt aber nicht mehr unter die private Haushaltsausnahme – verantwortlich ist dann der Ortsverein. Empfehlung: nur Name, keine Adressen oder Telefonnummern, Einträge bei Rückgabe löschen, und im Vorstand kurz klären, dass die Liste hier geführt wird (Supabase, EU-Region Frankfurt; Auftragsverarbeitung prüfen). <strong>Ausgabeprotokolle (seit Session 33)</strong> enthalten zusätzlich Kontakt und ggf. eine digitale Unterschrift – ebenfalls Daten Dritter. Kontakt nur, wenn nötig; Protokolle löschen, sobald sie nach der Rückgabe nicht mehr gebraucht werden (die App markiert Protokolle nach einem Jahr); Erklärung und Datenschutzhinweis im Protokoll sind Muster und sollten vom Vorstand bzw. Datenschutz-Ansprechpartner geprüft werden. Einschätzung, keine Rechtsprüfung</li>
                 <li><strong>OGS Rapunzel &amp; AWO OV Liblar:</strong> beide Bereiche sind für organisatorische Inhalte gedacht, keine personenbezogenen Daten über Kinder, Familien oder Kolleg:innen. Sollten künftig doch personenbezogene Daten Dritter hinzukommen, braucht es eine erneute Prüfung. <strong>Achtung Verleih:</strong> das Feld „An wen" nimmt Namen auf – dort möglichst Kürzel, Gruppen oder Funktionen statt vollständiger Namen eintragen</li>
                 <li><strong>Rezeptfotos:</strong> liegen in einem privaten Storage-Bucket (EU), sichtbar nur über kurzlebige signierte Links nach dem Login. Empfehlung: nur das Essen fotografieren, keine Personen – in OGS und AWO erst recht keine Kinder (Einschätzung, keine Rechtsprüfung)</li>
                 <li><strong>Business (zwischenkaffeeundchaos):</strong> Für geschäftliche Tätigkeit gilt die private Haushaltsausnahme nicht. Solange dort nur eigene Planungsdaten liegen (Aufgaben, Ideen, Notizen), ist das unkritisch. Bitte <strong>keine Kundendaten</strong> (Namen, E-Mail-Adressen, Bestellungen) im Dashboard ablegen – dafür bräuchte es u.a. einen Auftragsverarbeitungsvertrag mit Supabase und einen Eintrag im Verzeichnis der Verarbeitungstätigkeiten</li>
@@ -1389,7 +1394,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-schluessel" class="hidden">
-        <h1>Schlüssel <button class="hilfe-icon" data-hilfe="Schlüssel und elektronische Keys mit Seriennummer, Name und Verein eintragen und ankreuzen, welche Zugänge (Türen) sie öffnen – auch mehrere. Die Zugänge legst du einmal unten unter „Zugänge verwalten“ an. Die Liste ist nach Verein gruppiert (ohne Verein steht unten). Suche findet Seriennummer, Name, Verein, Zugang und Notiz; die Auswahlfelder zeigen nur Schlüssel oder nur Keys bzw. nur einen Zugang („Wer kommt in die Küche?“). Zum Bearbeiten auf einen Eintrag tippen, × löscht ihn. Name und Verein schlagen beim Tippen schon Eingetragenes vor.">?</button></h1>
+        <h1>Schlüssel <button class="hilfe-icon" data-hilfe="Schlüssel und elektronische Keys mit Seriennummer, Name und Verein eintragen und ankreuzen, welche Zugänge (Türen) sie öffnen – auch mehrere. Die Zugänge legst du einmal unten unter „Zugänge verwalten“ an. Die Liste ist nach Verein gruppiert (ohne Verein steht unten). Suche findet Seriennummer, Name, Verein, Zugang und Notiz; die Auswahlfelder zeigen nur Schlüssel oder nur Keys, einen Status (ausgegeben, überfällig, im Bestand) bzw. nur einen Zugang („Wer kommt in die Küche?“). Ausgeben und Zurücknehmen über die Knöpfe am Eintrag – mit Unterschrift auf dem Bildschirm oder per Ausdruck auf Papier. Alle Protokolle stehen unten unter „Ausgabeprotokolle“. Zum Bearbeiten auf einen Eintrag tippen, × löscht ihn. Name und Verein schlagen beim Tippen schon Eingetragenes vor.">?</button></h1>
         <p class="hero-text">Wer hat welchen Schlüssel oder Key – mit Seriennummer und Verein.</p>
 
         <div class="rezept-form">
@@ -1419,15 +1424,30 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <option value="schluessel">🔑 nur Schlüssel</option>
             <option value="key">📡 nur Keys</option>
           </select>
+          <select id="schluessel-filter-status" aria-label="Nach Status filtern">
+            <option value="alle">Alle Status</option>
+            <option value="ausgegeben">📤 ausgegeben</option>
+            <option value="ueberfaellig">⚠️ überfällig</option>
+            <option value="bestand">📥 im Bestand</option>
+            <option value="ohneprotokoll">ohne Protokoll</option>
+          </select>
           <select id="schluessel-filter-zugang" class="hidden" aria-label="Nach Zugang filtern"></select>
         </div>
         <p class="notiz-meta" id="schluessel-zusammenfassung"></p>
         <div id="schluessel-liste"></div>
         <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem; margin-top:0.8rem;">
-          <span class="notiz-meta" style="margin:0;">⬇ Liste exportieren (Schlüssel + Zugänge, nur dieser Bereich)</span>
+          <span class="notiz-meta" style="margin:0;">⬇ Liste exportieren (Schlüssel, Zugänge, Ausgaben – nur dieser Bereich)</span>
           <button class="btn-secondary" onclick="reiterExport('schluessel', 'excel')">Excel</button>
           <button class="btn-secondary" onclick="reiterExport('schluessel', 'word')">Word</button>
         </div>
+
+        <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
+          <summary>Ausgabeprotokolle <span id="schluessel-protokolle-zahl"></span></summary>
+          <div class="anleitung-text">
+            <p class="empty-text" style="margin-top:0;">Alle Ausgaben, offene zuerst. Antippen zum Korrigieren, 📄 drucken oder als PDF speichern, × löschen (inkl. Unterschriften).</p>
+            <div id="schluessel-protokolle"></div>
+          </div>
+        </details>
 
         <details class="anleitung-abschnitt" style="margin-top:0.8rem;">
           <summary>Zugänge verwalten</summary>
