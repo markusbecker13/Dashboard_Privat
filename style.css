@@ -1440,7 +1440,7 @@
 .blatt-feld { display: flex; flex-direction: column; flex: 1 1 100%; min-width: 0; }
 .blatt-feld.halb { flex: 1 1 calc(50% - 0.4rem); }
 .blatt-feld .blatt-label { margin: 0.8rem 0 0.35rem; }
-.blatt-feld input, .blatt-feld textarea { flex: 0 0 auto; width: 100%; box-sizing: border-box; min-height: 2.75rem; color: var(--ink); }
+.blatt-feld input, .blatt-feld textarea, .blatt-feld select { flex: 0 0 auto; width: 100%; box-sizing: border-box; min-height: 2.75rem; color: var(--ink); }
 .blatt-info { margin: 0; padding: 0.55rem 0; font-weight: 600; color: var(--ink); }
 .blatt-hinweis { margin-top: 0.25rem; font-size: 0.8rem; color: var(--ink-dim); }
 .blatt-wochentage .schnell-chip { padding: 0 0.7rem; min-width: 2.75rem; justify-content: center; }
