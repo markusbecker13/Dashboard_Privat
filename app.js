@@ -732,7 +732,9 @@
   // „+“-Blatt, Felder kommen aus BLATT_ARTEN. Genutzt von Blockzeiten,
   // Inventar und Verleih; weitere Reiter lassen sich hier anschließen.
   // Feldtypen: text, zahl, datum, zeit, text-lang, chips (eine Auswahl),
-  // auswahl (Klappliste), wochentage (mehrere), info (nur Anzeige).
+  // auswahl (Klappliste), wochentage (mehrere), mehrfach (Haken-Liste,
+  // Wert ist ein Array), info (nur Anzeige), html (fertiges HTML, z. B.
+  // Verlauf mit Knöpfen). „gesperrt(werte)“ macht ein Textfeld schreibgeschützt.
   // „optionen“ darf eine Liste [[wert, text], …] oder eine Funktion(werte) sein. „wenn(werte)“ blendet ein
   // Feld ein oder aus, „pflicht“ prüft vor dem Speichern.
   // ==========================================================
@@ -929,6 +931,48 @@
       loeschFrage: (r) => `Raum „${r.name || ""}“ löschen? Vorhandene Vermietungen bleiben erhalten, stehen dann aber ohne Raum.`,
       gespeichert: "Raum gespeichert",
     },
+
+    schluessel: {
+      titel: "Schlüssel bearbeiten",
+      finden: (id) => schluesselListe.find((k) => String(k.id) === String(id)),
+      laden: (k) => ({
+        _id: k.id,
+        _ausgegeben: !!offeneAusgabe(k),
+        art: k.art === "key" ? "key" : "schluessel", nr: k.seriennummer || "", name: k.inhaber || "", verein: k.verein || "",
+        zugaenge: (k.zugaenge || []).slice(), notiz: k.notiz || "",
+      }),
+      felder: [
+        { key: "art", label: "Art", typ: "chips", optionen: [["schluessel", "Schlüssel"], ["key", "Elektronischer Key"]] },
+        { key: "nr", label: "Seriennummer", typ: "text", pflicht: true },
+        // Ist der Schlüssel ausgegeben, ändern sich Name/Verein nur über das Protokoll
+        { key: "name", label: "Name", typ: "text", halb: true, liste: "schluessel-namen-vorschlaege", platzhalter: "optional",
+          gesperrt: (w) => w._ausgegeben, gesperrtHinweis: "ausgegeben – über das Protokoll ändern" },
+        { key: "verein", label: "Verein", typ: "text", halb: true, liste: "schluessel-vereine-vorschlaege", platzhalter: "optional",
+          gesperrt: (w) => w._ausgegeben, gesperrtHinweis: "ausgegeben – über das Protokoll ändern" },
+        { key: "zugaenge", label: "Zugänge", typ: "mehrfach", icon: "tuer",
+          optionen: () => zugaengeAktuell().map((z) => [z.id, z.name, z.beschreibung || ""]),
+          leer: `Noch keine Zugänge – über ${ic("zahnrad")} oben („Zugänge verwalten“) anlegen.` },
+        { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional" },
+        { key: "ausgaben", label: "Ausgaben", typ: "html", wenn: (w) => ausgabenVonSchluessel(schluesselListe.find((k) => k.id === w._id) || {}).length > 0,
+          html: (w) => ausgabenVonSchluessel(schluesselListe.find((k) => k.id === w._id)).map((a) => `
+            <div class="blatt-ausgabe">${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""} · ${datumDE(a.ausgegeben_am)} – ${a.zurueck_am ? datumDE(a.zurueck_am) : "heute"}
+              <span class="blatt-ausgabe-knoepfe"><button type="button" class="link-btn" onclick="ausgabeDrucken('${a.id}')">${ic("drucken")}Drucken</button>
+              <button type="button" class="link-btn" onclick="ausgabePdf('${a.id}')">${ic("export")}PDF</button>${mailEingerichtet ? `
+              <button type="button" class="link-btn" onclick="ausgabeMailen('${a.id}')">${ic("mail")}Mail</button>` : ""}</span></div>`).join("") },
+      ],
+      speichern: (id, w) => api("schluessel_aktualisieren", {
+        id, art: w.art, seriennummer: w.nr, inhaber: w.name, verein: w.verein, notiz: w.notiz,
+        // Zugänge nur mitschicken, wenn es welche gibt (sonst bleibt die Spalte unberührt)
+        ...(zugaengeAktuell().length ? { zugaenge: w.zugaenge } : {}),
+      }),
+      loeschen: (id) => api("schluessel_loeschen", { id }),
+      loeschFrage: (k) => {
+        const protokolle = ausgabenVonSchluessel(k).length;
+        return `${k.art === "key" ? "Key" : "Schlüssel"} Nr. ${k.seriennummer || ""} löschen?` +
+          (protokolle ? ` ${protokolle === 1 ? "Das Ausgabeprotokoll bleibt" : `Die ${protokolle} Ausgabeprotokolle bleiben`} erhalten (unten unter „Ausgabeprotokolle“).` : "");
+      },
+      gespeichert: "Schlüssel gespeichert",
+    },
   };
 
   let blatt = null; // { art, id, werte }
@@ -985,16 +1029,27 @@
           const an = w[f.key].includes(i);
           return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="blattWochentag(${i})">${t}</button>`;
         }).join("") + `</div>`;
+      } else if (f.typ === "mehrfach") {
+        const optionen = typeof f.optionen === "function" ? f.optionen(w) : f.optionen;
+        feld = optionen.length
+          ? `<div class="blatt-hakenliste" id="${id}" role="group" aria-label="${escapeAttr(f.label)}">` + optionen.map(([wert, text, unter]) => `
+              <label class="blatt-haken"><input type="checkbox" data-mehrfach="${f.key}" value="${escapeAttr(wert)}"${w[f.key].includes(wert) ? " checked" : ""}>
+                <span>${f.icon ? ic(f.icon) + " " : ""}${escapeHtml(text)}${unter ? `<span class="blatt-hinweis">${escapeHtml(unter)}</span>` : ""}</span></label>`).join("") + `</div>`
+          : `<p class="blatt-hinweis">${f.leer || "Keine Auswahl vorhanden."}</p>`;
+      } else if (f.typ === "html") {
+        feld = `<div class="blatt-html" id="${id}">${f.html(w)}</div>`;
       } else if (f.typ === "text-lang") {
         feld = `<textarea id="${id}" class="schnell-notiz" rows="${f.zeilen || 3}"${daten}${ph}>${escapeHtml(w[f.key])}</textarea>`;
       } else {
         const typ = { text: "text", zahl: "number", datum: "date", zeit: "time" }[f.typ];
         const extra = (f.liste ? ` list="${f.liste}"` : "") + (f.min !== undefined ? ` min="${f.min}"` : "") +
           (f.schritt ? ` step="${f.schritt}"` : "") + (f.typ === "zahl" ? ` inputmode="${f.schritt ? "decimal" : "numeric"}"` : "");
-        feld = `<input type="${typ}" id="${id}" value="${escapeAttr(w[f.key])}"${daten}${ph}${extra} autocomplete="off">`;
+        const gesperrt = f.gesperrt && f.gesperrt(w);
+        feld = `<input type="${typ}" id="${id}" value="${escapeAttr(w[f.key])}"${daten}${ph}${extra}${gesperrt ? " readonly" : ""} autocomplete="off">`;
       }
-      const hinweis = f.hinweis ? `<span class="blatt-hinweis">${escapeHtml(f.hinweis)}</span>` : "";
-      const fuer = ["chips", "wochentage", "info"].includes(f.typ) ? "div" : "label";
+      const hinweisText = f.gesperrt && f.gesperrt(w) ? f.gesperrtHinweis : f.hinweis;
+      const hinweis = hinweisText ? `<span class="blatt-hinweis">${escapeHtml(hinweisText)}</span>` : "";
+      const fuer = ["chips", "wochentage", "info", "mehrfach", "html"].includes(f.typ) ? "div" : "label";
       return `<${fuer} class="blatt-feld${f.halb ? " halb" : ""}"${fuer === "label" ? ` for="${id}"` : ""}>${label}${feld}${hinweis}</${fuer}>`;
     }).join("");
     const box = document.getElementById("blatt-felder");
@@ -1002,6 +1057,14 @@
     box.querySelectorAll("[data-feld]").forEach((el) => {
       el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => { blatt.werte[el.dataset.feld] = el.value; });
       if (el.tagName === "INPUT") el.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.blattSpeichern(); } });
+    });
+    // Haken-Listen: ohne Neuzeichnen, damit die Liste nicht nach oben springt
+    box.querySelectorAll("[data-mehrfach]").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const key = cb.dataset.mehrfach;
+        const liste = blatt.werte[key].filter((x) => x !== cb.value);
+        blatt.werte[key] = cb.checked ? [...liste, cb.value] : liste;
+      });
     });
   }
 
@@ -8736,7 +8799,6 @@
   // Seit Session 32b: Zugänge (Türen) einmal anlegen und je Schlüssel
   // ankreuzen – ein Schlüssel/Key kann zu mehreren Türen gehören.
   // ==========================================================
-  let schluesselBearbeitenId = null;
   let schluesselSuche = "";
   let schluesselFilterArt = "alle";
   let schluesselFilterZugang = "alle";
@@ -8837,7 +8899,7 @@
       : `<p class="empty-text">Noch keine Zugänge.</p>`;
   }
 
-  // Rendert die gefilterte Schlüsselliste nach Verein gruppiert, inkl. Bearbeiten-Ansicht des gewählten Eintrags
+  // Rendert die gefilterte Schlüsselliste nach Verein gruppiert (Bearbeiten öffnet das Blatt)
   function renderSchluesselListe() {
     const liste = document.getElementById("schluessel-liste");
     if (!liste) return;
@@ -8877,26 +8939,6 @@
         const offen = offeneAusgabe(k);
         if (schluesselAktion.modus === "zuruecknehmen" && offen) return ruecknahmeFormularHtml(k, offen);
         if (schluesselAktion.modus === "ausgeben" && !offen) return ausgabeFormularHtml(k);
-      }
-      if (schluesselBearbeitenId === k.id) {
-        // Ist der Schlüssel ausgegeben, ändern sich Name/Verein nur über das Protokoll
-        const gesperrt = offeneAusgabe(k) ? ' readonly title="Ausgegeben – bitte im Ausgabeprotokoll ändern"' : "";
-        return `
-          <div class="notiz-item" style="display:block;">
-            <div class="task-edit-felder">
-              <label class="ern-feld">Art<select id="schl-edit-art-${k.id}">${schluesselArtOptionen(k.art)}</select></label>
-              <label class="ern-feld">Seriennummer<input type="text" id="schl-edit-nr-${k.id}" value="${escapeAttr(k.seriennummer)}" maxlength="100"></label>
-              <label class="ern-feld">Name<input type="text" id="schl-edit-name-${k.id}" value="${escapeAttr(k.inhaber || "")}" maxlength="120" list="schluessel-namen-vorschlaege"${gesperrt}></label>
-              <label class="ern-feld">Verein<input type="text" id="schl-edit-verein-${k.id}" value="${escapeAttr(k.verein || "")}" maxlength="120" list="schluessel-vereine-vorschlaege"${gesperrt}></label>
-              <div class="ern-feld ern-feld-breit">Zugänge${schluesselZugangAuswahlHtml("schl-edit-zug-" + k.id, k.zugaenge || [])}</div>
-              <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="schl-edit-notiz-${k.id}" value="${escapeAttr(k.notiz || "")}" maxlength="500"></label>
-              ${schluesselHistorieHtml(k)}
-            </div>
-            <div class="row" style="margin:0.4rem 0 0;">
-              <button class="btn-primary" onclick="schluesselSpeichern('${k.id}')">Speichern</button>
-              <button class="link-btn" onclick="schluesselBearbeitenAbbrechen()">Abbrechen</button>
-            </div>
-          </div>`;
       }
       const zug = schluesselZugangNamen(k);
       const meta = [art.text, k.notiz ? escapeHtml(k.notiz) : ""].filter(Boolean).join(" · ");
@@ -8978,40 +9020,18 @@
     schluesselFilterZugang = e.target.value;
     renderSchluesselListe();
   });
-  // Öffnet die Bearbeiten-Ansicht für einen Schlüssel
+  // Bearbeiten eines Schlüssels/Keys: seit Session 35 im Bearbeiten-Blatt
   window.schluesselBearbeitenStart = function(id) {
-    schluesselBearbeitenId = id;
-    schluesselAktion = null;
-    renderSchluesselListe();
-  };
-  // Bricht das Bearbeiten eines Schlüssels ab
-  window.schluesselBearbeitenAbbrechen = function() {
-    schluesselBearbeitenId = null;
-    renderSchluesselListe();
-  };
-  // Speichert den bearbeiteten Schlüssel samt Zugängen und lädt die Daten neu
-  window.schluesselSpeichern = async function(id) {
-    const wert = (f) => document.getElementById(`schl-edit-${f}-${id}`).value.trim();
-    const daten = { id, art: wert("art"), seriennummer: wert("nr"), inhaber: wert("name"), verein: wert("verein"), notiz: wert("notiz") };
-    const zugaenge = schluesselZugangAuswahlLesen("schl-edit-zug-" + id);
-    if (zugaenge) daten.zugaenge = zugaenge;
-    try {
-      await api("schluessel_aktualisieren", daten);
-      schluesselBearbeitenId = null;
-      await ladeDaten();
-    } catch (fehler) {
-      alert(fehler.message);
-    }
+    window.blattOeffnen("schluessel", id);
   };
   // Löscht einen Schlüssel/Key nach Rückfrage und lädt die Daten neu
   window.schluesselLoeschen = async function(id) {
     const k = schluesselListe.find((x) => x.id === id);
     const protokolle = k ? ausgabenVonSchluessel(k).length : 0;
     if (!confirm(`${k && k.art === "key" ? "Key" : "Schlüssel"} Nr. ${k ? k.seriennummer : ""} löschen?` +
-      (protokolle ? ` Die ${protokolle} Ausgabeprotokoll${protokolle === 1 ? "" : "e"} bleiben erhalten (unten unter „Ausgabeprotokolle“).` : ""))) return;
+      (protokolle ? ` ${protokolle === 1 ? "Das Ausgabeprotokoll bleibt" : `Die ${protokolle} Ausgabeprotokolle bleiben`} erhalten (unten unter „Ausgabeprotokolle“).` : ""))) return;
     try {
       await api("schluessel_loeschen", { id });
-      if (schluesselBearbeitenId === id) schluesselBearbeitenId = null;
       await ladeDaten();
     } catch (fehler) {
       alert(fehler.message);
@@ -9220,14 +9240,6 @@
     if (schluesselStatus(k) === "zugeordnet") return knopf(ic("unterschrift") + "Protokoll", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Ausgabeprotokoll mit Unterschrift nachtragen");
     return knopf("Ausgeben", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Schlüssel ausgeben");
   }
-  // Ausgabe-Historie eines Schlüssels (für das Bearbeiten-Feld)
-  function schluesselHistorieHtml(k) {
-    const liste = ausgabenVonSchluessel(k);
-    if (!liste.length) return "";
-    return `<div class="ern-feld ern-feld-breit"><span>Ausgaben</span>${liste.map((a) => `
-      <span class="notiz-meta" style="display:block;">${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""} · ${datumDE(a.ausgegeben_am)} – ${a.zurueck_am ? datumDE(a.zurueck_am) : "heute"}
-        <button class="link-btn" onclick="ausgabeDrucken('${a.id}')">${ic("drucken")}Drucken</button> <button class="link-btn" onclick="ausgabePdf('${a.id}')">${ic("export")}PDF</button>${mailEingerichtet ? ` <button class="link-btn" onclick="ausgabeMailen('${a.id}')">${ic("mail")}Mail</button>` : ""}</span>`).join("")}</div>`;
-  }
 
   // Öffnet am Schlüssel das Formular zum Ausgeben bzw. Zurücknehmen
   // Übernimmt eine Mailadresse aus „Kontakt“ ins Mailfeld, solange dort nichts Eigenes steht
@@ -9242,7 +9254,6 @@
   };
   window.schluesselAktionStart = function(id, modus) {
     schluesselAktion = { id, modus };
-    schluesselBearbeitenId = null;
     renderSchluesselListe();
     unterschriftAktivieren((modus === "ausgeben" ? "sa-sig-" : "sr-sig-") + id);
   };
