@@ -1414,3 +1414,15 @@
   .koch-overlay .session-fokus-titel .ic, #koch-wach .ic { color: var(--accent); vertical-align: -0.18em; }
   .spiel-karte-inhalt .notiz-meta span[title] { white-space: nowrap; }
   .spiel-karte-inhalt .notiz-meta .ic { color: var(--accent); }
+
+  /* Erkanntes Datum/Uhrzeit im „+“-Blatt (seit Session 35) */
+  .schnell-erkannt {
+    display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; padding: 0.55rem 0.7rem 0.55rem 0.8rem;
+    border-radius: var(--r-mittel); background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  }
+  .schnell-erkannt > .ic { color: var(--accent); width: 1.2rem; height: 1.2rem; }
+  .schnell-erkannt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.05rem; font-size: 0.88rem; }
+  .schnell-erkannt-text strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .schnell-erkannt-text span { color: var(--ink-dim); font-size: 0.8rem; overflow-wrap: anywhere; }
+  .schnell-erkannt .link-btn { flex: none; min-height: 2.75rem; padding: 0 0.3rem; font-weight: 600; }
