@@ -250,7 +250,6 @@
             <div class="row">
               <input type="text" id="blockzeit-notiz" placeholder="Notiz (optional)">
               <button class="btn-primary" id="btn-blockzeit-anlegen">Anlegen</button>
-              <button class="btn-secondary hidden" id="btn-blockzeit-abbrechen">Abbrechen</button>
             </div>
           </div>
         </div>
@@ -818,7 +817,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Nach dem Öffnen und nach dem Login</strong> (seit Session 34): die App startet direkt im zuletzt genutzten Bereich auf dem Start-Screen (Heute) – ohne Umweg über die Willkommensseite. Beim allerersten Start ist das Privat. Verwaltung zählt dabei nicht als „zuletzt genutzt“</li>
                 <li><strong>Bereichsumschalter oben links:</strong> vier Punkte in den Bereichsfarben (Privat blau, OGS blau mit gelbem Ring, AWO rot, Business orange). Der aktive Bereich ist als Pille mit Namen hervorgehoben. Ein Tipp auf einen anderen Punkt wechselt sofort dorthin, ein Tipp auf den aktiven Bereich bringt dich zu seinem Start</li>
                 <li><strong>Leiste unten:</strong> die Themen Heute, Planen, Sammeln und der bereichsspezifische Block (Glühbirne, z.B. Ideen/Inventar/Projekte/Verleih), in der Mitte der runde „+“-Knopf für die Schnellerfassung. Das aktive Thema ist hervorgehoben und beschriftet. Ein Tipp auf ein Thema öffnet den Reiter, den du darin zuletzt offen hattest (beim ersten Mal den ersten)</li>
-                <li><strong>„+“ – Schnell erfassen:</strong> öffnet von überall ein Blatt: Text eintippen, Art wählen (Aufgabe, Termin, Notiz, Einkauf, Idee – nur was im gewählten Bereich eingeblendet ist; vorgewählt passend zum offenen Reiter), Bereich wählen (auch ein anderer als der aktive, z.B. AWO-Termin aus Privat heraus), bei Aufgabe und Termin „Wann“ (Ohne/Heute/Morgen/Datum, optional Uhrzeit). „▸ Details“ zeigt bei Bedarf Ende, Projekt, Wiederholung, Notiz bzw. Beschreibung. <strong>Datum und Uhrzeit aus dem Text</strong> (seit Session 35, bei Aufgabe und Termin): „Zahnarzt morgen 15 Uhr“ stellt Wann und Uhrzeit von selbst ein, ein Hinweis unter dem Textfeld zeigt, was erkannt wurde, und gespeichert wird nur „Zahnarzt“. Erkannt werden heute, morgen, übermorgen, Wochentage („Freitag“, „am Fr“, „nächsten Montag“), „in 3 Tagen“, Daten wie 12.10. oder 12. Oktober, Uhrzeiten wie „15 Uhr“, „15:30“, „um 9“ und Spannen wie „14–16 Uhr“ (setzt auch das Ende). „Ignorieren“ im Hinweis nimmt es zurück, ebenso wenn du Wann oder die Uhrzeit von Hand änderst – dann bleibt der Text, wie du ihn getippt hast. Speichern oder Enter – unten erscheint kurz eine Bestätigung. Schließen mit ✕, Escape oder Tipp daneben. <strong>Bearbeiten</strong> (seit Session 35): Aufgaben und Termine öffnen überall im selben Blatt – Stift in Aufgaben, Kalender und Frei, Antippen in Heute. Es heißt dann „Aufgabe bearbeiten“ bzw. „Termin bearbeiten“, ist ausgefüllt, zeigt die Details und hat unten „Löschen“. Datum und Bereich lassen sich dort auch ändern</li>
+                <li><strong>„+“ – Schnell erfassen:</strong> öffnet von überall ein Blatt: Text eintippen, Art wählen (Aufgabe, Termin, Notiz, Einkauf, Idee – nur was im gewählten Bereich eingeblendet ist; vorgewählt passend zum offenen Reiter), Bereich wählen (auch ein anderer als der aktive, z.B. AWO-Termin aus Privat heraus), bei Aufgabe und Termin „Wann“ (Ohne/Heute/Morgen/Datum, optional Uhrzeit). „▸ Details“ zeigt bei Bedarf Ende, Projekt, Wiederholung, Notiz bzw. Beschreibung. <strong>Datum und Uhrzeit aus dem Text</strong> (seit Session 35, bei Aufgabe und Termin): „Zahnarzt morgen 15 Uhr“ stellt Wann und Uhrzeit von selbst ein, ein Hinweis unter dem Textfeld zeigt, was erkannt wurde, und gespeichert wird nur „Zahnarzt“. Erkannt werden heute, morgen, übermorgen, Wochentage („Freitag“, „am Fr“, „nächsten Montag“), „in 3 Tagen“, Daten wie 12.10. oder 12. Oktober, Uhrzeiten wie „15 Uhr“, „15:30“, „um 9“ und Spannen wie „14–16 Uhr“ (setzt auch das Ende). „Ignorieren“ im Hinweis nimmt es zurück, ebenso wenn du Wann oder die Uhrzeit von Hand änderst – dann bleibt der Text, wie du ihn getippt hast. Speichern oder Enter – unten erscheint kurz eine Bestätigung. Schließen mit ✕, Escape oder Tipp daneben. <strong>Bearbeiten</strong> (seit Session 35): Aufgaben und Termine öffnen überall im selben Blatt – Stift in Aufgaben, Kalender und Frei, Antippen in Heute. Es heißt dann „Aufgabe bearbeiten“ bzw. „Termin bearbeiten“, ist ausgefüllt, zeigt die Details und hat unten „Löschen“. Datum und Bereich lassen sich dort auch ändern. <strong>Blockzeiten, Inventar und Verleih</strong> bearbeitest du in einem Blatt im gleichen Stil (Stift an der Blockzeit, Antippen eines Gegenstands bzw. Verleihs): ein Feld pro Zeile, Auswahl als Chips (Wochentage, Zustand), Speichern oder Enter, „Löschen“ unten mit Rückfrage. Passt etwas nicht (Pflichtfeld leer, Ende vor Beginn, Rückgabe vor Ausleihe), steht der Hinweis rot über „Speichern“</li>
                 <li><strong>Reiter-Leiste oben:</strong> hat das aktive Thema mehrere sichtbare Reiter, stehen sie als Knöpfe unter der Kopfzeile (seitlich wischbar). Thema mit nur einem Reiter (z.B. Heute): keine Reiter-Leiste</li>
                 <li><strong>„+ Neu …“ und <svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg> in den Reitern:</strong> unter der Überschrift klappt „+ Neu …“ das Eingabeformular auf (z.B. „+ Neue Aufgabe“, „+ Neuer Schlüssel“, „+ Neues Training“), <svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg> selten gebrauchte Einstellungen und Stammdaten (z.B. Projekte, Blockzeiten, Zeitrahmen, Räume und Mail-Verteiler, Zugänge, Sportarten/Übungen/Pläne). Einzeilige Eingaben (Notizen, Einkauf, Ideen) stehen weiter direkt da. Beim Bearbeiten eines Eintrags klappt das Formular von selbst auf. Im „+“-Blatt unten führt in diesen Reitern ein Link „ganzes Formular im Reiter“ direkt zum Formular</li>
                 <li><strong>⋮-Menü:</strong> oben Export, Verlauf und Anleitung (früher „Verwalten“ in der Leiste unten; nur die im Bereich eingeblendeten), darunter „<svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-raster"></use></svg> Bereichsübersicht“ öffnet die Willkommensseite mit den großen Bereichs-Karten (ohne Abmelden), „<svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg> Reiter verwalten“ öffnet direkt die Verwaltung. „? Hilfe-Symbole ausblenden“ blendet alle „?“ aus (und wieder ein), Darstellung Auto/Hell/Dunkel stellt das Farbschema ein. Aus der Verwaltung kommst du über den Umschalter oben zurück</li>
@@ -879,7 +878,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li>Mit ‹ › zwischen Monaten wechseln</li>
                 <li>Tag anklicken öffnet ein Panel mit den Terminen dieses Tages plus Formular zum Eintragen. Uhrzeiten im Titel werden erkannt („Flohmarkt 8-14 Uhr“ setzt Beginn und Ende); steht ein anderes Datum drin („Elternabend 12.11. 19 Uhr“), landet der Termin an diesem Tag und der Kalender springt dorthin. Beim Bearbeiten wird nichts erkannt</li>
                 <li>Tage mit Terminen zeigen einen kleinen Punkt; oben die nächsten 5 anstehenden Termine</li>
-                <li><strong>Blockzeiten:</strong> feste Zeitfenster, wiederkehrend an bestimmten Wochentagen oder einmalig an einem festen Datum. Sie bilden den Rahmen, aus dem der Frei-Tab die freien Zeiten berechnet</li>
+                <li><strong>Blockzeiten:</strong> feste Zeitfenster, wiederkehrend an bestimmten Wochentagen oder einmalig an einem festen Datum. Sie bilden den Rahmen, aus dem der Frei-Tab die freien Zeiten berechnet. Der Stift öffnet das Bearbeiten-Blatt</li>
               </ul>
               <p><strong>Google-Kalender-Sync</strong> – Karte oben im Tab:</p>
               <ul>
@@ -968,7 +967,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li>Liste automatisch nach Kategorie gruppiert, Filter-Dropdown zeigt die Anzahl je Kategorie</li>
                 <li><strong>Wiederbeschaffungswert</strong> (optional, seit Session 29): Betrag je Stück in €, was eine Neuanschaffung heute kosten würde. Beim Gegenstand steht er mit „zusammen“ (Wert × Menge), im Kopf jeder Kategorie die Summe, über der Liste der Gesamtwert (bei gewählter Kategorie nur deren Wert). Ein * heißt: Einige Gegenstände haben noch keinen Wert, die echte Summe liegt höher. Nachtragen über Antippen → Feld „Wert je Stück“</li>
                 <li><strong>Aufklappbare Kategorien</strong> (seit Session 29): jede Kategorie ist ein eigener Block mit Anzahl, dazu „x defekt“ und „x verliehen“, wenn es welche gibt. Antippen klappt auf und zu; welche offen sind, merkt sich das Gerät je Bereich. „Alle aufklappen“ / „Alle zuklappen“ über der Liste. Ist im Filter eine Kategorie gewählt oder wird ein Gegenstand bearbeitet, ist seine Kategorie automatisch offen</li>
-                <li>Klick auf einen Eintrag öffnet die Inline-Bearbeitung, Löschen mit Sicherheitsabfrage</li>
+                <li>Klick auf einen Eintrag öffnet das Bearbeiten-Blatt (seit Session 35), Löschen dort oder über ✕ in der Liste, jeweils mit Sicherheitsabfrage. Die Kategorie bleibt nach dem Speichern aufgeklappt</li>
               </ul>
             </div>
           </details>
@@ -998,7 +997,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Neuer Verleih:</strong> Gegenstand aus dem Inventar auswählen (nur Gegenstände des aktuellen Bereichs stehen zur Auswahl), An wen, Menge, Datum (leer = heute), optional Notiz</li>
                 <li><strong>Zwei Listen:</strong> „Aktuell ausgeliehen" und „Zurückgegeben" – innerhalb jeder Liste nach Person gruppiert, darunter je Person alle Gegenstände</li>
                 <li><strong>Zurückgeben:</strong> Button „Zurück (heute)" bei jedem offenen Eintrag trägt sofort das heutige Datum ein</li>
-                <li><strong>Nachträglich korrigieren:</strong> auf einen Eintrag tippen öffnet die Inline-Bearbeitung – dort auch ein abweichendes Rückgabedatum eintragbar oder ein Eintrag durch Leeren des Rückgabe-Feldes wieder auf „offen" setzbar</li>
+                <li><strong>Nachträglich korrigieren:</strong> auf einen Eintrag tippen öffnet das Bearbeiten-Blatt (seit Session 35) – dort auch ein abweichendes Rückgabedatum eintragbar oder ein Eintrag durch Leeren des Rückgabe-Feldes wieder auf „offen" setzbar</li>
                 <li><strong>Im Inventar-Reiter</strong> zeigen Gegenstände mit offenen Ausleihen direkt einen Hinweis, an wen wie viel gerade verliehen ist</li>
                 <li>Löschen entfernt nur den Verleih-Eintrag, nicht den Inventar-Gegenstand selbst</li>
               </ul>
@@ -1812,6 +1811,17 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <p class="schnell-status" id="schnell-status" role="status" aria-live="polite"></p>
       <button type="button" class="btn-primary schnell-speichern" id="schnell-speichern" onclick="schnellSpeichern()">Speichern</button>
       <button type="button" class="link-btn schnell-loeschen hidden" id="schnell-loeschen" onclick="schnellLoeschen()">Löschen</button>
+    </dialog>
+    <!-- Allgemeines Bearbeiten-Blatt (Blockzeiten, Inventar, Verleih) – Felder kommen aus BLATT_ARTEN in app.js -->
+    <dialog class="schnell-sheet" id="blatt-dialog" aria-labelledby="blatt-titel">
+      <div class="schnell-kopf">
+        <h2 id="blatt-titel">Bearbeiten</h2>
+        <button type="button" class="schnell-zu" onclick="blattSchliessen()" aria-label="Schließen"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-x"></use></svg></button>
+      </div>
+      <div class="blatt-felder" id="blatt-felder"></div>
+      <p class="schnell-status" id="blatt-status" role="status" aria-live="polite"></p>
+      <button type="button" class="btn-primary schnell-speichern" id="blatt-speichern" onclick="blattSpeichern()">Speichern</button>
+      <button type="button" class="link-btn schnell-loeschen" id="blatt-loeschen" onclick="blattLoeschen()">Löschen</button>
     </dialog>
   </div>
 
