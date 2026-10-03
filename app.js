@@ -1510,13 +1510,26 @@
 
   // Kurze Rückmeldung unten über der Leiste, verschwindet nach 3 Sekunden
   let hinweisTimer = null;
-  function hinweisZeigen(text) {
+  function hinweisZeigen(text, rueckgaengig) {
     const el = document.getElementById("app-hinweis");
     if (!el) return;
     el.textContent = text;
+    // Optional „Rückgängig“ (seit Session 35, z. B. nach einem Wisch in „Heute“)
+    if (typeof rueckgaengig === "function") {
+      const knopf = document.createElement("button");
+      knopf.type = "button";
+      knopf.className = "app-hinweis-knopf";
+      knopf.textContent = "Rückgängig";
+      knopf.addEventListener("click", async () => {
+        el.classList.add("hidden");
+        clearTimeout(hinweisTimer);
+        try { await rueckgaengig(); } catch (_e) { alert("Konnte nicht rückgängig gemacht werden."); }
+      });
+      el.appendChild(knopf);
+    }
     el.classList.remove("hidden");
     clearTimeout(hinweisTimer);
-    hinweisTimer = setTimeout(() => el.classList.add("hidden"), 3000);
+    hinweisTimer = setTimeout(() => el.classList.add("hidden"), typeof rueckgaengig === "function" ? 6000 : 3000);
   }
 
   // Dialog: Tipp neben das Blatt schließt, Enter im Textfeld speichert
@@ -2885,6 +2898,7 @@
           id: a.id, typ: "aufgabe", zeit: start || "–", start,
           ende: start ? (endeEcht || minutenZuZeit(zeitZuMinuten(start) + 30)) : null, endeEcht,
           titel: a.titel, meta: a.status === "heute" ? "Aufgabe" + (endeEcht ? ` bis ${endeEcht}` : "") : "Erinnerung",
+          erinnerung: a.status !== "heute",
           tab: "aufgaben", sort: start ? zeitZuMinuten(start) : 24 * 60,
         });
       });
@@ -3053,15 +3067,33 @@
     }).join("") + `</div>`;
   }
 
-  // Eine Zeile der Liste „Heute“ bzw. „Überfällig“: Abhak-Kreis, Zeit, Titel, Art
+  // Was ein Wisch nach links bei dieser Zeile tut (seit Session 35):
+  // überfällig → auf heute, Erinnerung → später erinnern, sonst → morgen; erledigt → nichts
+  function heuteWischLinks(e) {
+    if (e.erledigt) return "";
+    if (e.ueberfaellig) return "heute";
+    if (e.erinnerung) return "erinnerung";
+    return "morgen";
+  }
+  const WISCH_LINKS_TEXT = { morgen: ["kalender", "Morgen"], heute: ["kalender", "Auf heute"], erinnerung: ["wiederholen", "Später erinnern"] };
+
+  // Eine Zeile der Liste „Heute“ bzw. „Überfällig“: Abhak-Kreis, Zeit, Titel, Art.
+  // Seit Session 35 wischbar: nach rechts = erledigt/wieder offen, nach links = verschieben.
   function heuteZeileHtml(e, jetztMinuten) {
     const laeuftJetzt = !e.erledigt && e.start && e.ende &&
       zeitZuMinuten(e.start) <= jetztMinuten && jetztMinuten < zeitZuMinuten(e.ende);
     const klassen = ["heute-zeile"];
     if (laeuftJetzt) klassen.push("jetzt");
     if (e.erledigt) klassen.push("erledigt");
+    const links = heuteWischLinks(e);
+    const [linksIcon, linksText] = WISCH_LINKS_TEXT[links] || ["", ""];
     return `
-      <div class="${klassen.join(" ")}">
+      <div class="${klassen.join(" ")}" data-wisch-typ="${e.typ}" data-wisch-id="${e.id}" data-wisch-links="${links}">
+        <div class="heute-wisch-hinter" aria-hidden="true">
+          <span class="heute-wisch-rechts">${ic(e.erledigt ? "wiederholen" : "ok-kreis")} ${e.erledigt ? "Wieder offen" : "Erledigt"}</span>
+          <span class="heute-wisch-links">${links ? `${linksText} ${ic(linksIcon)}` : ""}</span>
+        </div>
+        <div class="heute-zeile-vorne">
         <button class="zl-check ${e.erledigt ? "done" : ""}" onclick="zeitleisteUmschalten('${e.typ}','${e.id}', this)"
           title="${e.erledigt ? "Wieder offen" : "Erledigt"}" aria-label="${escapeAttr(e.titel)} ${e.erledigt ? "wieder öffnen" : "als erledigt markieren"}"></button>
         <span class="heute-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
@@ -3069,8 +3101,142 @@
           <span class="heute-zeile-titel">${escapeHtml(e.titel)}</span>
           <span class="heute-zeile-meta">${escapeHtml(e.meta)}</span>
         </button>
+        </div>
       </div>`;
   }
+
+
+  // ==========================================================
+  // Wischgesten in „Heute“ (seit Session 35)
+  // Nach rechts: erledigt bzw. wieder offen. Nach links: Aufgabe/Termin auf
+  // morgen, überfällige Aufgabe auf heute, Erinnerung später. Danach kurz
+  // „Rückgängig“ (außer bei Erinnerungen). Senkrechtes Scrollen bleibt dem
+  // Browser (touch-action: pan-y); erst eine klar waagerechte Bewegung wird
+  // zum Wisch, sonst bleibt alles ein normaler Tipp.
+  // ==========================================================
+  let wisch = null;          // laufender Wisch
+  let wischKlickSperre = 0;  // Zeitpunkt, bis zu dem Klicks nach einem Wisch verschluckt werden
+
+  // Führt die Aktion eines Wischs aus; liefert den Hinweistext und ggf. eine Rückgängig-Funktion
+  async function wischAusfuehren(typ, id, richtung, art) {
+    if (richtung === "rechts") {
+      const eintrag = (typ === "termin" ? termine : aufgaben).find((x) => String(x.id) === String(id));
+      const warErledigt = !!(eintrag && eintrag.erledigt);
+      const aktion = typ === "termin" ? "termin_umschalten" : "aufgabe_umschalten";
+      await api(aktion, { id });
+      return { text: warErledigt ? "Wieder offen" : "Erledigt", zurueck: async () => { await api(aktion, { id }); await ladeDaten(); } };
+    }
+    if (art === "erinnerung") {
+      await api("erinnerung_verschieben", { id });
+      return { text: "Erinnerung verschoben" };
+    }
+    const ziel = art === "heute" ? heuteISO() : addTage(heuteISO(), 1);
+    const zielText = art === "heute" ? "Auf heute verschoben" : "Auf morgen verschoben";
+    if (typ === "termin") {
+      const t = termine.find((x) => String(x.id) === String(id));
+      if (!t) throw new Error("Termin nicht gefunden");
+      const felder = (datum) => ({ id, titel: t.titel, datum, uhrzeit: t.uhrzeit ? t.uhrzeit.slice(0, 5) : null,
+        ende_uhrzeit: t.ende_uhrzeit ? t.ende_uhrzeit.slice(0, 5) : null, notiz: t.notiz || null, aktiver_bereich: bereichVon(t) });
+      const alt = t.datum;
+      await api("termin_aktualisieren", felder(ziel));
+      return { text: zielText, zurueck: async () => { await api("termin_aktualisieren", felder(alt)); await ladeDaten(); } };
+    }
+    const a = aufgaben.find((x) => String(x.id) === String(id));
+    if (!a) throw new Error("Aufgabe nicht gefunden");
+    // Alle Felder mitschicken – aufgabe_aktualisieren überschreibt sonst Projekt, Uhrzeit, Wiederholung
+    const felder = (datum) => ({ id, titel: a.titel, projekt_id: a.projekt_id || null, faellig_am: datum,
+      uhrzeit: a.uhrzeit ? a.uhrzeit.slice(0, 5) : null, ende_uhrzeit: a.ende_uhrzeit ? a.ende_uhrzeit.slice(0, 5) : null,
+      erinnere_alle_tage: a.erinnere_alle_tage || null });
+    const alt = a.faellig_am || null;
+    await api("aufgabe_aktualisieren", felder(ziel));
+    return { text: zielText, zurueck: async () => { await api("aufgabe_aktualisieren", felder(alt)); await ladeDaten(); } };
+  }
+
+  // Setzt die Zeile auf eine Verschiebung und färbt den Hintergrund passend zur Richtung
+  function wischSetzen(zeile, dx, animiert) {
+    const vorne = zeile.querySelector(".heute-zeile-vorne");
+    vorne.style.transition = animiert ? "transform 0.2s ease" : "none";
+    vorne.style.transform = dx ? `translateX(${dx}px)` : "";
+    zeile.classList.toggle("wisch-rechts", dx > 0);
+    zeile.classList.toggle("wisch-links", dx < 0);
+  }
+
+  (function wischEinrichten() {
+    const wurzel = document.getElementById("heute-bereich");
+    if (!wurzel) return;
+
+    wurzel.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || wisch) return;
+      const zeile = e.target.closest(".heute-zeile[data-wisch-id]");
+      if (!zeile) return;
+      wisch = { zeile, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, aktiv: false, breite: zeile.offsetWidth };
+    });
+
+    wurzel.addEventListener("pointermove", (e) => {
+      if (!wisch || e.pointerId !== wisch.id) return;
+      const dx = e.clientX - wisch.x0;
+      const dy = e.clientY - wisch.y0;
+      if (!wisch.aktiv) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { wisch = null; return; } // senkrecht → Scrollen
+        if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        wisch.aktiv = true;
+        wisch.zeile.classList.add("wischt");
+        try { wisch.zeile.setPointerCapture(e.pointerId); } catch (_e) { /* egal */ }
+      }
+      e.preventDefault();
+      // Nach links nur, wenn die Zeile dort etwas anbietet – sonst gedämpftes Nachgeben
+      let weg = dx;
+      if (dx < 0 && !wisch.zeile.dataset.wischLinks) weg = Math.max(dx * 0.25, -40);
+      wisch.dx = weg;
+      wischSetzen(wisch.zeile, weg, false);
+    });
+
+    const ende = async (e) => {
+      if (!wisch || e.pointerId !== wisch.id) return;
+      const w = wisch;
+      wisch = null;
+      if (!w.aktiv) return;
+      wischKlickSperre = Date.now() + 400;
+      w.zeile.classList.remove("wischt");
+      const schwelle = Math.min(120, w.breite * 0.35);
+      const richtung = w.dx > 0 ? "rechts" : "links";
+      const art = w.zeile.dataset.wischLinks;
+      if (e.type === "pointercancel" || Math.abs(w.dx) < schwelle || (richtung === "links" && !art)) {
+        wischSetzen(w.zeile, 0, true);
+        return;
+      }
+      wischSetzen(w.zeile, richtung === "rechts" ? w.breite : -w.breite, true);
+      try {
+        const erg = await wischAusfuehren(w.zeile.dataset.wischTyp, w.zeile.dataset.wischId, richtung, art);
+        try { localStorage.setItem("heute-wisch-tipp", "gesehen"); } catch (_e) { /* egal */ }
+        await ladeDaten();
+        hinweisZeigen(erg.text, erg.zurueck);
+      } catch (fehler) {
+        wischSetzen(w.zeile, 0, true);
+        alert("Konnte nicht gespeichert werden: " + (fehler.message || "Fehler"));
+      }
+    };
+    wurzel.addEventListener("pointerup", ende);
+    wurzel.addEventListener("pointercancel", ende);
+
+    // Nach einem Wisch keinen Klick auf Abhak-Kreis oder Zeile auslösen
+    wurzel.addEventListener("click", (e) => {
+      if (Date.now() < wischKlickSperre) { e.preventDefault(); e.stopPropagation(); }
+    }, true);
+  })();
+
+  // Einmaliger Tipp über der Liste, bis zum ersten Wisch (oder bis er weggetippt wird)
+  function heuteWischTippHtml() {
+    let gesehen = false;
+    try { gesehen = localStorage.getItem("heute-wisch-tipp") === "gesehen"; } catch (_e) { /* egal */ }
+    if (gesehen) return "";
+    return `<p class="heute-wisch-tipp">Tipp: Zeile nach rechts wischen = erledigt, nach links = verschieben.
+      <button type="button" class="link-btn" onclick="heuteWischTippWeg()">Verstanden</button></p>`;
+  }
+  window.heuteWischTippWeg = function() {
+    try { localStorage.setItem("heute-wisch-tipp", "gesehen"); } catch (_e) { /* egal */ }
+    renderHeute();
+  };
 
   // Liste „Heute“ in einer gemeinsamen Karte
   function heuteListeHtml(eintraege, jetztMinuten) {
@@ -3081,6 +3247,7 @@
     return `
       <section class="heute-block" aria-labelledby="heute-liste-titel">
         <div class="heute-block-kopf"><h2 class="heute-label" id="heute-liste-titel">Heute</h2>${eintraege.length ? `<span class="heute-block-zahl">${offen} offen</span>` : ""}</div>
+        ${eintraege.length ? heuteWischTippHtml() : ""}
         <div class="heute-liste">${inhalt}</div>
       </section>`;
   }
@@ -3093,7 +3260,7 @@
     const zeilen = liste.map((a) => {
       const t = tageSeitIso(a.faellig_am, heuteIso);
       return heuteZeileHtml({
-        id: a.id, typ: "aufgabe", zeit: formatDatumKurz(a.faellig_am), titel: a.titel, tab: "aufgaben",
+        id: a.id, typ: "aufgabe", zeit: formatDatumKurz(a.faellig_am), titel: a.titel, tab: "aufgaben", ueberfaellig: true,
         meta: "fällig " + (t === 1 ? "gestern" : t === 2 ? "vorgestern" : `vor ${t} Tagen`),
       }, -1);
     }).join("");
