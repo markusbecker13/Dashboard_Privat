@@ -738,7 +738,10 @@
     if (e) {
       if (!schnell.erkannt) schnell.vorErkennung = schnellFelderLesen();
       const heute = heuteISO();
-      const datum = e.datum || heute;
+      // Nur Uhrzeit: ein vorher gewählter Tag (Morgen/Datum) bleibt, sonst heute
+      const v = schnell.vorErkennung;
+      const vorherTag = v && v.wann === "morgen" ? addTage(heute, 1) : v && v.wann === "datum" && v.datum ? v.datum : null;
+      const datum = e.datum || vorherTag || heute;
       schnellFelderSetzen({
         wann: datum === heute ? "heute" : datum === addTage(heute, 1) ? "morgen" : "datum",
         datum: datum === heute || datum === addTage(heute, 1) ? "" : datum,
@@ -770,7 +773,13 @@
     if (!el) return;
     const e = schnell.erkannt;
     if (!e) { el.classList.add("hidden"); el.innerHTML = ""; return; }
-    const datum = e.datum || heuteISO();
+    el.innerHTML = erkanntHinweisHtml(e, e.datum || heuteISO()) +
+      `<button type="button" class="link-btn" onclick="schnellErkennungIgnorieren()">Ignorieren</button>`;
+    el.classList.remove("hidden");
+  }
+
+  // Text des Hinweises „Morgen · 15:00 Uhr – Titel: …“ (Schnellerfassung und Formulare)
+  function erkanntHinweisHtml(e, datum, zusatz = "") {
     const [j, m, t] = datum.split("-").map(Number);
     const d = new Date(j, m - 1, t);
     const heute = heuteISO();
@@ -778,9 +787,69 @@
       : d.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short", year: j !== new Date().getFullYear() ? "numeric" : undefined });
     const zeitText = e.uhrzeit ? ` · ${e.uhrzeit}${e.ende ? "–" + e.ende : ""} Uhr` : "";
     const titel = e.rest ? `Titel: „${escapeHtml(e.rest)}“` : "Titel bleibt wie getippt";
-    el.innerHTML = `${ic("kalender")}<span class="schnell-erkannt-text"><strong>${escapeHtml(tagText + zeitText)}</strong><span>${titel}</span></span>
-      <button type="button" class="link-btn" onclick="schnellErkennungIgnorieren()">Ignorieren</button>`;
-    el.classList.remove("hidden");
+    return `${ic("kalender")}<span class="schnell-erkannt-text"><strong>${escapeHtml(tagText + zeitText)}</strong><span>${titel}${zusatz ? " · " + escapeHtml(zusatz) : ""}</span></span>`;
+  }
+
+  // ==========================================================
+  // Erkennung in den Formularen „+ Neue Aufgabe“ und Kalender-Tag
+  // (seit Session 35). Gleiches Verhalten wie im „+“-Blatt: beim Tippen
+  // Felder setzen, Stand davor merken, „Ignorieren“ bzw. eine Änderung von
+  // Hand schaltet die Erkennung für diesen Eintrag ab.
+  // opt: { text, datum (ID oder null), uhrzeit, ende, hinweis, festerTag: () => ISO | null }
+  // Ohne Datumsfeld (Kalender) zählt der Tag aus festerTag(), ein erkanntes
+  // Datum liefert erkanntesDatum().
+  // ==========================================================
+  function formErkennung(opt) {
+    const st = { erkannt: null, aus: false, vorher: null };
+    const el = (id) => (id ? document.getElementById(id) : null);
+    const lesen = () => ({ datum: el(opt.datum) ? el(opt.datum).value : "", uhrzeit: el(opt.uhrzeit).value, ende: el(opt.ende).value });
+    const setzen = (w) => {
+      if (el(opt.datum)) el(opt.datum).value = w.datum || "";
+      el(opt.uhrzeit).value = w.uhrzeit || "";
+      el(opt.ende).value = w.ende || "";
+    };
+    st.rendern = () => {
+      const h = el(opt.hinweis);
+      if (!h) return;
+      const e = st.erkannt;
+      if (!e) { h.classList.add("hidden"); h.innerHTML = ""; return; }
+      const fest = opt.festerTag ? opt.festerTag() : null;
+      const datum = e.datum || fest || heuteISO();
+      const zusatz = fest && e.datum && e.datum !== fest ? "anderer Tag als ausgewählt" : "";
+      h.innerHTML = erkanntHinweisHtml(e, datum, zusatz) + `<button type="button" class="link-btn">Ignorieren</button>`;
+      h.querySelector("button").addEventListener("click", () => { st.ignorieren(); el(opt.text).focus(); });
+      h.classList.remove("hidden");
+    };
+    st.pruefen = () => {
+      const e = st.aus ? null : textDatumErkennen(el(opt.text).value);
+      if (e) {
+        if (!st.erkannt) st.vorher = lesen();
+        // Nur Uhrzeit: ein vorher eingetragenes Datum bleibt, sonst heute
+        // (im Kalender gilt ohnehin der gewählte Tag)
+        setzen({ datum: e.datum || (st.vorher && st.vorher.datum) || heuteISO(), uhrzeit: e.uhrzeit || "", ende: e.ende || "" });
+      } else if (st.erkannt && st.vorher) {
+        setzen(st.vorher);
+        st.vorher = null;
+      }
+      st.erkannt = e;
+      st.rendern();
+    };
+    st.ignorieren = () => {
+      if (st.vorher) setzen(st.vorher);
+      st.vorher = null; st.erkannt = null; st.aus = true;
+      st.rendern();
+    };
+    st.manuell = () => {
+      if (!st.erkannt) return;
+      st.vorher = null; st.erkannt = null; st.aus = true;
+      st.rendern();
+    };
+    st.titel = (roh) => (st.erkannt && st.erkannt.rest ? st.erkannt.rest : roh);
+    st.erkanntesDatum = () => (st.erkannt && st.erkannt.datum) || null;
+    st.zuruecksetzen = () => { st.erkannt = null; st.aus = false; st.vorher = null; st.rendern(); };
+    el(opt.text).addEventListener("input", st.pruefen);
+    [opt.datum, opt.uhrzeit, opt.ende].forEach((id) => { if (el(id)) el(id).addEventListener("input", st.manuell); });
+    return st;
   }
 
   // Klappt die Zusatzfelder auf bzw. zu
@@ -1409,9 +1478,15 @@
   });
 
   // Legt eine neue Aufgabe im aktiven Bereich an, leert das Formular und lädt neu
+  // Erkennung im Formular „+ Neue Aufgabe“ (seit Session 35)
+  const aufgabeErkennung = formErkennung({
+    text: "neue-aufgabe", datum: "aufgabe-faellig", uhrzeit: "aufgabe-uhrzeit", ende: "aufgabe-ende", hinweis: "aufgabe-erkannt",
+  });
+
   async function aufgabeHinzufuegen() {
-    const titel = document.getElementById("neue-aufgabe").value.trim();
-    if (!titel) return;
+    const eingabe = document.getElementById("neue-aufgabe").value.trim();
+    if (!eingabe) return;
+    const titel = aufgabeErkennung.titel(eingabe);
     const projekt_id = document.getElementById("aufgabe-projekt").value || null;
     const faellig_am = document.getElementById("aufgabe-faellig").value || null;
     const uhrzeit = document.getElementById("aufgabe-uhrzeit").value || null;
@@ -1424,6 +1499,7 @@
     document.getElementById("aufgabe-uhrzeit").value = "";
     document.getElementById("aufgabe-ende").value = "";
     document.getElementById("aufgabe-intervall").value = "";
+    aufgabeErkennung.zuruecksetzen();
     await ladeDaten();
   }
 
@@ -2724,6 +2800,8 @@
   };
 
   // Rendert das Tagespanel mit Terminen und Formular zum Anlegen oder Bearbeiten
+  let terminErkennung = null; // Erkennung im Tagespanel (seit Session 35, neu je Darstellung)
+
   function renderCalDayPanel() {
     const panel = document.getElementById("cal-day-panel");
     if (!calAusgewaehlterTag) { panel.innerHTML = ""; return; }
@@ -2761,7 +2839,8 @@
         ${itemsHtml}
         ${formTitel ? `<div class="project-heading" style="margin:1rem 0 0.4rem;">${formTitel}</div>` : ""}
         <div class="termin-form">
-          <input type="text" id="termin-titel" placeholder="Titel" value="${bearbeiteterTermin ? escapeAttr(bearbeiteterTermin.titel) : ""}">
+          <input type="text" id="termin-titel" placeholder="${bearbeiteterTermin ? "Titel" : "Titel, z. B. „Elternabend 19 Uhr“"}" value="${bearbeiteterTermin ? escapeAttr(bearbeiteterTermin.titel) : ""}">
+          ${bearbeiteterTermin ? "" : `<div class="schnell-erkannt form-erkannt hidden" id="termin-erkannt" role="status" aria-live="polite"></div>`}
           <input type="time" id="termin-uhrzeit" style="width:8rem;" title="Beginn (optional)" value="${bearbeiteterTermin && bearbeiteterTermin.uhrzeit ? bearbeiteterTermin.uhrzeit.slice(0,5) : ""}">
           <input type="time" id="termin-ende" style="width:8rem;" title="Ende (optional)" value="${bearbeiteterTermin && bearbeiteterTermin.ende_uhrzeit ? bearbeiteterTermin.ende_uhrzeit.slice(0,5) : ""}">
           <input type="text" id="termin-notiz" placeholder="Notiz (optional)" value="${bearbeiteterTermin && bearbeiteterTermin.notiz ? escapeAttr(bearbeiteterTermin.notiz) : ""}">
@@ -2769,6 +2848,11 @@
           ${abbrechenHtml}
         </div>
       </div>`;
+    // Erkennung nur beim Anlegen – beim Bearbeiten bleibt der Titel unangetastet
+    terminErkennung = bearbeiteterTermin ? null : formErkennung({
+      text: "termin-titel", datum: null, uhrzeit: "termin-uhrzeit", ende: "termin-ende", hinweis: "termin-erkannt",
+      festerTag: () => calAusgewaehlterTag,
+    });
 
     document.getElementById("btn-termin-hinzufuegen").addEventListener("click", bearbeiteterTermin ? terminAktualisieren : terminHinzufuegen);
     document.getElementById("termin-titel").addEventListener("keydown", (e) => {
@@ -2790,13 +2874,22 @@
 
   // Legt einen Termin am ausgewählten Tag im aktiven Bereich an und lädt neu
   async function terminHinzufuegen() {
-    const titel = document.getElementById("termin-titel").value.trim();
-    if (!titel || !calAusgewaehlterTag) return;
+    const eingabe = document.getElementById("termin-titel").value.trim();
+    if (!eingabe || !calAusgewaehlterTag) return;
+    const titel = terminErkennung ? terminErkennung.titel(eingabe) : eingabe;
+    // Erkanntes Datum im Text („… am 12.10.“) geht vor dem angetippten Tag
+    const datum = (terminErkennung && terminErkennung.erkanntesDatum()) || calAusgewaehlterTag;
     const uhrzeit = document.getElementById("termin-uhrzeit").value || null;
     const ende_uhrzeit = document.getElementById("termin-ende").value || null;
     const notiz = document.getElementById("termin-notiz").value.trim() || null;
 
-    await api("termin_hinzufuegen", { titel, datum: calAusgewaehlterTag, uhrzeit, ende_uhrzeit, notiz, bereich: aktiverBereich });
+    await api("termin_hinzufuegen", { titel, datum, uhrzeit, ende_uhrzeit, notiz, bereich: aktiverBereich });
+    // Anderer Tag erkannt: dorthin springen, damit der neue Termin sichtbar ist
+    if (datum !== calAusgewaehlterTag) {
+      calAusgewaehlterTag = datum;
+      const [j, m] = datum.split("-").map(Number);
+      calMonat = new Date(j, m - 1, 1);
+    }
     await ladeDaten();
     renderKalender();
   }
