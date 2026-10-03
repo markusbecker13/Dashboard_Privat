@@ -1455,3 +1455,5 @@
 .blatt-ausgabe { padding: 0.35rem 0; font-size: 0.9rem; color: var(--ink); }
 .blatt-ausgabe + .blatt-ausgabe { border-top: 1px solid var(--border); }
 .blatt-ausgabe-knoepfe { display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem; }
+/* Stift zum Bearbeiten in Notizen, Links, Ideen (Bearbeiten-Blatt) – genug Tippfläche */
+.notiz-item > .task-edit-btn, .link-item > .task-edit-btn { min-width: 44px; min-height: 44px; }
