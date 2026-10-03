@@ -1830,8 +1830,11 @@
       ? `<button class="task-snooze" onclick="erinnerungVerschieben('${a.id}')" title="Später erneut erinnern" aria-label="Später erneut erinnern">${ic("wiederholen")}</button>`
       : "";
 
+    const links = aufgabeWischLinks(a, done);
     return `
-      <div class="task ${!done ? a.status : ""}">
+      <div class="task-wisch wisch-zeile" data-wisch-typ="aufgabe" data-wisch-id="${a.id}" data-wisch-links="${links}">
+      ${wischHinterHtml(done ? "wiederholen" : "ok-kreis", done ? "Wieder offen" : "Erledigt", links)}
+      <div class="task wisch-vorne ${!done ? a.status : ""}">
         <button class="task-check ${done ? "done" : ""}" onclick="umschalten('${a.id}')">${done ? "✓" : ""}</button>
         <div class="task-info">
           <span class="task-titel ${done ? "done" : ""}">${escapeHtml(a.titel)}</span>
@@ -1840,6 +1843,7 @@
         ${snoozeBtn}
         <button class="task-edit-btn" onclick="aufgabeBearbeitenStart('${a.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
         <button class="task-delete" onclick="loeschen('${a.id}')" aria-label="Löschen">${ic("x")}</button>
+      </div>
       </div>`;
   }
 
@@ -3075,7 +3079,27 @@
     if (e.erinnerung) return "erinnerung";
     return "morgen";
   }
-  const WISCH_LINKS_TEXT = { morgen: ["kalender", "Morgen"], heute: ["kalender", "Auf heute"], erinnerung: ["wiederholen", "Später erinnern"] };
+  const WISCH_LINKS_TEXT = {
+    morgen: ["kalender", "Morgen"], heute: ["kalender", "Auf heute"], spaeter: ["kalender", "+1 Tag"],
+    erinnerung: ["wiederholen", "Später erinnern"], loeschen: ["x", "Löschen"],
+  };
+  // Farbige Rückseite einer wischbaren Zeile: links die Rechts-Aktion, rechts die Links-Aktion
+  function wischHinterHtml(rechtsIcon, rechtsText, links) {
+    const [linksIcon, linksText] = WISCH_LINKS_TEXT[links] || ["", ""];
+    return `<div class="wisch-hinter" aria-hidden="true">
+          <span class="wisch-text-rechts">${ic(rechtsIcon)} ${rechtsText}</span>
+          <span class="wisch-text-links">${links ? `${linksText} ${ic(linksIcon)}` : ""}</span>
+        </div>`;
+  }
+  // Wisch nach links in der Aufgabenliste: überfällig → heute, fällige Erinnerung → später,
+  // Datum in der Zukunft → einen Tag später, sonst → morgen; erledigt → nichts
+  function aufgabeWischLinks(a, done) {
+    if (done) return "";
+    if (a.status === "ueberfaellig") return "heute";
+    if (a.erinnerungFaellig && a.status !== "heute") return "erinnerung";
+    if (a.faellig_am && a.faellig_am > heuteISO()) return "spaeter";
+    return "morgen";
+  }
 
   // Eine Zeile der Liste „Heute“ bzw. „Überfällig“: Abhak-Kreis, Zeit, Titel, Art.
   // Seit Session 35 wischbar: nach rechts = erledigt/wieder offen, nach links = verschieben.
@@ -3086,14 +3110,11 @@
     if (laeuftJetzt) klassen.push("jetzt");
     if (e.erledigt) klassen.push("erledigt");
     const links = heuteWischLinks(e);
-    const [linksIcon, linksText] = WISCH_LINKS_TEXT[links] || ["", ""];
+    klassen.push("wisch-zeile");
     return `
       <div class="${klassen.join(" ")}" data-wisch-typ="${e.typ}" data-wisch-id="${e.id}" data-wisch-links="${links}">
-        <div class="heute-wisch-hinter" aria-hidden="true">
-          <span class="heute-wisch-rechts">${ic(e.erledigt ? "wiederholen" : "ok-kreis")} ${e.erledigt ? "Wieder offen" : "Erledigt"}</span>
-          <span class="heute-wisch-links">${links ? `${linksText} ${ic(linksIcon)}` : ""}</span>
-        </div>
-        <div class="heute-zeile-vorne">
+        ${wischHinterHtml(e.erledigt ? "wiederholen" : "ok-kreis", e.erledigt ? "Wieder offen" : "Erledigt", links)}
+        <div class="heute-zeile-vorne wisch-vorne">
         <button class="zl-check ${e.erledigt ? "done" : ""}" onclick="zeitleisteUmschalten('${e.typ}','${e.id}', this)"
           title="${e.erledigt ? "Wieder offen" : "Erledigt"}" aria-label="${escapeAttr(e.titel)} ${e.erledigt ? "wieder öffnen" : "als erledigt markieren"}"></button>
         <span class="heute-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
@@ -3107,9 +3128,10 @@
 
 
   // ==========================================================
-  // Wischgesten in „Heute“ (seit Session 35)
-  // Nach rechts: erledigt bzw. wieder offen. Nach links: Aufgabe/Termin auf
-  // morgen, überfällige Aufgabe auf heute, Erinnerung später. Danach kurz
+  // Wischgesten (seit Session 35) in „Heute“, Aufgaben und Einkauf
+  // Nach rechts: erledigt/abgehakt bzw. wieder offen. Nach links: Aufgabe/
+  // Termin auf morgen (Aufgabe mit späterem Datum: +1 Tag), überfällige
+  // Aufgabe auf heute, Erinnerung später, Einkauf löschen. Danach kurz
   // „Rückgängig“ (außer bei Erinnerungen). Senkrechtes Scrollen bleibt dem
   // Browser (touch-action: pan-y); erst eine klar waagerechte Bewegung wird
   // zum Wisch, sonst bleibt alles ein normaler Tipp.
@@ -3119,6 +3141,26 @@
 
   // Führt die Aktion eines Wischs aus; liefert den Hinweistext und ggf. eine Rückgängig-Funktion
   async function wischAusfuehren(typ, id, richtung, art) {
+    if (typ === "einkauf") {
+      const e = einkaufsliste.find((x) => String(x.id) === String(id));
+      if (!e) throw new Error("Eintrag nicht gefunden");
+      if (richtung === "rechts") {
+        await api("einkauf_umschalten", { id });
+        return { text: e.erledigt ? "Wieder offen" : "Abgehakt", zurueck: async () => { await api("einkauf_umschalten", { id }); await ladeDaten(); } };
+      }
+      await api("einkauf_loeschen", { id });
+      // Rückgängig legt den Eintrag neu an (neue ID); war er abgehakt, wird er wieder abgehakt
+      return { text: `„${e.text}“ gelöscht`, zurueck: async () => {
+        const vorher = new Set(einkaufsliste.map((x) => String(x.id)));
+        await api("einkauf_hinzufuegen", { text: e.text, bereich: bereichVon(e) });
+        if (e.erledigt) {
+          await ladeDaten();
+          const neu = einkaufsliste.find((x) => !vorher.has(String(x.id)) && x.text === e.text);
+          if (neu) await api("einkauf_umschalten", { id: neu.id });
+        }
+        await ladeDaten();
+      } };
+    }
     if (richtung === "rechts") {
       const eintrag = (typ === "termin" ? termine : aufgaben).find((x) => String(x.id) === String(id));
       const warErledigt = !!(eintrag && eintrag.erledigt);
@@ -3130,8 +3172,12 @@
       await api("erinnerung_verschieben", { id });
       return { text: "Erinnerung verschoben" };
     }
-    const ziel = art === "heute" ? heuteISO() : addTage(heuteISO(), 1);
-    const zielText = art === "heute" ? "Auf heute verschoben" : "Auf morgen verschoben";
+    const eintragVorher = (typ === "termin" ? termine : aufgaben).find((x) => String(x.id) === String(id));
+    const ziel = art === "heute" ? heuteISO()
+      : art === "spaeter" && eintragVorher && eintragVorher.faellig_am ? addTage(eintragVorher.faellig_am, 1)
+      : addTage(heuteISO(), 1);
+    const zielText = art === "heute" ? "Auf heute verschoben"
+      : art === "spaeter" ? `Auf ${formatDatumKurz(ziel)} verschoben` : "Auf morgen verschoben";
     if (typ === "termin") {
       const t = termine.find((x) => String(x.id) === String(id));
       if (!t) throw new Error("Termin nicht gefunden");
@@ -3154,20 +3200,21 @@
 
   // Setzt die Zeile auf eine Verschiebung und färbt den Hintergrund passend zur Richtung
   function wischSetzen(zeile, dx, animiert) {
-    const vorne = zeile.querySelector(".heute-zeile-vorne");
+    const vorne = zeile.querySelector(".wisch-vorne");
     vorne.style.transition = animiert ? "transform 0.2s ease" : "none";
     vorne.style.transform = dx ? `translateX(${dx}px)` : "";
     zeile.classList.toggle("wisch-rechts", dx > 0);
     zeile.classList.toggle("wisch-links", dx < 0);
   }
 
-  (function wischEinrichten() {
-    const wurzel = document.getElementById("heute-bereich");
+  // Eingerichtet für „Heute“, die Aufgabenliste und den Einkauf (je per Delegation auf dem Container)
+  ["heute-bereich", "listen-bereich", "erledigt-bereich", "einkauf-bereich"].forEach(function wischEinrichten(wurzelId) {
+    const wurzel = document.getElementById(wurzelId);
     if (!wurzel) return;
 
     wurzel.addEventListener("pointerdown", (e) => {
       if (e.button !== 0 || wisch) return;
-      const zeile = e.target.closest(".heute-zeile[data-wisch-id]");
+      const zeile = e.target.closest(".wisch-zeile[data-wisch-id]");
       if (!zeile) return;
       wisch = { zeile, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, aktiv: false, breite: zeile.offsetWidth };
     });
@@ -3223,7 +3270,7 @@
     wurzel.addEventListener("click", (e) => {
       if (Date.now() < wischKlickSperre) { e.preventDefault(); e.stopPropagation(); }
     }, true);
-  })();
+  });
 
   // Einmaliger Tipp über der Liste, bis zum ersten Wisch (oder bis er weggetippt wird)
   function heuteWischTippHtml() {
@@ -8697,19 +8744,25 @@
       html = '<p class="empty-text">Nichts auf der Liste.</p>';
     } else {
       html += '<div class="task-list">' + offen.map((e) => `
-        <div class="task">
+        <div class="task-wisch wisch-zeile" data-wisch-typ="einkauf" data-wisch-id="${e.id}" data-wisch-links="loeschen">
+        ${wischHinterHtml("ok-kreis", "Abhaken", "loeschen")}
+        <div class="task wisch-vorne">
           <button class="task-check" onclick="einkaufUmschalten('${e.id}')"></button>
           <div class="task-info"><span class="task-titel">${escapeHtml(e.text)}</span></div>
           <button class="task-delete" onclick="einkaufLoeschen('${e.id}')" aria-label="Löschen">${ic("x")}</button>
+        </div>
         </div>`).join("") + '</div>';
 
       if (erledigt.length > 0) {
         html += `<div class="project-heading" style="margin-top:1.4rem;">Erledigt (${erledigt.length})</div><div class="task-list">` +
           erledigt.map((e) => `
-            <div class="task">
+            <div class="task-wisch wisch-zeile" data-wisch-typ="einkauf" data-wisch-id="${e.id}" data-wisch-links="loeschen">
+            ${wischHinterHtml("wiederholen", "Wieder offen", "loeschen")}
+            <div class="task wisch-vorne">
               <button class="task-check done" onclick="einkaufUmschalten('${e.id}')">✓</button>
               <div class="task-info"><span class="task-titel done">${escapeHtml(e.text)}</span></div>
               <button class="task-delete" onclick="einkaufLoeschen('${e.id}')" aria-label="Löschen">${ic("x")}</button>
+            </div>
             </div>`).join("") + '</div>';
       }
     }
