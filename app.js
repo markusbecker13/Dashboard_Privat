@@ -727,6 +727,242 @@
     if (aktiverTab === "frei") renderFrei();
   };
 
+  // ==========================================================
+  // Allgemeines Bearbeiten-Blatt (seit Session 35) – gleicher Look wie das
+  // „+“-Blatt, Felder kommen aus BLATT_ARTEN. Genutzt von Blockzeiten,
+  // Inventar und Verleih; weitere Reiter lassen sich hier anschließen.
+  // Feldtypen: text, zahl, datum, zeit, text-lang, chips (eine Auswahl),
+  // wochentage (mehrere), info (nur Anzeige). „wenn(werte)“ blendet ein
+  // Feld ein oder aus, „pflicht“ prüft vor dem Speichern.
+  // ==========================================================
+  const BLATT_ARTEN = {
+    blockzeit: {
+      titel: "Blockzeit bearbeiten",
+      finden: (id) => blockzeiten.find((b) => String(b.id) === String(id)),
+      laden: (b) => ({
+        titel: b.titel || "",
+        start: b.start_zeit ? b.start_zeit.slice(0, 5) : "",
+        ende: b.end_zeit ? b.end_zeit.slice(0, 5) : "",
+        art: b.datum ? "einmalig" : "wiederkehrend",
+        wochentage: Array.isArray(b.wochentage) ? b.wochentage.map(Number) : [],
+        datum: b.datum || "",
+        notiz: b.notiz || "",
+      }),
+      felder: [
+        { key: "titel", label: "Titel", typ: "text", pflicht: true },
+        { key: "start", label: "Von", typ: "zeit", pflicht: true, halb: true },
+        { key: "ende", label: "Bis", typ: "zeit", pflicht: true, halb: true },
+        { key: "art", label: "Wiederholung", typ: "chips", optionen: [["wiederkehrend", "Wiederkehrend"], ["einmalig", "Einmalig"]] },
+        { key: "wochentage", label: "Wochentage", typ: "wochentage", wenn: (w) => w.art === "wiederkehrend" },
+        { key: "datum", label: "Datum", typ: "datum", wenn: (w) => w.art === "einmalig" },
+        { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional" },
+      ],
+      pruefen: (w) => {
+        if (w.ende <= w.start) return "Das Ende muss nach dem Beginn liegen.";
+        if (w.art === "wiederkehrend" && !w.wochentage.length) return "Bitte mindestens einen Wochentag wählen.";
+        if (w.art === "einmalig" && !w.datum) return "Bitte ein Datum wählen.";
+        return "";
+      },
+      speichern: (id, w) => api("blockzeit_aktualisieren", {
+        id, titel: w.titel, start_zeit: w.start, end_zeit: w.ende, notiz: w.notiz || null,
+        wochentage: w.art === "wiederkehrend" ? [...w.wochentage].sort((a, b) => a - b) : null,
+        datum: w.art === "einmalig" ? w.datum : null,
+      }),
+      loeschen: (id) => api("blockzeit_loeschen", { id }),
+      loeschFrage: (b) => `Blockzeit „${b.titel}“ löschen?`,
+      gespeichert: "Blockzeit gespeichert",
+      danach: () => { if (aktiverTab === "frei") renderFrei(); },
+    },
+
+    inventar: {
+      titel: "Gegenstand bearbeiten",
+      finden: (id) => ogsInventar.find((i) => String(i.id) === String(id)),
+      laden: (i) => ({
+        name: i.name || "", kategorie: i.kategorie || "", menge: String(i.menge || 1),
+        wert: invWert(i) === null ? "" : String(invWert(i)), standort: i.standort || "",
+        beschreibung: i.beschreibung || "", zustand: i.zustand || "gut",
+      }),
+      felder: [
+        { key: "name", label: "Gegenstand", typ: "text", pflicht: true },
+        { key: "kategorie", label: "Kategorie", typ: "text", pflicht: true, liste: "inv-kategorie-liste" },
+        { key: "menge", label: "Menge", typ: "zahl", min: 1, halb: true },
+        { key: "wert", label: "Wert je Stück (€)", typ: "zahl", min: 0, schritt: "0.01", halb: true, platzhalter: "optional" },
+        { key: "zustand", label: "Zustand", typ: "chips", optionen: [["gut", "Gut"], ["eingeschraenkt", "Eingeschränkt"], ["defekt", "Defekt"]] },
+        { key: "standort", label: "Standort", typ: "text", platzhalter: "optional" },
+        { key: "beschreibung", label: "Beschreibung", typ: "text-lang", platzhalter: "optional" },
+      ],
+      speichern: (id, w) => api("ogs_inventar_aktualisieren", {
+        id, name: w.name, kategorie: w.kategorie, menge: w.menge || 1, standort: w.standort || null,
+        beschreibung: w.beschreibung || null, zustand: w.zustand, wiederbeschaffungswert: w.wert,
+      }),
+      loeschen: (id) => api("ogs_inventar_loeschen", { id }),
+      loeschFrage: (i) => `Gegenstand „${i.name}“ wirklich löschen?`,
+      gespeichert: "Gegenstand gespeichert",
+      // Kategorie nach dem Speichern offen lassen (auch eine geänderte)
+      vorher: (w) => { invGruppenOffen.add(invGruppenSchluessel(w.kategorie)); invGruppenMerken(); },
+    },
+
+    verleih: {
+      titel: "Verleih bearbeiten",
+      finden: (id) => verleih.find((v) => String(v.id) === String(id)),
+      laden: (v) => ({
+        gegenstand: (ogsInventar.find((i) => i.id === v.inventar_id) || {}).name || "(gelöschter Gegenstand)",
+        an: v.ausgeliehen_an || "", menge: String(v.menge || 1),
+        am: v.ausgeliehen_am || "", zurueck: v.rueckgabe_am || "", notiz: v.notiz || "",
+      }),
+      felder: [
+        { key: "gegenstand", label: "Gegenstand", typ: "info" },
+        { key: "an", label: "An wen", typ: "text", pflicht: true },
+        { key: "menge", label: "Menge", typ: "zahl", min: 1, halb: true },
+        { key: "am", label: "Ausgeliehen am", typ: "datum", pflicht: true, halb: true },
+        { key: "zurueck", label: "Zurück am", typ: "datum", hinweis: "leer = noch verliehen" },
+        { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional" },
+      ],
+      pruefen: (w) => (w.zurueck && w.zurueck < w.am ? "Die Rückgabe liegt vor dem Ausleihen." : ""),
+      speichern: (id, w) => api("verleih_aktualisieren", {
+        id, ausgeliehen_an: w.an, menge: w.menge || 1, ausgeliehen_am: w.am, rueckgabe_am: w.zurueck || null, notiz: w.notiz || null,
+      }),
+      loeschen: (id) => api("verleih_loeschen", { id }),
+      loeschFrage: () => "Diesen Verleih-Eintrag endgültig löschen?",
+      gespeichert: "Verleih gespeichert",
+    },
+  };
+
+  let blatt = null; // { art, id, werte }
+
+  // Öffnet das Bearbeiten-Blatt für einen Eintrag
+  window.blattOeffnen = function(art, id) {
+    const cfg = BLATT_ARTEN[art];
+    const dlg = document.getElementById("blatt-dialog");
+    const eintrag = cfg && cfg.finden(id);
+    if (!dlg || !eintrag) return;
+    blatt = { art, id: eintrag.id, werte: cfg.laden(eintrag) };
+    document.getElementById("blatt-titel").textContent = cfg.titel;
+    blattMeldung("", false);
+    blattRendern();
+    if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    const erstes = dlg.querySelector("#blatt-felder input, #blatt-felder textarea");
+    if (erstes) erstes.focus();
+  };
+
+  window.blattSchliessen = function() {
+    const dlg = document.getElementById("blatt-dialog");
+    if (!dlg) return;
+    if (typeof dlg.close === "function" && dlg.open) dlg.close(); else dlg.removeAttribute("open");
+  };
+
+  function blattMeldung(text, fehler) {
+    const el = document.getElementById("blatt-status");
+    el.textContent = text;
+    el.classList.toggle("fehler", !!fehler);
+  }
+
+  // Zeichnet die Felder; Werte stehen in blatt.werte, damit Neuzeichnen nichts verliert
+  function blattRendern() {
+    const cfg = BLATT_ARTEN[blatt.art];
+    const w = blatt.werte;
+    const html = cfg.felder.filter((f) => !f.wenn || f.wenn(w)).map((f) => {
+      const id = `blatt-f-${f.key}`;
+      const label = `<span class="schnell-label blatt-label">${escapeHtml(f.label)}</span>`;
+      const ph = f.platzhalter ? ` placeholder="${escapeAttr(f.platzhalter)}"` : "";
+      const daten = ` data-feld="${f.key}"`;
+      let feld = "";
+      if (f.typ === "info") {
+        feld = `<p class="blatt-info" id="${id}">${escapeHtml(w[f.key])}</p>`;
+      } else if (f.typ === "chips") {
+        feld = `<div class="schnell-chips" role="group" aria-label="${escapeAttr(f.label)}">` + f.optionen.map(([wert, text]) =>
+          `<button type="button" class="schnell-chip${w[f.key] === wert ? " aktiv" : ""}" aria-pressed="${w[f.key] === wert}"
+            onclick="blattWaehlen('${f.key}','${wert}')">${escapeHtml(text)}</button>`).join("") + `</div>`;
+      } else if (f.typ === "wochentage") {
+        feld = `<div class="schnell-chips blatt-wochentage" role="group" aria-label="${escapeAttr(f.label)}">` + TAGLABEL.map((t, i) => {
+          const an = w[f.key].includes(i);
+          return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="blattWochentag(${i})">${t}</button>`;
+        }).join("") + `</div>`;
+      } else if (f.typ === "text-lang") {
+        feld = `<textarea id="${id}" class="schnell-notiz" rows="3"${daten}${ph}>${escapeHtml(w[f.key])}</textarea>`;
+      } else {
+        const typ = { text: "text", zahl: "number", datum: "date", zeit: "time" }[f.typ];
+        const extra = (f.liste ? ` list="${f.liste}"` : "") + (f.min !== undefined ? ` min="${f.min}"` : "") +
+          (f.schritt ? ` step="${f.schritt}"` : "") + (f.typ === "zahl" ? ` inputmode="${f.schritt ? "decimal" : "numeric"}"` : "");
+        feld = `<input type="${typ}" id="${id}" value="${escapeAttr(w[f.key])}"${daten}${ph}${extra} autocomplete="off">`;
+      }
+      const hinweis = f.hinweis ? `<span class="blatt-hinweis">${escapeHtml(f.hinweis)}</span>` : "";
+      const fuer = ["chips", "wochentage", "info"].includes(f.typ) ? "div" : "label";
+      return `<${fuer} class="blatt-feld${f.halb ? " halb" : ""}"${fuer === "label" ? ` for="${id}"` : ""}>${label}${feld}${hinweis}</${fuer}>`;
+    }).join("");
+    const box = document.getElementById("blatt-felder");
+    box.innerHTML = html;
+    box.querySelectorAll("[data-feld]").forEach((el) => {
+      el.addEventListener("input", () => { blatt.werte[el.dataset.feld] = el.value; });
+      if (el.tagName === "INPUT") el.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.blattSpeichern(); } });
+    });
+  }
+
+  window.blattWaehlen = function(key, wert) {
+    blatt.werte[key] = wert;
+    blattRendern();
+  };
+  window.blattWochentag = function(i) {
+    const liste = blatt.werte.wochentage;
+    blatt.werte.wochentage = liste.includes(i) ? liste.filter((x) => x !== i) : [...liste, i];
+    blattRendern();
+  };
+
+  window.blattSpeichern = async function() {
+    if (!blatt) return;
+    const cfg = BLATT_ARTEN[blatt.art];
+    const w = blatt.werte;
+    Object.keys(w).forEach((k) => { if (typeof w[k] === "string") w[k] = w[k].trim(); });
+    const fehlt = cfg.felder.find((f) => f.pflicht && (!f.wenn || f.wenn(w)) && !w[f.key]);
+    if (fehlt) {
+      blattMeldung(`Bitte „${fehlt.label}“ ausfüllen.`, true);
+      const el = document.getElementById(`blatt-f-${fehlt.key}`);
+      if (el) el.focus();
+      return;
+    }
+    const problem = cfg.pruefen ? cfg.pruefen(w) : "";
+    if (problem) { blattMeldung(problem, true); return; }
+    const knopf = document.getElementById("blatt-speichern");
+    knopf.disabled = true;
+    blattMeldung("Speichere …", false);
+    try {
+      await cfg.speichern(blatt.id, w);
+    } catch (e) {
+      blattMeldung("Nicht gespeichert: " + (e.message || "Fehler"), true);
+      knopf.disabled = false;
+      return;
+    }
+    knopf.disabled = false;
+    if (cfg.vorher) cfg.vorher(w);
+    window.blattSchliessen();
+    hinweisZeigen(cfg.gespeichert);
+    await ladeDaten();
+    if (cfg.danach) cfg.danach();
+  };
+
+  window.blattLoeschen = async function() {
+    if (!blatt) return;
+    const cfg = BLATT_ARTEN[blatt.art];
+    const eintrag = cfg.finden(blatt.id);
+    if (!confirm(cfg.loeschFrage(eintrag || {}))) return;
+    try {
+      await cfg.loeschen(blatt.id);
+    } catch (e) {
+      blattMeldung("Nicht gelöscht: " + (e.message || "Fehler"), true);
+      return;
+    }
+    window.blattSchliessen();
+    hinweisZeigen("Gelöscht");
+    await ladeDaten();
+    if (cfg.danach) cfg.danach();
+  };
+
+  // Tipp neben das Blatt schließt es (Escape schließt der Browser selbst)
+  (function blattEinrichten() {
+    const dlg = document.getElementById("blatt-dialog");
+    if (dlg) dlg.addEventListener("click", (e) => { if (e.target === dlg) window.blattSchliessen(); });
+  })();
+
   // Schließt das Blatt und öffnet stattdessen das Formular des offenen Reiters
   window.schnellZumReiterformular = function() {
     window.schnellSchliessen();
@@ -1325,6 +1561,7 @@
     renderBlockzeiten();
     renderOgsIdeen();
     renderInventar();
+    renderVerleih();
     renderProjekte();
     renderSpiele();
     renderRezepte();
@@ -2909,8 +3146,6 @@
   // ==========================================================
   // Blockzeiten ("nicht stören" – wiederkehrend oder einmalig)
   // ==========================================================
-  let blockzeitBearbeiteterId = null;
-
   document.getElementById("toggle-blockzeit-form").addEventListener("click", (e) => {
     const form = document.getElementById("blockzeit-form");
     form.classList.toggle("hidden");
@@ -2939,11 +3174,9 @@
   renderBlockzeitWochentage();
 
   document.getElementById("btn-blockzeit-anlegen").addEventListener("click", blockzeitSpeichern);
-  document.getElementById("btn-blockzeit-abbrechen").addEventListener("click", blockzeitFormZuruecksetzen);
 
-  // Setzt das Blockzeit-Formular auf Anlegen-Modus mit leeren Feldern zurück
+  // Setzt das Blockzeit-Formular nach dem Anlegen zurück
   function blockzeitFormZuruecksetzen() {
-    blockzeitBearbeiteterId = null;
     document.getElementById("blockzeit-titel").value = "";
     document.getElementById("blockzeit-start").value = "";
     document.getElementById("blockzeit-ende").value = "";
@@ -2952,39 +3185,14 @@
     document.getElementById("blockzeit-art-wiederkehrend").checked = true;
     document.querySelectorAll(".blockzeit-wochentag-cb").forEach((cb) => { cb.checked = false; });
     blockzeitArtUmschalten();
-    document.getElementById("btn-blockzeit-anlegen").textContent = "Anlegen";
-    document.getElementById("btn-blockzeit-abbrechen").classList.add("hidden");
   }
 
-  // Füllt das Blockzeit-Formular mit einer bestehenden Blockzeit zum Bearbeiten
+  // Bearbeiten einer Blockzeit: seit Session 35 im Bearbeiten-Blatt
   window.blockzeitBearbeitenStart = function(id) {
-    const b = blockzeiten.find((bb) => bb.id === id);
-    if (!b) return;
-    blockzeitBearbeiteterId = id;
-    reiterFormularOeffnen("einst-kalender");
-    document.getElementById("blockzeit-form").classList.remove("hidden");
-    document.getElementById("toggle-blockzeit-form").textContent = "▾ Neue Blockzeit anlegen";
-    document.getElementById("blockzeit-titel").value = b.titel;
-    document.getElementById("blockzeit-start").value = b.start_zeit ? b.start_zeit.slice(0,5) : "";
-    document.getElementById("blockzeit-ende").value = b.end_zeit ? b.end_zeit.slice(0,5) : "";
-    document.getElementById("blockzeit-notiz").value = b.notiz || "";
-    document.querySelectorAll(".blockzeit-wochentag-cb").forEach((cb) => { cb.checked = false; });
-    if (b.datum) {
-      document.getElementById("blockzeit-art-einmalig").checked = true;
-      document.getElementById("blockzeit-datum").value = b.datum;
-    } else {
-      document.getElementById("blockzeit-art-wiederkehrend").checked = true;
-      document.querySelectorAll(".blockzeit-wochentag-cb").forEach((cb) => {
-        cb.checked = (b.wochentage || []).includes(parseInt(cb.value, 10));
-      });
-    }
-    blockzeitArtUmschalten();
-    document.getElementById("btn-blockzeit-anlegen").textContent = "Speichern";
-    document.getElementById("btn-blockzeit-abbrechen").classList.remove("hidden");
-    document.getElementById("blockzeit-titel").scrollIntoView({ behavior: "smooth", block: "center" });
+    window.blattOeffnen("blockzeit", id);
   };
 
-  // Prüft Eingaben und legt die Blockzeit an oder aktualisiert sie (wiederkehrend oder einmalig)
+  // Prüft Eingaben und legt eine neue Blockzeit an (wiederkehrend oder einmalig)
   async function blockzeitSpeichern() {
     const titel = document.getElementById("blockzeit-titel").value.trim();
     const start_zeit = document.getElementById("blockzeit-start").value;
@@ -3003,18 +3211,13 @@
     }
     const notiz = document.getElementById("blockzeit-notiz").value.trim() || null;
 
-    if (blockzeitBearbeiteterId) {
-      await api("blockzeit_aktualisieren", { id: blockzeitBearbeiteterId, titel, start_zeit, end_zeit, wochentage, datum, notiz });
-    } else {
-      await api("blockzeit_hinzufuegen", { titel, start_zeit, end_zeit, wochentage, datum, notiz });
-    }
+    await api("blockzeit_hinzufuegen", { titel, start_zeit, end_zeit, wochentage, datum, notiz });
     blockzeitFormZuruecksetzen();
     await ladeDaten();
   }
 
   // Löscht eine Blockzeit und lädt die Daten neu
   window.blockzeitLoeschen = async function(id) {
-    if (blockzeitBearbeiteterId === id) blockzeitFormZuruecksetzen();
     await api("blockzeit_loeschen", { id });
     await ladeDaten();
   };
@@ -4354,7 +4557,6 @@
   // ==========================================================
   const INV_ZUSTAND_LABEL = { gut: `${ic("ok-kreis")} Gut`, eingeschraenkt: `${ic("warnung")} Eingeschränkt nutzbar`, defekt: `${ic("x-kreis")} Defekt` };
   let invAktiveKategorie = "alle";
-  let invBearbeitenId = null;
   // Offene Inventar-Kategorien, je Bereich (Schlüssel "bereich|Kategorie")
   const invGruppenOffen = new Set();
   try { JSON.parse(localStorage.getItem("inv-gruppen-offen") || "[]").forEach((k) => invGruppenOffen.add(k)); } catch (_e) { /* leer lassen */ }
@@ -4427,26 +4629,6 @@
     listeBereich.innerHTML = kategorienSortiert.map((kat) => {
       const items = gruppen[kat].sort((a, b) => a.name.localeCompare(b.name));
       const zeilen = items.map((i) => {
-        if (invBearbeitenId === i.id) {
-          return `
-            <div class="notiz-item">
-              <div style="flex:1; display:flex; flex-wrap:wrap; gap:0.4rem;">
-                <input type="text" id="inv-edit-name-${i.id}" value="${escapeAttr(i.name)}" placeholder="Gegenstand">
-                <input type="text" id="inv-edit-kategorie-${i.id}" value="${escapeAttr(i.kategorie)}" placeholder="Kategorie" list="inv-kategorie-liste">
-                <input type="number" id="inv-edit-menge-${i.id}" value="${i.menge}" min="1" style="width:5rem;">
-                <input type="number" id="inv-edit-wert-${i.id}" value="${invWert(i) ?? ""}" min="0" step="0.01" inputmode="decimal" placeholder="Wert je Stück (€)" title="Wiederbeschaffungswert je Stück in €" style="width:9.5rem;">
-                <input type="text" id="inv-edit-standort-${i.id}" value="${escapeAttr(i.standort || "")}" placeholder="Standort">
-                <input type="text" id="inv-edit-beschreibung-${i.id}" value="${escapeAttr(i.beschreibung || "")}" placeholder="Beschreibung" style="min-width:14rem; flex:1;">
-                <select id="inv-edit-zustand-${i.id}">
-                  <option value="gut" ${i.zustand === "gut" ? "selected" : ""}>Gut</option>
-                  <option value="eingeschraenkt" ${i.zustand === "eingeschraenkt" ? "selected" : ""}>Eingeschränkt nutzbar</option>
-                  <option value="defekt" ${i.zustand === "defekt" ? "selected" : ""}>Defekt</option>
-                </select>
-                <button class="btn-primary" onclick="invBearbeitenSpeichern('${i.id}')">Speichern</button>
-                <button class="link-btn" onclick="invBearbeitenAbbrechen()">Abbrechen</button>
-              </div>
-            </div>`;
-        }
         const offeneAusleihen = verleihAktuell().filter((v) => v.inventar_id === i.id && !v.rueckgabe_am);
         const ausleiheHinweis = offeneAusleihen.length > 0
           ? `<span class="notiz-meta" style="display:block; color:var(--accent);">→ ${offeneAusleihen.reduce((s, v) => s + v.menge, 0)}× verliehen an ${offeneAusleihen.map((v) => escapeHtml(v.ausgeliehen_an)).join(", ")}</span>`
@@ -4465,10 +4647,9 @@
       }).join("");
       // Aufklappbar je Kategorie (seit Session 29), gleiche Optik wie bei den
       // Spielen. Offen bleibt, was du geöffnet hast (je Bereich gemerkt),
-      // außerdem automatisch bei gewählter Kategorie im Filter und beim
-      // Bearbeiten eines Gegenstands darin.
+      // außerdem automatisch bei gewählter Kategorie im Filter.
       const schluessel = invGruppenSchluessel(kat);
-      const offen = invAktiveKategorie !== "alle" || invGruppenOffen.has(schluessel) || items.some((i) => i.id === invBearbeitenId);
+      const offen = invAktiveKategorie !== "alle" || invGruppenOffen.has(schluessel);
       const defekt = items.filter((i) => i.zustand === "defekt").length;
       const verliehen = items.filter((i) => verleihAktuell().some((v) => v.inventar_id === i.id && !v.rueckgabe_am)).length;
       const wertKat = invWertSumme(items);
@@ -4557,39 +4738,9 @@
     await ladeDaten();
   }
 
-  // Öffnet die Bearbeitung eines Inventar-Gegenstands
+  // Bearbeiten eines Gegenstands: seit Session 35 im Bearbeiten-Blatt
   window.invBearbeitenStart = function(id) {
-    invBearbeitenId = id;
-    renderInventar();
-  };
-
-  // Bricht die Bearbeitung eines Inventar-Gegenstands ab
-  window.invBearbeitenAbbrechen = function() {
-    invBearbeitenId = null;
-    renderInventar();
-  };
-
-  // Speichert den bearbeiteten Inventar-Gegenstand und lässt seine Kategorie offen
-  window.invBearbeitenSpeichern = async function(id) {
-    const name = document.getElementById(`inv-edit-name-${id}`).value.trim();
-    const kategorie = document.getElementById(`inv-edit-kategorie-${id}`).value.trim();
-    if (!name || !kategorie) return;
-    const menge = document.getElementById(`inv-edit-menge-${id}`).value || 1;
-    const standort = document.getElementById(`inv-edit-standort-${id}`).value.trim() || null;
-    const beschreibung = document.getElementById(`inv-edit-beschreibung-${id}`).value.trim() || null;
-    const zustand = document.getElementById(`inv-edit-zustand-${id}`).value;
-    const wiederbeschaffungswert = document.getElementById(`inv-edit-wert-${id}`).value.trim();
-    try {
-      await api("ogs_inventar_aktualisieren", { id, name, kategorie, menge, standort, beschreibung, zustand, wiederbeschaffungswert });
-    } catch (fehler) {
-      alert("Speichern fehlgeschlagen: " + fehler.message);
-      return;
-    }
-    // Kategorie nach dem Speichern offen lassen (auch eine geänderte)
-    invGruppenOffen.add(invGruppenSchluessel(kategorie));
-    invGruppenMerken();
-    invBearbeitenId = null;
-    await ladeDaten();
+    window.blattOeffnen("inventar", id);
   };
 
   // Löscht einen Inventar-Gegenstand nach Rückfrage
@@ -4608,7 +4759,6 @@
   ];
   const PROJ_MAX_BYTES = 5 * 1024 * 1024;
   let projBearbeitenId = null;
-  let verleihBearbeitenId = null;
 
   // Liest eine Datei als Base64-String (ohne Data-URL-Präfix) ein
   function dateiZuBase64(datei) {
@@ -4928,22 +5078,8 @@
       return inventarById[v.inventar_id]?.name || "(gelöschter Gegenstand)";
     }
 
-    // Baut das HTML eines Verleih-Eintrags – als Bearbeiten-Formular oder als Anzeigezeile
+    // Baut das HTML eines Verleih-Eintrags (Bearbeiten öffnet das Blatt)
     function eintragHtml(v) {
-      if (verleihBearbeitenId === v.id) {
-        return `
-          <div class="notiz-item">
-            <div style="flex:1; display:flex; flex-wrap:wrap; gap:0.4rem;">
-              <input type="text" id="verleih-edit-an-${v.id}" value="${escapeAttr(v.ausgeliehen_an)}" placeholder="An wen">
-              <input type="number" id="verleih-edit-menge-${v.id}" value="${v.menge}" min="1" style="width:5rem;">
-              <label class="empty-text" style="display:flex; align-items:center; gap:0.3rem;">Ausgeliehen: <input type="date" id="verleih-edit-am-${v.id}" value="${v.ausgeliehen_am}"></label>
-              <label class="empty-text" style="display:flex; align-items:center; gap:0.3rem;">Zurück: <input type="date" id="verleih-edit-rueck-${v.id}" value="${v.rueckgabe_am || ""}"></label>
-              <input type="text" id="verleih-edit-notiz-${v.id}" value="${escapeAttr(v.notiz || "")}" placeholder="Notiz (optional)" style="flex:1; min-width:150px;">
-              <button class="btn-primary" onclick="verleihBearbeitenSpeichern('${v.id}')">Speichern</button>
-              <button class="link-btn" onclick="verleihBearbeitenAbbrechen()">Abbrechen</button>
-            </div>
-          </div>`;
-      }
       const offen = !v.rueckgabe_am;
       return `
         <div class="notiz-item">
@@ -5024,29 +5160,9 @@
     await ladeDaten();
   };
 
-  // Öffnet das Bearbeiten-Formular für einen Verleih-Eintrag
+  // Bearbeiten eines Verleih-Eintrags: seit Session 35 im Bearbeiten-Blatt
   window.verleihBearbeitenStart = function(id) {
-    verleihBearbeitenId = id;
-    renderVerleih();
-  };
-
-  // Bricht das Bearbeiten eines Verleih-Eintrags ab
-  window.verleihBearbeitenAbbrechen = function() {
-    verleihBearbeitenId = null;
-    renderVerleih();
-  };
-
-  // Speichert den bearbeiteten Verleih-Eintrag (Person, Menge, Daten, Notiz) und lädt neu
-  window.verleihBearbeitenSpeichern = async function(id) {
-    const ausgeliehen_an = document.getElementById(`verleih-edit-an-${id}`).value.trim();
-    if (!ausgeliehen_an) return;
-    const menge = document.getElementById(`verleih-edit-menge-${id}`).value || 1;
-    const ausgeliehen_am = document.getElementById(`verleih-edit-am-${id}`).value;
-    const rueckgabe_am = document.getElementById(`verleih-edit-rueck-${id}`).value || null;
-    const notiz = document.getElementById(`verleih-edit-notiz-${id}`).value.trim() || null;
-    await api("verleih_aktualisieren", { id, ausgeliehen_an, menge, ausgeliehen_am, rueckgabe_am, notiz });
-    verleihBearbeitenId = null;
-    await ladeDaten();
+    window.blattOeffnen("verleih", id);
   };
 
   // ==========================================================
