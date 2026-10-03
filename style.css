@@ -1429,3 +1429,8 @@
   /* … auch in den Formularen „+ Neue Aufgabe“ und Kalender-Tag */
   /* steht direkt unter dem Textfeld und nimmt in der Zeile die volle Breite */
   .form-erkannt { flex: 1 1 100%; margin: 0; }
+
+  /* Bearbeiten im „+“-Blatt (seit Session 35) */
+  .schnell-loeschen { display: block; width: 100%; min-height: 2.75rem; margin-top: 0.4rem; color: var(--overdue-text); font-weight: 600; }
+  .schnell-loeschen.hidden { display: none; }
+  .heute-naechstes, .heute-zeile-inhalt { cursor: pointer; }
