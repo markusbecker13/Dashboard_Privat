@@ -1213,7 +1213,12 @@
   .heute-block-kopf { display: flex; justify-content: space-between; align-items: baseline; padding: 0 0.15rem; }
   .heute-block-zahl { font-size: 0.78rem; color: var(--ink-dim); }
   .heute-liste { background: var(--panel); border-radius: var(--r-karte); overflow: hidden; }
-  .heute-zeile { display: flex; align-items: center; gap: 0.15rem; padding: 0.1rem 0.4rem 0.1rem 0.15rem; border-top: 1px solid var(--border); }
+  .heute-zeile { position: relative; overflow: hidden; border-top: 1px solid var(--border); }
+  /* Vorderseite (wischbar, seit Session 35) – deckt den farbigen Hintergrund ab */
+  .heute-zeile-vorne {
+    position: relative; display: flex; align-items: center; gap: 0.15rem; padding: 0.1rem 0.4rem 0.1rem 0.15rem;
+    background: var(--panel); touch-action: pan-y; will-change: transform;
+  }
   .heute-zeile:first-child { border-top: none; }
   .heute-zeit { width: 3.2rem; flex-shrink: 0; font-size: 0.82rem; font-weight: 600; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
   .heute-zeile-inhalt {
@@ -1223,7 +1228,7 @@
   }
   .heute-zeile-titel { font-size: 0.98rem; font-weight: 600; overflow-wrap: anywhere; }
   .heute-zeile-meta { font-size: 0.75rem; color: var(--ink-dim); }
-  .heute-zeile.jetzt { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .heute-zeile.jetzt .heute-zeile-vorne { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
   .heute-zeile.jetzt .heute-zeit { color: var(--ink); font-weight: 800; }
   .heute-zeile.erledigt .heute-zeile-titel { text-decoration: line-through; color: var(--ink-dim); }
   .heute-leer { margin: 0; padding: 0.9rem 1rem; color: var(--ink-dim); }
@@ -1457,3 +1462,26 @@
 .blatt-ausgabe-knoepfe { display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem; }
 /* Stift zum Bearbeiten in Notizen, Links, Ideen (Bearbeiten-Blatt) – genug Tippfläche */
 .notiz-item > .task-edit-btn, .link-item > .task-edit-btn { min-width: 44px; min-height: 44px; }
+
+/* Wischgesten in „Heute“ (Session 35): Hintergrund zeigt, was beim Loslassen passiert */
+.heute-wisch-hinter {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1rem; font-size: 0.88rem; font-weight: 700; visibility: hidden;
+}
+.heute-zeile.wisch-rechts .heute-wisch-hinter, .heute-zeile.wisch-links .heute-wisch-hinter { visibility: visible; }
+.heute-zeile.wisch-rechts .heute-wisch-hinter { background: var(--ok-bg); color: var(--ok-text); }
+.heute-zeile.wisch-links .heute-wisch-hinter { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); color: var(--ink); }
+.heute-zeile.wisch-rechts .heute-wisch-links, .heute-zeile.wisch-links .heute-wisch-rechts { visibility: hidden; }
+.heute-wisch-rechts, .heute-wisch-links { display: inline-flex; align-items: center; gap: 0.4rem; }
+.heute-zeile.wischt { user-select: none; -webkit-user-select: none; }
+.heute-wisch-tipp {
+  margin: 0; padding: 0.45rem 0.8rem; border-radius: var(--r-mittel); background: var(--panel);
+  font-size: 0.8rem; color: var(--ink-dim); display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem 0.6rem;
+}
+.heute-wisch-tipp .link-btn { font-size: 0.8rem; }
+.app-hinweis { display: flex; align-items: center; gap: 0.9rem; }
+.app-hinweis-knopf {
+  border: none; background: none; padding: 0.2rem 0; cursor: pointer; font: inherit; font-weight: 800;
+  color: var(--bg); text-decoration: underline; text-underline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) { .heute-zeile-vorne { transition: none !important; } }
