@@ -188,7 +188,8 @@
 
       <div class="reiter-formular hidden" id="form-aufgaben">
       <div class="row">
-        <input type="text" id="neue-aufgabe" placeholder="Neue Aufgabe eintragen …">
+        <input type="text" id="neue-aufgabe" placeholder="Neue Aufgabe, z. B. „Steuer bis Freitag“">
+        <div class="schnell-erkannt form-erkannt hidden" id="aufgabe-erkannt" role="status" aria-live="polite"></div>
         <select id="aufgabe-projekt"><option value="">Ohne Projekt</option></select>
         <button type="button" class="hilfe-icon" data-hilfe="Projekte sind je Bereich (Privat/OGS/AWO) getrennt – hier erscheinen nur Projekte des gerade aktiven Bereichs.">?</button>
         <input type="date" id="aufgabe-faellig" title="Fälligkeitsdatum (optional)">
@@ -856,7 +857,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <div class="anleitung-text">
               <p>Deine zentrale Todo-Liste, nach Projekten gruppiert.</p>
               <ul>
-                <li><strong>Neue Aufgabe:</strong> Titel eintippen, optional Projekt, Fälligkeitsdatum und/oder wiederkehrende Erinnerung („alle X Tage") setzen</li>
+                <li><strong>Neue Aufgabe:</strong> Titel eintippen, optional Projekt, Fälligkeitsdatum und/oder wiederkehrende Erinnerung („alle X Tage") setzen. Datum und Uhrzeit dürfen auch im Titel stehen: „Steuer bis Freitag 10 Uhr“ trägt Freitag und 10:00 ein und speichert nur „Steuer“ – ein Hinweis unter dem Feld zeigt, was erkannt wurde, „Ignorieren“ nimmt es zurück</li>
                 <li><strong>Erledigen:</strong> Kreis anklicken, Aufgabe wandert zu „Erledigt" (ausklappbar unten)</li>
                 <li><strong>Löschen:</strong> <svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-x"></use></svg> klicken</li>
                 <li><strong>Projekt anlegen:</strong> „Neues Projekt anlegen" ausklappen, Namen eintragen</li>
@@ -875,7 +876,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <p>Monatsansicht für Termine.</p>
               <ul>
                 <li>Mit ‹ › zwischen Monaten wechseln</li>
-                <li>Tag anklicken öffnet ein Panel mit den Terminen dieses Tages plus Formular zum Eintragen</li>
+                <li>Tag anklicken öffnet ein Panel mit den Terminen dieses Tages plus Formular zum Eintragen. Uhrzeiten im Titel werden erkannt („Flohmarkt 8-14 Uhr“ setzt Beginn und Ende); steht ein anderes Datum drin („Elternabend 12.11. 19 Uhr“), landet der Termin an diesem Tag und der Kalender springt dorthin. Beim Bearbeiten wird nichts erkannt</li>
                 <li>Tage mit Terminen zeigen einen kleinen Punkt; oben die nächsten 5 anstehenden Termine</li>
                 <li><strong>Blockzeiten:</strong> feste Zeitfenster, wiederkehrend an bestimmten Wochentagen oder einmalig an einem festen Datum. Sie bilden den Rahmen, aus dem der Frei-Tab die freien Zeiten berechnet</li>
               </ul>
