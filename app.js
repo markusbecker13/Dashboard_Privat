@@ -507,8 +507,8 @@
   // immer), damit nichts in einem ausgeblendeten Reiter verschwindet.
   // ==========================================================
   const SCHNELL_ARTEN = [
-    { art: "aufgabe", label: "Aufgabe", tab: "aufgaben", platzhalter: "Was ist zu tun?" },
-    { art: "termin", label: "Termin", tab: "kalender", platzhalter: "Welcher Termin?" },
+    { art: "aufgabe", label: "Aufgabe", tab: "aufgaben", platzhalter: "Was ist zu tun? z. B. „Steuer bis Freitag“" },
+    { art: "termin", label: "Termin", tab: "kalender", platzhalter: "Welcher Termin? z. B. „Zahnarzt morgen 15 Uhr“" },
     { art: "notiz", label: "Notiz", tab: "notizen", platzhalter: "Notiz …" },
     { art: "einkauf", label: "Einkauf", tab: "einkauf", platzhalter: "Was fehlt?" },
     { art: "idee", label: "Idee", tab: "ogsideen", platzhalter: "Welche Idee?" },
@@ -524,6 +524,135 @@
     training: "Neues Training",
   };
 
+  // ==========================================================
+  // Datum/Uhrzeit aus dem Text erkennen (seit Session 35). Reine Funktion,
+  // ohne DOM: liefert { datum, uhrzeit, ende, rest, teile } oder null.
+  //   datum   "YYYY-MM-DD" oder null (nur Uhrzeit → heute)
+  //   uhrzeit "HH:MM" oder null, ende "HH:MM" oder null
+  //   rest    Text ohne die erkannten Angaben (wird zum Titel)
+  // Erkannt: heute, morgen, übermorgen, Wochentage („Freitag“, „am Fr“,
+  // „nächsten Montag“), „in 3 Tagen“, „in 2 Wochen“, 12.10., 12.10.2026,
+  // 12. Oktober; Uhrzeiten „15 Uhr“, „15:30“, „um 9“, „15.30 Uhr“,
+  // Spannen „15–16 Uhr“, „von 9 bis 11 Uhr“, „14:00-15:30“; „abends“ /
+  // „nachmittags“ hinter einer Uhrzeit unter 12 zählt +12 Stunden.
+  // Bewusst nicht: Wiederholungen („jeden Montag“), „halb 3“, „Wochenende“.
+  // ==========================================================
+  const TD_MONATE = {
+    januar: 1, jan: 1, februar: 2, feb: 2, "märz": 3, maerz: 3, "mär": 3, april: 4, apr: 4, mai: 5,
+    juni: 6, jun: 6, juli: 7, jul: 7, august: 8, aug: 8, september: 9, sept: 9, sep: 9,
+    oktober: 10, okt: 10, november: 11, nov: 11, dezember: 12, dez: 12,
+  };
+  const TD_WOCHENTAGE = { sonntag: 0, montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6 };
+  const TD_KURZ = { So: 0, Mo: 1, Di: 2, Mi: 3, Do: 4, Fr: 5, Sa: 6 };
+  const TD_ZAHLWORT = { ein: 1, einem: 1, einer: 1, eine: 1, zwei: 2, drei: 3, vier: 4, "fünf": 5, fuenf: 5, sechs: 6, sieben: 7, acht: 8, neun: 9, zehn: 10 };
+  // Wortgrenzen, die auch Umlaute kennen (\b reicht in JS nur für a–z)
+  const TD_VOR = "(?<![\\p{L}\\p{N}])";
+  const TD_NACH = "(?![\\p{L}\\p{N}])";
+
+  function textDatumErkennen(text, jetzt = new Date()) {
+    const quelle = String(text || "");
+    if (!quelle.trim()) return null;
+    const teile = []; // erkannte Stellen [start, ende, art]
+    const frei = (s, e) => teile.every(([a, b]) => e <= a || s >= b);
+    const nimm = (re, art) => {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(quelle))) {
+        if (frei(m.index, m.index + m[0].length)) { teile.push([m.index, m.index + m[0].length, art]); return m; }
+      }
+      return null;
+    };
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const heute = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+    const plusTage = (n) => { const d = new Date(heute); d.setDate(d.getDate() + n); return d; };
+    const zeit = (h, m) => (h >= 0 && h <= 23 && m >= 0 && m <= 59) ? `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}` : null;
+    // Gibt es ein gültiges Kalenderdatum? (31.02. → nein)
+    const gueltig = (j, mo, t) => { const d = new Date(j, mo - 1, t); return d.getMonth() === mo - 1 && d.getDate() === t ? d : null; };
+    // Datum ohne Jahr: liegt es schon hinter uns, ist das nächste Jahr gemeint
+    const ohneJahr = (mo, t) => {
+      let d = gueltig(heute.getFullYear(), mo, t);
+      if (d && d < heute) d = gueltig(heute.getFullYear() + 1, mo, t);
+      return d;
+    };
+
+    // ---- Uhrzeit zuerst (sonst hält „15.30“ für ein Datum her) ----
+    let uhrzeit = null, ende = null;
+    const tageszeit = (h, nachsatz) => (h < 12 && /^\s*(abends|nachmittags|nachts)/i.test(nachsatz) ? h + 12 : h);
+    const spanne = nimm(new RegExp(`${TD_VOR}(?:von\\s+|ab\\s+)?(\\d{1,2})(?:[:.](\\d{2}))?\\s*(?:uhr\\s*)?(?:-|–|bis)\\s*(\\d{1,2})(?:[:.](\\d{2}))?\\s*uhr${TD_NACH}`, "giu"), "zeit")
+      || nimm(new RegExp(`${TD_VOR}(?:von\\s+|ab\\s+)?(\\d{1,2}):(\\d{2})\\s*(?:-|–|bis)\\s*(\\d{1,2}):(\\d{2})(?:\\s*uhr)?${TD_NACH}`, "giu"), "zeit");
+    if (spanne) {
+      const s = zeit(+spanne[1], +(spanne[2] || 0)), e = zeit(+spanne[3], +(spanne[4] || 0));
+      if (s && e && e > s) { uhrzeit = s; ende = e; } else teile.pop();
+    }
+    if (!uhrzeit) {
+      const muster = [
+        new RegExp(`${TD_VOR}(?:um|ab|gegen)\\s+(\\d{1,2})(?:[:.](\\d{2}))?(?:\\s*uhr)?${TD_NACH}`, "giu"),
+        new RegExp(`${TD_VOR}(\\d{1,2})(?:[:.](\\d{2}))?\\s*uhr${TD_NACH}`, "giu"),
+        new RegExp(`${TD_VOR}(\\d{1,2}):(\\d{2})${TD_NACH}`, "giu"),
+      ];
+      for (const re of muster) {
+        const m = nimm(re, "zeit");
+        if (!m) continue;
+        const nach = quelle.slice(m.index + m[0].length);
+        const z = zeit(tageszeit(+m[1], nach), +(m[2] || 0));
+        if (z) {
+          uhrzeit = z;
+          const tz = nach.match(/^\s*(abends|nachmittags|nachts|morgens|vormittags|früh)(?![\p{L}])/iu);
+          if (tz) teile[teile.length - 1][1] += tz[0].length;
+          break;
+        }
+        teile.pop();
+      }
+    }
+
+    // ---- Datum ----
+    let datum = null;
+    let m;
+    if ((m = nimm(new RegExp(`${TD_VOR}(?:am\\s+|bis\\s+(?:zum\\s+)?|zum\\s+|ab\\s+(?:dem\\s+)?)?(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4}|\\d{2})?${TD_NACH}`, "giu"), "datum"))) {
+      const t = +m[1], mo = +m[2];
+      let d = null;
+      if (m[3]) { const j = m[3].length === 2 ? 2000 + +m[3] : +m[3]; d = gueltig(j, mo, t); } else d = ohneJahr(mo, t);
+      if (d) datum = iso(d); else teile.pop();
+    }
+    if (!datum && (m = nimm(new RegExp(`${TD_VOR}(?:am\\s+|bis\\s+(?:zum\\s+)?|zum\\s+|ab\\s+(?:dem\\s+)?)?(\\d{1,2})\\.\\s*(${Object.keys(TD_MONATE).join("|")})\\.?(?:\\s+(\\d{4}))?${TD_NACH}`, "giu"), "datum"))) {
+      const t = +m[1], mo = TD_MONATE[m[2].toLowerCase()];
+      const d = m[3] ? gueltig(+m[3], mo, t) : ohneJahr(mo, t);
+      if (d) datum = iso(d); else teile.pop();
+    }
+    if (!datum && (m = nimm(new RegExp(`${TD_VOR}(?:über|ueber)morgen${TD_NACH}`, "giu"), "datum"))) datum = iso(plusTage(2));
+    if (!datum && (m = nimm(new RegExp(`${TD_VOR}morgen(?:\\s+(?:früh|frueh|vormittag|mittag|nachmittag|abend))?${TD_NACH}`, "giu"), "datum"))) datum = iso(plusTage(1));
+    if (!datum && (m = nimm(new RegExp(`${TD_VOR}heute(?:\\s+(?:früh|frueh|vormittag|mittag|nachmittag|abend))?${TD_NACH}`, "giu"), "datum"))) datum = iso(heute);
+    if (!datum && (m = nimm(new RegExp(`${TD_VOR}in\\s+(\\d{1,2}|${Object.keys(TD_ZAHLWORT).join("|")})\\s+(tag|tagen|woche|wochen)${TD_NACH}`, "giu"), "datum"))) {
+      const n = /^\d+$/.test(m[1]) ? +m[1] : TD_ZAHLWORT[m[1].toLowerCase()];
+      datum = iso(plusTage(n * (/^woche/i.test(m[2]) ? 7 : 1)));
+    }
+    if (!datum) {
+      // „nächsten Freitag“: immer nach heute; „Freitag“/„am Fr“: ab heute
+      const lang = nimm(new RegExp(`${TD_VOR}(?:(nächsten|nächste|naechsten|kommenden|kommende)\\s+|am\\s+)?(${Object.keys(TD_WOCHENTAGE).join("|")})${TD_NACH}`, "giu"), "datum");
+      // Kurzformen nur großgeschrieben und mit „am“ davor oder direkt vor einer
+      // Uhrzeit („Mo 15 Uhr“) – sonst wäre „so“ ein Wochentag
+      const k = Object.keys(TD_KURZ).join("|");
+      const kurz = lang ? null : (nimm(new RegExp(`${TD_VOR}am\\s+(${k})\\.?${TD_NACH}`, "gu"), "datum")
+        || nimm(new RegExp(`${TD_VOR}(${k})\\.?(?=\\s+(?:(?:um|ab|von|gegen)\\s+\\d|\\d{1,2}(?::\\d{2}|(?:[.]\\d{2})?\\s*(?:[Uu]hr|-|–|bis))))`, "gu"), "datum"));
+      const ziel = lang ? TD_WOCHENTAGE[lang[2].toLowerCase()] : (kurz ? TD_KURZ[kurz[1]] : null);
+      if (ziel !== null && ziel !== undefined) {
+        let n = (ziel - heute.getDay() + 7) % 7;
+        if (lang && lang[1] && n === 0) n = 7;
+        datum = iso(plusTage(n));
+      }
+    }
+    if (!datum && !uhrzeit) return null;
+
+    // ---- Rest: erkannte Stellen raus, Füllwörter am Rand weg ----
+    let rest = "";
+    let pos = 0;
+    teile.sort((a, b) => a[0] - b[0]).forEach(([s, e]) => { rest += quelle.slice(pos, s) + " "; pos = e; });
+    rest += quelle.slice(pos);
+    rest = rest.replace(/\s+/g, " ").replace(/\s+([,.;:!?])/g, "$1").trim()
+      .replace(/(?:^|\s)(am|um|ab|von|bis|gegen)$/iu, "").replace(/^[,;:–-]\s*|\s*[,;:–-]$/g, "").trim();
+    return { datum, uhrzeit, ende, rest, teile };
+  }
+
   // Arten, die im Bereich angeboten werden (Aufgabe immer)
   function schnellArtenFuer(bereich) {
     return SCHNELL_ARTEN.filter((a) => a.art === "aufgabe" || reiterIstSichtbar(bereich, a.tab));
@@ -536,7 +665,7 @@
     const bereich = BEREICH_FARBWELT.includes(aktiverBereich) ? aktiverBereich : "privat";
     const wunsch = SCHNELL_ART_VON_TAB[aktiverTab] || "aufgabe";
     const art = schnellArtenFuer(bereich).some((a) => a.art === wunsch) ? wunsch : "aufgabe";
-    schnell = { art, bereich, wann: art === "termin" ? "heute" : "ohne", details: false };
+    schnell = { art, bereich, wann: art === "termin" ? "heute" : "ohne", details: false, erkannt: null, erkennungAus: false, vorErkennung: null };
     document.getElementById("schnell-text").value = "";
     ["schnell-datum", "schnell-uhrzeit", "schnell-ende", "schnell-intervall", "schnell-notiz"].forEach((id) => {
       document.getElementById(id).value = "";
@@ -570,6 +699,7 @@
 
   // Setzt Art, Bereich oder Wann und zeichnet das Blatt neu
   window.schnellSetzen = function(feld, wert) {
+    if (feld === "wann" && schnell.erkannt) schnellErkennungAbschalten(false);
     schnell[feld] = wert;
     if (feld === "bereich" && !schnellArtenFuer(wert).some((a) => a.art === schnell.art)) schnell.art = "aufgabe";
     if (feld === "art") {
@@ -579,9 +709,79 @@
       const datum = document.getElementById("schnell-datum");
       if (!datum.value) datum.value = heuteISO();
     }
+    if (feld === "art" || feld === "bereich") { schnellTextPruefen(); return; }
     schnellRendern();
     if (feld === "wann" && wert === "datum") document.getElementById("schnell-datum").focus();
   };
+
+  // ---- Datum/Uhrzeit aus dem Text (seit Session 35) ----
+  // Prüft beim Tippen den Text und stellt Wann, Datum, Uhrzeit und Ende ein.
+  // Nur bei Aufgabe und Termin. Was vorher eingestellt war, wird gemerkt und
+  // zurückgesetzt, sobald die Angabe wieder aus dem Text verschwindet.
+  function schnellFelderLesen() {
+    return {
+      wann: schnell.wann,
+      datum: document.getElementById("schnell-datum").value,
+      uhrzeit: document.getElementById("schnell-uhrzeit").value,
+      ende: document.getElementById("schnell-ende").value,
+    };
+  }
+  function schnellFelderSetzen(w) {
+    schnell.wann = w.wann;
+    document.getElementById("schnell-datum").value = w.datum || "";
+    document.getElementById("schnell-uhrzeit").value = w.uhrzeit || "";
+    document.getElementById("schnell-ende").value = w.ende || "";
+  }
+  function schnellTextPruefen() {
+    const mitWann = schnell.art === "aufgabe" || schnell.art === "termin";
+    const e = (!mitWann || schnell.erkennungAus) ? null : textDatumErkennen(document.getElementById("schnell-text").value);
+    if (e) {
+      if (!schnell.erkannt) schnell.vorErkennung = schnellFelderLesen();
+      const heute = heuteISO();
+      const datum = e.datum || heute;
+      schnellFelderSetzen({
+        wann: datum === heute ? "heute" : datum === addTage(heute, 1) ? "morgen" : "datum",
+        datum: datum === heute || datum === addTage(heute, 1) ? "" : datum,
+        uhrzeit: e.uhrzeit || "",
+        ende: e.ende || "",
+      });
+    } else if (schnell.erkannt && schnell.vorErkennung) {
+      schnellFelderSetzen(schnell.vorErkennung);
+      schnell.vorErkennung = null;
+    }
+    schnell.erkannt = e;
+    schnellRendern();
+  }
+  // „Ignorieren“ bzw. Wann von Hand geändert: Erkennung für diesen Eintrag aus
+  function schnellErkennungAbschalten(zuruecksetzen) {
+    if (zuruecksetzen && schnell.vorErkennung) schnellFelderSetzen(schnell.vorErkennung);
+    schnell.vorErkennung = null;
+    schnell.erkannt = null;
+    schnell.erkennungAus = true;
+  }
+  window.schnellErkennungIgnorieren = function() {
+    schnellErkennungAbschalten(true);
+    schnellRendern();
+    document.getElementById("schnell-text").focus();
+  };
+  // Hinweis unter dem Textfeld: was erkannt wurde und welcher Titel bleibt
+  function schnellErkanntRendern() {
+    const el = document.getElementById("schnell-erkannt");
+    if (!el) return;
+    const e = schnell.erkannt;
+    if (!e) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+    const datum = e.datum || heuteISO();
+    const [j, m, t] = datum.split("-").map(Number);
+    const d = new Date(j, m - 1, t);
+    const heute = heuteISO();
+    const tagText = datum === heute ? "Heute" : datum === addTage(heute, 1) ? "Morgen"
+      : d.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short", year: j !== new Date().getFullYear() ? "numeric" : undefined });
+    const zeitText = e.uhrzeit ? ` · ${e.uhrzeit}${e.ende ? "–" + e.ende : ""} Uhr` : "";
+    const titel = e.rest ? `Titel: „${escapeHtml(e.rest)}“` : "Titel bleibt wie getippt";
+    el.innerHTML = `${ic("kalender")}<span class="schnell-erkannt-text"><strong>${escapeHtml(tagText + zeitText)}</strong><span>${titel}</span></span>
+      <button type="button" class="link-btn" onclick="schnellErkennungIgnorieren()">Ignorieren</button>`;
+    el.classList.remove("hidden");
+  }
 
   // Klappt die Zusatzfelder auf bzw. zu
   window.schnellDetailsUmschalten = function() {
@@ -597,6 +797,7 @@
 
   // Zeichnet Chips und Felder passend zur aktuellen Auswahl
   function schnellRendern() {
+    schnellErkanntRendern();
     const arten = schnellArtenFuer(schnell.bereich);
     const artInfo = SCHNELL_ARTEN.find((a) => a.art === schnell.art);
     document.getElementById("schnell-text").placeholder = artInfo.platzhalter;
@@ -664,15 +865,18 @@
 
   // Speichert den Eintrag über die passende Aktion, schließt das Blatt und lädt neu
   window.schnellSpeichern = async function() {
-    const text = document.getElementById("schnell-text").value.trim();
-    if (!text) { schnellMeldung("Bitte erst etwas eintragen.", true); document.getElementById("schnell-text").focus(); return; }
+    const eingabe = document.getElementById("schnell-text").value.trim();
+    if (!eingabe) { schnellMeldung("Bitte erst etwas eintragen.", true); document.getElementById("schnell-text").focus(); return; }
+    // Erkanntes Datum/Uhrzeit aus dem Titel nehmen („Zahnarzt morgen 15 Uhr“ → „Zahnarzt“)
+    const erkannt = schnell.erkannt;
+    const text = erkannt && erkannt.rest ? erkannt.rest : eingabe;
     const bereich = schnell.bereich;
     const datum = schnellDatum();
     if (schnell.art === "termin" && !datum) { schnellMeldung("Ein Termin braucht ein Datum.", true); return; }
     const mitZeit = schnell.wann !== "ohne";
     const uhrzeit = (mitZeit && document.getElementById("schnell-uhrzeit").value) || null;
     const zeigeDetails = schnell.details;
-    const ende_uhrzeit = (zeigeDetails && uhrzeit && document.getElementById("schnell-ende").value) || null;
+    const ende_uhrzeit = ((zeigeDetails || (erkannt && erkannt.ende)) && uhrzeit && document.getElementById("schnell-ende").value) || null;
     const projekt_id = (zeigeDetails && document.getElementById("schnell-projekt").value) || null;
     const intervall = zeigeDetails ? document.getElementById("schnell-intervall").value : "";
     const notiz = (zeigeDetails && document.getElementById("schnell-notiz").value.trim()) || null;
@@ -724,6 +928,13 @@
     const dlg = document.getElementById("schnell-dialog");
     if (!dlg) return;
     dlg.addEventListener("click", (e) => { if (e.target === dlg) window.schnellSchliessen(); });
+    document.getElementById("schnell-text").addEventListener("input", schnellTextPruefen);
+    // Datum, Uhrzeit oder Ende von Hand geändert → Erkennung für diesen Eintrag aus (Text bleibt, wie er ist)
+    ["schnell-datum", "schnell-uhrzeit", "schnell-ende"].forEach((id) => document.getElementById(id).addEventListener("input", () => {
+      if (!schnell.erkannt) return;
+      schnellErkennungAbschalten(false);
+      schnellRendern();
+    }));
     document.getElementById("schnell-text").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.schnellSpeichern(); }
     });
