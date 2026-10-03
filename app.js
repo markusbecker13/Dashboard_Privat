@@ -122,7 +122,7 @@
   const NUR_PRIVAT_REITER = ["ernaehrung"];
   const REITER_OHNE_PRIVATE = ALLE_REITER.filter(([k]) => !NUR_PRIVAT_REITER.includes(k));
   const BEREICH_TABS = { privat: ALLE_REITER, ogs: REITER_OHNE_PRIVATE, awo: REITER_OHNE_PRIVATE, business: REITER_OHNE_PRIVATE };
-  const BEREICH_TITEL_VERWALTUNG = { privat: "🏠 Privat", ogs: "🏫 OGS Rapunzel", awo: "🤝 AWO OV Liblar", business: "☕ Business" };
+  const BEREICH_TITEL_VERWALTUNG = { privat: `${ic("haus")} Privat`, ogs: `${ic("schule")} OGS Rapunzel`, awo: `${ic("personen")} AWO OV Liblar`, business: `${ic("tasse")} Business` };
 
   // Vorbelegung, solange in tab_einstellungen noch kein expliziter Eintrag
   // existiert – entspricht dem bisherigen Standardverhalten, damit sich
@@ -147,15 +147,14 @@
   // Themen (Hauptkategorien) je Bereich – bilden die Leiste unten, ihre
   // Reiter die Reiter-Leiste oben. "arbeit" trägt bewusst das Label des
   // aktiven Bereichs.
-  const BEREICH_ARBEIT_ICON = { ogs: "🏫", awo: "🤝" };
 
   function hauptkategorien() {
     return [
-      { schluessel: "heute", label: "Heute", icon: "☀️", tabs: ["heute"] },
-      { schluessel: "planen", label: "Planen", icon: "🗓️", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
-      { schluessel: "sammeln", label: "Sammeln", icon: "🗂️", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf", "rezepte", "training", "ernaehrung"] },
-      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", icon: BEREICH_ARBEIT_ICON[aktiverBereich] || "📌", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
-      { schluessel: "verwalten", label: "Verwalten", icon: "🛠️", tabs: ["export", "verlauf", "anleitung"] },
+      { schluessel: "heute", label: "Heute", tabs: ["heute"] },
+      { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
+      { schluessel: "sammeln", label: "Sammeln", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf", "rezepte", "training", "ernaehrung"] },
+      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
+      { schluessel: "verwalten", label: "Verwalten", tabs: ["export", "verlauf", "anleitung"] },
     ];
   }
 
@@ -2910,13 +2909,13 @@
     const eintraege = freiTagEintraege(iso, wtIndex);
 
     if (!eintraege) {
-      timelineEl.innerHTML = '<p class="empty-text">Für diesen Wochentag ist kein Zeitrahmen aktiv – einschalten über ⚙ oben.</p>';
+      timelineEl.innerHTML = `<p class="empty-text">Für diesen Wochentag ist kein Zeitrahmen aktiv – einschalten über ${ic("zahnrad")} oben.</p>`;
       freiFormularSchliessen();
       return;
     }
 
     if (eintraege.length === 0) {
-      timelineEl.innerHTML = '<p class="empty-text">Kein Zeitrahmen für diesen Tag eingestellt – über ⚙ oben festlegen.</p>';
+      timelineEl.innerHTML = `<p class="empty-text">Kein Zeitrahmen für diesen Tag eingestellt – über ${ic("zahnrad")} oben festlegen.</p>`;
       return;
     }
 
@@ -3404,7 +3403,7 @@
   // Baut die Metazeile eines Rezepts (Foto, Kategorie, Portionen, Zeit)
   function rezeptMeta(r) {
     const teile = [];
-    if (r.bild_pfad) teile.push("📷");
+    if (r.bild_pfad) teile.push(`${ic("kamera")}<span class="nur-vorleser">mit Foto</span>`);
     if (r.kategorie) teile.push(escapeHtml(r.kategorie));
     if (r.portionen) teile.push(`${r.portionen} ${r.portionen === 1 ? "Portion" : "Portionen"}`);
     if (r.zeit_minuten) teile.push(`${r.zeit_minuten} Min.`);
@@ -3583,12 +3582,12 @@
     const el = document.getElementById("koch-wach");
     if (!el || !kochmodus) return;
     const texte = {
-      an: "🔆 Bildschirm bleibt an",
+      an: "Bildschirm bleibt an",
       aus: "Bildschirm-Sperre wieder aktiv – kurz antippen, um sie erneut zu verhindern",
       nicht: "Dieser Browser kann den Bildschirm nicht wach halten",
       fehler: "Bildschirm konnte nicht wach gehalten werden",
     };
-    el.textContent = texte[kochmodus.wach] || "";
+    el.innerHTML = (kochmodus.wach === "an" ? ic("sonne") + " " : "") + escapeHtml(texte[kochmodus.wach] || "");
   }
 
   document.addEventListener("visibilitychange", () => {
@@ -3693,7 +3692,7 @@
     const scrollPos = overlay.querySelector(".session-fokus-inhalt")?.scrollTop || 0;
     overlay.innerHTML = `
       <div class="session-fokus-kopf">
-        <span class="session-fokus-titel" id="koch-titel">👨‍🍳 ${escapeHtml(r.titel)}</span>
+        <span class="session-fokus-titel" id="koch-titel">${ic("kochen")} ${escapeHtml(r.titel)}</span>
         <button class="session-fokus-schliessen" onclick="kochmodusSchliessen()" aria-label="Kochmodus schließen">${ic("x")}</button>
       </div>
       <div class="session-fokus-inhalt koch-inhalt">
@@ -3806,9 +3805,9 @@
           <div class="rezept-detail">
             ${fotoHtml}
             <p class="notiz-meta rezept-gekocht-info">${rezeptGekochtText(r.zuletzt_gekocht)}</p>
-            ${(hatZutaten || r.zubereitung) && !einkaufModus ? `<button class="btn-primary rezept-koch-start" onclick="kochmodusStarten('${r.id}')">👨‍🍳 Kochmodus</button>` : ""}
+            ${(hatZutaten || r.zubereitung) && !einkaufModus ? `<button class="btn-primary rezept-koch-start" onclick="kochmodusStarten('${r.id}')">${ic("kochen")}Kochmodus</button>` : ""}
             ${zutaten ? `<h3 class="rezept-abschnitt">Zutaten</h3>${portionenLeiste}${zutaten}` : ""}
-            ${hatZutaten && !einkaufModus ? `<button class="btn-secondary rezept-einkauf-start" onclick="rezeptEinkaufStarten('${r.id}')">🛒 Zutaten auf die Einkaufsliste …</button>` : ""}
+            ${hatZutaten && !einkaufModus ? `<button class="btn-secondary rezept-einkauf-start" onclick="rezeptEinkaufStarten('${r.id}')">${ic("einkauf")}Zutaten auf die Einkaufsliste …</button>` : ""}
             ${r.zubereitung ? `<h3 class="rezept-abschnitt">Zubereitung</h3><p class="rezept-text">${escapeHtml(r.zubereitung)}</p>` : ""}
             ${r.notiz ? `<h3 class="rezept-abschnitt">Notiz</h3><p class="rezept-text">${escapeHtml(r.notiz)}</p>` : ""}
             ${r.quelle ? `<p class="notiz-meta">Quelle: ${rezeptQuelleHtml(r.quelle)}</p>` : ""}
@@ -3866,7 +3865,7 @@
       <div class="rezept-foto-feld">
         <div id="rezept-f-foto-vorschau"></div>
         <div class="rezept-foto-knoepfe">
-          <label class="btn-secondary rezept-foto-label" for="rezept-f-foto">📷 Foto wählen</label>
+          <label class="btn-secondary rezept-foto-label" for="rezept-f-foto">${ic("kamera")}Foto wählen</label>
           <input type="file" id="rezept-f-foto" accept="image/jpeg,image/png,image/webp" class="rezept-foto-input">
           <button type="button" class="link-btn hidden" id="rezept-f-foto-entfernen" onclick="rezeptFotoEntfernenKlick()">Foto entfernen</button>
         </div>
@@ -4175,7 +4174,7 @@
   // ==========================================================
   // OGS Rapunzel – Inventar
   // ==========================================================
-  const INV_ZUSTAND_LABEL = { gut: "✅ Gut", eingeschraenkt: "⚠️ Eingeschränkt nutzbar", defekt: "❌ Defekt" };
+  const INV_ZUSTAND_LABEL = { gut: `${ic("ok-kreis")} Gut`, eingeschraenkt: `${ic("warnung")} Eingeschränkt nutzbar`, defekt: `${ic("x-kreis")} Defekt` };
   let invAktiveKategorie = "alle";
   let invBearbeitenId = null;
   // Offene Inventar-Kategorien, je Bereich (Schlüssel "bereich|Kategorie")
@@ -4503,7 +4502,7 @@
       const dateiZeilen = dateien.map((d) => {
         const hochgeladen = new Date(d.hochgeladen_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
         return `
-              <div>📎 <span onclick="event.stopPropagation(); projDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
+              <div>${ic("anhang")} <span onclick="event.stopPropagation(); projDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
                 <span style="opacity:0.65;">(${hochgeladen})</span>
                 <span onclick="event.stopPropagation(); projDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen" aria-label="Datei entfernen">${ic("x")}</span></div>`;
       }).join("");
@@ -4525,7 +4524,7 @@
               </div>
               <div class="notiz-meta" style="margin-top:0.3rem;">
                 ${dateiZeilen}
-                <label style="text-decoration:underline; cursor:pointer;" onclick="event.stopPropagation();">📎 Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="projDateiHinzufuegen('${p.id}', this)"></label>
+                <label style="text-decoration:underline; cursor:pointer;" onclick="event.stopPropagation();">${ic("anhang")} Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="projDateiHinzufuegen('${p.id}', this)"></label>
               </div>
             </div>
             ${unterprojekteHtml}
@@ -5068,7 +5067,7 @@
       zielEl.innerHTML = `
         <span style="font-weight:600;">${anzahlDieseWoche} von ${zielWoche}</span> diese Woche${zielLabel}${erreicht ? " ✓" : ""}
         <button class="link-btn" style="margin-left:0.6rem;" onclick="trainingZielBearbeiten()">Ziel ändern</button>
-        ${laengsteStreak >= 1 ? `<div class="empty-text" style="margin-top:0.2rem;">🔥 Längste Serie: ${laengsteStreak} Woche${laengsteStreak === 1 ? "" : "n"} in Folge Ziel erreicht</div>` : ""}`;
+        ${laengsteStreak >= 1 ? `<div class="empty-text" style="margin-top:0.2rem;">${ic("flamme")} Längste Serie: ${laengsteStreak} Woche${laengsteStreak === 1 ? "" : "n"} in Folge Ziel erreicht</div>` : ""}`;
     }
 
     renderTrainingSession();
@@ -5171,7 +5170,7 @@
         }
         if (u.progression) werte += `${werte ? " · " : ""}${escapeHtml(u.progression)}`;
         const bestleistung = t && istBestleistung(t, u);
-        return `<span class="chip" style="cursor:default; padding-right:0.7rem;" ${bestleistung ? 'title="Neue Bestleistung"' : ""}>${chipBildHtml("uebung", u.name)}${bestleistung ? "🏆 " : ""}${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
+        return `<span class="chip" style="cursor:default; padding-right:0.7rem;" ${bestleistung ? 'title="Neue Bestleistung"' : ""}>${chipBildHtml("uebung", u.name)}${bestleistung ? ic("pokal", "ic-pokal") + " " : ""}${escapeHtml(u.name)}${werte ? ` <span style="color:var(--ink-dim);">${werte}</span>` : ""}</span>`;
       });
       return `<div class="chip-liste" style="margin-top:0.4rem;">${chips.join("")}</div>`;
     }
@@ -5238,7 +5237,7 @@
       return `
         <div class="notiz-item" style="cursor:pointer;" onclick="trainingBearbeitenStart('${t.id}')">
           <div style="flex:1;">
-            <span class="notiz-text">${istEntryBestleistung(t) ? '<span title="Neue Bestleistung">🏆</span> ' : ""}${escapeHtml(t.sportart)}${t.ort ? " · " + escapeHtml(t.ort) : ""}</span>
+            <span class="notiz-text">${istEntryBestleistung(t) ? '<span title="Neue Bestleistung">' + ic("pokal", "ic-pokal") + '<span class="nur-vorleser">Neue Bestleistung</span></span> ' : ""}${escapeHtml(t.sportart)}${t.ort ? " · " + escapeHtml(t.ort) : ""}</span>
             <span class="notiz-meta">
               ${datumDe(t.datum)}${t.dauer_minuten ? " · " + t.dauer_minuten + " Min." : ""}
               ${t.strecke_km ? " · " + t.strecke_km + " km" : ""}
@@ -5454,8 +5453,8 @@
           </summary>
           ${uebungenAnzeige(uebungen)}
           <div class="row plan-item-aktionen" style="flex-wrap:wrap;">
-            <button class="link-btn" onclick="planStarten('${p.id}')" ${uebungen.length ? "" : "disabled"}>▶ Starten</button>
-            <button class="link-btn" onclick="planExportieren('${p.id}')">⇩ Export</button>
+            <button class="link-btn" onclick="planStarten('${p.id}')" ${uebungen.length ? "" : "disabled"}>${ic("play")}Starten</button>
+            <button class="link-btn" onclick="planExportieren('${p.id}')">${ic("export")}Export</button>
             <button class="task-edit-btn" onclick="planBearbeitenStart('${p.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
             <button class="task-delete" onclick="planLoeschen('${p.id}')" aria-label="Löschen">${ic("x")}</button>
           </div>
@@ -5736,7 +5735,7 @@
         console.error(err);
         alert("Import fehlgeschlagen: " + (err.message || err));
       } finally {
-        btnPlaeneImport.textContent = "⇪ Pläne importieren (CSV/JSON)";
+        btnPlaeneImport.innerHTML = `${ic("import")}Pläne importieren (CSV/JSON)`;
         btnPlaeneImport.disabled = false;
       }
     });
@@ -6078,7 +6077,7 @@
                 <select onchange="uebungKategorieVorschlagAendern('${v.id}', this.value)">${optionen(v.kategorie)}</select>
               </label>`).join("")}
           </div>` : `<p class="empty-text" style="margin-top:0;">Für keine Übung ohne Kategorie wurde ein passendes Stichwort gefunden.</p>`}
-        ${unerkannt.length ? `<p class="empty-text">Nicht erkannt (bitte über „✎" von Hand zuordnen): ${unerkannt.map((v) => escapeHtml(v.name)).join(", ")}</p>` : ""}
+        ${unerkannt.length ? `<p class="empty-text">Nicht erkannt (bitte über den Stift von Hand zuordnen): ${unerkannt.map((v) => escapeHtml(v.name)).join(", ")}</p>` : ""}
         <div class="row" style="margin-top:0.6rem;">
           ${erkannt.length ? `<button class="btn-primary" id="btn-kategorie-vorschlag-uebernehmen" onclick="uebungKategorieVorschlaegeUebernehmen()" ${anzahlUebernehmen ? "" : "disabled"}>Übernehmen (${anzahlUebernehmen})</button>` : ""}
           <button class="link-btn" onclick="uebungKategorieVorschlaegeSchliessen()">${erkannt.length ? "Abbrechen" : "Schließen"}</button>
@@ -6579,13 +6578,13 @@
       knoepfe = `<button class="session-fokus-btn-sek" onclick="sessionCountdownNeu()">↺ Nochmal</button>`;
     } else if (c.status === "laeuft") {
       status = `Satz ${c.satz} von ${c.saetze} läuft`;
-      knoepfe = `<button class="session-fokus-btn-sek" onclick="sessionCountdownPause()">⏸ Pause</button>`;
+      knoepfe = `<button class="session-fokus-btn-sek" onclick="sessionCountdownPause()">${ic("pause")}Pause</button>`;
     } else if (c.status === "pausiert") {
       status = `Satz ${c.satz} von ${c.saetze} pausiert`;
-      knoepfe = `<button class="session-fokus-btn-primaer" onclick="sessionCountdownStart()">▶ Weiter</button>`;
+      knoepfe = `<button class="session-fokus-btn-primaer" onclick="sessionCountdownStart()">${ic("play")}Weiter</button>`;
     } else {
       status = `Satz ${c.satz} von ${c.saetze}`;
-      knoepfe = `<button class="session-fokus-btn-primaer" onclick="sessionCountdownStart()">▶ ${c.saetze > 1 ? `Satz ${c.satz} starten` : "Start"}</button>`;
+      knoepfe = `<button class="session-fokus-btn-primaer" onclick="sessionCountdownStart()">${ic("play")}${c.saetze > 1 ? `Satz ${c.satz} starten` : "Start"}</button>`;
     }
     return `
       <div class="session-countdown session-countdown-${c.status}">
@@ -6610,7 +6609,7 @@
     overlay.innerHTML = `
       <div class="session-fokus-kopf">
         <span class="session-fokus-titel">${escapeHtml(trainingSession.planName)} · Übung ${i + 1} von ${gesamt}</span>
-        <span class="session-gesamtzeit" title="Gesamtzeit">⏱ <span id="session-gesamtzeit">${zeitFormat((Date.now() - trainingSession.startMs) / 1000, true)}</span></span>
+        <span class="session-gesamtzeit" title="Gesamtzeit">${ic("stoppuhr")} <span id="session-gesamtzeit">${zeitFormat((Date.now() - trainingSession.startMs) / 1000, true)}</span></span>
         <button class="session-fokus-schliessen" onclick="trainingSessionAbbrechen()" aria-label="Schließen">${ic("x")}</button>
       </div>
       <div class="session-fokus-inhalt">
@@ -6687,7 +6686,7 @@
             <span class="notiz-text">${escapeHtml(t.name)}</span>
             <span class="notiz-meta">${t.arbeit_sekunden}s Arbeit${t.pause_sekunden ? ` / ${t.pause_sekunden}s Pause` : ""} × ${t.runden} Runde${t.runden === 1 ? "" : "n"}${t.vorbereitung_sekunden ? ` · ${t.vorbereitung_sekunden}s Vorbereitung` : ""}</span>
           </div>
-          <button class="link-btn" onclick="timerStarten('${t.id}')">▶ Starten</button>
+          <button class="link-btn" onclick="timerStarten('${t.id}')">${ic("play")}Starten</button>
           <button class="task-edit-btn" onclick="timerBearbeitenStart('${t.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
           <button class="task-delete" onclick="timerLoeschen('${t.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
@@ -6927,7 +6926,7 @@
     const overlay = document.getElementById("timer-fokus-overlay");
     if (!overlay || !timerSession) return;
     const t = timerSession;
-    const phaseLabel = { vorbereitung: "Vorbereitung", arbeit: "Arbeit", pause: "Pause", fertig: "Fertig! 🎉" }[t.phase];
+    const phaseLabel = { vorbereitung: "Vorbereitung", arbeit: "Arbeit", pause: "Pause", fertig: "Fertig!" }[t.phase];
     const mm = String(Math.floor(t.sekundenVerbleibend / 60)).padStart(2, "0");
     const ss = String(t.sekundenVerbleibend % 60).padStart(2, "0");
 
@@ -6941,7 +6940,7 @@
         ${t.phase !== "fertig" ? `<div class="timer-countdown">${mm}:${ss}</div>` : ""}
       </div>
       <div class="session-fokus-fuss">
-        ${t.phase !== "fertig" ? `<button class="session-fokus-btn-sek" onclick="timerPausieren()">${t.laeuft ? "⏸ Pause" : "▶ Weiter"}</button>` : ""}
+        ${t.phase !== "fertig" ? `<button class="session-fokus-btn-sek" onclick="timerPausieren()">${t.laeuft ? ic("pause") + "Pause" : ic("play") + "Weiter"}</button>` : ""}
         <button class="session-fokus-btn-primaer" onclick="timerAbbrechen()">${t.phase === "fertig" ? "Fertig" : "Beenden"}</button>
       </div>`;
   }
@@ -7011,7 +7010,7 @@
             </span>
             ${z.beschreibung ? `<span class="notiz-meta" style="white-space:pre-wrap;">${escapeHtml(z.beschreibung)}</span>` : ""}
           </div>
-          ${z.plan_id ? `<button class="link-btn" onclick="planStarten('${z.plan_id}')">▶ Starten</button>` : ""}
+          ${z.plan_id ? `<button class="link-btn" onclick="planStarten('${z.plan_id}')">${ic("play")}Starten</button>` : ""}
           <button class="task-edit-btn" onclick="zieleventBearbeitenStart('${z.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
           <button class="task-delete" onclick="zieleventLoeschen('${z.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
@@ -7287,10 +7286,10 @@
   // Baut die Infozeile eines Spiels (Teilnehmer, Alter, Dauer, Material) mit Icons
   function spielMetaZeile(s) {
     const teile = [];
-    if (s.teilnehmerzahl) teile.push(`👥 ${escapeHtml(s.teilnehmerzahl)}`);
-    if (s.altersgruppe) teile.push(`🎂 ${escapeHtml(s.altersgruppe)}`);
-    if (s.dauer) teile.push(`⏱ ${escapeHtml(s.dauer)}`);
-    if (s.material) teile.push(`🧰 ${escapeHtml(s.material)}`);
+    if (s.teilnehmerzahl) teile.push(`<span title="Teilnehmerzahl">${ic("personen")} ${escapeHtml(s.teilnehmerzahl)}</span>`);
+    if (s.altersgruppe) teile.push(`<span title="Altersgruppe">${ic("kuchen")} ${escapeHtml(s.altersgruppe)}</span>`);
+    if (s.dauer) teile.push(`<span title="Dauer">${ic("stoppuhr")} ${escapeHtml(s.dauer)}</span>`);
+    if (s.material) teile.push(`<span title="Material">${ic("werkzeug")} ${escapeHtml(s.material)}</span>`);
     return teile.join(" · ");
   }
 
@@ -7420,7 +7419,7 @@
         const dateiZeilen = dateien.map((d) => {
           const hochgeladen = new Date(d.hochgeladen_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
           return `
-                <div>📎 <span onclick="spielDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
+                <div>${ic("anhang")} <span onclick="spielDateiOeffnen('${d.id}')" style="text-decoration:underline; cursor:pointer;">${escapeHtml(d.datei_name)}</span>
                   <span style="opacity:0.65;">(${hochgeladen})</span>
                   <span onclick="spielDateiLoeschen('${d.id}')" style="cursor:pointer; margin-left:0.3rem;" title="Datei entfernen" aria-label="Datei entfernen">${ic("x")}</span></div>`;
         }).join("");
@@ -7440,7 +7439,7 @@
               </details>` : ""}
               <div class="notiz-meta" style="margin-top:0.3rem;">
                 ${dateiZeilen}
-                <label style="text-decoration:underline; cursor:pointer;">📎 Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="spielDateiHinzufuegen('${s.id}', this)"></label>
+                <label style="text-decoration:underline; cursor:pointer;">${ic("anhang")} Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="spielDateiHinzufuegen('${s.id}', this)"></label>
               </div>
             </div>
             <div class="spiel-karte-knoepfe">
@@ -8449,7 +8448,7 @@
   let schluesselSuche = "";
   let schluesselFilterArt = "alle";
   let schluesselFilterZugang = "alle";
-  const SCHLUESSEL_ART = { schluessel: { icon: "🔑", text: "Schlüssel" }, key: { icon: "📡", text: "Elektronischer Key" } };
+  const SCHLUESSEL_ART = { schluessel: { icon: "schluessel", text: "Schlüssel" }, key: { icon: "funk", text: "Elektronischer Key" } };
   const SCHLUESSEL_OHNE_VEREIN = "Ohne Verein";
 
   // Liefert die Schlüssel/Keys des aktiven Bereichs
@@ -8474,20 +8473,20 @@
   // Erzeugt die Select-Optionen für die Schlüsselart (Schlüssel/elektronischer Key) mit Vorauswahl
   function schluesselArtOptionen(gewaehlt) {
     return Object.entries(SCHLUESSEL_ART).map(([wert, a]) =>
-      `<option value="${wert}" ${wert === gewaehlt ? "selected" : ""}>${a.icon} ${a.text}</option>`).join("");
+      `<option value="${wert}" ${wert === gewaehlt ? "selected" : ""}>${a.text}</option>`).join("");
   }
   // Ankreuzfelder für die Zugänge; containerId bündelt sie für das Auslesen
   function schluesselZugangAuswahlHtml(containerId, gewaehlt) {
     const zugaenge = zugaengeAktuell();
     if (!zugaenge.length) {
-      return `<span class="notiz-meta">Noch keine Zugänge – über ⚙ oben („Zugänge verwalten“) anlegen.</span>`;
+      return `<span class="notiz-meta">Noch keine Zugänge – über ${ic("zahnrad")} oben („Zugänge verwalten“) anlegen.</span>`;
     }
     // Saubere Liste untereinander: je Zugang eine Zeile mit Häkchen links (Breite fest, sonst
     // zieht .ern-feld input die Checkbox auf 100 %), Beschreibung klein darunter
     const zeilen = zugaenge.map((z, i) => `
       <label style="display:flex; align-items:center; gap:0.7rem; padding:0.5rem 0.75rem; margin:0; cursor:pointer; font-weight:normal; color:var(--ink);${i < zugaenge.length - 1 ? " border-bottom:1px solid var(--border);" : ""}">
         <input type="checkbox" value="${z.id}" ${gewaehlt.includes(z.id) ? "checked" : ""} style="width:1.15rem; height:1.15rem; margin:0; flex:0 0 auto; accent-color:var(--accent);">
-        <span style="flex:1; min-width:0; line-height:1.3;">🚪 ${escapeHtml(z.name)}${z.beschreibung ? `<span class="notiz-meta" style="display:block; margin:0;">${escapeHtml(z.beschreibung)}</span>` : ""}</span>
+        <span style="flex:1; min-width:0; line-height:1.3;">${ic("tuer")} ${escapeHtml(z.name)}${z.beschreibung ? `<span class="notiz-meta" style="display:block; margin:0;">${escapeHtml(z.beschreibung)}</span>` : ""}</span>
       </label>`).join("");
     return `<div id="${containerId}" style="display:flex; flex-direction:column; border:1px solid var(--border); border-radius:8px; background:var(--panel); max-height:16rem; overflow-y:auto;">${zeilen}</div>`;
   }
@@ -8518,7 +8517,7 @@
     const filter = document.getElementById("schluessel-filter-zugang");
     if (schluesselFilterZugang !== "alle" && !zugaenge.some((z) => z.id === schluesselFilterZugang)) schluesselFilterZugang = "alle";
     filter.innerHTML = `<option value="alle">Alle Zugänge</option>` + zugaenge.map((z) =>
-      `<option value="${z.id}" ${z.id === schluesselFilterZugang ? "selected" : ""}>🚪 ${escapeHtml(z.name)}</option>`).join("");
+      `<option value="${z.id}" ${z.id === schluesselFilterZugang ? "selected" : ""}>${escapeHtml(z.name)}</option>`).join("");
     filter.classList.toggle("hidden", !zugaenge.length);
 
     const anzSchl = alle.filter((k) => k.art !== "key").length;
@@ -8536,7 +8535,7 @@
           return `
             <div class="notiz-item">
               <div style="flex:1;">
-                <span class="notiz-text">🚪 ${escapeHtml(z.name)}</span>
+                <span class="notiz-text">${ic("tuer")} ${escapeHtml(z.name)}</span>
                 <span class="notiz-meta" style="display:block;">${z.beschreibung ? escapeHtml(z.beschreibung) + " · " : ""}${anzahl} Schlüssel/Key${anzahl === 1 ? "" : "s"}</span>
               </div>
               <button class="task-edit-btn" onclick="zugangBearbeiten('${z.id}')" aria-label="Zugang bearbeiten" title="Bearbeiten">${ic("stift")}</button>
@@ -8612,9 +8611,9 @@
       return `
         <div class="notiz-item">
           <div style="flex:1; cursor:pointer;" onclick="schluesselBearbeitenStart('${k.id}')">
-            <span class="notiz-text">${art.icon} ${k.inhaber ? escapeHtml(k.inhaber) : (schluesselStatus(k) === "bestand" ? "frei" : `<em>ohne Name</em>`)}</span>
+            <span class="notiz-text">${ic(art.icon)}<span class="nur-vorleser">${art.text}:</span> ${k.inhaber ? escapeHtml(k.inhaber) : (schluesselStatus(k) === "bestand" ? "frei" : `<em>ohne Name</em>`)}</span>
             <span class="notiz-meta" style="display:block;">Nr. <strong>${escapeHtml(k.seriennummer)}</strong> · ${meta}</span>
-            ${zug.length ? `<span class="notiz-meta" style="display:block;">🚪 ${zug.map(escapeHtml).join(", ")}</span>` : ""}
+            ${zug.length ? `<span class="notiz-meta" style="display:block;">${ic("tuer")} ${zug.map(escapeHtml).join(", ")}</span>` : ""}
             ${schluesselStatusHtml(k)}
           </div>
           <div style="display:flex; flex-direction:column; gap:0.3rem; align-items:flex-end;">${schluesselKnoepfeHtml(k)}</div>
@@ -8626,11 +8625,11 @@
       const eintraege = gruppen[v].sort(schluesselVergleich);
       const s = eintraege.filter((k) => k.art !== "key").length;
       const kz = eintraege.length - s;
-      const zahl = [s ? `🔑 ${s}` : "", kz ? `📡 ${kz}` : ""].filter(Boolean).join(" ");
+      const zahl = [s ? `<span title="Schlüssel">${ic("schluessel")} ${s}</span>` : "", kz ? `<span title="Elektronische Keys">${ic("funk")} ${kz}</span>` : ""].filter(Boolean).join(" ");
       return `
         <details class="spiel-gruppe" open>
           <summary class="spiel-gruppe-kopf">
-            <span class="spiel-gruppe-titel">${escapeHtml(v)}</span>
+            <span class="spiel-gruppe-titel">${v === SCHLUESSEL_BESTAND ? ic("eingang") + " " : ""}${escapeHtml(v)}</span>
             <span class="zl-gruppe-zahl">${zahl}</span>
           </summary>
           <div class="notiz-list">${eintraege.map(karte).join("")}</div>
@@ -8777,7 +8776,7 @@
   let schluesselAktion = null; // { id: schluessel-id, modus: "ausgeben" | "zuruecknehmen" }
   let ausgabeBearbeitenId = null;
   let schluesselFilterStatus = "alle";
-  const SCHLUESSEL_BESTAND = "📥 Im Bestand";
+  const SCHLUESSEL_BESTAND = "Im Bestand";
   const PROTOKOLL_ALT_TAGE = 365;
 
   // Offene (noch nicht zurückgegebene) Ausgabe eines Schlüssels oder undefined
@@ -8878,7 +8877,7 @@
     const id = k.id;
     return `
       <div class="notiz-item" style="display:block;">
-        <p class="notiz-text" style="margin:0 0 0.4rem;">📤 ${escapeHtml((SCHLUESSEL_ART[k.art] || SCHLUESSEL_ART.schluessel).text)} Nr. ${escapeHtml(k.seriennummer)} ausgeben</p>
+        <p class="notiz-text" style="margin:0 0 0.4rem;">${ic("ausgeben")} ${escapeHtml((SCHLUESSEL_ART[k.art] || SCHLUESSEL_ART.schluessel).text)} Nr. ${escapeHtml(k.seriennummer)} ausgeben</p>
         <div class="task-edit-felder">
           <label class="ern-feld">Name *<input type="text" id="sa-name-${id}" value="${escapeAttr(k.inhaber || "")}" maxlength="120" list="schluessel-namen-vorschlaege"></label>
           <label class="ern-feld">Verein<input type="text" id="sa-verein-${id}" value="${escapeAttr(k.verein || "")}" maxlength="120" list="schluessel-vereine-vorschlaege"></label>
@@ -8903,7 +8902,7 @@
     const id = k.id;
     return `
       <div class="notiz-item" style="display:block;">
-        <p class="notiz-text" style="margin:0 0 0.4rem;">📥 Nr. ${escapeHtml(k.seriennummer)} von ${escapeHtml(a.inhaber)} zurücknehmen</p>
+        <p class="notiz-text" style="margin:0 0 0.4rem;">${ic("eingang")} Nr. ${escapeHtml(k.seriennummer)} von ${escapeHtml(a.inhaber)} zurücknehmen</p>
         <div class="task-edit-felder">
           <label class="ern-feld">Zurück am<input type="date" id="sr-am-${id}" value="${heuteISO()}"></label>
           <label class="ern-feld">Zurückgenommen von<input type="text" id="sr-von-${id}" value="${escapeAttr(letzterAusgeber())}" maxlength="120"></label>
@@ -8921,23 +8920,23 @@
   function schluesselStatusHtml(k) {
     const a = offeneAusgabe(k);
     if (a) {
-      const sig = a.hat_unterschrift_ausgabe ? " · ✍️" : "";
+      const sig = a.hat_unterschrift_ausgabe ? ` · <span title="digital unterschrieben">${ic("unterschrift")}<span class="nur-vorleser">digital unterschrieben</span></span>` : "";
       if (ausgabeUeberfaellig(a)) {
-        return `<span class="notiz-meta" style="display:block; color:var(--accent); font-weight:600;">⚠️ Rückgabe überfällig seit ${datumDE(a.rueckgabe_bis)} · ausgegeben ${datumDE(a.ausgegeben_am)}${sig}</span>`;
+        return `<span class="notiz-meta" style="display:block; color:var(--accent); font-weight:600;">${ic("warnung")} Rückgabe überfällig seit ${datumDE(a.rueckgabe_bis)} · ausgegeben ${datumDE(a.ausgegeben_am)}${sig}</span>`;
       }
-      return `<span class="notiz-meta" style="display:block;">📤 ausgegeben seit ${datumDE(a.ausgegeben_am)}${a.rueckgabe_bis ? " · bis " + datumDE(a.rueckgabe_bis) : ""}${sig}</span>`;
+      return `<span class="notiz-meta" style="display:block;">${ic("ausgeben")} ausgegeben seit ${datumDE(a.ausgegeben_am)}${a.rueckgabe_bis ? " · bis " + datumDE(a.rueckgabe_bis) : ""}${sig}</span>`;
     }
     if (schluesselStatus(k) === "zugeordnet") return `<span class="notiz-meta" style="display:block;">ohne Ausgabeprotokoll</span>`;
-    return `<span class="notiz-meta" style="display:block;">📥 im Bestand</span>`;
+    return `<span class="notiz-meta" style="display:block;">${ic("eingang")} im Bestand</span>`;
   }
   // Knöpfe einer Karte je nach Status
   function schluesselKnoepfeHtml(k) {
     const a = offeneAusgabe(k);
-    const knopf = (text, aufruf, titel) => `<button class="btn-secondary" style="white-space:nowrap; padding:0.25rem 0.6rem;" title="${titel}" onclick="event.stopPropagation(); ${aufruf}">${text}</button>`;
+    const knopf = (text, aufruf, titel) => `<button class="btn-secondary" style="white-space:nowrap; padding:0.25rem 0.6rem;" title="${titel}" aria-label="${titel}" onclick="event.stopPropagation(); ${aufruf}">${text}</button>`;
     if (a) return knopf("Zurück", `schluesselAktionStart('${k.id}', 'zuruecknehmen')`, "Schlüssel zurücknehmen") +
-      knopf("📄", `ausgabeDrucken('${a.id}')`, "Protokoll drucken / als PDF") +
-      (mailEingerichtet ? knopf("✉️", `ausgabeMailen('${a.id}')`, "Protokoll per Mail senden") : "");
-    if (schluesselStatus(k) === "zugeordnet") return knopf("✍️ Protokoll", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Ausgabeprotokoll mit Unterschrift nachtragen");
+      knopf(ic("drucken"), `ausgabeDrucken('${a.id}')`, "Protokoll drucken / als PDF") +
+      (mailEingerichtet ? knopf(ic("mail"), `ausgabeMailen('${a.id}')`, "Protokoll per Mail senden") : "");
+    if (schluesselStatus(k) === "zugeordnet") return knopf(ic("unterschrift") + "Protokoll", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Ausgabeprotokoll mit Unterschrift nachtragen");
     return knopf("Ausgeben", `schluesselAktionStart('${k.id}', 'ausgeben')`, "Schlüssel ausgeben");
   }
   // Ausgabe-Historie eines Schlüssels (für das Bearbeiten-Feld)
@@ -8946,7 +8945,7 @@
     if (!liste.length) return "";
     return `<div class="ern-feld ern-feld-breit"><span>Ausgaben</span>${liste.map((a) => `
       <span class="notiz-meta" style="display:block;">${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""} · ${datumDE(a.ausgegeben_am)} – ${a.zurueck_am ? datumDE(a.zurueck_am) : "heute"}
-        <button class="link-btn" onclick="ausgabeDrucken('${a.id}')">📄 Drucken</button> <button class="link-btn" onclick="ausgabePdf('${a.id}')">⬇ PDF</button>${mailEingerichtet ? ` <button class="link-btn" onclick="ausgabeMailen('${a.id}')">✉️ Mail</button>` : ""}</span>`).join("")}</div>`;
+        <button class="link-btn" onclick="ausgabeDrucken('${a.id}')">${ic("drucken")}Drucken</button> <button class="link-btn" onclick="ausgabePdf('${a.id}')">${ic("export")}PDF</button>${mailEingerichtet ? ` <button class="link-btn" onclick="ausgabeMailen('${a.id}')">${ic("mail")}Mail</button>` : ""}</span>`).join("")}</div>`;
   }
 
   // Öffnet am Schlüssel das Formular zum Ausgeben bzw. Zurücknehmen
@@ -9143,7 +9142,7 @@
       const antwort = await protokollMailSenden(ausgabeId, email);
       alert(`Gespeichert. Protokoll als PDF an ${email} verschickt.${antwort && antwort.kopie ? " Eine Kopie ging an dein Postfach." : ""}`);
     } catch (fehler) {
-      alert("Gespeichert, aber die Mail ging nicht raus: " + fehler.message + " – über ✉️ in den Ausgabeprotokollen erneut versuchen.");
+      alert("Gespeichert, aber die Mail ging nicht raus: " + fehler.message + " – über das Mail-Symbol in den Ausgabeprotokollen erneut versuchen.");
     }
   }
 
@@ -9162,19 +9161,19 @@
         <button class="link-btn" onclick="alteProtokolleLoeschen()">Alte löschen</button></p>` : "";
     html += `<div class="notiz-list">${alle.map((a) => {
       if (ausgabeBearbeitenId === a.id) return ausgabeBearbeitenHtml(a);
-      const icon = a.art === "key" ? "📡" : "🔑";
+      const icon = ic(a.art === "key" ? "funk" : "schluessel");
       const status = a.zurueck_am
-        ? `zurück ${datumDE(a.zurueck_am)}${a.hat_unterschrift_rueckgabe ? " ✍️" : ""}`
+        ? `zurück ${datumDE(a.zurueck_am)}${a.hat_unterschrift_rueckgabe ? " " + ic("unterschrift") : ""}`
         : (ausgabeUeberfaellig(a) ? `<strong style="color:var(--accent);">überfällig seit ${datumDE(a.rueckgabe_bis)}</strong>` : "noch ausgegeben");
       return `
         <div class="notiz-item">
           <div style="flex:1; cursor:pointer;" onclick="ausgabeBearbeitenStart('${a.id}')">
             <span class="notiz-text">${icon} ${escapeHtml(a.seriennummer)} · ${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""}</span>
-            <span class="notiz-meta" style="display:block;">ausgegeben ${datumDE(a.ausgegeben_am)}${a.hat_unterschrift_ausgabe ? " ✍️" : ""}${a.ausgegeben_von ? " von " + escapeHtml(a.ausgegeben_von) : ""} · ${status}${ausgabeIstAlt(a) ? " · älter als 1 Jahr" : ""}</span>
+            <span class="notiz-meta" style="display:block;">ausgegeben ${datumDE(a.ausgegeben_am)}${a.hat_unterschrift_ausgabe ? " " + ic("unterschrift") : ""}${a.ausgegeben_von ? " von " + escapeHtml(a.ausgegeben_von) : ""} · ${status}${ausgabeIstAlt(a) ? " · älter als 1 Jahr" : ""}</span>
           </div>
-          <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeDrucken('${a.id}')" aria-label="Protokoll drucken" title="Drucken">📄</button>
-          <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabePdf('${a.id}')" aria-label="Protokoll als PDF herunterladen" title="PDF herunterladen">⬇</button>
-          ${mailEingerichtet ? `<button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeMailen('${a.id}')" aria-label="Protokoll per Mail senden" title="Per Mail senden">✉️</button>` : ""}
+          <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeDrucken('${a.id}')" aria-label="Protokoll drucken" title="Drucken">${ic("drucken")}</button>
+          <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabePdf('${a.id}')" aria-label="Protokoll als PDF herunterladen" title="PDF herunterladen">${ic("export")}</button>
+          ${mailEingerichtet ? `<button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeMailen('${a.id}')" aria-label="Protokoll per Mail senden" title="Per Mail senden">${ic("mail")}</button>` : ""}
           <button class="task-delete" onclick="event.stopPropagation(); ausgabeLoeschen('${a.id}')" aria-label="Protokoll löschen">${ic("x")}</button>
         </div>`;
     }).join("")}</div>`;
@@ -9326,15 +9325,15 @@
   // Erzeugt die Statuszeile zum Mailversand einer Vermietung, bei Fehlern mit „Erneut senden“
   function raumMailStatusHtml(v) {
     if (v.mail_status === "gesendet") {
-      return `<span class="notiz-meta" style="display:block;">✉️ Mail verschickt${v.mail_gesendet_am ? " am " + new Date(v.mail_gesendet_am).toLocaleDateString("de-DE") : ""}</span>`;
+      return `<span class="notiz-meta" style="display:block;">${ic("mail")} Mail verschickt${v.mail_gesendet_am ? " am " + new Date(v.mail_gesendet_am).toLocaleDateString("de-DE") : ""}</span>`;
     }
     const texte = {
-      fehler: "⚠️ Mail fehlgeschlagen" + (v.mail_fehler ? ": " + v.mail_fehler : ""),
-      keine_empfaenger: "⚠️ Keine Mail – der Verteiler war leer",
-      nicht_eingerichtet: "⚠️ Keine Mail – Versand ist noch nicht eingerichtet",
+      fehler: "Mail fehlgeschlagen" + (v.mail_fehler ? ": " + v.mail_fehler : ""),
+      keine_empfaenger: "Keine Mail – der Verteiler war leer",
+      nicht_eingerichtet: "Keine Mail – Versand ist noch nicht eingerichtet",
     };
     if (!texte[v.mail_status]) return "";
-    return `<span class="notiz-meta" style="display:block; color:var(--accent);">${escapeHtml(texte[v.mail_status])}
+    return `<span class="notiz-meta" style="display:block; color:var(--accent);">${ic("warnung")} ${escapeHtml(texte[v.mail_status])}
       <button class="link-btn" onclick="event.stopPropagation(); raumMailErneut('${v.id}')">Erneut senden</button></span>`;
   }
   // Erzeugt den Rückmeldetext zum Mailversand nach dem Speichern einer Vermietung
@@ -9356,10 +9355,11 @@
     // Hinweise oben
     const hinweise = [];
     if (!mailEingerichtet) hinweise.push("Der Mail-Versand ist noch nicht eingerichtet (Secrets SMTP_USER und SMTP_PASS in der Edge Function, siehe Anleitung). Vermietungen lassen sich trotzdem eintragen.");
-    if (!empfaenger.length) hinweise.push("Der Mail-Verteiler ist noch leer – über ⚙ oben unter „Mail-Verteiler“ Adressen eintragen.");
-    if (!raeumeListe.length) hinweise.push("Noch keine Räume angelegt – über ⚙ oben unter „Räume verwalten“ anlegen.");
+    if (!empfaenger.length) hinweise.push(`Der Mail-Verteiler ist noch leer – über ${ic("zahnrad")} oben unter „Mail-Verteiler“ Adressen eintragen.`);
+    if (!raeumeListe.length) hinweise.push(`Noch keine Räume angelegt – über ${ic("zahnrad")} oben unter „Räume verwalten“ anlegen.`);
     document.getElementById("raum-hinweise").innerHTML = hinweise
-      .map((h) => `<p class="notiz-meta" style="color:var(--accent); margin:0 0 0.5rem;">${escapeHtml(h)}</p>`).join("");
+      // feste Texte ohne Nutzereingaben – nicht escapen, sonst wird das Zahnrad-Icon zu Text
+      .map((h) => `<p class="notiz-meta" style="color:var(--accent); margin:0 0 0.5rem;">${h}</p>`).join("");
 
     // Raum-Auswahl im Formular (Auswahl behalten)
     const auswahl = document.getElementById("raum-neu-raum");
@@ -9417,7 +9417,7 @@
               const serie = raumSerie(v);
               if (serie.length < 2) return "";
               const nr = serie.findIndex((x) => x.id === v.id) + 1;
-              return `<span class="notiz-meta" style="display:block;">🔁 Serie · Termin ${nr} von ${serie.length}</span>`;
+              return `<span class="notiz-meta" style="display:block;">${ic("serie")} Serie · Termin ${nr} von ${serie.length}</span>`;
             })()}
             <span class="notiz-meta" style="display:block;">${escapeHtml(v.mieter_name)}${v.mieter_kontakt ? " · " + escapeHtml(v.mieter_kontakt) : ""}${v.zweck ? " · " + escapeHtml(v.zweck) : ""}</span>
             ${v.notiz ? `<span class="notiz-meta" style="display:block;">${escapeHtml(v.notiz)}</span>` : ""}
@@ -10146,7 +10146,7 @@
       </p>
 
       <button class="link-btn" id="toggle-fixkosten-form">▸ Neue Position anlegen</button>
-      <button class="link-btn" id="btn-fixkosten-aufraeumen" title="Doppelte Positionen zusammenführen und Monatswerte aus den Buchungen übernehmen">🧹 Doppelte zusammenführen &amp; Monate aktualisieren</button>
+      <button class="link-btn" id="btn-fixkosten-aufraeumen" title="Doppelte Positionen zusammenführen und Monatswerte aus den Buchungen übernehmen">${ic("funkeln")}Doppelte zusammenführen &amp; Monate aktualisieren</button>
       <div class="row hidden fin-neu-form" id="fixkosten-form" style="margin-top:0.6rem;">
         <select id="neue-fk-typ">
           <option value="ausgabe">Ausgabe</option>
@@ -10441,7 +10441,7 @@
         <button class="btn-primary fin-quick-save" id="btn-buchung-speichern">Speichern</button>
       </div>
 
-      <button class="fin-csv-btn" id="btn-csv-import">⇪ CSV importieren</button>
+      <button class="fin-csv-btn" id="btn-csv-import">${ic("import")}CSV importieren</button>
       <input type="file" id="csv-import-input" accept=".csv" class="hidden">
 
       <div class="fin-summary-row">
@@ -10483,7 +10483,7 @@
         console.error(err);
         alert("Import fehlgeschlagen: " + (err.message || err));
       } finally {
-        btn.textContent = "⇪ CSV importieren";
+        btn.innerHTML = `${ic("import")}CSV importieren`;
         btn.disabled = false;
       }
     });
@@ -11185,7 +11185,7 @@
     const kategorien = finMlAlleKategorien();
     return `
       <details class="fin-massenloeschung" id="fin-ml-details">
-        <summary>⚠ Daten löschen (Buchungen / Fixkosten / Sonderausgaben)</summary>
+        <summary>${ic("warnung")} Daten löschen (Buchungen / Fixkosten / Sonderausgaben)</summary>
         <div class="fin-ml-body">
           <p class="fin-ml-hinweis">
             Löscht endgültig und ohne Papierkorb. Zeitraum gilt für Buchungen (Datum)
@@ -11401,10 +11401,10 @@
   // und wird nie mitgezeichnet – sonst ginge Getipptes verloren.
   // ==========================================================
   const ERN_MAHLZEITEN = [
-    ["fruehstueck", "Frühstück", "🌅"],
-    ["mittag", "Mittag", "🍽️"],
-    ["abend", "Abend", "🌙"],
-    ["snack", "Snacks", "🍎"],
+    ["fruehstueck", "Frühstück", "sonnenaufgang"],
+    ["mittag", "Mittag", "besteck"],
+    ["abend", "Abend", "mond"],
+    ["snack", "Snacks", "apfel"],
   ];
   const ERN_MAHLZEIT_NAME = Object.fromEntries(ERN_MAHLZEITEN.map(([k, n]) => [k, n]));
 
@@ -11582,10 +11582,10 @@
       const titel = eintraege.length
         ? `<button class="ern-mahlzeit-toggle" onclick="ernMahlzeitKlappen('${schluessel}')" aria-expanded="${zu ? "false" : "true"}" aria-controls="ern-mz-${schluessel}">
              <span class="ern-mahlzeit-pfeil${zu ? " zu" : ""}" aria-hidden="true">▾</span>
-             <span class="ern-mahlzeit-titel">${icon} ${name}</span>
+             <span class="ern-mahlzeit-titel">${ic(icon)} ${name}</span>
              <span class="ern-mahlzeit-kcal">${kcalText}</span>
            </button>`
-        : `<h3>${icon} ${name}</h3>`;
+        : `<h3>${ic(icon)} ${name}</h3>`;
       return `
         <section class="ern-mahlzeit${zu ? " zugeklappt" : ""}">
           <div class="ern-mahlzeit-kopf">
@@ -11658,7 +11658,7 @@
     const tag = ernAktDatum() === heuteISO() ? "gestern" : "am Vortag";
     return `
       <button class="ern-kopieren" onclick="ernKopieren('${mahlzeit}', this)">
-        ⧉ Wie ${tag} <span class="notiz-meta">· ${v.anzahl} ${v.anzahl === 1 ? "Eintrag" : "Einträge"} · ${ernZahl(v.kcal, 0)} kcal</span>
+        ${ic("kopieren")} Wie ${tag} <span class="notiz-meta">· ${v.anzahl} ${v.anzahl === 1 ? "Eintrag" : "Einträge"} · ${ernZahl(v.kcal, 0)} kcal</span>
       </button>`;
   }
 
@@ -11796,7 +11796,7 @@
     const gefuellt = [...new Set(paare.map((p) => p.nach))].filter((k) => ziel[k] && ziel[k].anzahl);
     let html = `<p class="notiz-meta">Aus ${vonText}:<br>${zeilen.join("<br>")}${paare.length > 1 ? `<br>Zusammen ${ernZahl(kcal, 0)} kcal` : ""}</p>`;
     if (gefuellt.length) {
-      html += `<p class="ern-kop-hinweis">⚠️ ${gefuellt.map((k) => ERN_MAHLZEIT_NAME[k]).join(", ")} ${gefuellt.length === 1 ? "hat" : "haben"} schon Einträge – die kopierten kommen dazu.</p>`;
+      html += `<p class="ern-kop-hinweis">${ic("warnung")} ${gefuellt.map((k) => ERN_MAHLZEIT_NAME[k]).join(", ")} ${gefuellt.length === 1 ? "hat" : "haben"} schon Einträge – die kopierten kommen dazu.</p>`;
     }
     vorschauEl.innerHTML = html;
     btn.disabled = !zielGeladen || ernKopLaeuft;
@@ -12391,7 +12391,7 @@
       const namen = { ballaststoffe: "Ballaststoffe", zucker: "Zucker", ges_fett: "gesättigte Fettsäuren", salz: "Salz" };
       status.textContent = res.ergaenzt && res.ergaenzt.length
         ? `✓ Ergänzt: ${res.ergaenzt.map((f) => namen[f] || f).join(", ")}`
-        : "Open Food Facts hat für dieses Produkt keine weiteren Werte. Du kannst sie über „✎ Werte … korrigieren“ selbst eintragen.";
+        : "Open Food Facts hat für dieses Produkt keine weiteren Werte. Du kannst sie über „Werte … korrigieren“ (Stift) selbst eintragen.";
       ernAuswahlInfoZeigen();
       if (!res.ergaenzt || !res.ergaenzt.length) knopf.classList.add("hidden");
       ernVorschau();
@@ -12670,7 +12670,7 @@
   function ernSchritteZeileHtml(z) {
     const sc = z.schritte;
     if (!sc) return "";
-    const basis = `👣 ${ernZahl(sc.schritte, 0)} Schritte`;
+    const basis = `${ic("schritte")} ${ernZahl(sc.schritte, 0)} Schritte`;
     if (!sc.ueber) return `<p class="ern-training-zeile">${basis} – nicht über dem Sockel von ${ernZahl(sc.sockel, 0)}, zählt nichts extra</p>`;
     if (sc.kcal === null) return `<p class="ern-training-zeile">${basis}: <span class="ern-ohne-wert">? (${sc.grund})</span></p>`;
     const zuschlag = z.anrechnung === 100
@@ -12795,8 +12795,8 @@
   function ernSummeHtml(s, z) {
     if (!z) {
       const hinweis = !ernProfilGeladen ? ""
-        : !ernProfil ? "Für ein Tagesziel unten „⚙️ Profil &amp; Ziel“ ausfüllen."
-        : "Für ein Tagesziel unten unter „⚖️ Gewicht“ dein Gewicht eintragen.";
+        : !ernProfil ? "Für ein Tagesziel unten „Profil &amp; Ziel“ ausfüllen."
+        : "Für ein Tagesziel unten unter „Gewicht“ dein Gewicht eintragen.";
       return `
         <div class="ern-summe-karte">
           <div class="ern-kcal-gross"><span>${ernZahl(s.kcal, 0)}</span> kcal</div>
@@ -12888,7 +12888,7 @@
     const heute = heuteISO();
     const g = ernGewichtFuer(heute);
     const p = ernProfilAusFormular();
-    if (!g) { el.innerHTML = `<p class="notiz-meta">Trag unter „⚖️ Gewicht“ dein aktuelles Gewicht ein, dann steht hier die Rechnung.</p>`; return; }
+    if (!g) { el.innerHTML = `<p class="notiz-meta">Trag unter „Gewicht“ dein aktuelles Gewicht ein, dann steht hier die Rechnung.</p>`; return; }
     const r = ernBedarfRechnen(p, g.gewicht_kg, heute);
     if (!r) { el.innerHTML = `<p class="notiz-meta">Geschlecht, Geburtsdatum und Größe ausfüllen, dann steht hier die Rechnung.</p>`; return; }
     const diff = Number(p.ziel_kcal_diff);
@@ -13099,7 +13099,7 @@
     const zuschlag = z.anrechnung === 100
       ? `+${ernZahl(z.trainingZuschlag, 0)} kcal aufs Ziel`
       : `davon ${z.anrechnung} % = +${ernZahl(z.trainingZuschlag, 0)} kcal aufs Ziel`;
-    return `<p class="ern-training-zeile">🏃 ${teile.join(" · ")}${z.trainingSumme > 0 ? ` → ${zuschlag}` : ""}</p>`;
+    return `<p class="ern-training-zeile">${ic("aktivitaet")} ${teile.join(" · ")}${z.trainingSumme > 0 ? ` → ${zuschlag}` : ""}</p>`;
   }
 
   // ---- MET-Werte je Sportart (Block „🏃 Trainingskalorien“) ----
@@ -13507,7 +13507,7 @@
   function ernMeineRendern() {
     const el = document.getElementById("ern-meine-liste");
     if (!ernMeineListe.length) {
-      el.innerHTML = `<p class="notiz-meta">Noch keine eigenen Lebensmittel. „➕ Neu“ legt eins an – oder scann ein Produkt, das Open Food Facts nicht kennt.</p>`;
+      el.innerHTML = `<p class="notiz-meta">Noch keine eigenen Lebensmittel. „Neu“ legt eins an – oder scann ein Produkt, das Open Food Facts nicht kennt.</p>`;
       return;
     }
     const woerter = document.getElementById("ern-meine-filter").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -13679,7 +13679,7 @@
     ernScanLicht = false;
     if (!knopf) return;   // alte index.html aus dem Cache
     knopf.classList.add("hidden");
-    knopf.textContent = "🔦 Licht an";
+    knopf.innerHTML = `${ic("taschenlampe")}Licht an`;
     const spur = ernScanStream && ernScanStream.getVideoTracks()[0];
     if (!spur || typeof spur.getCapabilities !== "function") return;
     const fk = spur.getCapabilities();
@@ -13698,7 +13698,7 @@
     try {
       await spur.applyConstraints({ advanced: [{ torch: !ernScanLicht }] });
       ernScanLicht = !ernScanLicht;
-      document.getElementById("btn-ern-scanner-licht").textContent = ernScanLicht ? "🔦 Licht aus" : "🔦 Licht an";
+      document.getElementById("btn-ern-scanner-licht").innerHTML = ic("taschenlampe") + (ernScanLicht ? "Licht aus" : "Licht an");
     } catch (e) { /* ignorieren */ }
   });
 
