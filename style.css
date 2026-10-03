@@ -1217,7 +1217,7 @@
   /* Vorderseite (wischbar, seit Session 35) – deckt den farbigen Hintergrund ab */
   .heute-zeile-vorne {
     position: relative; display: flex; align-items: center; gap: 0.15rem; padding: 0.1rem 0.4rem 0.1rem 0.15rem;
-    background: var(--panel); touch-action: pan-y; will-change: transform;
+    background: var(--panel);
   }
   .heute-zeile:first-child { border-top: none; }
   .heute-zeit { width: 3.2rem; flex-shrink: 0; font-size: 0.82rem; font-weight: 600; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
@@ -1464,24 +1464,28 @@
 .notiz-item > .task-edit-btn, .link-item > .task-edit-btn { min-width: 44px; min-height: 44px; }
 
 /* Wischgesten in „Heute“ (Session 35): Hintergrund zeigt, was beim Loslassen passiert */
-.heute-wisch-hinter {
+.wisch-zeile { position: relative; overflow: hidden; }
+.wisch-vorne { position: relative; touch-action: pan-y; }
+.task-wisch { border-radius: var(--r-mittel); }
+.wisch-hinter {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between;
   padding: 0 1rem; font-size: 0.88rem; font-weight: 700; visibility: hidden;
 }
-.heute-zeile.wisch-rechts .heute-wisch-hinter, .heute-zeile.wisch-links .heute-wisch-hinter { visibility: visible; }
-.heute-zeile.wisch-rechts .heute-wisch-hinter { background: var(--ok-bg); color: var(--ok-text); }
-.heute-zeile.wisch-links .heute-wisch-hinter { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); color: var(--ink); }
-.heute-zeile.wisch-rechts .heute-wisch-links, .heute-zeile.wisch-links .heute-wisch-rechts { visibility: hidden; }
-.heute-wisch-rechts, .heute-wisch-links { display: inline-flex; align-items: center; gap: 0.4rem; }
-.heute-zeile.wischt { user-select: none; -webkit-user-select: none; }
+.wisch-zeile.wisch-rechts .wisch-hinter, .wisch-zeile.wisch-links .wisch-hinter { visibility: visible; }
+.wisch-zeile.wisch-rechts .wisch-hinter { background: var(--ok-bg); color: var(--ok-text); }
+.wisch-zeile.wisch-links .wisch-hinter { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); color: var(--ink); }
+.wisch-zeile.wisch-links[data-wisch-links="loeschen"] .wisch-hinter { background: var(--overdue-bg); color: var(--overdue-text); }
+.wisch-zeile.wisch-rechts .wisch-text-links, .wisch-zeile.wisch-links .wisch-text-rechts { visibility: hidden; }
+.wisch-text-rechts, .wisch-text-links { display: inline-flex; align-items: center; gap: 0.4rem; }
+.wisch-zeile.wischt { user-select: none; -webkit-user-select: none; }
 .heute-wisch-tipp {
   margin: 0; padding: 0.45rem 0.8rem; border-radius: var(--r-mittel); background: var(--panel);
   font-size: 0.8rem; color: var(--ink-dim); display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem 0.6rem;
 }
 .heute-wisch-tipp .link-btn { font-size: 0.8rem; }
-.app-hinweis { display: flex; align-items: center; gap: 0.9rem; }
+.app-hinweis { display: flex; align-items: center; gap: 0.9rem; width: max-content; } /* sonst bricht „Wieder offen“ um */
 .app-hinweis-knopf {
   border: none; background: none; padding: 0.2rem 0; cursor: pointer; font: inherit; font-weight: 800;
   color: var(--bg); text-decoration: underline; text-underline-offset: 3px;
 }
-@media (prefers-reduced-motion: reduce) { .heute-zeile-vorne { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .wisch-vorne { transition: none !important; } }
