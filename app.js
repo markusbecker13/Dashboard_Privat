@@ -32,7 +32,6 @@
   let zielExpandiert = new Set();
   let calMonat = new Date(); // aktuell angezeigter Monat im Kalender
   let calAusgewaehlterTag = null; // "YYYY-MM-DD" oder null
-  let calBearbeiteterTermin = null; // id des gerade bearbeiteten Termins oder null
   let blockzeiten = [];
   let tagesrahmen = [];
   let fixkosten = [];
@@ -665,7 +664,7 @@
     const bereich = BEREICH_FARBWELT.includes(aktiverBereich) ? aktiverBereich : "privat";
     const wunsch = SCHNELL_ART_VON_TAB[aktiverTab] || "aufgabe";
     const art = schnellArtenFuer(bereich).some((a) => a.art === wunsch) ? wunsch : "aufgabe";
-    schnell = { art, bereich, wann: art === "termin" ? "heute" : "ohne", details: false, erkannt: null, erkennungAus: false, vorErkennung: null };
+    schnell = { art, bereich, wann: art === "termin" ? "heute" : "ohne", details: false, erkannt: null, erkennungAus: false, vorErkennung: null, modus: "neu", id: null };
     document.getElementById("schnell-text").value = "";
     ["schnell-datum", "schnell-uhrzeit", "schnell-ende", "schnell-intervall", "schnell-notiz"].forEach((id) => {
       document.getElementById(id).value = "";
@@ -678,6 +677,54 @@
     schnellRendern();
     if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
     document.getElementById("schnell-text").focus();
+  };
+
+  // ==========================================================
+  // Bearbeiten im selben Blatt (seit Session 35): Aufgaben und Termine aus
+  // Aufgaben, Kalender, Frei und Heute öffnen das „+“-Blatt ausgefüllt, mit
+  // Speichern und Löschen. Ersetzt die früheren Inline-Formulare.
+  // ==========================================================
+  window.eintragBearbeiten = function(typ, id) {
+    const dlg = document.getElementById("schnell-dialog");
+    const liste = typ === "termin" ? termine : aufgaben;
+    const e = liste.find((x) => String(x.id) === String(id));
+    if (!dlg || !e) return;
+    const heute = heuteISO();
+    const datum = (typ === "termin" ? e.datum : e.faellig_am) || null;
+    const wann = !datum ? "ohne" : datum === heute ? "heute" : datum === addTage(heute, 1) ? "morgen" : "datum";
+    const bereich = BEREICH_FARBWELT.includes(bereichVon(e)) ? bereichVon(e) : "privat";
+    schnell = { art: typ, bereich, wann, details: true, erkannt: null, erkennungAus: false, vorErkennung: null, modus: "bearbeiten", id: e.id, altDatum: datum };
+    const zeit = (z) => (z ? String(z).slice(0, 5) : "");
+    document.getElementById("schnell-text").value = e.titel || "";
+    document.getElementById("schnell-datum").value = wann === "datum" ? datum : "";
+    document.getElementById("schnell-uhrzeit").value = zeit(e.uhrzeit);
+    document.getElementById("schnell-ende").value = zeit(e.ende_uhrzeit);
+    document.getElementById("schnell-intervall").value = typ === "aufgabe" && e.erinnere_alle_tage ? e.erinnere_alle_tage : "";
+    document.getElementById("schnell-notiz").value = typ === "termin" ? (e.notiz || "") : "";
+    schnellMeldung("", false);
+    document.getElementById("schnell-reiterform").classList.add("hidden");
+    schnellRendern();
+    document.getElementById("schnell-projekt").value = typ === "aufgabe" && e.projekt_id ? String(e.projekt_id) : "";
+    if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    document.getElementById("schnell-text").focus();
+  };
+
+  // Löscht den gerade bearbeiteten Eintrag (mit Rückfrage)
+  window.schnellLoeschen = async function() {
+    if (schnell.modus !== "bearbeiten") return;
+    const label = schnell.art === "termin" ? "Termin" : "Aufgabe";
+    const titel = document.getElementById("schnell-text").value.trim();
+    if (!confirm(`${label} „${titel}“ löschen?`)) return;
+    try {
+      await api(schnell.art === "termin" ? "termin_loeschen" : "aufgabe_loeschen", { id: schnell.id, aktiver_bereich: schnell.bereich });
+    } catch (e) {
+      schnellMeldung("Nicht gelöscht: " + (e.message || "Fehler"), true);
+      return;
+    }
+    window.schnellSchliessen();
+    hinweisZeigen(`${label} gelöscht`);
+    await ladeDaten();
+    if (aktiverTab === "frei") renderFrei();
   };
 
   // Schließt das Blatt und öffnet stattdessen das Formular des offenen Reiters
@@ -867,6 +914,12 @@
   // Zeichnet Chips und Felder passend zur aktuellen Auswahl
   function schnellRendern() {
     schnellErkanntRendern();
+    const bearbeiten = schnell.modus === "bearbeiten";
+    const artName = (SCHNELL_ARTEN.find((a) => a.art === schnell.art) || {}).label || "";
+    document.getElementById("schnell-titel").textContent = bearbeiten ? `${artName} bearbeiten` : "Schnell erfassen";
+    document.getElementById("schnell-art-label").classList.toggle("hidden", bearbeiten);
+    document.getElementById("schnell-arten").classList.toggle("hidden", bearbeiten);
+    document.getElementById("schnell-loeschen").classList.toggle("hidden", !bearbeiten);
     const arten = schnellArtenFuer(schnell.bereich);
     const artInfo = SCHNELL_ARTEN.find((a) => a.art === schnell.art);
     document.getElementById("schnell-text").placeholder = artInfo.platzhalter;
@@ -887,9 +940,11 @@
       document.getElementById("schnell-wann").innerHTML = optionen
         .map(([w, l]) => schnellChip("wann", w, l, w === schnell.wann)).join("");
       document.getElementById("schnell-datum").classList.toggle("hidden", schnell.wann !== "datum");
-      // Uhrzeit nur mit Datum sinnvoll
-      document.getElementById("schnell-zeit-zeile").classList.toggle("hidden", schnell.wann === "ohne");
-      document.getElementById("schnell-zeile").classList.toggle("hidden", schnell.wann === "ohne");
+      // Uhrzeit nur mit Datum sinnvoll – außer es steht schon eine drin
+      // (Aufgaben dürfen eine Uhrzeit ohne Datum haben; sichtbar = gespeichert)
+      const zeitOhneTag = schnell.wann === "ohne" && !document.getElementById("schnell-uhrzeit").value;
+      document.getElementById("schnell-zeit-zeile").classList.toggle("hidden", zeitOhneTag);
+      document.getElementById("schnell-zeile").classList.toggle("hidden", zeitOhneTag);
     }
 
     // Details je Art
@@ -900,7 +955,7 @@
     detailsKnopf.textContent = (schnell.details && hatDetails ? "▾" : "▸") + " Details";
     const zeigen = schnell.details && hatDetails;
     document.getElementById("schnell-details").classList.toggle("hidden", !zeigen);
-    const ohneZeit = schnell.wann === "ohne";
+    const ohneZeit = schnell.wann === "ohne" && !document.getElementById("schnell-uhrzeit").value;
     document.getElementById("schnell-ende-zeile").classList.toggle("hidden", !(zeigen && mitWann && !ohneZeit));
     document.getElementById("schnell-projekt-zeile").classList.toggle("hidden", !(zeigen && (schnell.art === "aufgabe" || schnell.art === "notiz")));
     document.getElementById("schnell-intervall-zeile").classList.toggle("hidden", !(zeigen && schnell.art === "aufgabe"));
@@ -942,9 +997,13 @@
     const bereich = schnell.bereich;
     const datum = schnellDatum();
     if (schnell.art === "termin" && !datum) { schnellMeldung("Ein Termin braucht ein Datum.", true); return; }
-    const mitZeit = schnell.wann !== "ohne";
+    const bearbeiten = schnell.modus === "bearbeiten";
+    // Beim Bearbeiten zählt, was im Feld steht (auch Uhrzeit ohne Datum)
+    const mitZeit = schnell.wann !== "ohne" || bearbeiten;
     const uhrzeit = (mitZeit && document.getElementById("schnell-uhrzeit").value) || null;
-    const zeigeDetails = schnell.details;
+    // Beim Bearbeiten immer alle Felder mitschicken – das Backend überschreibt
+    // sie, ein zugeklapptes Details würde sonst Projekt/Wiederholung löschen
+    const zeigeDetails = schnell.details || bearbeiten;
     const ende_uhrzeit = ((zeigeDetails || (erkannt && erkannt.ende)) && uhrzeit && document.getElementById("schnell-ende").value) || null;
     const projekt_id = (zeigeDetails && document.getElementById("schnell-projekt").value) || null;
     const intervall = zeigeDetails ? document.getElementById("schnell-intervall").value : "";
@@ -956,7 +1015,11 @@
     knopf.disabled = true;
     schnellMeldung("Speichere …", false);
     try {
-      if (schnell.art === "aufgabe") {
+      if (bearbeiten && schnell.art === "aufgabe") {
+        await api("aufgabe_aktualisieren", { ...basis, id: schnell.id, titel: text, projekt_id, faellig_am: datum, uhrzeit, ende_uhrzeit, erinnere_alle_tage: intervall || null });
+      } else if (bearbeiten && schnell.art === "termin") {
+        await api("termin_aktualisieren", { ...basis, id: schnell.id, titel: text, datum, uhrzeit, ende_uhrzeit, notiz });
+      } else if (schnell.art === "aufgabe") {
         await api("aufgabe_hinzufuegen", { ...basis, titel: text, projekt_id, faellig_am: datum, uhrzeit, ende_uhrzeit, erinnere_alle_tage: intervall || null });
       } else if (schnell.art === "termin") {
         await api("termin_hinzufuegen", { ...basis, titel: text, datum, uhrzeit, ende_uhrzeit, notiz });
@@ -977,8 +1040,18 @@
     const bereichName = (BEREICH_UMSCHALTER.find((b) => b.bereich === bereich) || {}).name || bereich;
     window.schnellSchliessen();
     hinweisZeigen(`${artLabel} gespeichert${bereich !== aktiverBereich ? ` · ${bereichName}` : ""}`);
+    // Verschoben? Frei und Kalender springen mit, damit der Eintrag sichtbar bleibt
+    if (bearbeiten && datum && datum !== schnell.altDatum) {
+      if (aktiverTab === "frei") freiTag = new Date(datum + "T00:00:00");
+      if (aktiverTab === "kalender" && calAusgewaehlterTag === schnell.altDatum) {
+        calAusgewaehlterTag = datum;
+        const [j, m] = datum.split("-").map(Number);
+        calMonat = new Date(j, m - 1, 1);
+      }
+    }
     await ladeDaten();
     if (schnell.art === "termin") renderKalender();
+    if (aktiverTab === "frei") renderFrei();
   };
 
   // Kurze Rückmeldung unten über der Leiste, verschwindet nach 3 Sekunden
@@ -1264,61 +1337,13 @@
     return `<span class="badge ${cls}">${escapeHtml(text)}</span>`;
   }
 
-  let aufgabeBearbeitenId = null;
-
-  // Startet die Inline-Bearbeitung einer Aufgabe
+  // Bearbeiten einer Aufgabe: seit Session 35 im Blatt (eintragBearbeiten)
   window.aufgabeBearbeitenStart = function(id) {
-    aufgabeBearbeitenId = id;
-    render();
+    window.eintragBearbeiten("aufgabe", id);
   };
-
-  // Bricht die Inline-Bearbeitung einer Aufgabe ab
-  window.aufgabeBearbeitenAbbrechen = function() {
-    aufgabeBearbeitenId = null;
-    render();
-  };
-
-  // Speichert die bearbeitete Aufgabe und lädt die Daten neu
-  window.aufgabeBearbeitenSpeichern = async function(id) {
-    const titel = document.getElementById("edit-aufgabe-titel").value.trim();
-    if (!titel) return;
-    const projekt_id = document.getElementById("edit-aufgabe-projekt").value || null;
-    const faellig_am = document.getElementById("edit-aufgabe-faellig").value || null;
-    const uhrzeit = document.getElementById("edit-aufgabe-uhrzeit").value || null;
-    const ende_uhrzeit = document.getElementById("edit-aufgabe-ende").value || null;
-    const erinnere_alle_tage = document.getElementById("edit-aufgabe-intervall").value || null;
-    await api("aufgabe_aktualisieren", { id, titel, projekt_id, faellig_am, uhrzeit, ende_uhrzeit, erinnere_alle_tage });
-    aufgabeBearbeitenId = null;
-    await ladeDaten();
-    render();
-  };
-
-  // Erzeugt das Bearbeitungsformular (HTML) für eine Aufgabe
-  function taskEditHtml(a) {
-    const projektOptions = '<option value="">Ohne Projekt</option>' +
-      projekteAktuell().map((p) => `<option value="${p.id}" ${p.id === a.projekt_id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
-    return `
-      <div class="task task-edit">
-        <div class="task-info" style="width:100%;">
-          <div class="task-edit-felder">
-            <input type="text" id="edit-aufgabe-titel" value="${escapeAttr(a.titel)}" placeholder="Titel">
-            <select id="edit-aufgabe-projekt">${projektOptions}</select>
-            <input type="date" id="edit-aufgabe-faellig" value="${a.faellig_am || ""}" title="Fälligkeitsdatum (optional)">
-            <input type="time" id="edit-aufgabe-uhrzeit" style="width:8rem;" value="${a.uhrzeit ? a.uhrzeit.slice(0,5) : ""}" title="Beginn (optional)">
-            <input type="time" id="edit-aufgabe-ende" style="width:8rem;" value="${a.ende_uhrzeit ? a.ende_uhrzeit.slice(0,5) : ""}" title="Ende (optional)">
-            <input type="number" id="edit-aufgabe-intervall" min="1" placeholder="alle X Tage" value="${a.erinnere_alle_tage || ""}" title="Wiederkehrende Erinnerung">
-          </div>
-          <div class="row" style="margin:0;">
-            <button class="btn-primary" onclick="aufgabeBearbeitenSpeichern('${a.id}')">Speichern</button>
-            <button class="btn-secondary" onclick="aufgabeBearbeitenAbbrechen()">Abbrechen</button>
-          </div>
-        </div>
-      </div>`;
-  }
 
   // Erzeugt das HTML einer Aufgabenzeile mit Fälligkeits-/Erinnerungs-Badges und Aktionsknöpfen
   function taskHtml(a, done) {
-    if (a.id === aufgabeBearbeitenId) return taskEditHtml(a);
     const projekt = projekteAktuell().find((p) => p.id === a.projekt_id);
     let meta = "";
     if (done && projekt) meta += badgeHtml("", projekt.name);
@@ -1395,7 +1420,7 @@
         </div>`;
     }
     const gemerkt = aufgGruppeOffen[schluessel];
-    const offen = liste.some((a) => a.id === aufgabeBearbeitenId) || gemerkt !== false;
+    const offen = gemerkt !== false;
     const ueber = liste.filter((a) => a.status === "ueberfaellig").length;
     const heute = liste.filter((a) => a.status === "heute").length;
     const info = [
@@ -2509,7 +2534,7 @@
     const zeit = naechster.start + (naechster.endeEcht ? "–" + naechster.endeEcht : "");
     const hinweis = laufend ? `noch ${dauerText(en - jetztMinuten)}` : `in ${dauerText(s - jetztMinuten)}`;
     return `
-      <button type="button" class="heute-naechstes" onclick="tabWechseln('${naechster.tab}')">
+      <button type="button" class="heute-naechstes" onclick="eintragBearbeiten('${naechster.typ}','${naechster.id}')" title="Bearbeiten">
         <span class="heute-naechstes-text">
           <span class="heute-naechstes-label">${laufend ? "Jetzt" : "Als Nächstes"} · ${zeit}</span>
           <span class="heute-naechstes-titel">${escapeHtml(naechster.titel)}</span>
@@ -2585,7 +2610,7 @@
         <button class="zl-check ${e.erledigt ? "done" : ""}" onclick="zeitleisteUmschalten('${e.typ}','${e.id}', this)"
           title="${e.erledigt ? "Wieder offen" : "Erledigt"}" aria-label="${escapeAttr(e.titel)} ${e.erledigt ? "wieder öffnen" : "als erledigt markieren"}"></button>
         <span class="heute-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
-        <button class="heute-zeile-inhalt" onclick="tabWechseln('${e.tab}')" title="${e.tab === "kalender" ? "Im Kalender öffnen" : "In Aufgaben öffnen"}">
+        <button class="heute-zeile-inhalt" onclick="eintragBearbeiten('${e.typ}','${e.id}')" title="${e.typ === "termin" ? "Termin bearbeiten" : "Aufgabe bearbeiten"}">
           <span class="heute-zeile-titel">${escapeHtml(e.titel)}</span>
           <span class="heute-zeile-meta">${escapeHtml(e.meta)}</span>
         </button>
@@ -2810,13 +2835,6 @@
     const [j,m,t] = calAusgewaehlterTag.split("-");
     const titel = `${t}. ${MONATSNAMEN[parseInt(m,10)-1]} ${j}`;
 
-    // Falls der gerade bearbeitete Termin nicht mehr auf diesem Tag ist
-    // (z.B. Tag gewechselt), Bearbeitungsmodus verlassen.
-    const bearbeiteterTermin = calBearbeiteterTermin
-      ? liste.find((t) => t.id === calBearbeiteterTermin)
-      : null;
-    if (calBearbeiteterTermin && !bearbeiteterTermin) calBearbeiteterTermin = null;
-
     const itemsHtml = liste.length === 0
       ? `<p class="empty-text" style="margin:0 0 0.6rem;">Noch keine Termine an diesem Tag.</p>`
       : liste.map((t) => `
@@ -2827,49 +2845,36 @@
             <button class="task-delete" onclick="terminLoeschen('${t.id}')" aria-label="Löschen">${ic("x")}</button>
           </div>`).join("");
 
-    const formTitel = bearbeiteterTermin ? "Termin bearbeiten" : "";
-    const buttonLabel = bearbeiteterTermin ? "Speichern" : "Eintragen";
-    const abbrechenHtml = bearbeiteterTermin
-      ? `<button class="btn-secondary" id="btn-termin-abbrechen">Abbrechen</button>`
-      : "";
-
+    // Das Formular dient nur noch zum Anlegen – Bearbeiten läuft seit
+    // Session 35 über das Blatt (terminBearbeitenStart → eintragBearbeiten)
     panel.innerHTML = `
       <div class="cal-day-panel">
         <h3>${titel}</h3>
         ${itemsHtml}
-        ${formTitel ? `<div class="project-heading" style="margin:1rem 0 0.4rem;">${formTitel}</div>` : ""}
         <div class="termin-form">
-          <input type="text" id="termin-titel" placeholder="${bearbeiteterTermin ? "Titel" : "Titel, z. B. „Elternabend 19 Uhr“"}" value="${bearbeiteterTermin ? escapeAttr(bearbeiteterTermin.titel) : ""}">
-          ${bearbeiteterTermin ? "" : `<div class="schnell-erkannt form-erkannt hidden" id="termin-erkannt" role="status" aria-live="polite"></div>`}
-          <input type="time" id="termin-uhrzeit" style="width:8rem;" title="Beginn (optional)" value="${bearbeiteterTermin && bearbeiteterTermin.uhrzeit ? bearbeiteterTermin.uhrzeit.slice(0,5) : ""}">
-          <input type="time" id="termin-ende" style="width:8rem;" title="Ende (optional)" value="${bearbeiteterTermin && bearbeiteterTermin.ende_uhrzeit ? bearbeiteterTermin.ende_uhrzeit.slice(0,5) : ""}">
-          <input type="text" id="termin-notiz" placeholder="Notiz (optional)" value="${bearbeiteterTermin && bearbeiteterTermin.notiz ? escapeAttr(bearbeiteterTermin.notiz) : ""}">
-          <button class="btn-primary" id="btn-termin-hinzufuegen">${buttonLabel}</button>
-          ${abbrechenHtml}
+          <input type="text" id="termin-titel" placeholder="Titel, z. B. „Elternabend 19 Uhr“">
+          <div class="schnell-erkannt form-erkannt hidden" id="termin-erkannt" role="status" aria-live="polite"></div>
+          <input type="time" id="termin-uhrzeit" style="width:8rem;" title="Beginn (optional)">
+          <input type="time" id="termin-ende" style="width:8rem;" title="Ende (optional)">
+          <input type="text" id="termin-notiz" placeholder="Notiz (optional)">
+          <button class="btn-primary" id="btn-termin-hinzufuegen">Eintragen</button>
         </div>
       </div>`;
-    // Erkennung nur beim Anlegen – beim Bearbeiten bleibt der Titel unangetastet
-    terminErkennung = bearbeiteterTermin ? null : formErkennung({
+    terminErkennung = formErkennung({
       text: "termin-titel", datum: null, uhrzeit: "termin-uhrzeit", ende: "termin-ende", hinweis: "termin-erkannt",
       festerTag: () => calAusgewaehlterTag,
     });
 
-    document.getElementById("btn-termin-hinzufuegen").addEventListener("click", bearbeiteterTermin ? terminAktualisieren : terminHinzufuegen);
+    document.getElementById("btn-termin-hinzufuegen").addEventListener("click", terminHinzufuegen);
     document.getElementById("termin-titel").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") (bearbeiteterTermin ? terminAktualisieren : terminHinzufuegen)();
+      if (e.key === "Enter") terminHinzufuegen();
     });
-    if (bearbeiteterTermin) {
-      document.getElementById("btn-termin-abbrechen").addEventListener("click", () => {
-        calBearbeiteterTermin = null;
-        renderCalDayPanel();
-      });
-    }
   }
 
-  // Startet die Bearbeitung eines Termins im Tagespanel
+
+  // Bearbeiten eines Termins: seit Session 35 im Blatt (eintragBearbeiten)
   window.terminBearbeitenStart = function(id) {
-    calBearbeiteterTermin = id;
-    renderCalDayPanel();
+    window.eintragBearbeiten("termin", id);
   };
 
   // Legt einen Termin am ausgewählten Tag im aktiven Bereich an und lädt neu
@@ -2894,24 +2899,8 @@
     renderKalender();
   }
 
-  // Speichert den bearbeiteten Termin und lädt die Daten neu
-  async function terminAktualisieren() {
-    const id = calBearbeiteterTermin;
-    const titel = document.getElementById("termin-titel").value.trim();
-    if (!titel || !id) return;
-    const uhrzeit = document.getElementById("termin-uhrzeit").value || null;
-    const ende_uhrzeit = document.getElementById("termin-ende").value || null;
-    const notiz = document.getElementById("termin-notiz").value.trim() || null;
-
-    await api("termin_aktualisieren", { id, titel, uhrzeit, ende_uhrzeit, notiz });
-    calBearbeiteterTermin = null;
-    await ladeDaten();
-    renderKalender();
-  }
-
   // Löscht einen Termin und lädt die Daten neu
   window.terminLoeschen = async function(id) {
-    if (calBearbeiteterTermin === id) calBearbeiteterTermin = null;
     await api("termin_loeschen", { id });
     await ladeDaten();
     renderKalender();
@@ -3074,8 +3063,6 @@
   let freiTag = new Date();
   let freiAusgewaehlteLuecke = null;
   let freiFormularTyp = "termin";
-  let freiBearbeiteterTermin = null;
-  let freiBearbeiteteAufgabe = null;
 
   // Wandelt JS-Wochentag in Index mit Montag=0 bis Sonntag=6 um
   function wochentagIndex(d) {
@@ -3289,7 +3276,6 @@
 
   // Löscht einen Termin aus der Frei-Ansicht und schließt ggf. dessen Formular
   window.freiTerminEntfernen = async function(id) {
-    if (freiBearbeiteterTermin === id) freiFormularSchliessen();
     await api("termin_loeschen", { id });
     await ladeDaten();
     renderFrei();
@@ -3304,8 +3290,6 @@
 
   // Wählt eine freie Lücke aus und öffnet das Formular zum Eintragen
   window.freiLueckeAuswaehlen = function(start, ende) {
-    freiBearbeiteterTermin = null;
-    freiBearbeiteteAufgabe = null;
     freiAusgewaehlteLuecke = { start, ende };
     freiFormularTyp = "termin";
     renderFreiFormular();
@@ -3315,123 +3299,13 @@
   // Schließt das Formular der Frei-Ansicht und setzt Auswahl/Bearbeitung zurück
   function freiFormularSchliessen() {
     freiAusgewaehlteLuecke = null;
-    freiBearbeiteterTermin = null;
-    freiBearbeiteteAufgabe = null;
     document.getElementById("frei-formular-bereich").innerHTML = "";
   }
 
-  // Öffnet das Bearbeiten-Formular für einen Termin in der Frei-Ansicht
-  window.freiTerminBearbeitenStart = function(id) {
-    freiAusgewaehlteLuecke = null;
-    freiBearbeiteteAufgabe = null;
-    freiBearbeiteterTermin = id;
-    renderFreiTerminFormular();
-    document.getElementById("frei-formular-bereich").scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-
-  // Rendert das Formular zum Verschieben/Bearbeiten eines Termins
-  function renderFreiTerminFormular() {
-    const bereich = document.getElementById("frei-formular-bereich");
-    const t = termine.find((tt) => tt.id === freiBearbeiteterTermin);
-    if (!t) { bereich.innerHTML = ""; return; }
-
-    bereich.innerHTML = `
-      <div class="cal-day-panel">
-        <div class="project-heading" style="margin:0 0 0.6rem;">Termin verschieben / bearbeiten</div>
-        <div class="row">
-          <input type="text" id="frei-termin-titel" placeholder="Titel" value="${escapeAttr(t.titel)}">
-        </div>
-        <div class="row">
-          <input type="date" id="frei-termin-datum" value="${t.datum}">
-          <input type="time" id="frei-termin-start" style="width:8rem;" value="${t.uhrzeit ? t.uhrzeit.slice(0,5) : ""}">
-          <input type="time" id="frei-termin-ende" style="width:8rem;" value="${t.ende_uhrzeit ? t.ende_uhrzeit.slice(0,5) : ""}">
-        </div>
-        <div class="row">
-          <input type="text" id="frei-termin-notiz" placeholder="Notiz (optional)" value="${t.notiz ? escapeAttr(t.notiz) : ""}">
-        </div>
-        <div class="row">
-          <button class="btn-primary" id="btn-frei-termin-speichern">Speichern</button>
-          <button class="btn-secondary" id="btn-frei-termin-abbrechen">Abbrechen</button>
-        </div>
-      </div>`;
-
-    document.getElementById("btn-frei-termin-speichern").addEventListener("click", freiTerminSpeichern);
-    document.getElementById("btn-frei-termin-abbrechen").addEventListener("click", freiFormularSchliessen);
-  }
-
-  // Speichert den bearbeiteten Termin und springt ggf. zum neuen Datum
-  async function freiTerminSpeichern() {
-    const id = freiBearbeiteterTermin;
-    const titel = document.getElementById("frei-termin-titel").value.trim();
-    if (!titel || !id) return;
-    const datum = document.getElementById("frei-termin-datum").value || null;
-    const uhrzeit = document.getElementById("frei-termin-start").value || null;
-    const ende_uhrzeit = document.getElementById("frei-termin-ende").value || null;
-    const notiz = document.getElementById("frei-termin-notiz").value.trim() || null;
-
-    await api("termin_aktualisieren", { id, titel, datum, uhrzeit, ende_uhrzeit, notiz });
-    freiFormularSchliessen();
-    await ladeDaten();
-    if (datum && datum !== dateToISO(freiTag)) freiTag = new Date(datum + "T00:00:00");
-    renderFrei();
-  }
-
-  // Öffnet das Bearbeiten-Formular für eine Aufgabe in der Frei-Ansicht
-  window.freiAufgabeBearbeitenStart = function(id) {
-    freiAusgewaehlteLuecke = null;
-    freiBearbeiteterTermin = null;
-    freiBearbeiteteAufgabe = id;
-    renderFreiAufgabeFormular();
-    document.getElementById("frei-formular-bereich").scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-
-  // Rendert das Formular zum Verschieben/Bearbeiten einer Aufgabe inkl. Projektauswahl
-  function renderFreiAufgabeFormular() {
-    const bereich = document.getElementById("frei-formular-bereich");
-    const a = aufgaben.find((aa) => aa.id === freiBearbeiteteAufgabe);
-    if (!a) { bereich.innerHTML = ""; return; }
-
-    const projektOptions = '<option value="">Ohne Projekt</option>' +
-      projekteAktuell().map((p) => `<option value="${p.id}" ${p.id === a.projekt_id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
-
-    bereich.innerHTML = `
-      <div class="cal-day-panel">
-        <div class="project-heading" style="margin:0 0 0.6rem;">Aufgabe verschieben / bearbeiten</div>
-        <div class="row">
-          <input type="text" id="frei-aufgabe-titel" placeholder="Titel" value="${escapeAttr(a.titel)}">
-          <select id="frei-aufgabe-projekt">${projektOptions}</select>
-        </div>
-        <div class="row">
-          <input type="date" id="frei-aufgabe-datum" value="${a.faellig_am || ""}">
-          <input type="time" id="frei-aufgabe-start" style="width:8rem;" value="${a.uhrzeit ? a.uhrzeit.slice(0,5) : ""}">
-          <input type="time" id="frei-aufgabe-ende" style="width:8rem;" value="${a.ende_uhrzeit ? a.ende_uhrzeit.slice(0,5) : ""}">
-        </div>
-        <div class="row">
-          <button class="btn-primary" id="btn-frei-aufgabe-speichern">Speichern</button>
-          <button class="btn-secondary" id="btn-frei-aufgabe-abbrechen">Abbrechen</button>
-        </div>
-      </div>`;
-
-    document.getElementById("btn-frei-aufgabe-speichern").addEventListener("click", freiAufgabeSpeichern);
-    document.getElementById("btn-frei-aufgabe-abbrechen").addEventListener("click", freiFormularSchliessen);
-  }
-
-  // Speichert die bearbeitete Aufgabe und springt ggf. zum neuen Fälligkeitsdatum
-  async function freiAufgabeSpeichern() {
-    const id = freiBearbeiteteAufgabe;
-    const titel = document.getElementById("frei-aufgabe-titel").value.trim();
-    if (!titel || !id) return;
-    const projekt_id = document.getElementById("frei-aufgabe-projekt").value || null;
-    const faellig_am = document.getElementById("frei-aufgabe-datum").value || null;
-    const uhrzeit = document.getElementById("frei-aufgabe-start").value || null;
-    const ende_uhrzeit = document.getElementById("frei-aufgabe-ende").value || null;
-
-    await api("aufgabe_aktualisieren", { id, titel, projekt_id, faellig_am, uhrzeit, ende_uhrzeit });
-    freiFormularSchliessen();
-    await ladeDaten();
-    if (faellig_am && faellig_am !== dateToISO(freiTag)) freiTag = new Date(faellig_am + "T00:00:00");
-    renderFrei();
-  }
+  // Bearbeiten in Frei: seit Session 35 im Blatt (eintragBearbeiten) – vorher
+  // eigene Formulare, die u. a. die Wiederholung einer Aufgabe verloren
+  window.freiTerminBearbeitenStart = function(id) { window.eintragBearbeiten("termin", id); };
+  window.freiAufgabeBearbeitenStart = function(id) { window.eintragBearbeiten("aufgabe", id); };
 
   // Rendert das Formular zum Eintragen eines Termins oder einer Aufgabe in eine freie Lücke
   function renderFreiFormular() {
