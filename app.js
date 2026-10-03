@@ -732,7 +732,8 @@
   // „+“-Blatt, Felder kommen aus BLATT_ARTEN. Genutzt von Blockzeiten,
   // Inventar und Verleih; weitere Reiter lassen sich hier anschließen.
   // Feldtypen: text, zahl, datum, zeit, text-lang, chips (eine Auswahl),
-  // wochentage (mehrere), info (nur Anzeige). „wenn(werte)“ blendet ein
+  // auswahl (Klappliste), wochentage (mehrere), info (nur Anzeige).
+  // „optionen“ darf eine Liste [[wert, text], …] oder eine Funktion(werte) sein. „wenn(werte)“ blendet ein
   // Feld ein oder aus, „pflicht“ prüft vor dem Speichern.
   // ==========================================================
   const BLATT_ARTEN = {
@@ -826,6 +827,108 @@
       loeschFrage: () => "Diesen Verleih-Eintrag endgültig löschen?",
       gespeichert: "Verleih gespeichert",
     },
+
+    projekt: {
+      titel: "Projekt bearbeiten",
+      finden: (id) => ogsProjekte.find((p) => String(p.id) === String(id)),
+      laden: (p) => ({
+        _id: p.id,
+        _unter: ogsProjekte.some((u) => u.hauptprojekt_id === p.id),
+        titel: p.titel || "", kategorie: p.kategorie || "", beschreibung: p.beschreibung || "",
+        haupt: p.hauptprojekt_id || "",
+        unterInfo: "Hat eigene Unterprojekte – bleibt deshalb Hauptprojekt",
+      }),
+      felder: [
+        { key: "titel", label: "Titel", typ: "text", pflicht: true },
+        { key: "kategorie", label: "Kategorie", typ: "text", liste: "proj-kategorie-liste", platzhalter: "optional" },
+        { key: "beschreibung", label: "Kurzbeschreibung", typ: "text-lang", platzhalter: "optional" },
+        // Nur eine Ebene: Ziel sind Hauptprojekte des Bereichs außer dem Projekt selbst
+        { key: "haupt", label: "Gehört zu", typ: "auswahl", wenn: (w) => !w._unter,
+          optionen: (w) => [["", "– Eigenständiges Hauptprojekt –"],
+            ...ogsProjekteAktuell().filter((h) => !h.hauptprojekt_id && h.id !== w._id)
+              .sort((a, b) => a.titel.localeCompare(b.titel)).map((h) => [h.id, h.titel])] },
+        { key: "unterInfo", label: "Gehört zu", typ: "info", wenn: (w) => w._unter },
+      ],
+      speichern: (id, w) => api("ogs_projekt_aktualisieren", {
+        id, titel: w.titel, kategorie: w.kategorie || null, beschreibung: w.beschreibung || null,
+        hauptprojekt_id: w._unter ? undefined : (w.haupt || null),
+      }),
+      loeschen: (id) => api("ogs_projekt_loeschen", { id }),
+      loeschFrage: (p) => `Projekt „${p.titel}“ inklusive hinterlegter Dateien wirklich löschen?`,
+      gespeichert: "Projekt gespeichert",
+    },
+
+    spiel: {
+      titel: "Spiel bearbeiten",
+      finden: (id) => spiele.find((x) => String(x.id) === String(id)),
+      laden: (x) => ({
+        titel: x.titel || "", kategorie: x.kategorie || "", teilnehmer: x.teilnehmerzahl || "",
+        alter: x.altersgruppe || "", dauer: x.dauer || "", material: x.material || "", beschreibung: x.beschreibung || "",
+      }),
+      felder: [
+        { key: "titel", label: "Titel", typ: "text", pflicht: true },
+        { key: "kategorie", label: "Kategorie", typ: "text", liste: "spiel-kategorie-liste", platzhalter: "optional" },
+        { key: "teilnehmer", label: "Teilnehmerzahl", typ: "text", halb: true, platzhalter: "z. B. 6–20" },
+        { key: "alter", label: "Altersgruppe", typ: "text", halb: true, platzhalter: "z. B. ab 8" },
+        { key: "dauer", label: "Dauer", typ: "text", halb: true, platzhalter: "z. B. 15 Min." },
+        { key: "material", label: "Material", typ: "text", halb: true, platzhalter: "optional" },
+        { key: "beschreibung", label: "Spielbeschreibung", typ: "text-lang", zeilen: 7, platzhalter: "optional" },
+      ],
+      speichern: (id, w) => api("spiel_aktualisieren", {
+        id, titel: w.titel, kategorie: w.kategorie || null, beschreibung: w.beschreibung || null,
+        teilnehmerzahl: w.teilnehmer || null, altersgruppe: w.alter || null, dauer: w.dauer || null, material: w.material || null,
+      }),
+      loeschen: (id) => api("spiel_loeschen", { id }),
+      loeschFrage: (x) => `Spiel „${x.titel}“ inklusive hinterlegter Dateien wirklich löschen?`,
+      gespeichert: "Spiel gespeichert",
+      // Kategorie nach dem Speichern offen lassen (auch eine geänderte)
+      vorher: (w) => { spielGruppenOffen.add(w.kategorie || SPIEL_OHNE_KATEGORIE); spielGruppenMerken(); },
+    },
+
+    reflexion: {
+      titel: "Reflexion bearbeiten",
+      finden: (id) => reflexionen.find((r) => String(r.id) === String(id)),
+      laden: (r) => ({ datum: r.datum || "", text: r.text || "" }),
+      felder: [
+        { key: "datum", label: "Datum", typ: "datum", pflicht: true },
+        { key: "text", label: "Text", typ: "text-lang", zeilen: 8, pflicht: true },
+      ],
+      speichern: (id, w) => api("reflexion_aktualisieren", { id, text: w.text, datum: w.datum }),
+      loeschen: (id) => api("reflexion_loeschen", { id }),
+      loeschFrage: () => "Diese Reflexion löschen?",
+      gespeichert: "Reflexion gespeichert",
+    },
+
+    zugang: {
+      titel: "Zugang bearbeiten",
+      finden: (id) => schluesselZugaenge.find((z) => String(z.id) === String(id)),
+      laden: (z) => ({ name: z.name || "", beschreibung: z.beschreibung || "" }),
+      felder: [
+        { key: "name", label: "Name", typ: "text", pflicht: true },
+        { key: "beschreibung", label: "Beschreibung", typ: "text", platzhalter: "optional" },
+      ],
+      speichern: (id, w) => api("zugang_aktualisieren", { id, name: w.name, beschreibung: w.beschreibung }),
+      loeschen: (id) => api("zugang_loeschen", { id }),
+      loeschFrage: (z) => {
+        const anzahl = schluesselAktuell().filter((k) => (k.zugaenge || []).includes(z.id)).length;
+        return `Zugang „${z.name || ""}“ löschen?` + (anzahl ? ` Er wird bei ${anzahl} Schlüssel/Key${anzahl === 1 ? "" : "s"} entfernt.` : "");
+      },
+      gespeichert: "Zugang gespeichert",
+    },
+
+    raum: {
+      titel: "Raum bearbeiten",
+      finden: (id) => raeume.find((r) => String(r.id) === String(id)),
+      laden: (r) => ({ name: r.name || "", beschreibung: r.beschreibung || "" }),
+      felder: [
+        { key: "name", label: "Name", typ: "text", pflicht: true },
+        { key: "beschreibung", label: "Beschreibung", typ: "text", platzhalter: "optional" },
+      ],
+      speichern: (id, w) => api("raum_aktualisieren", { id, name: w.name, beschreibung: w.beschreibung }),
+      loeschen: (id) => api("raum_loeschen", { id }),
+      loeschFrage: (r) => `Raum „${r.name || ""}“ löschen? Vorhandene Vermietungen bleiben erhalten, stehen dann aber ohne Raum.`,
+      gespeichert: "Raum gespeichert",
+    },
   };
 
   let blatt = null; // { art, id, werte }
@@ -869,6 +972,10 @@
       let feld = "";
       if (f.typ === "info") {
         feld = `<p class="blatt-info" id="${id}">${escapeHtml(w[f.key])}</p>`;
+      } else if (f.typ === "auswahl") {
+        const optionen = typeof f.optionen === "function" ? f.optionen(w) : f.optionen;
+        feld = `<select id="${id}"${daten}>` + optionen.map(([wert, text]) =>
+          `<option value="${escapeAttr(wert)}"${String(w[f.key]) === String(wert) ? " selected" : ""}>${escapeHtml(text)}</option>`).join("") + `</select>`;
       } else if (f.typ === "chips") {
         feld = `<div class="schnell-chips" role="group" aria-label="${escapeAttr(f.label)}">` + f.optionen.map(([wert, text]) =>
           `<button type="button" class="schnell-chip${w[f.key] === wert ? " aktiv" : ""}" aria-pressed="${w[f.key] === wert}"
@@ -879,7 +986,7 @@
           return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="blattWochentag(${i})">${t}</button>`;
         }).join("") + `</div>`;
       } else if (f.typ === "text-lang") {
-        feld = `<textarea id="${id}" class="schnell-notiz" rows="3"${daten}${ph}>${escapeHtml(w[f.key])}</textarea>`;
+        feld = `<textarea id="${id}" class="schnell-notiz" rows="${f.zeilen || 3}"${daten}${ph}>${escapeHtml(w[f.key])}</textarea>`;
       } else {
         const typ = { text: "text", zahl: "number", datum: "date", zeit: "time" }[f.typ];
         const extra = (f.liste ? ` list="${f.liste}"` : "") + (f.min !== undefined ? ` min="${f.min}"` : "") +
@@ -893,7 +1000,7 @@
     const box = document.getElementById("blatt-felder");
     box.innerHTML = html;
     box.querySelectorAll("[data-feld]").forEach((el) => {
-      el.addEventListener("input", () => { blatt.werte[el.dataset.feld] = el.value; });
+      el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => { blatt.werte[el.dataset.feld] = el.value; });
       if (el.tagName === "INPUT") el.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.blattSpeichern(); } });
     });
   }
@@ -4758,7 +4865,6 @@
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ];
   const PROJ_MAX_BYTES = 5 * 1024 * 1024;
-  let projBearbeitenId = null;
 
   // Liest eine Datei als Base64-String (ohne Data-URL-Präfix) ein
   function dateiZuBase64(datei) {
@@ -4770,7 +4876,7 @@
     });
   }
 
-  // Rendert die OGS-Projekte mit Unterprojekten, Dateien und Bearbeitungsformular
+  // Rendert die OGS-Projekte mit Unterprojekten und Dateien
   function renderProjekte() {
     const bereich = document.getElementById("proj-liste-bereich");
     if (!bereich) return;
@@ -4799,33 +4905,11 @@
       return;
     }
 
-    // Baut das HTML eines (Unter-)Projekts mit Dateien bzw. im Bearbeiten-Modus
+    // Baut das HTML eines (Unter-)Projekts mit Dateien (Bearbeiten öffnet das Blatt)
     function projektHtml(p, istUnterprojekt) {
       const datum = new Date(p.erstellt_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
       const dateien = ogsProjektDateien.filter((d) => d.projekt_id === p.id);
       const itemKlasse = istUnterprojekt ? "proj-unter-item" : "notiz-item";
-
-      if (projBearbeitenId === p.id) {
-        // Auswahl fürs Umhängen: alle Hauptprojekte außer sich selbst.
-        const hauptOptionen = hauptprojekte.filter((h) => h.id !== p.id)
-          .map((h) => `<option value="${h.id}" ${p.hauptprojekt_id === h.id ? "selected" : ""}>${escapeAttr(h.titel)}</option>`).join("");
-        return `
-          <div class="${itemKlasse}">
-            <div style="flex:1; display:flex; flex-direction:column; gap:0.4rem;">
-              <input type="text" id="proj-edit-titel-${p.id}" value="${escapeAttr(p.titel)}" placeholder="Titel">
-              <input type="text" id="proj-edit-kategorie-${p.id}" value="${escapeAttr(p.kategorie || "")}" placeholder="Kategorie" list="proj-kategorie-liste">
-              <textarea id="proj-edit-beschreibung-${p.id}" rows="2" placeholder="Kurzbeschreibung">${escapeHtml(p.beschreibung || "")}</textarea>
-              <select id="proj-edit-hauptprojekt-${p.id}">
-                <option value="">– Eigenständiges Hauptprojekt –</option>
-                ${hauptOptionen}
-              </select>
-              <div>
-                <button class="btn-primary" onclick="projBearbeitenSpeichern('${p.id}')">Speichern</button>
-                <button class="link-btn" onclick="projBearbeitenAbbrechen()">Abbrechen</button>
-              </div>
-            </div>
-          </div>`;
-      }
 
       const dateiZeilen = dateien.map((d) => {
         const hochgeladen = new Date(d.hochgeladen_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -4901,33 +4985,9 @@
     await ladeDaten();
   }
 
-  // Öffnet das Bearbeiten-Formular für ein Projekt und rendert die Projektliste neu
+  // Bearbeiten eines Projekts: seit Session 35 im Bearbeiten-Blatt
   window.projBearbeitenStart = function(id) {
-    projBearbeitenId = id;
-    renderProjekte();
-  };
-
-  // Bricht das Bearbeiten eines Projekts ab und rendert die Projektliste neu
-  window.projBearbeitenAbbrechen = function() {
-    projBearbeitenId = null;
-    renderProjekte();
-  };
-
-  // Speichert Titel, Kategorie, Beschreibung und Hauptprojekt eines bearbeiteten Projekts und lädt neu
-  window.projBearbeitenSpeichern = async function(id) {
-    const titel = document.getElementById(`proj-edit-titel-${id}`).value.trim();
-    if (!titel) return;
-    const kategorie = document.getElementById(`proj-edit-kategorie-${id}`).value.trim() || null;
-    const beschreibung = document.getElementById(`proj-edit-beschreibung-${id}`).value.trim() || null;
-    const hauptprojektSelect = document.getElementById(`proj-edit-hauptprojekt-${id}`);
-    const hauptprojekt_id = hauptprojektSelect ? (hauptprojektSelect.value || null) : undefined;
-    try {
-      await api("ogs_projekt_aktualisieren", { id, titel, kategorie, beschreibung, hauptprojekt_id });
-      projBearbeitenId = null;
-      await ladeDaten();
-    } catch (e) {
-      alert("Konnte nicht gespeichert werden: " + e.message);
-    }
+    window.blattOeffnen("projekt", id);
   };
 
   // Löscht ein Projekt samt hinterlegter Dateien nach Rückfrage
@@ -7563,7 +7623,6 @@
   // Spiele (Spielekartei für die Jugendarbeit, nur Privat)
   // ==========================================================
   let spielAktiveKategorie = "alle";
-  let spielBearbeitenId = null;
   const SPIEL_OHNE_KATEGORIE = "__ohne__";
   // Bewertungs-Filter: "alle" | "5" | "4" | "3" (= mindestens so viele Sterne) | "ohne"
   let spielBewertungFilter = "alle";
@@ -7689,27 +7748,6 @@
       const zeilen = items.map((s) => {
         const dateien = spieleDateien.filter((d) => d.spiel_id === s.id);
 
-        if (spielBearbeitenId === s.id) {
-          return `
-            <div class="notiz-item">
-              <div style="flex:1; display:flex; flex-direction:column; gap:0.4rem;">
-                <input type="text" id="spiel-edit-titel-${s.id}" value="${escapeAttr(s.titel)}" placeholder="Titel">
-                <input type="text" id="spiel-edit-kategorie-${s.id}" value="${escapeAttr(s.kategorie || "")}" placeholder="Kategorie" list="spiel-kategorie-liste">
-                <div class="row" style="flex-wrap:wrap;">
-                  <input type="text" id="spiel-edit-teilnehmerzahl-${s.id}" value="${escapeAttr(s.teilnehmerzahl || "")}" placeholder="Teilnehmerzahl" style="max-width:12rem;">
-                  <input type="text" id="spiel-edit-altersgruppe-${s.id}" value="${escapeAttr(s.altersgruppe || "")}" placeholder="Altersgruppe" style="max-width:12rem;">
-                  <input type="text" id="spiel-edit-dauer-${s.id}" value="${escapeAttr(s.dauer || "")}" placeholder="Dauer" style="max-width:10rem;">
-                  <input type="text" id="spiel-edit-material-${s.id}" value="${escapeAttr(s.material || "")}" placeholder="Material">
-                </div>
-                <textarea id="spiel-edit-beschreibung-${s.id}" rows="6" placeholder="Spielbeschreibung">${escapeHtml(s.beschreibung || "")}</textarea>
-                <div>
-                  <button class="btn-primary" onclick="spielBearbeitenSpeichern('${s.id}')">Speichern</button>
-                  <button class="link-btn" onclick="spielBearbeitenAbbrechen()">Abbrechen</button>
-                </div>
-              </div>
-            </div>`;
-        }
-
         const dateiZeilen = dateien.map((d) => {
           const hochgeladen = new Date(d.hochgeladen_am).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
           return `
@@ -7742,7 +7780,7 @@
             </div>
           </div>`;
       }).join("");
-      const offen = autoOffen || spielGruppenOffen.has(kat) || items.some((s) => s.id === spielBearbeitenId);
+      const offen = autoOffen || spielGruppenOffen.has(kat);
       return `
         <details class="spiel-gruppe" data-kat="${escapeAttr(kat)}" ${offen ? "open" : ""} ontoggle="spielGruppeUmschalten(this)">
           <summary class="spiel-gruppe-kopf">
@@ -7843,31 +7881,9 @@
     await ladeDaten();
   }
 
-  // Öffnet ein Spiel im Bearbeitungsmodus
+  // Bearbeiten eines Spiels: seit Session 35 im Bearbeiten-Blatt
   window.spielBearbeitenStart = function(id) {
-    spielBearbeitenId = id;
-    renderSpiele();
-  };
-
-  // Bricht die Bearbeitung eines Spiels ab
-  window.spielBearbeitenAbbrechen = function() {
-    spielBearbeitenId = null;
-    renderSpiele();
-  };
-
-  // Speichert das bearbeitete Spiel und lädt die Daten neu
-  window.spielBearbeitenSpeichern = async function(id) {
-    const titel = document.getElementById(`spiel-edit-titel-${id}`).value.trim();
-    if (!titel) return;
-    const kategorie = document.getElementById(`spiel-edit-kategorie-${id}`).value.trim() || null;
-    const beschreibung = document.getElementById(`spiel-edit-beschreibung-${id}`).value.trim() || null;
-    const teilnehmerzahl = document.getElementById(`spiel-edit-teilnehmerzahl-${id}`).value.trim() || null;
-    const altersgruppe = document.getElementById(`spiel-edit-altersgruppe-${id}`).value.trim() || null;
-    const dauer = document.getElementById(`spiel-edit-dauer-${id}`).value.trim() || null;
-    const material = document.getElementById(`spiel-edit-material-${id}`).value.trim() || null;
-    await api("spiel_aktualisieren", { id, titel, kategorie, beschreibung, teilnehmerzahl, altersgruppe, dauer, material });
-    spielBearbeitenId = null;
-    await ladeDaten();
+    window.blattOeffnen("spiel", id);
   };
 
   // Löscht ein Spiel samt Dateien nach Rückfrage
@@ -7993,7 +8009,6 @@
   // Reflexion
   // ==========================================================
   document.getElementById("reflex-datum").value = heuteISO();
-  let reflexBearbeiteterId = null;
 
   // Formatiert ein ISO-Datum lang auf Deutsch, z. B. "3. Oktober 2026"
   function formatDatumLang(iso) {
@@ -8023,49 +8038,32 @@
       </div>`).join("");
   }
 
-  // Setzt das Reflexionsformular auf Neueintrag mit heutigem Datum zurück
+  // Setzt das Reflexionsformular nach dem Eintragen zurück (heutiges Datum)
   function reflexFormZuruecksetzen() {
-    reflexBearbeiteterId = null;
     document.getElementById("reflex-text").value = "";
     document.getElementById("reflex-datum").value = heuteISO();
-    document.getElementById("btn-reflex-hinzufuegen").textContent = "Eintragen";
-    document.getElementById("btn-reflex-abbrechen").classList.add("hidden");
   }
 
-  // Lädt eine Reflexion ins Formular zum Bearbeiten und scrollt dorthin
+  // Bearbeiten einer Reflexion: seit Session 35 im Bearbeiten-Blatt
   window.reflexionBearbeitenStart = function(id) {
-    const r = reflexionen.find((rr) => rr.id === id);
-    if (!r) return;
-    reflexBearbeiteterId = id;
-    reiterFormularOeffnen("form-reflexion");
-    document.getElementById("reflex-datum").value = r.datum;
-    document.getElementById("reflex-text").value = r.text;
-    document.getElementById("btn-reflex-hinzufuegen").textContent = "Speichern";
-    document.getElementById("btn-reflex-abbrechen").classList.remove("hidden");
-    document.getElementById("reflex-text").scrollIntoView({ behavior: "smooth", block: "center" });
+    window.blattOeffnen("reflexion", id);
   };
 
   document.getElementById("btn-reflex-hinzufuegen").addEventListener("click", reflexSpeichern);
-  document.getElementById("btn-reflex-abbrechen").addEventListener("click", reflexFormZuruecksetzen);
 
-  // Speichert die Reflexion – aktualisiert beim Bearbeiten, sonst neu im aktiven Bereich
+  // Legt eine neue Reflexion im aktiven Bereich an
   async function reflexSpeichern() {
     const text = document.getElementById("reflex-text").value.trim();
     if (!text) return;
     const datum = document.getElementById("reflex-datum").value || heuteISO();
 
-    if (reflexBearbeiteterId) {
-      await api("reflexion_aktualisieren", { id: reflexBearbeiteterId, text, datum });
-    } else {
-      await api("reflexion_hinzufuegen", { text, datum, bereich: aktiverBereich });
-    }
+    await api("reflexion_hinzufuegen", { text, datum, bereich: aktiverBereich });
     reflexFormZuruecksetzen();
     await ladeDaten();
   }
 
-  // Löscht eine Reflexion (setzt das Formular zurück, falls sie gerade bearbeitet wird)
+  // Löscht eine Reflexion
   window.reflexionLoeschen = async function(id) {
-    if (reflexBearbeiteterId === id) reflexFormZuruecksetzen();
     await api("reflexion_loeschen", { id });
     await ladeDaten();
   };
@@ -9032,20 +9030,9 @@
       alert(fehler.message);
     }
   });
-  // Bearbeitet Name und Beschreibung eines Zugangs per Prompt und speichert
-  window.zugangBearbeiten = async function(id) {
-    const z = schluesselZugaenge.find((x) => x.id === id);
-    if (!z) return;
-    const name = prompt("Name des Zugangs:", z.name);
-    if (name === null || !name.trim()) return;
-    const beschreibung = prompt("Beschreibung (optional):", z.beschreibung || "");
-    if (beschreibung === null) return;
-    try {
-      await api("zugang_aktualisieren", { id, name: name.trim(), beschreibung: beschreibung.trim() });
-      await ladeDaten();
-    } catch (fehler) {
-      alert(fehler.message);
-    }
+  // Bearbeiten eines Zugangs: seit Session 35 im Bearbeiten-Blatt (vorher zwei Abfragefenster)
+  window.zugangBearbeiten = function(id) {
+    window.blattOeffnen("zugang", id);
   };
   // Löscht einen Zugang nach Rückfrage (mit Anzahl betroffener Schlüssel) und lädt die Daten neu
   window.zugangLoeschen = async function(id) {
@@ -10231,20 +10218,9 @@
       alert(fehler.message);
     }
   });
-  // Bearbeitet Name und Beschreibung eines Raums per Prompt und speichert
-  window.raumUmbenennen = async function(id) {
-    const r = raeume.find((x) => x.id === id);
-    if (!r) return;
-    const name = prompt("Name des Raums:", r.name);
-    if (name === null || !name.trim()) return;
-    const beschreibung = prompt("Beschreibung (optional):", r.beschreibung || "");
-    if (beschreibung === null) return;
-    try {
-      await api("raum_aktualisieren", { id, name: name.trim(), beschreibung: beschreibung.trim() });
-      await ladeDaten();
-    } catch (fehler) {
-      alert(fehler.message);
-    }
+  // Bearbeiten eines Raums: seit Session 35 im Bearbeiten-Blatt (vorher zwei Abfragefenster)
+  window.raumUmbenennen = function(id) {
+    window.blattOeffnen("raum", id);
   };
   // Löscht einen Raum nach Rückfrage; Vermietungen bleiben ohne Raum erhalten
   window.raumLoeschen = async function(id) {
