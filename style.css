@@ -1396,3 +1396,21 @@
   .heute-wetter-knopf .ic-wetter { width: 1.25em; height: 1.25em; vertical-align: -0.28em; }
   .wetter-kachel-icon { display: inline-flex; color: var(--accent); }
   .wetter-kachel-icon .ic { width: 1.7rem; height: 1.7rem; stroke-width: 1.8; }
+
+  /* Icons Etappe B (seit Session 35): Inhalts-Icons in den Reitern */
+  .link-btn > .ic:first-child { margin-right: 0.35em; }
+  .ern-frei-link .ic, .anleitung-abschnitt summary .ic, .ern-block summary .ic { color: var(--accent); }
+  .anleitung-text .ic { width: 1.05em; height: 1.05em; vertical-align: -0.18em; color: var(--accent); }
+  .notiz-meta .ic, .notiz-text .ic, .zl-gruppe-zahl .ic, .spiel-gruppe-titel .ic, .empty-text .ic { width: 1.05em; height: 1.05em; vertical-align: -0.18em; }
+  .notiz-text > .ic:first-child { color: var(--accent); margin-right: 0.15em; }
+  .ic-pokal { color: #c99700; }
+  :root[data-schema="dunkel"] .ic-pokal { color: #f2c94c; }
+  .ern-mahlzeit-titel .ic, .ern-mahlzeit-kopf h3 .ic { color: var(--accent); vertical-align: -0.15em; }
+  .ern-schritte-label .ic { vertical-align: -0.2em; color: var(--accent); }
+  .reiter-verwaltung-block h3 .ic { color: var(--accent); vertical-align: -0.18em; margin-right: 0.15em; }
+  .bereich-karte--verwaltung .ic-karte { width: 22px; height: 22px; }
+  .session-gesamtzeit .ic { vertical-align: -0.2em; }
+  .session-fokus-btn-sek .ic, .session-fokus-btn-primaer .ic { margin-right: 0.35em; vertical-align: -0.2em; }
+  .koch-overlay .session-fokus-titel .ic, #koch-wach .ic { color: var(--accent); vertical-align: -0.18em; }
+  .spiel-karte-inhalt .notiz-meta span[title] { white-space: nowrap; }
+  .spiel-karte-inhalt .notiz-meta .ic { color: var(--accent); }
