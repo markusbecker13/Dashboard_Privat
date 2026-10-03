@@ -973,6 +973,53 @@
       },
       gespeichert: "Schlüssel gespeichert",
     },
+
+    notiz: {
+      titel: "Notiz bearbeiten",
+      finden: (id) => notizen.find((n) => String(n.id) === String(id)),
+      laden: (n) => ({ text: n.text || "", projekt: n.projekt_id || "" }),
+      felder: [
+        { key: "text", label: "Notiz", typ: "text-lang", zeilen: 5, pflicht: true },
+        { key: "projekt", label: "Projekt", typ: "auswahl",
+          optionen: () => [["", "Ohne Projekt"], ...projekteAktuell().map((p) => [p.id, p.name])] },
+      ],
+      speichern: (id, w) => api("notiz_aktualisieren", { id, text: w.text, projekt_id: w.projekt || null }),
+      loeschen: (id) => api("notiz_loeschen", { id }),
+      loeschFrage: () => "Diese Notiz löschen?",
+      gespeichert: "Notiz gespeichert",
+    },
+
+    link: {
+      titel: "Link bearbeiten",
+      finden: (id) => links.find((l) => String(l.id) === String(id)),
+      laden: (l) => ({ titel: l.titel || "", url: l.url || "", notiz: l.notiz || "", projekt: l.projekt_id || "" }),
+      felder: [
+        { key: "titel", label: "Titel", typ: "text", pflicht: true },
+        { key: "url", label: "Adresse", typ: "text", eingabe: "url", pflicht: true, hinweis: "ohne https:// wird es automatisch ergänzt" },
+        { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional" },
+        { key: "projekt", label: "Projekt", typ: "auswahl",
+          optionen: () => [["", "Ohne Projekt"], ...projekteAktuell().map((p) => [p.id, p.name])] },
+      ],
+      speichern: (id, w) => api("link_aktualisieren", { id, titel: w.titel, url: w.url, notiz: w.notiz || null, projekt_id: w.projekt || null }),
+      loeschen: (id) => api("link_loeschen", { id }),
+      loeschFrage: (l) => `Link „${l.titel || ""}“ löschen?`,
+      gespeichert: "Link gespeichert",
+    },
+
+    idee: {
+      titel: "Idee bearbeiten",
+      finden: (id) => ogsIdeen.find((i) => String(i.id) === String(id)),
+      laden: (i) => ({ titel: i.titel || "", beschreibung: i.beschreibung || "", status: i.status || "offen" }),
+      felder: [
+        { key: "titel", label: "Idee", typ: "text", pflicht: true },
+        { key: "beschreibung", label: "Beschreibung", typ: "text-lang", zeilen: 4, platzhalter: "optional" },
+        { key: "status", label: "Status", typ: "chips", optionen: () => Object.entries(OGS_IDEE_STATUS_LABEL) },
+      ],
+      speichern: (id, w) => api("ogs_idee_aktualisieren", { id, titel: w.titel, beschreibung: w.beschreibung || null, status: w.status }),
+      loeschen: (id) => api("ogs_idee_loeschen", { id }),
+      loeschFrage: (i) => `Idee „${i.titel || ""}“ löschen?`,
+      gespeichert: "Idee gespeichert",
+    },
   };
 
   let blatt = null; // { art, id, werte }
@@ -1021,7 +1068,8 @@
         feld = `<select id="${id}"${daten}>` + optionen.map(([wert, text]) =>
           `<option value="${escapeAttr(wert)}"${String(w[f.key]) === String(wert) ? " selected" : ""}>${escapeHtml(text)}</option>`).join("") + `</select>`;
       } else if (f.typ === "chips") {
-        feld = `<div class="schnell-chips" role="group" aria-label="${escapeAttr(f.label)}">` + f.optionen.map(([wert, text]) =>
+        const optionen = typeof f.optionen === "function" ? f.optionen(w) : f.optionen;
+        feld = `<div class="schnell-chips" role="group" aria-label="${escapeAttr(f.label)}">` + optionen.map(([wert, text]) =>
           `<button type="button" class="schnell-chip${w[f.key] === wert ? " aktiv" : ""}" aria-pressed="${w[f.key] === wert}"
             onclick="blattWaehlen('${f.key}','${wert}')">${escapeHtml(text)}</button>`).join("") + `</div>`;
       } else if (f.typ === "wochentage") {
@@ -1041,7 +1089,7 @@
       } else if (f.typ === "text-lang") {
         feld = `<textarea id="${id}" class="schnell-notiz" rows="${f.zeilen || 3}"${daten}${ph}>${escapeHtml(w[f.key])}</textarea>`;
       } else {
-        const typ = { text: "text", zahl: "number", datum: "date", zeit: "time" }[f.typ];
+        const typ = f.eingabe || { text: "text", zahl: "number", datum: "date", zeit: "time" }[f.typ];
         const extra = (f.liste ? ` list="${f.liste}"` : "") + (f.min !== undefined ? ` min="${f.min}"` : "") +
           (f.schritt ? ` step="${f.schritt}"` : "") + (f.typ === "zahl" ? ` inputmode="${f.schritt ? "decimal" : "numeric"}"` : "");
         const gesperrt = f.gesperrt && f.gesperrt(w);
@@ -3760,6 +3808,7 @@
             <span class="notiz-text">${escapeHtml(n.text)}</span>
             <span class="notiz-meta">${datum}${projekt ? " · " + escapeHtml(projekt.name) : ""}</span>
           </div>
+          <button class="task-edit-btn" onclick="blattOeffnen('notiz','${n.id}')" aria-label="Notiz bearbeiten" title="Bearbeiten">${ic("stift")}</button>
           <button class="task-delete" onclick="notizLoeschen('${n.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }).join("");
@@ -3814,6 +3863,7 @@
               <select onchange="ogsIdeeStatusAendern('${i.id}', this.value)" style="padding:0.2rem 0.4rem; font-size:0.78rem;">${statusOptions}</select>
             </div>
           </div>
+          <button class="task-edit-btn" onclick="blattOeffnen('idee','${i.id}')" aria-label="Idee bearbeiten" title="Bearbeiten">${ic("stift")}</button>
           <button class="task-delete" onclick="ogsIdeeLoeschen('${i.id}')" aria-label="Löschen">${ic("x")}</button>
         </div>`;
     }).join("");
@@ -8005,6 +8055,7 @@
           <span class="link-url">${escapeHtml(l.url)}</span>
           ${l.notiz ? `<span class="link-notiz">${escapeHtml(l.notiz)}</span>` : ""}
         </div>
+        <button class="task-edit-btn" onclick="blattOeffnen('link','${l.id}')" aria-label="Link bearbeiten" title="Bearbeiten">${ic("stift")}</button>
         <button class="task-delete" onclick="linkLoeschen('${l.id}')" aria-label="Löschen">${ic("x")}</button>
       </div>`;
   }
