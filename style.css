@@ -1426,3 +1426,6 @@
   .schnell-erkannt-text strong { color: var(--ink); font-variant-numeric: tabular-nums; }
   .schnell-erkannt-text span { color: var(--ink-dim); font-size: 0.8rem; overflow-wrap: anywhere; }
   .schnell-erkannt .link-btn { flex: none; min-height: 2.75rem; padding: 0 0.3rem; font-weight: 600; }
+  /* … auch in den Formularen „+ Neue Aufgabe“ und Kalender-Tag */
+  /* steht direkt unter dem Textfeld und nimmt in der Zeile die volle Breite */
+  .form-erkannt { flex: 1 1 100%; margin: 0; }
