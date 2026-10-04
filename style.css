@@ -453,7 +453,7 @@
   .verlauf-text { flex: 1; }
   .verlauf-kategorie { color: var(--accent); font-weight: 500; }
 
-  .plan-typ-tabs { display: flex; gap: 0.4rem; margin-bottom: 1.2rem; }
+  .plan-typ-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 1.2rem; } /* umbrechen statt seitlich überstehen (5 Finanz-Reiter) */
   .plan-typ-btn {
     padding: 0.45rem 0.9rem; border: 1px solid var(--border); border-radius: var(--r-pille);
     background: var(--panel); color: var(--ink-dim); cursor: pointer; font-size: 0.85rem;
@@ -1489,3 +1489,35 @@
   color: var(--bg); text-decoration: underline; text-underline-offset: 3px;
 }
 @media (prefers-reduced-motion: reduce) { .wisch-vorne { transition: none !important; } }
+
+/* Finanzen → Prognose (Session 35) */
+.fin-prognose-steuerung {
+  display: flex; flex-direction: column; gap: 0.7rem; margin-bottom: 1.4rem; padding: 0.9rem 1rem;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-karte);
+}
+.fin-prognose-wahl { display: flex; flex-direction: column; gap: 0.35rem; }
+.fin-prognose-wahl-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-dim); }
+.fin-prognose-wahl .schnell-chip { min-height: 2.5rem; padding: 0 0.8rem; font-size: 0.85rem; }
+.fin-prognose-haken { display: flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; color: var(--ink); cursor: pointer; }
+.fin-prognose-haken input { width: 1.2rem; height: 1.2rem; accent-color: var(--accent); }
+.fin-prognose-anpassung { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; color: var(--ink); font-size: 0.92rem; }
+.fin-prognose-anpassung input { width: 6.5rem; min-height: 2.5rem; }
+.fin-prognose-anpassung .blatt-hinweis { flex-basis: 100%; }
+.fin-prognose-aussage {
+  margin-bottom: 0.8rem; padding: 0.9rem 1rem; border-radius: var(--r-karte); font-size: 1rem; line-height: 1.45;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel)); border-left: 4px solid var(--accent); color: var(--ink);
+}
+.fin-prognose-hinweis { display: flex; gap: 0.4rem; align-items: flex-start; margin: 0 0 0.8rem; font-size: 0.85rem; color: var(--overdue-text); }
+.fin-prognose-tabelle .fin-prognose-ist td { color: var(--ink-dim); }
+.fin-prognose-tabelle .fin-prognose-jetzt td { background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+.fin-prognose-tabelle .fin-prognose-prognose td { font-style: italic; }
+.fin-prognose-marke {
+  display: inline-block; margin-left: 0.3rem; padding: 0 0.4rem; border-radius: var(--r-pille);
+  background: var(--accent); color: var(--on-accent); font-size: 0.7rem; font-style: normal; font-weight: 700;
+}
+.fin-legende-linie { display: inline-block; width: 1.4rem; height: 0; border-top: 2px solid var(--ink-dim); vertical-align: middle; margin-right: 0.35rem; }
+.fin-legende-linie.gestrichelt { border-top: 2.5px dashed var(--accent); }
+.fin-prognose-erklaerung { margin-bottom: 1.4rem; padding: 0.8rem 1rem; background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-karte); font-size: 0.88rem; }
+.fin-prognose-erklaerung summary { cursor: pointer; font-weight: 700; min-height: 2rem; }
+.fin-prognose-erklaerung li { margin: 0.35rem 0; }
+.fin-prognose-steuerung h3 { font-family: var(--font-display); font-size: 1rem; margin: 0; }
