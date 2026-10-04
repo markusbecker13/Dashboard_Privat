@@ -719,7 +719,7 @@
   /* ==========================================================
      Navigation: Bereichs-Knopf oben, Reiter-Leiste, Leiste unten
      ========================================================== */
-  
+
   .bottom-nav-btn:focus-visible, .reiter-chip:focus-visible, .zl-check:focus-visible {
     outline: 3px solid var(--accent); outline-offset: 2px;
   }
@@ -798,7 +798,7 @@
   .heute-gruss { font-size: 2.6rem; line-height: 1; margin: 0.35rem 0 1.2rem; text-align: center; position: relative; padding: 0; }
   /* „?“ unten am rechten Rand statt hinter dem Text – sonst rückt die letzte Zeile aus der Mitte. Unten, weil die letzte Zeile („… heute.“) kurz ist; ein Innenabstand würde „Moin Markus.“ am Handy umbrechen */
   .heute-gruss .hilfe-icon { position: absolute; bottom: 0.15rem; right: 0; margin-left: 0; }
-  
+
   .tages-zitat { margin: -0.5rem 0 1.2rem; padding: 0.1rem 0 0.1rem 0.85rem; border-left: 3px solid var(--accent); }
   .tages-zitat-text { margin: 0; font-family: var(--font-text); font-size: 1rem; font-style: italic; line-height: 1.45; color: var(--ink); }
   .tages-zitat-quelle { margin-top: 0.3rem; font-size: 0.78rem; color: var(--ink-dim); }
@@ -1521,3 +1521,36 @@
 .fin-prognose-erklaerung summary { cursor: pointer; font-weight: 700; min-height: 2rem; }
 .fin-prognose-erklaerung li { margin: 0.35rem 0; }
 .fin-prognose-steuerung h3 { font-family: var(--font-display); font-size: 1rem; margin: 0; }
+
+/* Prognose → „Wo geht das Geld hin?“ (Session 36): Ausgaben je Kategorie */
+.fin-kat-liste { display: flex; flex-direction: column; }
+.fin-kat-zeile { border-top: 1px solid var(--border); }
+.fin-kat-zeile:first-child { border-top: none; }
+.fin-kat-zeile > summary {
+  list-style: none; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem;
+  min-height: 44px; padding: 0.6rem 0.1rem;
+}
+.fin-kat-zeile > summary::-webkit-details-marker { display: none; }
+.fin-kat-zeile > summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: var(--r-klein); }
+.fin-kat-kopf { display: flex; align-items: baseline; gap: 0.5rem; }
+.fin-kat-kopf::before { content: "▸"; color: var(--accent); flex: none; width: 0.8rem; }
+.fin-kat-zeile[open] .fin-kat-kopf::before { content: "▾"; }
+.fin-kat-name { font-weight: 700; overflow-wrap: anywhere; min-width: 0; }
+.fin-kat-betrag { margin-left: auto; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fin-kat-balken { display: block; height: 8px; margin-left: 1.3rem; border-radius: var(--r-pille); background: var(--bg); overflow: hidden; }
+.fin-kat-balken span { display: block; height: 100%; border-radius: var(--r-pille); background: var(--accent); }
+.fin-kat-meta { margin-left: 1.3rem; font-size: 0.78rem; color: var(--ink-dim); }
+.fin-kat-trend {
+  flex: none; padding: 0.05rem 0.45rem; border-radius: var(--r-pille); font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+}
+.fin-kat-trend.hoch { background: var(--overdue-bg); color: var(--overdue-text); }
+.fin-kat-trend.runter { background: var(--ok-bg); color: var(--ok-text); }
+.fin-kat-inhalt { padding: 0.2rem 0.1rem 0.9rem 1.3rem; }
+.fin-kat-empf-liste { list-style: none; margin: 0.35rem 0 0.7rem; padding: 0; }
+.fin-kat-empf { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+.fin-kat-empf-name { flex: 1; min-width: 0; font-size: 0.9rem; overflow-wrap: anywhere; }
+.fin-kat-empf-name .notiz-meta { margin-top: 0.1rem; }
+.fin-kat-empf-betrag { flex: none; font-size: 0.9rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fin-kat-empf-rest { color: var(--ink-dim); }
+.fin-kat-spar { margin: 0 0 0.6rem; font-size: 0.9rem; line-height: 1.45; }
+.fin-kat .btn-secondary { min-height: 44px; }
