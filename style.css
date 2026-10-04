@@ -1554,3 +1554,33 @@
 .fin-kat-empf-rest { color: var(--ink-dim); }
 .fin-kat-spar { margin: 0 0 0.6rem; font-size: 0.9rem; line-height: 1.45; }
 .fin-kat .btn-secondary { min-height: 44px; }
+
+/* Kategorie-Regeln (Session 36): Block in Buchungen, Vorschau im Blatt, Stift in der Prognose */
+.fin-regeln { margin: 0.8rem 0 1rem; }
+.fin-regel-liste { display: flex; flex-direction: column; margin-bottom: 0.6rem; }
+.fin-regel { display: flex; align-items: center; gap: 0.4rem; border-bottom: 1px solid var(--border); }
+.fin-regel:last-child { border-bottom: none; }
+.fin-regel-info {
+  flex: 1; min-width: 0; min-height: 44px; display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem;
+  padding: 0.5rem 0.1rem; border: none; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+}
+.fin-regel-info:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: var(--r-klein); }
+.fin-regel-zeile { font-size: 0.95rem; overflow-wrap: anywhere; }
+.fin-regel-muster { font-weight: 600; }
+.fin-regel-pfeil { color: var(--ink-dim); margin: 0 0.15rem; }
+.fin-regel-knoepfe { flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0; }
+.fin-regel-knoepfe .btn-secondary { min-height: 44px; }
+.fin-regel-vorschau { margin: 0; font-size: 0.9rem; line-height: 1.45; }
+.fin-regel-beispiele { list-style: none; margin: 0.35rem 0 0; padding: 0; }
+.fin-regel-beispiele li {
+  font-size: 0.78rem; color: var(--ink-dim); padding: 0.15rem 0; overflow-wrap: anywhere;
+  border-top: 1px dashed var(--border);
+}
+.fin-kat-empf { align-items: center; }
+.fin-kat-empf-regel {
+  flex: none; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--r-pille); background: var(--panel); color: var(--accent); cursor: pointer;
+}
+.fin-kat-empf-regel:hover { border-color: var(--accent); }
+.fin-kat-empf-regel:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.fin-kat-empf-regel .ic { width: 1rem; height: 1rem; }
