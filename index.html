@@ -918,7 +918,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Finanzen <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
             <div class="anleitung-text">
-              <p>Übersicht über Fixkosten, Sonderausgaben und einzelne Buchungen, über vier Reiter oben im Tab. Fixkosten, Sonderausgaben, Buchungen und Startkapital haben ein eigenes <code>bereich</code>-Feld – zusätzlich in einem anderen Bereich eingeblendet, sind das komplett eigene, getrennte Datensätze inkl. eigenem Startkapital pro Jahr.</p>
+              <p>Übersicht über Fixkosten, Sonderausgaben und einzelne Buchungen, über fünf Reiter oben im Tab. Fixkosten, Sonderausgaben, Buchungen und Startkapital haben ein eigenes <code>bereich</code>-Feld – zusätzlich in einem anderen Bereich eingeblendet, sind das komplett eigene, getrennte Datensätze inkl. eigenem Startkapital pro Jahr.</p>
               <p><strong>Fixkosten</strong> – zwei Excel-artige 12-Monats-Tabellen (Ausgaben, Einnahmen). Zelle anklicken, um die ganze Zeile inline zu bearbeiten; Summenspalte/-zeile aktualisieren sich automatisch.</p>
               <ul>
                 <li><strong>Eine Zeile je Kosten</strong> (seit Session 29): Jede Position hat einen festen Erkennungsschlüssel, den bereinigten Kern des Buchungstexts ohne Zahlen, Datum und Referenzen (z. B. „ARBEITGEBER GMBH LOHN GEHALT“). Neue Buchungen derselben Kosten ergänzen nach dem CSV-Import nur den Monat in der vorhandenen Zeile, statt eine neue anzulegen</li>
@@ -943,6 +943,13 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li>Startkapital einmalig eintragen; Monatstabelle mit Einnahmen, Ausgaben, Differenz, laufendem Kontostand</li>
                 <li>Drei Charts: Einnahmen vs. Ausgaben pro Monat, Kontostand-Verlauf, Ausgaben nach Kategorie</li>
                 <li>Rechnet <strong>ausschließlich</strong> aus den erfassten Buchungen – Fixkosten und Sonderausgaben fließen bewusst nicht mit ein, damit nichts doppelt gezählt wird</li>
+              </ul>
+              <p><strong>Prognose</strong> – „Wie sehen meine Finanzen aus, wenn ich weitermache wie bisher?“</p>
+              <ul>
+                <li>Oben die Kernaussage (legst du im Monat etwas zurück oder sinkt der Kontostand – und wann wärst du ggf. im Minus), darunter Kontostand heute, Ø pro Monat und der Stand am Ende des Zeitraums</li>
+                <li>Diagramm: bisheriger Verlauf durchgezogen, Prognose gestrichelt; Tabelle je Monat mit Einnahmen, Ausgaben, Sonderausgaben, Kontostand</li>
+                <li><strong>Annahmen:</strong> Grundlage die letzten 3, 6, 12 oder 24 vollen Monate, Blick nach vorn 6 bis 36 Monate, geplante Sonderausgaben abziehen (an/aus) und „Was wäre, wenn ich pro Monat … € mehr spare?“ – wird pro Gerät gemerkt</li>
+                <li>Rechnet wie die Übersicht nur mit Buchungen: Startkapital + Buchungen seit 1. Januar = heute, danach der Monatsdurchschnitt. „So wird gerechnet“ unten erklärt die Details. Eine Fortschreibung, kein Versprechen</li>
               </ul>
               <p><strong>Massenlöschung</strong> (unten in der Übersicht) wirkt nur auf den aktuell aktiven Bereich – löscht in Privat keine Buchungen anderer Bereiche und umgekehrt.</p>
             </div>
@@ -1324,7 +1331,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-finanzen" class="hidden">
-        <h1>Finanzen <button class="hilfe-icon" data-hilfe="Vier Bereiche: Fixkosten (wiederkehrend, je Kosten eine Zeile mit den gebuchten Monaten und Planwerten für die kommenden), Sonderausgaben (einmalig, geplant), Buchungen (tatsächliche Kontobewegungen, auch per CSV-Import) und Übersicht (Jahresauswertung – zählt bewusst nur Buchungen, damit Fixkosten/Sonderausgaben nicht doppelt mitgerechnet werden).">?</button></h1>
+        <h1>Finanzen <button class="hilfe-icon" data-hilfe="Fünf Bereiche: Fixkosten (wiederkehrend, je Kosten eine Zeile mit den gebuchten Monaten und Planwerten für die kommenden), Sonderausgaben (einmalig, geplant), Buchungen (tatsächliche Kontobewegungen, auch per CSV-Import), Übersicht (Jahresauswertung – zählt bewusst nur Buchungen, damit Fixkosten/Sonderausgaben nicht doppelt mitgerechnet werden) und Prognose (wie es weitergeht, wenn du weitermachst wie bisher).">?</button></h1>
         <p class="hero-text">Fixkosten, feste Einnahmen und Sonderausgaben.</p>
 
         <div class="plan-typ-tabs">
@@ -1332,6 +1339,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <button class="plan-typ-btn" id="fintyp-sonderausgaben" data-fintyp="sonderausgaben">Sonderausgaben</button>
           <button class="plan-typ-btn" id="fintyp-buchungen" data-fintyp="buchungen">Buchungen</button>
           <button class="plan-typ-btn" id="fintyp-uebersicht" data-fintyp="uebersicht">Übersicht</button>
+          <button class="plan-typ-btn" id="fintyp-prognose" data-fintyp="prognose">Prognose</button>
           <button type="button" class="hilfe-icon" data-hilfe="Fixkosten zeigen je Kosten eine Zeile für das laufende Jahr; kommende Monate sind farbig hinterlegt und enthalten Planwerte. Eine Beitragsanpassung trägst du im jeweiligen Monat ein (Zeile antippen). Nach dem CSV-Import ersetzen die echten Beträge die Planwerte der gebuchten Monate. „Doppelte zusammenführen“ unter den Tabellen räumt ältere Doppelzeilen auf. Buchungen sind die echten Kontobewegungen, die du einzeln erfasst oder per CSV aus dem Online-Banking importierst. Die Übersicht wertet nur Buchungen aus, um Doppelzählung zu vermeiden.">?</button>
         </div>
 
@@ -1339,6 +1347,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <div id="fin-sonderausgaben-bereich" class="hidden"></div>
         <div id="fin-buchungen-bereich" class="hidden"></div>
         <div id="fin-uebersicht-bereich" class="hidden"></div>
+        <div id="fin-prognose-bereich" class="hidden"></div>
       </div>
 
       <div id="view-ogs-ideen" class="hidden">
