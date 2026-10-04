@@ -10553,26 +10553,29 @@
     return Number.isFinite(n) ? n : 0;
   }
 
-  ["fixkosten", "sonderausgaben", "buchungen", "uebersicht"].forEach((t) => {
+  ["fixkosten", "sonderausgaben", "buchungen", "uebersicht", "prognose"].forEach((t) => {
     document.getElementById("fintyp-" + t).addEventListener("click", () => {
       finTyp = t;
       document.getElementById("fintyp-fixkosten").classList.toggle("active", t === "fixkosten");
       document.getElementById("fintyp-sonderausgaben").classList.toggle("active", t === "sonderausgaben");
       document.getElementById("fintyp-buchungen").classList.toggle("active", t === "buchungen");
       document.getElementById("fintyp-uebersicht").classList.toggle("active", t === "uebersicht");
+      document.getElementById("fintyp-prognose").classList.toggle("active", t === "prognose");
       document.getElementById("fin-fixkosten-bereich").classList.toggle("hidden", t !== "fixkosten");
       document.getElementById("fin-sonderausgaben-bereich").classList.toggle("hidden", t !== "sonderausgaben");
       document.getElementById("fin-buchungen-bereich").classList.toggle("hidden", t !== "buchungen");
       document.getElementById("fin-uebersicht-bereich").classList.toggle("hidden", t !== "uebersicht");
+      document.getElementById("fin-prognose-bereich").classList.toggle("hidden", t !== "prognose");
       renderFinanzen();
     });
   });
 
-  // Rendert den aktiven Finanzen-Reiter (Fixkosten, Sonderausgaben, Buchungen oder Übersicht)
+  // Rendert den aktiven Finanzen-Reiter (Fixkosten, Sonderausgaben, Buchungen, Übersicht oder Prognose)
   function renderFinanzen() {
     if (finTyp === "fixkosten") renderFinFixkosten();
     else if (finTyp === "sonderausgaben") renderFinSonderausgaben();
     else if (finTyp === "buchungen") renderFinBuchungen();
+    else if (finTyp === "prognose") renderFinPrognose();
     else renderFinUebersicht();
   }
 
@@ -11721,6 +11724,274 @@
     });
 
     finMassenloeschungBinden();
+  }
+
+  // ==========================================================
+  // Finanzen-Modul: Prognose (seit Session 35)
+  // „Wenn ich so weitermache wie bisher“: Durchschnitt der Einnahmen und
+  // Ausgaben der letzten vollen Monate (nur Buchungen, wie die Übersicht),
+  // ab dem heutigen Kontostand fortgeschrieben. Optional geplante
+  // Sonderausgaben abziehen und eine Anpassung pro Monat durchspielen.
+  // ==========================================================
+  const FIN_PROGNOSE_STANDARD = { basis: 12, horizont: 12, sonder: true, anpassung: 0 };
+  let finPrognoseOpt = { ...FIN_PROGNOSE_STANDARD };
+  try { Object.assign(finPrognoseOpt, JSON.parse(localStorage.getItem("fin-prognose") || "{}")); } catch (_e) { /* Standard */ }
+  let finPrognoseDaten = null; // letzte Antwort von finanzen_monatssummen (+ Bereich)
+
+  // "2026-10" → "Okt 26"
+  function finMonatLabel(schluessel) {
+    const [j, m] = schluessel.split("-").map(Number);
+    return `${FIN_MONATSNAMEN_KURZ[m - 1]} ${String(j).slice(2)}`;
+  }
+  // Verschiebt einen Monatsschlüssel "YYYY-MM" um n Monate
+  function finMonatPlus(schluessel, n) {
+    const [j, m] = schluessel.split("-").map(Number);
+    const d = new Date(j, m - 1 + n, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  // Reine Rechnung (ohne DOM), damit sie sich einzeln prüfen lässt.
+  // daten: { heute, jahr, monate:[{monat,einnahmen,ausgaben}], startkapital, erste_buchung }
+  // sonderListe: [{ jahr, monat, betrag, bezeichnung }]
+  function finPrognoseRechnen(daten, opt, sonderListe) {
+    const aktMonat = daten.heute.slice(0, 7);
+    const summe = new Map((daten.monate || []).map((m) => [m.monat, m]));
+    const wert = (k, feld) => (summe.get(k) ? finZahl(summe.get(k)[feld]) : 0);
+
+    // Ab wann gibt es Daten? Der erste Monat zählt nur, wenn die erste Buchung
+    // in den ersten 10 Tagen liegt – sonst wäre er nur ein angebrochener Monat.
+    let ersterVoller = null;
+    if (daten.erste_buchung) {
+      const k = daten.erste_buchung.slice(0, 7);
+      ersterVoller = Number(daten.erste_buchung.slice(8, 10)) <= 10 ? k : finMonatPlus(k, 1);
+    }
+    const basisMonate = [];
+    for (let i = opt.basis; i >= 1; i--) {
+      const k = finMonatPlus(aktMonat, -i);
+      if (ersterVoller && k >= ersterVoller) basisMonate.push(k);
+    }
+    const n = basisMonate.length;
+    const oE = n ? basisMonate.reduce((s, k) => s + wert(k, "einnahmen"), 0) / n : 0;
+    const oA = n ? basisMonate.reduce((s, k) => s + wert(k, "ausgaben"), 0) / n : 0;
+
+    // Kontostand heute: Startkapital + alle Buchungen des laufenden Jahres
+    const jahrPrefix = `${daten.jahr}-`;
+    const imJahr = (daten.monate || []).filter((m) => m.monat.startsWith(jahrPrefix));
+    const heuteStand = finZahl(daten.startkapital) + imJahr.reduce((s, m) => s + finZahl(m.einnahmen) - finZahl(m.ausgaben), 0);
+
+    // Geplante Sonderausgaben je Monat (nur ab dem laufenden Monat, nur mit Monat)
+    const sonder = new Map();
+    const sonderOhneMonat = [];
+    (sonderListe || []).forEach((s) => {
+      if (!s.monat) { sonderOhneMonat.push(s); return; }
+      const k = `${s.jahr}-${String(s.monat).padStart(2, "0")}`;
+      if (k < aktMonat) return;
+      sonder.set(k, (sonder.get(k) || 0) + finZahl(s.betrag));
+    });
+    const sonderIn = (k) => (opt.sonder ? sonder.get(k) || 0 : 0);
+
+    // Vergangene Monatsenden rückwärts vom heutigen Stand (für das Diagramm)
+    const zeilen = [];
+    let stand = heuteStand - (wert(aktMonat, "einnahmen") - wert(aktMonat, "ausgaben"));
+    for (let i = basisMonate.length - 1; i >= 0; i--) {
+      const k = basisMonate[i];
+      zeilen.unshift({ monat: k, art: "ist", einnahmen: wert(k, "einnahmen"), ausgaben: wert(k, "ausgaben"), sonder: 0, kontostand: stand });
+      stand -= wert(k, "einnahmen") - wert(k, "ausgaben");
+    }
+    // Laufender Monat: Gebuchtes zählt, der Rest bis zum Durchschnitt wird ergänzt
+    const gebE = wert(aktMonat, "einnahmen");
+    const gebA = wert(aktMonat, "ausgaben");
+    const restE = Math.max(0, oE - gebE);
+    const restA = Math.max(0, oA - gebA);
+    let laufend = heuteStand + restE - restA - sonderIn(aktMonat);
+    zeilen.push({ monat: aktMonat, art: "jetzt", einnahmen: gebE + restE, ausgaben: gebA + restA, sonder: sonderIn(aktMonat), kontostand: laufend,
+      gebuchtE: gebE, gebuchtA: gebA });
+    const anpassung = finZahl(opt.anpassung);
+    for (let i = 1; i <= opt.horizont; i++) {
+      const k = finMonatPlus(aktMonat, i);
+      laufend += oE - oA - sonderIn(k) + anpassung;
+      zeilen.push({ monat: k, art: "prognose", einnahmen: oE, ausgaben: oA - anpassung, sonder: sonderIn(k), kontostand: laufend });
+    }
+    const prognose = zeilen.filter((z) => z.art !== "ist");
+    const minus = prognose.find((z) => z.kontostand < 0);
+    return {
+      n, basisMonate, oE, oA, saldo: oE - oA + anpassung, heuteStand, zeilen, ende: prognose[prognose.length - 1],
+      ersterMinusMonat: heuteStand >= 0 && minus ? minus.monat : null, schonImMinus: heuteStand < 0,
+      sonderSumme: [...sonder.entries()].filter(([k]) => k <= finMonatPlus(aktMonat, opt.horizont)).reduce((s, [, v]) => s + v, 0),
+      sonderOhneMonat, startkapitalFehlt: daten.startkapital === null || daten.startkapital === undefined,
+    };
+  }
+
+  // Liniendiagramm: Ist (durchgezogen) und Prognose (gestrichelt), Null-Linie
+  function finChartPrognose(zeilen) {
+    // Schmale Zeichenfläche, damit die Schrift am Handy lesbar bleibt
+    const breite = 360, hoehe = 200, unten = 22, oben = 22, rand = 10;
+    const werte = zeilen.map((z) => z.kontostand);
+    const minWert = Math.min(0, ...werte);
+    const maxWert = Math.max(1, ...werte);
+    const spanne = maxWert - minWert || 1;
+    const schrittX = (breite - rand * 2) / Math.max(1, zeilen.length - 1);
+    const x = (i) => rand + i * schrittX;
+    const y = (w) => oben + (hoehe - oben - unten) * (1 - (w - minWert) / spanne);
+    const iJetzt = zeilen.findIndex((z) => z.art === "jetzt");
+    const pkt = (von, bis) => zeilen.slice(von, bis + 1).map((z, j) => `${x(von + j).toFixed(1)},${y(z.kontostand).toFixed(1)}`).join(" ");
+    const ist = iJetzt > 0 ? `<polyline points="${pkt(0, iJetzt)}" fill="none" stroke="var(--ink-dim)" stroke-width="2"></polyline>` : "";
+    const prog = `<polyline points="${pkt(Math.max(0, iJetzt), zeilen.length - 1)}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="6,4"></polyline>`;
+    const jede = Math.max(1, Math.ceil(zeilen.length / 6));
+    // Beschriftung: „heute“ immer; sonst jeder n-te Monat, aber nicht zu nah an „heute“
+    const anker = (i) => (i === 0 ? "start" : i === zeilen.length - 1 ? "end" : "middle");
+    const labels = zeilen.map((z, i) => {
+      const zeigen = i === iJetzt || (i % jede === 0 && Math.abs(i - iJetzt) >= Math.max(2, jede / 2));
+      if (!zeigen) return "";
+      return `<text x="${x(i).toFixed(1)}" y="${hoehe - 7}" font-size="10" fill="var(--ink-dim)" text-anchor="${anker(i)}"${i === iJetzt ? ' font-weight="700"' : ""}>${i === iJetzt ? "heute" : finMonatLabel(z.monat)}</text>`;
+    }).join("");
+    const nullLinie = minWert < 0
+      ? `<line x1="0" y1="${y(0).toFixed(1)}" x2="${breite}" y2="${y(0).toFixed(1)}" stroke="var(--overdue-text)" stroke-width="1" stroke-dasharray="3,3"></line>
+         <text x="${breite - 4}" y="${(y(0) - 4).toFixed(1)}" font-size="10" fill="var(--overdue-text)" text-anchor="end">0 €</text>` : "";
+    const punktJetzt = iJetzt >= 0 ? `<circle cx="${x(iJetzt).toFixed(1)}" cy="${y(zeilen[iJetzt].kontostand).toFixed(1)}" r="4" fill="var(--accent)"></circle>` : "";
+    const ende = zeilen[zeilen.length - 1];
+    const endeText = `<text x="${(x(zeilen.length - 1) - 2).toFixed(1)}" y="${(y(ende.kontostand) - 8).toFixed(1)}" font-size="11" font-weight="700" fill="var(--ink)" text-anchor="end">${escapeHtml(finEuro(ende.kontostand))}</text>`;
+    return `<svg viewBox="0 0 ${breite} ${hoehe}" style="width:100%; height:auto; display:block;" role="img"
+        aria-label="Kontostand: bisher und Prognose bis ${finMonatLabel(ende.monat)}, am Ende etwa ${escapeAttr(finEuro(ende.kontostand))}">
+      <line x1="0" y1="${hoehe - unten}" x2="${breite}" y2="${hoehe - unten}" stroke="var(--border)" stroke-width="1"></line>
+      ${nullLinie}${ist}${prog}${punktJetzt}${endeText}${labels}
+    </svg>`;
+  }
+
+  // Auswahl-Chips der Prognose (Grundlage, Zeitraum)
+  function finPrognoseChips(key, optionen, label) {
+    return `<div class="fin-prognose-wahl"><span class="fin-prognose-wahl-label">${label}</span><div class="schnell-chips" role="group" aria-label="${escapeAttr(label)}">` +
+      optionen.map((n) => `<button type="button" class="schnell-chip${finPrognoseOpt[key] === n ? " aktiv" : ""}" aria-pressed="${finPrognoseOpt[key] === n}"
+        onclick="finPrognoseSetzen('${key}', ${n})">${n} Mon.</button>`).join("") + `</div></div>`;
+  }
+
+  window.finPrognoseSetzen = function(key, wert) {
+    finPrognoseOpt[key] = wert;
+    try { localStorage.setItem("fin-prognose", JSON.stringify(finPrognoseOpt)); } catch (_e) { /* egal */ }
+    renderFinPrognose(false);
+  };
+
+  // Lädt (bei Bedarf) die Monatssummen und zeichnet die Prognose
+  async function renderFinPrognose(neuLaden = true) {
+    const el = document.getElementById("fin-prognose-bereich");
+    if (!el) return;
+    if (neuLaden || !finPrognoseDaten || finPrognoseDaten.bereich !== aktiverBereich) {
+      el.innerHTML = `<p class="empty-text">Rechne Prognose …</p>`;
+      try {
+        const daten = await api("finanzen_monatssummen", { bereich: aktiverBereich, monate: 24 });
+        finPrognoseDaten = { ...daten, bereich: aktiverBereich };
+      } catch (err) {
+        el.innerHTML = `<p class="empty-text">Prognose konnte nicht geladen werden${err && err.message ? ": " + escapeHtml(err.message) : ""}.</p>`;
+        return;
+      }
+    }
+    const r = finPrognoseRechnen(finPrognoseDaten, finPrognoseOpt, sonderausgabenAktuell());
+    const steuerung = `
+      <div class="fin-prognose-steuerung">
+        <h3>Annahmen</h3>
+        ${finPrognoseChips("basis", [3, 6, 12, 24], "Grundlage: die letzten")}
+        ${finPrognoseChips("horizont", [6, 12, 24, 36], "Blick nach vorn")}
+        <label class="fin-prognose-haken"><input type="checkbox" id="fin-prognose-sonder" ${finPrognoseOpt.sonder ? "checked" : ""}> geplante Sonderausgaben abziehen</label>
+        <label class="fin-prognose-anpassung">Was wäre, wenn ich pro Monat
+          <input type="number" id="fin-prognose-anpassung" step="10" inputmode="decimal" value="${finZahl(finPrognoseOpt.anpassung) || ""}" placeholder="0"> € mehr spare?
+          <span class="blatt-hinweis">minus = mehr ausgeben</span></label>
+      </div>`;
+
+    if (!r.n) {
+      el.innerHTML = steuerung + `<p class="empty-text">Für eine Prognose braucht es mindestens einen vollen Monat mit Buchungen.
+        Importiere die Kontoauszüge (Buchungen → CSV-Import) oder erfasse Buchungen – dann rechnet die Prognose.</p>`;
+      finPrognoseBinden();
+      return;
+    }
+
+    const ende = r.ende;
+    const saldoText = `${r.saldo >= 0 ? "+" : "−"}${finEuro(Math.abs(r.saldo))}`;
+    let aussage;
+    if (r.schonImMinus) {
+      aussage = r.saldo > 0
+        ? `Dein Konto ist im Minus. Wie bisher kämen pro Monat ${saldoText} dazu – Ende ${finMonatLabel(ende.monat)} stündest du bei etwa <strong>${finEuro(ende.kontostand)}</strong>.`
+        : `Dein Konto ist im Minus, und wie bisher ginge es pro Monat um ${finEuro(Math.abs(r.saldo))} weiter nach unten – Ende ${finMonatLabel(ende.monat)} etwa <strong>${finEuro(ende.kontostand)}</strong>.`;
+    } else if (r.ersterMinusMonat) {
+      aussage = `Machst du weiter wie bisher, sinkt dein Kontostand um etwa ${finEuro(Math.abs(r.saldo))} im Monat. <strong>Im ${finMonatLabel(r.ersterMinusMonat)} wärst du im Minus.</strong>`;
+    } else if (r.saldo < 0) {
+      aussage = `Machst du weiter wie bisher, sinkt dein Kontostand um etwa ${finEuro(Math.abs(r.saldo))} im Monat – Ende ${finMonatLabel(ende.monat)} noch etwa <strong>${finEuro(ende.kontostand)}</strong>.`;
+    } else {
+      aussage = `Machst du weiter wie bisher, legst du etwa ${finEuro(r.saldo)} im Monat zurück – Ende ${finMonatLabel(ende.monat)} etwa <strong>${finEuro(ende.kontostand)}</strong>.`;
+    }
+
+    const hinweise = [];
+    if (r.startkapitalFehlt) hinweise.push(`Für ${finPrognoseDaten.jahr} ist kein Startkapital eingetragen – die Rechnung beginnt deshalb bei 0 €. Eintragen unter „Übersicht“.`);
+    if (r.n < finPrognoseOpt.basis) hinweise.push(`Es liegen erst ${r.n} volle ${r.n === 1 ? "Monat" : "Monate"} mit Buchungen vor – der Durchschnitt beruht nur darauf.`);
+    if (finPrognoseOpt.sonder && r.sonderOhneMonat.length) hinweise.push(`${r.sonderOhneMonat.length} Sonderausgabe${r.sonderOhneMonat.length === 1 ? "" : "n"} ohne Monat ${r.sonderOhneMonat.length === 1 ? "ist" : "sind"} nicht eingerechnet.`);
+
+    const zeile = (z) => `
+      <tr class="fin-prognose-${z.art}">
+        <td class="fin-bez">${z.art === "jetzt" ? `${finMonatLabel(z.monat)} <span class="fin-prognose-marke">jetzt</span>` : finMonatLabel(z.monat)}</td>
+        <td>${finEuro(z.einnahmen)}</td>
+        <td>${finEuro(z.ausgaben)}</td>
+        <td>${z.sonder ? "−" + finEuro(z.sonder) : "–"}</td>
+        <td><strong${z.kontostand < 0 ? ' style="color:var(--overdue-text);"' : ""}>${finEuro(z.kontostand)}</strong></td>
+      </tr>`;
+
+    el.innerHTML = `
+      <div class="fin-prognose-aussage">${aussage}</div>
+      ${hinweise.map((h) => `<p class="fin-prognose-hinweis">${ic("warnung")} ${escapeHtml(h)}</p>`).join("")}
+      <div class="fin-summary-row">
+        <div class="fin-summary-item">
+          <div class="fin-summary-label">Kontostand heute</div>
+          <div class="fin-summary-value">${finEuro(r.heuteStand)}</div>
+        </div>
+        <div class="fin-summary-item">
+          <div class="fin-summary-label">Ø pro Monat</div>
+          <div class="fin-summary-value" style="color:${r.saldo < 0 ? "var(--overdue-text)" : "var(--einnahme)"};">${saldoText}</div>
+        </div>
+        <div class="fin-summary-item">
+          <div class="fin-summary-label">Ende ${finMonatLabel(ende.monat)}</div>
+          <div class="fin-summary-value"${ende.kontostand < 0 ? ' style="color:var(--overdue-text);"' : ""}>${finEuro(ende.kontostand)}</div>
+        </div>
+      </div>
+
+      <div class="fin-chart-wrap">
+        <h3>Kontostand: bisher und Prognose</h3>
+        ${finChartPrognose(r.zeilen)}
+        <div class="fin-chart-legende">
+          <span><span class="fin-legende-linie"></span>bisher</span>
+          <span><span class="fin-legende-linie gestrichelt"></span>Prognose</span>
+        </div>
+      </div>
+      ${steuerung}
+
+      <div class="fin-tabelle-wrap">
+        <table class="fin-tabelle fin-prognose-tabelle">
+          <thead><tr><th class="fin-bez-th">Monat</th><th>Einnahmen</th><th>Ausgaben</th><th>Sonder</th><th>Kontostand Ende</th></tr></thead>
+          <tbody>${r.zeilen.map(zeile).join("")}</tbody>
+        </table>
+      </div>
+
+      <details class="fin-prognose-erklaerung">
+        <summary>So wird gerechnet</summary>
+        <ul>
+          <li><strong>Grundlage:</strong> ${r.n} volle ${r.n === 1 ? "Monat" : "Monate"} (${finMonatLabel(r.basisMonate[0])} bis ${finMonatLabel(r.basisMonate[r.n - 1])}) –
+            im Schnitt ${finEuro(r.oE)} Einnahmen und ${finEuro(r.oA)} Ausgaben pro Monat. Gezählt werden nur Buchungen, wie in der Übersicht.</li>
+          <li><strong>Heute:</strong> Startkapital ${finPrognoseDaten.jahr} plus alle Buchungen seit 1. Januar = ${finEuro(r.heuteStand)}.</li>
+          <li><strong>Laufender Monat:</strong> bereits gebucht ${finEuro(r.zeilen.find((z) => z.art === "jetzt").gebuchtE)} rein / ${finEuro(r.zeilen.find((z) => z.art === "jetzt").gebuchtA)} raus; was zum Durchschnitt noch fehlt, wird ergänzt.</li>
+          <li><strong>Danach</strong> jeden Monat der Durchschnitt${finPrognoseOpt.sonder ? ", abzüglich geplanter Sonderausgaben mit Monat" : ""}${finZahl(finPrognoseOpt.anpassung) ? `, plus deine Anpassung von ${finEuro(finZahl(finPrognoseOpt.anpassung))}` : ""}.</li>
+          <li><strong>Grenzen:</strong> Es ist eine Fortschreibung, kein Versprechen. Jährliche Zahlungen (Versicherung, Steuer) verteilt der Durchschnitt gleichmäßig – mit 12 oder 24 Monaten Grundlage sind sie am besten abgebildet. Einmalige große Posten der Grundlage-Monate ziehen den Schnitt mit.</li>
+        </ul>
+      </details>`;
+    finPrognoseBinden();
+  }
+
+  // Bindet Häkchen und Anpassungsfeld (ohne neu zu laden)
+  function finPrognoseBinden() {
+    const haken = document.getElementById("fin-prognose-sonder");
+    if (haken) haken.addEventListener("change", () => window.finPrognoseSetzen("sonder", haken.checked));
+    const feld = document.getElementById("fin-prognose-anpassung");
+    if (feld) feld.addEventListener("change", () => {
+      window.finPrognoseSetzen("anpassung", finZahl(feld.value));
+      const neu = document.getElementById("fin-prognose-anpassung");
+      if (neu) neu.focus();
+    });
   }
 
   // ==========================================================
