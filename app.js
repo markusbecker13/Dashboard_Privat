@@ -11822,6 +11822,150 @@
     };
   }
 
+  // ---- „Wo geht das Geld hin?“ (seit Session 36) ----
+  // Ausgaben je Kategorie und Empfänger über dieselben Grundlage-Monate wie die
+  // Prognose. Reine Rechnung ohne DOM.
+  // daten.kategorien: [{monat, kategorie, betrag, anzahl}]
+  // daten.empfaenger: [{monat, kategorie, schluessel, betrag, anzahl}]
+  // Liefert null, wenn das Backend die Felder (noch) nicht schickt.
+  function finKategorienRechnen(daten, basisMonate) {
+    if (!Array.isArray(daten.kategorien) || !Array.isArray(daten.empfaenger)) return null;
+    const n = basisMonate.length;
+    if (!n) return { liste: [], gesamt: 0, n: 0 };
+    const inBasis = new Set(basisMonate);
+    const letzte3 = new Set(n >= 6 ? basisMonate.slice(-3) : []);
+    const map = new Map();
+    daten.kategorien.forEach((k) => {
+      if (!inBasis.has(k.monat)) return;
+      const e = map.get(k.kategorie) || { kategorie: k.kategorie, summe: 0, summeLetzte: 0, anzahl: 0 };
+      e.summe += finZahl(k.betrag);
+      e.anzahl += Number(k.anzahl || 0);
+      if (letzte3.has(k.monat)) e.summeLetzte += finZahl(k.betrag);
+      map.set(k.kategorie, e);
+    });
+    const gesamt = [...map.values()].reduce((s, e) => s + e.summe, 0);
+
+    // Empfänger je Kategorie: Summe und in wie vielen Monaten sie vorkommen
+    const empf = new Map();
+    daten.empfaenger.forEach((e) => {
+      if (!inBasis.has(e.monat)) return;
+      const key = `${e.kategorie}|${e.schluessel}`;
+      const x = empf.get(key) || { kategorie: e.kategorie, schluessel: e.schluessel, summe: 0, anzahl: 0, monate: new Set() };
+      x.summe += finZahl(e.betrag);
+      x.anzahl += Number(e.anzahl || 0);
+      x.monate.add(e.monat);
+      empf.set(key, x);
+    });
+
+    const liste = [...map.values()].map((e) => {
+      const oMonat = e.summe / n;
+      let trend = null;
+      if (n >= 6) {
+        const oLetzte = e.summeLetzte / 3;
+        const oFrueher = (e.summe - e.summeLetzte) / (n - 3);
+        if (oFrueher <= 0 && oLetzte > 0) trend = { art: "neu", oLetzte, oFrueher };
+        else if (oFrueher > 0) {
+          const diff = oLetzte - oFrueher;
+          if (Math.abs(diff) >= Math.max(10, oFrueher * 0.15)) {
+            trend = { art: diff > 0 ? "hoch" : "runter", prozent: Math.round((diff / oFrueher) * 100), oLetzte, oFrueher };
+          }
+        }
+      }
+      const alleEmpf = [...empf.values()].filter((x) => x.kategorie === e.kategorie).sort((a, b) => b.summe - a.summe);
+      const top = alleEmpf.slice(0, 5).map((x) => ({
+        name: x.schluessel ? finNameAusSchluessel(x.schluessel) : "ohne Buchungstext",
+        oMonat: x.summe / n, summe: x.summe, anzahl: x.anzahl, monate: x.monate.size,
+      }));
+      const rest = alleEmpf.slice(5).reduce((s, x) => s + x.summe, 0);
+      return {
+        kategorie: e.kategorie, summe: e.summe, oMonat, anzahl: e.anzahl,
+        anteil: gesamt > 0 ? e.summe / gesamt : 0, trend, top, rest, weitere: Math.max(0, alleEmpf.length - 5),
+        spar10: Math.max(1, Math.round(oMonat * 0.1)),
+      };
+    }).sort((a, b) => b.summe - a.summe);
+    return { liste, gesamt, n };
+  }
+
+  let finKatOffen = new Set(); // aufgeklappte Kategorien (bis zum Neuladen)
+
+  // HTML des Abschnitts „Wo geht das Geld hin?“
+  function finKategorienHtml(k, r) {
+    if (k === null) {
+      return `<div class="fin-chart-wrap fin-kat"><h3>Wo geht das Geld hin?</h3>
+        <p class="empty-text" style="margin:0;">Für diese Auswertung muss die neue <code>index.ts</code> eingespielt werden (Supabase → Edge Functions).</p></div>`;
+    }
+    if (!k.liste.length) return "";
+    const max = Math.max(...k.liste.map((e) => e.oMonat)) || 1;
+    const prozent = (x) => `${Math.round(x * 100)} %`;
+    const sonstiges = k.liste.find((e) => e.kategorie === "Sonstiges");
+    const hinweisSonstiges = sonstiges && sonstiges.anteil >= 0.35
+      ? `<p class="fin-prognose-hinweis">${ic("warnung")} ${prozent(sonstiges.anteil)} der Ausgaben stehen unter „Sonstiges“. Die Kategorie rät der CSV-Import aus dem Buchungstext – aufklappen zeigt, welche Empfänger drinstecken. Ändern lässt sie sich je Buchung unter „Buchungen“.</p>`
+      : "";
+    const trendHtml = (t) => {
+      if (!t) return "";
+      if (t.art === "neu") return `<span class="fin-kat-trend hoch" title="In den letzten 3 Monaten neu dazugekommen">neu</span>`;
+      const hoch = t.art === "hoch";
+      return `<span class="fin-kat-trend ${hoch ? "hoch" : "runter"}" title="Letzte 3 Monate Ø ${escapeAttr(finEuro(t.oLetzte))}, davor Ø ${escapeAttr(finEuro(t.oFrueher))}">${hoch ? "↑" : "↓"} ${Math.abs(t.prozent)} %</span>`;
+    };
+    const wieOft = (x) => {
+      if (x.monate >= k.n) return "jeden Monat";
+      if (x.anzahl === 1) return "einmal";
+      return `in ${x.monate} von ${k.n} Monaten`;
+    };
+    const zeilen = k.liste.map((e) => {
+      const offen = finKatOffen.has(e.kategorie);
+      const empf = e.top.map((x) => `
+        <li class="fin-kat-empf">
+          <span class="fin-kat-empf-name">${escapeHtml(x.name)}<span class="notiz-meta">${wieOft(x)} · ${x.anzahl} ${x.anzahl === 1 ? "Buchung" : "Buchungen"}</span></span>
+          <span class="fin-kat-empf-betrag">${finEuro(x.oMonat)}</span>
+        </li>`).join("");
+      const rest = e.weitere ? `<li class="fin-kat-empf fin-kat-empf-rest"><span class="fin-kat-empf-name">${e.weitere} weitere</span><span class="fin-kat-empf-betrag">${finEuro(e.rest / k.n)}</span></li>` : "";
+      return `
+        <details class="fin-kat-zeile" data-kategorie="${escapeAttr(e.kategorie)}"${offen ? " open" : ""}>
+          <summary>
+            <span class="fin-kat-kopf">
+              <span class="fin-kat-name">${escapeHtml(e.kategorie)}</span>
+              ${trendHtml(e.trend)}
+              <span class="fin-kat-betrag">${finEuro(e.oMonat)}</span>
+            </span>
+            <span class="fin-kat-balken" aria-hidden="true"><span style="width:${Math.max(2, Math.round((e.oMonat / max) * 100))}%;"></span></span>
+            <span class="fin-kat-meta">${prozent(e.anteil)} der Ausgaben · ${e.anzahl} ${e.anzahl === 1 ? "Buchung" : "Buchungen"}</span>
+          </summary>
+          <div class="fin-kat-inhalt">
+            <div class="fin-prognose-wahl-label">Größte Empfänger · Ø pro Monat</div>
+            <ul class="fin-kat-empf-liste">${empf}${rest}</ul>
+            <p class="fin-kat-spar">10 % weniger bei „${escapeHtml(e.kategorie)}“ wären etwa <strong>${finEuro(e.spar10)} im Monat</strong>
+              – ${finEuro(e.spar10 * finPrognoseOpt.horizont)} in ${finPrognoseOpt.horizont} Monaten.</p>
+            <button type="button" class="btn-secondary" onclick="finKatSparen(this.closest('.fin-kat-zeile').dataset.kategorie)">In der Prognose durchrechnen</button>
+          </div>
+        </details>`;
+    }).join("");
+    return `
+      <div class="fin-chart-wrap fin-kat" id="fin-kat">
+        <h3>Wo geht das Geld hin?</h3>
+        <p class="notiz-meta" style="margin:0 0 0.7rem;">Ausgaben je Kategorie, Ø pro Monat über dieselben ${k.n} ${k.n === 1 ? "Monat" : "Monate"} wie die Prognose
+          (${finMonatLabel(r.basisMonate[0])} bis ${finMonatLabel(r.basisMonate[r.n - 1])}).${k.n >= 6 ? " Pfeile: letzte 3 Monate gegenüber den Monaten davor." : ""} Antippen zeigt die größten Empfänger.</p>
+        ${hinweisSonstiges}
+        <div class="fin-kat-liste">${zeilen}</div>
+      </div>`;
+  }
+
+  // „In der Prognose durchrechnen“: 10 % der Kategorie als Anpassung setzen
+  window.finKatSparen = function(kategorie) {
+    if (!finPrognoseDaten) return;
+    const r = finPrognoseRechnen(finPrognoseDaten, finPrognoseOpt, sonderausgabenAktuell());
+    const k = finKategorienRechnen(finPrognoseDaten, r.basisMonate);
+    const e = k && k.liste.find((x) => x.kategorie === kategorie);
+    if (!e) return;
+    const vorher = finZahl(finPrognoseOpt.anpassung);
+    window.finPrognoseSetzen("anpassung", e.spar10);
+    const aussage = document.querySelector("#fin-prognose-bereich .fin-prognose-aussage");
+    if (aussage) aussage.scrollIntoView({ behavior: "smooth", block: "center" });
+    hinweisZeigen(`Prognose mit ${finEuro(e.spar10)} weniger „${kategorie}“ pro Monat`, () => {
+      window.finPrognoseSetzen("anpassung", vorher);
+    });
+  };
+
   // Liniendiagramm: Ist (durchgezogen) und Prognose (gestrichelt), Null-Linie
   function finChartPrognose(zeilen) {
     // Schmale Zeichenfläche, damit die Schrift am Handy lesbar bleibt
@@ -11879,6 +12023,7 @@
       el.innerHTML = `<p class="empty-text">Rechne Prognose …</p>`;
       try {
         const daten = await api("finanzen_monatssummen", { bereich: aktiverBereich, monate: 24 });
+        if (!finPrognoseDaten || finPrognoseDaten.bereich !== aktiverBereich) finKatOffen = new Set();
         finPrognoseDaten = { ...daten, bereich: aktiverBereich };
       } catch (err) {
         el.innerHTML = `<p class="empty-text">Prognose konnte nicht geladen werden${err && err.message ? ": " + escapeHtml(err.message) : ""}.</p>`;
@@ -11960,6 +12105,7 @@
         </div>
       </div>
       ${steuerung}
+      ${finKategorienHtml(finKategorienRechnen(finPrognoseDaten, r.basisMonate), r)}
 
       <div class="fin-tabelle-wrap">
         <table class="fin-tabelle fin-prognose-tabelle">
@@ -11976,6 +12122,7 @@
           <li><strong>Heute:</strong> Startkapital ${finPrognoseDaten.jahr} plus alle Buchungen seit 1. Januar = ${finEuro(r.heuteStand)}.</li>
           <li><strong>Laufender Monat:</strong> bereits gebucht ${finEuro(r.zeilen.find((z) => z.art === "jetzt").gebuchtE)} rein / ${finEuro(r.zeilen.find((z) => z.art === "jetzt").gebuchtA)} raus; was zum Durchschnitt noch fehlt, wird ergänzt.</li>
           <li><strong>Danach</strong> jeden Monat der Durchschnitt${finPrognoseOpt.sonder ? ", abzüglich geplanter Sonderausgaben mit Monat" : ""}${finZahl(finPrognoseOpt.anpassung) ? `, plus deine Anpassung von ${finEuro(finZahl(finPrognoseOpt.anpassung))}` : ""}.</li>
+          <li><strong>Wo geht das Geld hin?</strong> Gleiche Grundlage-Monate, nur Ausgaben, nach der Kategorie der Buchung. Empfänger = die ersten Wörter des Buchungstexts ohne Zahlen. „In der Prognose durchrechnen“ setzt 10 % der Kategorie als Anpassung oben ein.</li>
           <li><strong>Grenzen:</strong> Es ist eine Fortschreibung, kein Versprechen. Jährliche Zahlungen (Versicherung, Steuer) verteilt der Durchschnitt gleichmäßig – mit 12 oder 24 Monaten Grundlage sind sie am besten abgebildet. Einmalige große Posten der Grundlage-Monate ziehen den Schnitt mit.</li>
         </ul>
       </details>`;
@@ -11984,6 +12131,12 @@
 
   // Bindet Häkchen und Anpassungsfeld (ohne neu zu laden)
   function finPrognoseBinden() {
+    // Auf-/Zuklappen der Kategorien merken, damit es beim Neuzeichnen bleibt
+    document.querySelectorAll("#fin-prognose-bereich .fin-kat-zeile").forEach((d) => {
+      d.addEventListener("toggle", () => {
+        if (d.open) finKatOffen.add(d.dataset.kategorie); else finKatOffen.delete(d.dataset.kategorie);
+      });
+    });
     const haken = document.getElementById("fin-prognose-sonder");
     if (haken) haken.addEventListener("change", () => window.finPrognoseSetzen("sonder", haken.checked));
     const feld = document.getElementById("fin-prognose-anpassung");
