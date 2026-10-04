@@ -38,6 +38,8 @@
   let sonderausgaben = [];
   let buchungen = [];
   let finanzEinstellungen = [];
+  let kategorieRegeln = null; // Kategorie-Regeln (seit Session 36); null = SQL/index.ts fehlt
+  let finRegelnOffen = false; // Block „Kategorie-Regeln“ in Buchungen aufgeklappt
   let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben"
   let finBearbeitetesFixkosten = null; // id oder null
   let finBearbeiteteSonderausgabe = null; // id oder null
@@ -1020,6 +1022,42 @@
       loeschFrage: (i) => `Idee „${i.titel || ""}“ löschen?`,
       gespeichert: "Idee gespeichert",
     },
+
+    // Kategorie-Regel (seit Session 36): „Buchungstext beginnt mit … → Kategorie“
+    katregel: {
+      titel: "Kategorie-Regel bearbeiten",
+      titelNeu: "Neue Kategorie-Regel",
+      finden: (id) => (kategorieRegeln || []).find((r) => String(r.id) === String(id)),
+      laden: (r) => ({
+        muster: r.muster ? finNameAusSchluessel(finRegelText(r.muster)) : "",
+        typ: r.typ === "einnahme" ? "einnahme" : "ausgabe",
+        kategorie: r.kategorie || "",
+        rueckwirkend: "ja",
+      }),
+      felder: [
+        { key: "muster", label: "Buchungstext beginnt mit", typ: "text", pflicht: true, platzhalter: "z. B. Rewe",
+          hinweis: "Groß- und Kleinschreibung, Zahlen und Wörter wie Lastschrift spielen keine Rolle." },
+        { key: "typ", label: "Gilt für", typ: "chips", optionen: [["ausgabe", "Ausgaben"], ["einnahme", "Einnahmen"]] },
+        { key: "kategorie", label: "Kategorie", typ: "text", pflicht: true, liste: "fin-kategorie-liste", platzhalter: "z. B. Lebensmittel" },
+        { key: "rueckwirkend", label: "Bisherige Buchungen", typ: "chips", optionen: [["ja", "Auch ändern"], ["nein", "Nur neue Importe"]] },
+        { key: "vorschau", label: "Passt zu", typ: "html", html: (w) => finRegelVorschauHtml(w) },
+      ],
+      pruefen: (w) => (finRegelText(w.muster).length < 2
+        ? "Der Suchtext braucht mindestens 2 Buchstaben – Zahlen, Satzzeichen und Wörter wie Lastschrift zählen nicht." : ""),
+      speichern: (id, w) => api("kategorie_regel_speichern", {
+        id, bereich: aktiverBereich, typ: w.typ, muster: w.muster, kategorie: w.kategorie, rueckwirkend: w.rueckwirkend === "ja",
+      }),
+      loeschen: (id) => api("kategorie_regel_loeschen", { id }),
+      loeschFrage: (r) => `Regel „${finNameAusSchluessel(r.muster || "")} → ${r.kategorie || ""}“ löschen? Schon geänderte Buchungen behalten ihre Kategorie.`,
+      gespeichert: (erg) => (erg && erg.geaendert
+        ? `Regel gespeichert · ${erg.geaendert} ${erg.geaendert === 1 ? "Buchung" : "Buchungen"} geändert` : "Regel gespeichert"),
+      beimRendern: (w) => finKategorieListeFuellen(w.typ),
+      beimTippen: (w) => {
+        const el = document.getElementById("blatt-f-vorschau");
+        if (el) el.innerHTML = finRegelVorschauHtml(w);
+      },
+      danach: () => finNachRegelAenderung(),
+    },
   };
 
   let blatt = null; // { art, id, werte }
@@ -1030,14 +1068,29 @@
     const dlg = document.getElementById("blatt-dialog");
     const eintrag = cfg && cfg.finden(id);
     if (!dlg || !eintrag) return;
-    blatt = { art, id: eintrag.id, werte: cfg.laden(eintrag) };
-    document.getElementById("blatt-titel").textContent = cfg.titel;
+    blattStarten(art, eintrag.id, cfg.laden(eintrag), cfg.titel);
+  };
+
+  // Öffnet das Blatt für einen neuen Eintrag (seit Session 36, z. B. Kategorie-Regel);
+  // vorlage wird wie ein vorhandener Eintrag über cfg.laden gelesen
+  window.blattNeu = function(art, vorlage) {
+    const cfg = BLATT_ARTEN[art];
+    if (!cfg || !document.getElementById("blatt-dialog")) return;
+    blattStarten(art, null, cfg.laden(vorlage || {}), cfg.titelNeu || cfg.titel);
+  };
+
+  function blattStarten(art, id, werte, titel) {
+    const dlg = document.getElementById("blatt-dialog");
+    blatt = { art, id, werte };
+    document.getElementById("blatt-titel").textContent = titel;
+    // „Löschen“ nur bei vorhandenen Einträgen
+    document.getElementById("blatt-loeschen").classList.toggle("hidden", id === null);
     blattMeldung("", false);
     blattRendern();
     if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
     const erstes = dlg.querySelector("#blatt-felder input, #blatt-felder textarea");
     if (erstes) erstes.focus();
-  };
+  }
 
   window.blattSchliessen = function() {
     const dlg = document.getElementById("blatt-dialog");
@@ -1103,7 +1156,10 @@
     const box = document.getElementById("blatt-felder");
     box.innerHTML = html;
     box.querySelectorAll("[data-feld]").forEach((el) => {
-      el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => { blatt.werte[el.dataset.feld] = el.value; });
+      el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => {
+        blatt.werte[el.dataset.feld] = el.value;
+        if (cfg.beimTippen) cfg.beimTippen(blatt.werte);
+      });
       if (el.tagName === "INPUT") el.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.blattSpeichern(); } });
     });
     // Haken-Listen: ohne Neuzeichnen, damit die Liste nicht nach oben springt
@@ -1114,6 +1170,7 @@
         blatt.werte[key] = cb.checked ? [...liste, cb.value] : liste;
       });
     });
+    if (cfg.beimRendern) cfg.beimRendern(w);
   }
 
   window.blattWaehlen = function(key, wert) {
@@ -1143,8 +1200,9 @@
     const knopf = document.getElementById("blatt-speichern");
     knopf.disabled = true;
     blattMeldung("Speichere …", false);
+    let ergebnis;
     try {
-      await cfg.speichern(blatt.id, w);
+      ergebnis = await cfg.speichern(blatt.id, w);
     } catch (e) {
       blattMeldung("Nicht gespeichert: " + (e.message || "Fehler"), true);
       knopf.disabled = false;
@@ -1153,7 +1211,7 @@
     knopf.disabled = false;
     if (cfg.vorher) cfg.vorher(w);
     window.blattSchliessen();
-    hinweisZeigen(cfg.gespeichert);
+    hinweisZeigen(typeof cfg.gespeichert === "function" ? cfg.gespeichert(ergebnis, w) : cfg.gespeichert);
     await ladeDaten();
     if (cfg.danach) cfg.danach();
   };
@@ -1510,7 +1568,7 @@
 
   // Kurze Rückmeldung unten über der Leiste, verschwindet nach 3 Sekunden
   let hinweisTimer = null;
-  function hinweisZeigen(text, rueckgaengig) {
+  function hinweisZeigen(text, rueckgaengig, knopfText = "Rückgängig") {
     const el = document.getElementById("app-hinweis");
     if (!el) return;
     el.textContent = text;
@@ -1519,11 +1577,11 @@
       const knopf = document.createElement("button");
       knopf.type = "button";
       knopf.className = "app-hinweis-knopf";
-      knopf.textContent = "Rückgängig";
+      knopf.textContent = knopfText;
       knopf.addEventListener("click", async () => {
         el.classList.add("hidden");
         clearTimeout(hinweisTimer);
-        try { await rueckgaengig(); } catch (_e) { alert("Konnte nicht rückgängig gemacht werden."); }
+        try { await rueckgaengig(); } catch (_e) { alert(knopfText === "Rückgängig" ? "Konnte nicht rückgängig gemacht werden." : "Das hat nicht geklappt."); }
       });
       el.appendChild(knopf);
     }
@@ -1752,6 +1810,7 @@
     sonderausgaben = data.sonderausgaben || [];
     buchungen = data.buchungen || [];
     finanzEinstellungen = data.finanz_einstellungen || [];
+    kategorieRegeln = Array.isArray(data.kategorie_regeln) ? data.kategorie_regeln : null;
     ogsIdeen = data.ogs_ideen || [];
     ogsInventar = data.ogs_inventar || [];
     ogsProjekte = data.ogs_projekte || [];
@@ -10999,6 +11058,8 @@
       <button class="fin-csv-btn" id="btn-csv-import">${ic("import")}CSV importieren</button>
       <input type="file" id="csv-import-input" accept=".csv" class="hidden">
 
+      ${finRegelnHtml()}
+
       <div class="fin-summary-row">
         <div class="fin-summary-item">
           <div class="fin-summary-label">Ausgaben</div>
@@ -11021,6 +11082,9 @@
 
     document.getElementById("btn-buchung-speichern").addEventListener("click",
       finBearbeiteteBuchung ? () => buchungAktualisieren(finBearbeiteteBuchung) : buchungHinzufuegen);
+
+    const regelBlock = document.getElementById("fin-regeln");
+    if (regelBlock) regelBlock.addEventListener("toggle", () => { finRegelnOffen = regelBlock.open; });
 
     document.getElementById("btn-csv-import").addEventListener("click", () => {
       document.getElementById("csv-import-input").click();
@@ -11078,10 +11142,17 @@
     const typ = document.getElementById("edit-buchung-typ-" + id).value;
     const kategorie = document.getElementById("edit-buchung-kategorie-" + id).value.trim();
     const notiz = document.getElementById("edit-buchung-notiz-" + id).value.trim();
+    const vorher = buchungen.find((b) => String(b.id) === String(id));
     await api("buchung_aktualisieren", { id, datum, betrag, typ, kategorie, notiz });
     finBearbeiteteBuchung = null;
     await ladeDaten();
     renderFinanzen();
+    // Kategorie geändert? Dann anbieten, das als Regel für diesen Empfänger zu merken (seit Session 36)
+    const muster = finEmpfSchluessel(notiz);
+    const regel = kategorieRegeln !== null && muster.length >= 2 && finRegelFuer(notiz, typ === "einnahme" ? "einnahme" : "ausgabe", kategorieRegelnAktuell());
+    if (kategorieRegeln !== null && vorher && kategorie && kategorie !== (vorher.kategorie || "") && muster.length >= 2 && !(regel && regel.kategorie === kategorie)) {
+      hinweisZeigen(`Kategorie „${kategorie}“ gespeichert`, () => window.finRegelNeu({ muster, typ, kategorie }), "Als Regel merken");
+    }
   };
   // Löscht eine Buchung und rendert die Finanzen neu
   window.buchungLoeschen = async function (id) {
@@ -11206,6 +11277,7 @@
       `Neue Einnahmen: ${ergebnis.importiert_einnahmen}\n` +
       `Bereits vorhanden (Duplikate): ${ergebnis.uebersprungen_duplikate}\n` +
       (fixErkannt ? `Davon passend zu Fixkosten (trotzdem übernommen): ${fixErkannt}\n` : "") +
+      (Number(ergebnis.nach_regel) ? `Kategorie aus deinen Regeln: ${ergebnis.nach_regel}\n` : "") +
       (alteUebersprungen ? `Als Fixkosten übersprungen: ${alteUebersprungen} – bitte index.ts (Edge Function) aktualisieren!\n` : "") +
       (nichtLesbar ? `Nicht lesbare Zeilen: ${nichtLesbar}\n` : "");
 
@@ -11257,6 +11329,182 @@
     text = text.replace(/[^A-ZÄÖÜẞ\s]/g, " ");
     text = text.replace(/\s+/g, " ").trim();
     return text.split(" ").filter(Boolean).slice(0, 4).join(" ");
+  }
+
+  // ---- Kategorie-Regeln (seit Session 36) ----
+  // Text für den Regel-Vergleich – identisch zu regelText in index.ts:
+  // Großbuchstaben, ohne Füllwörter, Zahlen und Satzzeichen
+  function finRegelText(notiz) {
+    let text = String(notiz || "").toUpperCase();
+    FIN_NOISE_WORDS.forEach((w) => { text = text.split(w).join(" "); });
+    return text.replace(/[0-9]+/g, " ").replace(/[^A-ZÄÖÜẞ\s]/g, " ").replace(/\s+/g, " ").trim();
+  }
+  // Empfänger-Schlüssel wie in der Prognose (3 Wörter, empfaengerSchluessel in index.ts)
+  function finEmpfSchluessel(notiz) {
+    return finRegelText(notiz).split(" ").filter(Boolean).slice(0, 3).join(" ");
+  }
+  // Passende Regel: Muster beginnt an einer Wortgrenze, das längste gewinnt (wie regelFuer in index.ts)
+  function finRegelFuer(notiz, typ, regeln) {
+    const text = " " + finRegelText(notiz) + " ";
+    let beste = null;
+    for (const r of regeln) {
+      if (r.typ !== typ || !r.muster) continue;
+      if (text.includes(" " + r.muster) && (!beste || r.muster.length > beste.muster.length)) beste = r;
+    }
+    return beste;
+  }
+  function kategorieRegelnAktuell() {
+    return (kategorieRegeln || []).filter((r) => bereichVon(r) === aktiverBereich);
+  }
+  function finBuchungTyp(b) {
+    return b.typ === "einnahme" ? "einnahme" : "ausgabe";
+  }
+
+  // Wie viele Buchungen eine (neue oder geänderte) Regel träfe – für die Vorschau im Blatt
+  function finRegelTreffer(w) {
+    const muster = finRegelText(w.muster);
+    if (muster.length < 2) return null;
+    const neu = { id: blatt && blatt.id, typ: w.typ, muster, kategorie: String(w.kategorie || "").trim() };
+    const regeln = kategorieRegelnAktuell()
+      .filter((r) => String(r.id) !== String(neu.id) && !(r.typ === neu.typ && r.muster === neu.muster))
+      .concat([neu]);
+    const ergebnis = { treffer: 0, aendern: 0, bisher: new Map(), beispiele: [] };
+    for (const b of buchungenAktuell()) {
+      if (finRegelFuer(b.notiz, finBuchungTyp(b), regeln) !== neu) continue;
+      ergebnis.treffer++;
+      const kat = b.kategorie || "Sonstiges";
+      if (kat !== neu.kategorie) {
+        ergebnis.aendern++;
+        ergebnis.bisher.set(kat, (ergebnis.bisher.get(kat) || 0) + 1);
+      }
+      const text = String(b.notiz || "").trim();
+      if (text && ergebnis.beispiele.length < 3 && !ergebnis.beispiele.includes(text)) ergebnis.beispiele.push(text);
+    }
+    return ergebnis;
+  }
+
+  function finRegelVorschauHtml(w) {
+    const t = finRegelTreffer(w);
+    if (!t) return `<p class="blatt-hinweis">Mindestens 2 Buchstaben eingeben.</p>`;
+    if (!t.treffer) return `<p class="blatt-hinweis">Passt zu keiner vorhandenen Buchung – greift beim nächsten CSV-Import.</p>`;
+    const bisher = [...t.bisher.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)
+      .map(([k, n]) => `${n}× ${escapeHtml(k)}`).join(", ");
+    let satz = `<strong>${t.treffer} ${t.treffer === 1 ? "Buchung" : "Buchungen"}</strong>`;
+    if (!t.aendern) satz += t.treffer === 1 ? ", schon in dieser Kategorie" : ", alle schon in dieser Kategorie";
+    else {
+      satz += `, davon ${t.aendern} bisher anders (${bisher})`;
+      satz += w.rueckwirkend === "ja" ? " – werden geändert" : " – bleiben so";
+    }
+    const kurz = (s) => (s.length > 70 ? s.slice(0, 69) + "…" : s);
+    return `<p class="fin-regel-vorschau">${satz}.</p>
+      <ul class="fin-regel-beispiele">${t.beispiele.map((b) => `<li>${escapeHtml(kurz(b))}</li>`).join("")}</ul>`;
+  }
+
+  // Vorschläge für das Kategorie-Feld: Standardliste, schon benutzte und Regel-Kategorien
+  function finKategorieListeFuellen(typ) {
+    const liste = document.getElementById("fin-kategorie-liste");
+    if (!liste) return;
+    const kats = new Set(typ === "einnahme" ? FIN_KAT_EINNAHME : FIN_KAT_AUSGABE);
+    buchungenAktuell().forEach((b) => { if (finBuchungTyp(b) === typ && b.kategorie) kats.add(b.kategorie); });
+    kategorieRegelnAktuell().forEach((r) => { if (r.typ === typ) kats.add(r.kategorie); });
+    liste.innerHTML = [...kats].sort((a, b) => a.localeCompare(b, "de"))
+      .map((k) => `<option value="${escapeAttr(k)}"></option>`).join("");
+  }
+
+  // Neue Regel – gibt es für den Suchtext schon eine, öffnet sie stattdessen
+  window.finRegelNeu = function(vorlage = {}) {
+    if (kategorieRegeln === null) {
+      alert("Für Kategorie-Regeln bitte zuerst kategorie_regeln_setup.sql in Supabase ausführen und die neue index.ts einspielen.");
+      return;
+    }
+    const typ = vorlage.typ === "einnahme" ? "einnahme" : "ausgabe";
+    const muster = finRegelText(vorlage.muster);
+    const vorhanden = muster && kategorieRegelnAktuell().find((r) => r.typ === typ && r.muster === muster);
+    if (vorhanden) { window.blattOeffnen("katregel", vorhanden.id); return; }
+    window.blattNeu("katregel", { muster, typ, kategorie: vorlage.kategorie || "" });
+  };
+  // Stift an einem Empfänger in „Wo geht das Geld hin?“
+  window.finRegelAusPrognose = function(knopf) {
+    const kat = knopf.dataset.kategorie || "";
+    window.finRegelNeu({ muster: knopf.dataset.muster, typ: "ausgabe", kategorie: kat === "Sonstiges" ? "" : kat });
+  };
+
+  window.finRegelLoeschen = async function(id) {
+    const r = (kategorieRegeln || []).find((x) => String(x.id) === String(id));
+    if (!r || !confirm(BLATT_ARTEN.katregel.loeschFrage(r))) return;
+    await api("kategorie_regel_loeschen", { id });
+    hinweisZeigen("Regel gelöscht");
+    await ladeDaten();
+    finNachRegelAenderung();
+  };
+
+  // Alle Regeln auf die vorhandenen Buchungen des Bereichs anwenden
+  window.finRegelnAnwenden = async function() {
+    const regeln = kategorieRegelnAktuell();
+    const n = buchungenAktuell().filter((b) => {
+      const r = finRegelFuer(b.notiz, finBuchungTyp(b), regeln);
+      return r && (b.kategorie || "") !== r.kategorie;
+    }).length;
+    if (!n) { hinweisZeigen("Alle Buchungen passen schon zu ihren Regeln"); return; }
+    if (!confirm(`${n} ${n === 1 ? "Buchung bekommt" : "Buchungen bekommen"} die Kategorie ihrer Regel. Fortfahren?`)) return;
+    const erg = await api("kategorie_regeln_anwenden", { bereich: aktiverBereich });
+    hinweisZeigen(`${erg.geaendert || 0} ${erg.geaendert === 1 ? "Buchung" : "Buchungen"} geändert`);
+    await ladeDaten();
+    finNachRegelAenderung();
+  };
+
+  // Nach Änderungen an Regeln: offene Finanz-Ansicht neu zeichnen (Prognose mit frischen Summen)
+  function finNachRegelAenderung() {
+    if (aktiverTab !== "finanzen") return;
+    if (finTyp === "prognose") renderFinPrognose(true);
+    else renderFinanzen();
+  }
+
+  // Block „Kategorie-Regeln“ im Reiter Buchungen
+  function finRegelnHtml() {
+    if (kategorieRegeln === null) {
+      return `<details class="anleitung-abschnitt fin-regeln" id="fin-regeln"${finRegelnOffen ? " open" : ""}>
+        <summary>Kategorie-Regeln</summary>
+        <div class="anleitung-text"><p class="empty-text" style="margin:0;">Für Kategorie-Regeln bitte zuerst <code>kategorie_regeln_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p></div>
+      </details>`;
+    }
+    const regeln = kategorieRegelnAktuell();
+    const zaehler = new Map(regeln.map((r) => [r, { treffer: 0, anders: 0 }]));
+    buchungenAktuell().forEach((b) => {
+      const r = finRegelFuer(b.notiz, finBuchungTyp(b), regeln);
+      if (!r) return;
+      const z = zaehler.get(r);
+      z.treffer++;
+      if ((b.kategorie || "") !== r.kategorie) z.anders++;
+    });
+    const sortiert = [...regeln].sort((a, b) => a.kategorie.localeCompare(b.kategorie, "de") || a.muster.localeCompare(b.muster, "de"));
+    const anders = [...zaehler.values()].reduce((s, z) => s + z.anders, 0);
+    const zeilen = sortiert.map((r) => {
+      const z = zaehler.get(r);
+      const meta = `${r.typ === "einnahme" ? "Einnahmen" : "Ausgaben"} · ${z.treffer ? `passt zu ${z.treffer} ${z.treffer === 1 ? "Buchung" : "Buchungen"}` : "noch kein Treffer"}` +
+        (z.anders ? ` · ${z.anders} noch anders` : "");
+      return `
+        <div class="fin-regel">
+          <button type="button" class="fin-regel-info" onclick="blattOeffnen('katregel','${escapeAttr(String(r.id))}')">
+            <span class="fin-regel-zeile"><span class="fin-regel-muster">${escapeHtml(finNameAusSchluessel(r.muster))}</span>
+              <span class="fin-regel-pfeil" aria-hidden="true">→</span> <strong>${escapeHtml(r.kategorie)}</strong></span>
+            <span class="notiz-meta">${meta}</span>
+          </button>
+          <button type="button" class="fin-loesch-btn" onclick="finRegelLoeschen('${escapeAttr(String(r.id))}')" title="Regel löschen" aria-label="Regel löschen">${ic("x")}</button>
+        </div>`;
+    }).join("");
+    return `
+      <details class="anleitung-abschnitt fin-regeln" id="fin-regeln"${finRegelnOffen ? " open" : ""}>
+        <summary>Kategorie-Regeln${regeln.length ? ` (${regeln.length})` : ""}</summary>
+        <div class="anleitung-text">
+          <p class="notiz-meta" style="margin-top:0;">Beginnt ein Buchungstext mit dem Suchtext, bekommt die Buchung beim CSV-Import diese Kategorie – vor der automatischen Schätzung. Passen mehrere Regeln, gilt die genaueste.</p>
+          ${zeilen ? `<div class="fin-regel-liste">${zeilen}</div>` : `<p class="empty-text">Noch keine Regeln. Tipp: In der Prognose unter „Wo geht das Geld hin?“ legt der Stift an einem Empfänger direkt eine Regel an.</p>`}
+          <div class="row fin-regel-knoepfe">
+            <button type="button" class="btn-secondary" onclick="finRegelNeu()">${ic("plus")}Neue Regel</button>
+            ${anders ? `<button type="button" class="btn-secondary" onclick="finRegelnAnwenden()">${ic("wiederholen")}Auf ${anders} bisherige ${anders === 1 ? "Buchung" : "Buchungen"} anwenden</button>` : ""}
+          </div>
+        </div>
+      </details>`;
   }
 
   // Berechnet den Median einer Zahlenliste
@@ -11873,7 +12121,7 @@
       }
       const alleEmpf = [...empf.values()].filter((x) => x.kategorie === e.kategorie).sort((a, b) => b.summe - a.summe);
       const top = alleEmpf.slice(0, 5).map((x) => ({
-        name: x.schluessel ? finNameAusSchluessel(x.schluessel) : "ohne Buchungstext",
+        name: x.schluessel ? finNameAusSchluessel(x.schluessel) : "ohne Buchungstext", schluessel: x.schluessel || "",
         oMonat: x.summe / n, summe: x.summe, anzahl: x.anzahl, monate: x.monate.size,
       }));
       const rest = alleEmpf.slice(5).reduce((s, x) => s + x.summe, 0);
@@ -11899,7 +12147,7 @@
     const prozent = (x) => `${Math.round(x * 100)} %`;
     const sonstiges = k.liste.find((e) => e.kategorie === "Sonstiges");
     const hinweisSonstiges = sonstiges && sonstiges.anteil >= 0.35
-      ? `<p class="fin-prognose-hinweis">${ic("warnung")} ${prozent(sonstiges.anteil)} der Ausgaben stehen unter „Sonstiges“. Die Kategorie rät der CSV-Import aus dem Buchungstext – aufklappen zeigt, welche Empfänger drinstecken. Ändern lässt sie sich je Buchung unter „Buchungen“.</p>`
+      ? `<p class="fin-prognose-hinweis">${ic("warnung")} ${prozent(sonstiges.anteil)} der Ausgaben stehen unter „Sonstiges“. Die Kategorie rät der CSV-Import aus dem Buchungstext – aufklappen zeigt, welche Empfänger drinstecken. Der Stift an einem Empfänger legt eine Kategorie-Regel an, die auch die bisherigen Buchungen umstellt.</p>`
       : "";
     const trendHtml = (t) => {
       if (!t) return "";
@@ -11914,10 +12162,16 @@
     };
     const zeilen = k.liste.map((e) => {
       const offen = finKatOffen.has(e.kategorie);
+      // Stift: Kategorie-Regel für diesen Empfänger (seit Session 36)
+      const regelKnopf = (x) => (kategorieRegeln !== null && x.schluessel
+        ? `<button type="button" class="fin-kat-empf-regel" data-muster="${escapeAttr(x.schluessel)}" data-kategorie="${escapeAttr(e.kategorie)}"
+            onclick="finRegelAusPrognose(this)" title="Kategorie-Regel" aria-label="Kategorie-Regel für ${escapeAttr(x.name)}">${ic("stift")}</button>`
+        : "");
       const empf = e.top.map((x) => `
         <li class="fin-kat-empf">
           <span class="fin-kat-empf-name">${escapeHtml(x.name)}<span class="notiz-meta">${wieOft(x)} · ${x.anzahl} ${x.anzahl === 1 ? "Buchung" : "Buchungen"}</span></span>
           <span class="fin-kat-empf-betrag">${finEuro(x.oMonat)}</span>
+          ${regelKnopf(x)}
         </li>`).join("");
       const rest = e.weitere ? `<li class="fin-kat-empf fin-kat-empf-rest"><span class="fin-kat-empf-name">${e.weitere} weitere</span><span class="fin-kat-empf-betrag">${finEuro(e.rest / k.n)}</span></li>` : "";
       return `
