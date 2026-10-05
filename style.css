@@ -1639,3 +1639,39 @@
   .bu-knopf { min-width: 2.1rem; }
   .content-topbar .topbar-logo { min-width: 1.75rem; }
 }
+
+/* Wochenrückblick (Session 37) */
+.rueck-nav { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
+.rueck-titel { text-align: center; font-size: 0.95rem; }
+.rueck-fazit { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.4rem; }
+.rueck-zahl { padding: 0.3rem 0.7rem; border-radius: var(--r-pille); background: var(--bg); font-size: 0.85rem; }
+.rueck-zahl.warn strong { color: var(--overdue-text); }
+.rueck-block { padding: 0.8rem 0 0.4rem; border-top: 1px solid var(--border); margin-top: 0.6rem; }
+.rueck-block h3 { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.5rem; font-size: 1rem; }
+.rueck-block h3 .ic { color: var(--accent); }
+.rueck-block h4 { margin: 0.6rem 0 0.2rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-dim); }
+.rueck-block .btn-secondary { min-height: 44px; margin-top: 0.4rem; }
+.rueck-liste { list-style: none; margin: 0; padding: 0; }
+.rueck-liste li { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+.rueck-liste li:last-child { border-bottom: none; }
+.rueck-liste li > .rueck-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rueck-liste li > .notiz-meta { margin: 0; flex: none; }
+.rueck-liste li.rueck-refl { flex-direction: column; align-items: flex-start; gap: 0.1rem; }
+.rueck-mehr { justify-content: center; }
+.rueck-eintrag {
+  flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 0.5rem; padding: 0;
+  border: none; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+}
+.rueck-eintrag .rueck-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rueck-eintrag:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: var(--r-klein); }
+.rueck-block .rueck-schieben { flex: none; margin-top: 0; min-height: 40px; padding: 0 0.8rem; }
+.rueck-satz { margin: 0; line-height: 1.45; }
+.rueck-impulse { margin: 0.6rem 0 0.5rem; }
+.rueck-impulse .schnell-chip { min-height: 2.4rem; font-size: 0.82rem; }
+.rueck-karte { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.4rem 0.4rem 0.9rem; border: 1px solid var(--border); border-radius: var(--r-karte, 16px); background: var(--panel); }
+.rueck-karte-knopf {
+  flex: 1; min-width: 0; min-height: 44px; display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem;
+  border: none; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; padding: 0.3rem 0;
+}
+.rueck-karte-titel { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700; }
+.rueck-karte-titel .ic { color: var(--accent); }
