@@ -1811,3 +1811,30 @@
 .push-geraete li .icon-knopf-klein { grid-column: 2; grid-row: 1 / span 2; min-width: 44px; min-height: 44px; justify-content: center; }
 .push-geraet-name { overflow-wrap: anywhere; }
 .push-meldung:empty { display: none; }
+
+/* Sprache: Mikrofon im „+“-Blatt und Vorlesen (Session 37) */
+.schnell-text-zeile { display: flex; align-items: stretch; gap: 0.5rem; }
+.schnell-text-zeile .schnell-text { flex: 1 1 auto; min-width: 0; }
+.schnell-mikro {
+  flex: 0 0 auto; width: 48px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--r-mittel); background: var(--panel); color: var(--accent); cursor: pointer;
+}
+.schnell-mikro .ic { width: 1.35rem; height: 1.35rem; }
+.schnell-mikro:focus-visible, .vorlesen-knopf:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.schnell-mikro.aktiv { background: var(--accent); color: var(--on-accent); border-color: var(--accent); animation: mikro-puls 1.2s ease-in-out infinite; }
+@keyframes mikro-puls { 0%, 100% { box-shadow: 0 0 0 0 var(--akzent-flaeche); } 50% { box-shadow: 0 0 0 6px var(--akzent-flaeche); } }
+@media (prefers-reduced-motion: reduce) { .schnell-mikro.aktiv { animation: none; } }
+.vorlesen-knopf {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 0.3rem; min-height: 36px; padding: 0.2rem 0.7rem;
+  border: 1px solid var(--border); border-radius: var(--r-pille); background: var(--panel); color: var(--ink);
+  font: inherit; font-size: var(--fs-klein); cursor: pointer;
+}
+.vorlesen-knopf .ic { color: var(--accent); }
+.vorlesen-knopf.aktiv { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.vorlesen-knopf.aktiv .ic { color: var(--on-accent); }
+.push-feld { display: block; margin-bottom: 0.4rem; }
+.push-feld select { width: 100%; }
+@media (max-width: 480px) {
+  .vorlesen-knopf { padding: 0; width: 36px; justify-content: center; }
+  .vorlesen-knopf span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
