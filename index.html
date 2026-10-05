@@ -392,6 +392,13 @@
         <div id="spiel-liste-bereich"></div>
       </div>
 
+      <div id="view-einheiten" class="hidden">
+        <h1>Einheiten <button class="hilfe-icon" data-hilfe="Plane Angebote und Gruppenstunden: Spiele aus der Kartei und eigene Programmpunkte (Begrüßung, Pause …) zu einem Ablauf zusammenstellen. Mit Beginn rechnet die App die Uhrzeiten, die Materialliste entsteht aus dem Material der Spiele. Kopieren als Vorlage, Drucken als Ablaufplan, nach der Einheit kurz reflektieren und die Spiele bewerten. Einheiten gehören zum Bereich, in dem du sie anlegst.">?</button></h1>
+        <p class="hero-text">Spiele aus der Kartei zu einem Ablauf mit Zeiten und Materialliste zusammenstellen.</p>
+        <div class="reiter-aktionen"><button type="button" class="reiter-neu" onclick="einheitNeu()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neue Einheit</button></div>
+        <div id="einheiten-bereich"></div>
+      </div>
+
       <div id="view-einkauf" class="hidden">
         <h1>Einkaufsliste <button class="hilfe-icon" data-hilfe="Einfache Merkliste zum Abhaken. Nur im Bereich Privat verfügbar.">?</button></h1>
         <p class="hero-text">Was besorgt werden muss – abhaken statt vergessen.</p>
@@ -772,7 +779,7 @@
       <div id="view-reiter-verwaltung" class="hidden">
         <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
-        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Raumplanung und Schlüssel sind ebenfalls bereichsgetrennt (Standard: AWO). Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Ernährung gibt es nur in Privat und taucht hier bei den anderen Bereichen deshalb nicht auf.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Raumplanung und Schlüssel sind ebenfalls bereichsgetrennt (Standard: AWO), Einheiten auch (Standard: Privat und OGS; die Spiele darin kommen aus der gemeinsamen Kartei). Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Ernährung gibt es nur in Privat und taucht hier bei den anderen Bereichen deshalb nicht auf.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -1117,6 +1124,23 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Sortierung:</strong> „A–Z“ oder „Beste zuerst“ (innerhalb jeder Kategorie, unbewertete am Ende). Die Wahl merkt sich das Gerät</li>
                 <li><strong><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-stift"></use></svg></strong> öffnet das Bearbeiten-Blatt mit allen Feldern, <strong><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-x"></use></svg></strong> löscht mit Sicherheitsabfrage (inklusive hinterlegter Dateien)</li>
                 <li><strong>Viele Spiele auf einmal</strong> (z. B. aus einer PDF-Sammlung) übernimmt Claude per SQL-Import – das Dashboard selbst zerlegt Dateien nicht</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Einheiten <span class="anleitung-nur">(Standard: Privat und OGS, per Reiter-Verwaltung überall – bereichsgetrennt)</span></summary>
+            <div class="anleitung-text">
+              <p>Angebote und Gruppenstunden planen – aus der Spielekartei und eigenen Programmpunkten (seit Session 37).</p>
+              <ul>
+                <li><strong>„+ Neue Einheit“:</strong> Titel (Pflicht), optional Datum, Beginn, Ort, Gruppe, Ziel und Notiz. Danach öffnet sich die Einheit</li>
+                <li><strong>Ablauf:</strong> „+ Spiel aus der Kartei“ öffnet die Spielekartei mit Suche (beste Bewertung zuerst, ✓ = schon im Ablauf) – antippen fügt das Spiel hinzu, das Blatt bleibt für weitere offen. Die Dauer wird aus der Dauer-Angabe des Spiels übernommen (erste Zahl, sonst 15 Min.). „+ Eigener Punkt“ für Begrüßung, Pause, Abschlussrunde …</li>
+                <li><strong>Zeiten:</strong> Mit Beginn stehen links die Uhrzeiten, sonst die Zeit seit Start. Dauer direkt im Feld ändern, ↑ ↓ ändern die Reihenfolge, <svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-x"></use></svg> entfernt. Antippen eines Bausteins: Dauer und Notiz (z. B. Variante, wer leitet an), bei eigenen Punkten auch der Name. Unten die Gesamtdauer und „bis ca.“</li>
+                <li><strong>Material:</strong> kommt automatisch aus dem Feld Material der Spiele (an Komma, Semikolon oder Zeilenumbruch getrennt, gleiche Dinge nur einmal, darunter aus welchen Spielen). Eigene Punkte ergänzen („Erste-Hilfe-Set“). Abhaken beim Packen – der Stand bleibt gespeichert</li>
+                <li><strong>Kopieren</strong> legt eine Kopie ohne Datum und mit leerer Materialliste an – gut als Vorlage für wiederkehrende Angebote. <strong>Drucken</strong> öffnet den Druckdialog (auch „Als PDF speichern“) mit Ablaufplan, Material zum Abhaken und Notiz</li>
+                <li><strong>Nach der Einheit:</strong> „Wie lief es?“ ausfüllen, Spiele mit Sternen bewerten (wirkt in der Spielekartei) und „Als durchgeführt speichern“ – auf Wunsch zusätzlich als Reflexion. Durchgeführte Einheiten stehen unten eingeklappt; „Wieder auf geplant“ nimmt es zurück</li>
+                <li><strong>Liste:</strong> geplante Einheiten nach Datum (ohne Datum am Ende), „vorbei“ wenn das Datum verstrichen ist. Einheiten der nächsten Woche stehen auch im Wochenrückblick, und die Suche findet sie</li>
+                <li><strong>Datenschutz:</strong> keine Namen von Kindern in Gruppe, Notiz oder Reflexion – Gruppe als „3b“ oder „8–12 J.“</li>
               </ul>
             </div>
           </details>
@@ -1831,6 +1855,16 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       <p class="schnell-status" id="schnell-status" role="status" aria-live="polite"></p>
       <button type="button" class="btn-primary schnell-speichern" id="schnell-speichern" onclick="schnellSpeichern()">Speichern</button>
       <button type="button" class="link-btn schnell-loeschen hidden" id="schnell-loeschen" onclick="schnellLoeschen()">Löschen</button>
+    </dialog>
+    <!-- Einheiten: Spiel aus der Kartei auswählen (seit Session 37) -->
+    <dialog class="schnell-sheet such-sheet" id="einheit-spiel-dialog" aria-labelledby="einheit-spiel-titel">
+      <div class="schnell-kopf">
+        <h2 id="einheit-spiel-titel">Spiel aus der Kartei</h2>
+        <button type="button" class="schnell-zu" onclick="einheitSpielAuswahlSchliessen()" aria-label="Schließen"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-x"></use></svg></button>
+      </div>
+      <input type="search" id="einheit-spiel-suche" class="schnell-text" placeholder="Suchen: Titel, Kategorie, Material …" autocomplete="off" aria-label="Spiel suchen">
+      <p class="schnell-status" id="einheit-spiel-status" role="status" aria-live="polite"></p>
+      <div id="einheit-spiel-liste" class="such-ergebnis"></div>
     </dialog>
     <!-- Wochenrückblick (seit Session 37) -->
     <dialog class="schnell-sheet such-sheet rueck-sheet" id="rueck-dialog" aria-labelledby="rueck-kopf">
