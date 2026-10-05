@@ -40,6 +40,9 @@
   let finanzEinstellungen = [];
   let kategorieRegeln = null; // Kategorie-Regeln (seit Session 36); null = SQL/index.ts fehlt
   let finRegelnOffen = false;
+  let einheiten = null; // Einheiten planen (seit Session 37); null = SQL/index.ts fehlt
+  let einheitBausteine = [];
+  let einheitOffenId = null; // geöffnete Einheit im Reiter Einheiten
   let sparziele = null; // Sparziele (seit Session 37); null = SQL/index.ts fehlt // Block „Kategorie-Regeln“ in Buchungen aufgeklappt
   let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben"
   let finBearbeitetesFixkosten = null; // id oder null
@@ -100,7 +103,7 @@
   const VIEW_ELEMENTE = {
     heute: "view-heute", frei: "view-frei", aufgaben: "view-aufgaben", kalender: "view-kalender",
     planung: "view-planung", finanzen: "view-finanzen", notizen: "view-notizen", links: "view-links",
-    reflexion: "view-reflexion", spiele: "view-spiele", einkauf: "view-einkauf", export: "view-export",
+    reflexion: "view-reflexion", spiele: "view-spiele", einheiten: "view-einheiten", einkauf: "view-einkauf", export: "view-export",
     verlauf: "view-verlauf", anleitung: "view-anleitung", ogsideen: "view-ogs-ideen",
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
@@ -113,7 +116,7 @@
   const ALLE_REITER = [
     ["heute", "Start"], ["frei", "Frei"], ["aufgaben", "Aufgaben"], ["kalender", "Kalender"],
     ["planung", "Planung"], ["finanzen", "Finanzen"], ["notizen", "Notizen"], ["links", "Links"],
-    ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["einkauf", "Einkauf"], ["export", "Export"],
+    ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["einheiten", "Einheiten"], ["einkauf", "Einkauf"], ["export", "Export"],
     ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
@@ -131,9 +134,9 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung"],
+      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
-      "ogsideen", "ogsinventar", "ogsprojekte", "verleih"],
+      "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel"],
     business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen"],
   };
@@ -154,7 +157,7 @@
     return [
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
       { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
-      { schluessel: "sammeln", label: "Sammeln", tabs: ["notizen", "links", "reflexion", "spiele", "einkauf", "rezepte", "training", "ernaehrung"] },
+      { schluessel: "sammeln", label: "Sammeln", tabs: ["notizen", "links", "reflexion", "spiele", "einheiten", "einkauf", "rezepte", "training", "ernaehrung"] },
       { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
       { schluessel: "verwalten", label: "Verwalten", tabs: ["export", "verlauf", "anleitung"] },
     ];
@@ -500,6 +503,378 @@
   };
 
   // ==========================================================
+  // Einheiten planen (seit Session 37, Etappe 4): Spiele aus der Kartei und
+  // eigene Programmpunkte zu einem Ablauf mit Zeiten zusammenstellen,
+  // Materialliste zum Abhaken, Drucken, Kopieren, nach der Einheit
+  // Reflexion und Spiele bewerten. Daten: einheiten, einheit_bausteine.
+  // ==========================================================
+  function einheitenAktuell() {
+    return (einheiten || []).filter((e) => bereichVon(e) === aktiverBereich);
+  }
+  function einheitBausteineVon(id) {
+    return einheitBausteine.filter((b) => String(b.einheit_id) === String(id)).sort((a, b) => a.position - b.position);
+  }
+  function spielVon(id) {
+    return spiele.find((s) => String(s.id) === String(id));
+  }
+  function bausteinTitel(b) {
+    const s = b.spiel_id && spielVon(b.spiel_id);
+    if (s) return s.titel;
+    return b.titel || (b.spiel_id ? "Spiel (gelöscht)" : "Programmpunkt");
+  }
+  // Erste Zahl aus dem Dauer-Text eines Spiels („10–15 Min.“ → 10), sonst 15
+  function spielDauerMinuten(s) {
+    const m = String((s && s.dauer) || "").match(/\d+/);
+    return m ? Math.min(600, Number(m[0])) : 15;
+  }
+  function uhrPlus(hhmm, minuten) {
+    const [h, m] = String(hhmm).slice(0, 5).split(":").map(Number);
+    const ges = ((h * 60 + m + minuten) % 1440 + 1440) % 1440;
+    return `${String(Math.floor(ges / 60)).padStart(2, "0")}:${String(ges % 60).padStart(2, "0")}`;
+  }
+  function minutenText(min) {
+    if (min < 60) return `${min} Min.`;
+    const h = Math.floor(min / 60), m = min % 60;
+    return m ? `${h} Std. ${m} Min.` : `${h} Std.`;
+  }
+  // Materialliste: Material der Spiele (an Komma, Semikolon, Zeilenumbruch getrennt) plus eigene Punkte
+  function einheitMaterial(e) {
+    const map = new Map();
+    einheitBausteineVon(e.id).forEach((b) => {
+      const s = b.spiel_id && spielVon(b.spiel_id);
+      if (!s || !s.material) return;
+      String(s.material).split(/[,;\n]/).map((x) => x.trim()).filter(Boolean).forEach((x) => {
+        const k = x.toLowerCase();
+        const v = map.get(k) || { text: x, quellen: [], extra: false };
+        if (!v.quellen.includes(s.titel)) v.quellen.push(s.titel);
+        map.set(k, v);
+      });
+    });
+    (e.material_extra || []).forEach((x) => {
+      const k = String(x).toLowerCase();
+      if (map.has(k)) map.get(k).extra = true;
+      else map.set(k, { text: x, quellen: [], extra: true });
+    });
+    const erledigt = new Set((e.material_erledigt || []).map((x) => String(x).toLowerCase()));
+    return [...map.entries()].map(([key, v]) => ({ ...v, key, erledigt: erledigt.has(key) }));
+  }
+  function einheitDatumText(e) {
+    if (!e.datum) return "ohne Datum";
+    return `${RUECK_WOCHENTAG[new Date(e.datum + "T00:00:00").getDay()]} ${datumDE(e.datum)}${e.uhrzeit ? " · " + String(e.uhrzeit).slice(0, 5) : ""}`;
+  }
+
+  function renderEinheiten() {
+    const el = document.getElementById("einheiten-bereich");
+    if (!el) return;
+    if (einheiten === null) {
+      el.innerHTML = `<p class="empty-text">Für Einheiten bitte zuerst <code>einheiten_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+      return;
+    }
+    const offen = einheitOffenId && einheitenAktuell().find((e) => String(e.id) === String(einheitOffenId));
+    if (offen) { el.innerHTML = einheitDetailHtml(offen); einheitDetailBinden(offen); return; }
+    einheitOffenId = null;
+    const heute = heuteISO();
+    const liste = einheitenAktuell();
+    const geplant = liste.filter((e) => e.status !== "durchgefuehrt")
+      .sort((a, b) => (a.datum ? 0 : 1) - (b.datum ? 0 : 1) || String(a.datum || "").localeCompare(String(b.datum || "")) || a.titel.localeCompare(b.titel, "de"));
+    const fertig = liste.filter((e) => e.status === "durchgefuehrt").sort((a, b) => String(b.datum || "").localeCompare(String(a.datum || "")));
+    const karte = (e) => {
+      const bs = einheitBausteineVon(e.id);
+      const dauer = bs.reduce((s, b) => s + (Number(b.dauer_min) || 0), 0);
+      const mat = einheitMaterial(e);
+      const meta = [einheitDatumText(e), e.ort, e.gruppe].filter(Boolean).map(escapeHtml).join(" · ");
+      const vorbei = e.status !== "durchgefuehrt" && e.datum && e.datum < heute;
+      return `<button type="button" class="einheit-karte" onclick="einheitOeffnen('${escapeAttr(String(e.id))}')">
+          <span class="einheit-karte-titel">${escapeHtml(e.titel)}${vorbei ? ` <span class="badge overdue">vorbei</span>` : ""}</span>
+          <span class="notiz-meta">${meta}</span>
+          <span class="notiz-meta">${bs.length} ${bs.length === 1 ? "Baustein" : "Bausteine"}${dauer ? ` · ${minutenText(dauer)}` : ""}${mat.length ? ` · Material ${mat.filter((m) => m.erledigt).length}/${mat.length}` : ""}</span>
+        </button>`;
+    };
+    el.innerHTML = (geplant.length || fertig.length ? "" : `<p class="empty-text">Noch keine Einheit. Mit „+ Neue Einheit“ anlegen und dann Spiele aus der Kartei und eigene Programmpunkte zu einem Ablauf zusammenstellen.</p>`) +
+      (geplant.length ? `<div class="schnell-label">Geplant</div><div class="einheit-liste">${geplant.map(karte).join("")}</div>` : "") +
+      (fertig.length ? `<details class="anleitung-abschnitt einheit-fertig"><summary>Durchgeführt (${fertig.length})</summary><div class="anleitung-text"><div class="einheit-liste">${fertig.map(karte).join("")}</div></div></details>` : "");
+  }
+
+  function einheitDetailHtml(e) {
+    const bs = einheitBausteineVon(e.id);
+    const start = e.uhrzeit ? String(e.uhrzeit).slice(0, 5) : null;
+    let lauf = 0;
+    const zeilen = bs.map((b, i) => {
+      const s = b.spiel_id && spielVon(b.spiel_id);
+      const zeit = start ? uhrPlus(start, lauf) : `+${Math.floor(lauf / 60)}:${String(lauf % 60).padStart(2, "0")}`;
+      lauf += Number(b.dauer_min) || 0;
+      const meta = [];
+      if (s && s.kategorie) meta.push(escapeHtml(s.kategorie));
+      if (s && Number(s.bewertung)) meta.push("★".repeat(Number(s.bewertung)));
+      if (!s && !b.spiel_id) meta.push("eigener Punkt");
+      const id = escapeAttr(String(b.id));
+      return `<div class="einheit-baustein" data-id="${id}">
+          <span class="eb-zeit">${zeit}</span>
+          <div class="eb-info">
+            <button type="button" class="eb-titel" onclick="blattOeffnen('baustein','${id}')">${escapeHtml(bausteinTitel(b))}</button>
+            ${meta.length ? `<span class="notiz-meta">${meta.join(" · ")}</span>` : ""}
+            ${b.notiz ? `<span class="eb-notiz">${escapeHtml(b.notiz)}</span>` : ""}
+          </div>
+          <label class="eb-dauer"><input type="number" min="0" max="600" inputmode="numeric" value="${Number(b.dauer_min) || 0}" data-baustein="${id}" aria-label="Dauer ${escapeAttr(bausteinTitel(b))} in Minuten"><span>Min.</span></label>
+          <div class="eb-knoepfe">
+            <button type="button" class="task-edit-btn" onclick="bausteinSchieben('${id}', -1)" ${i === 0 ? "disabled" : ""} aria-label="Nach oben">↑</button>
+            <button type="button" class="task-edit-btn" onclick="bausteinSchieben('${id}', 1)" ${i === bs.length - 1 ? "disabled" : ""} aria-label="Nach unten">↓</button>
+            <button type="button" class="task-delete" onclick="bausteinEntfernen('${id}')" aria-label="Entfernen">${ic("x")}</button>
+          </div>
+        </div>`;
+    }).join("");
+    const ende = start ? ` · bis ca. ${uhrPlus(start, lauf)}` : "";
+    const mat = einheitMaterial(e);
+    const eid = escapeAttr(String(e.id));
+    const matHtml = mat.map((m) => `
+        <label class="einheit-material${m.erledigt ? " erledigt" : ""}">
+          <input type="checkbox" data-material="${escapeAttr(m.key)}"${m.erledigt ? " checked" : ""}>
+          <span class="em-text">${escapeHtml(m.text)}${m.quellen.length ? `<span class="notiz-meta">${escapeHtml(m.quellen.join(", "))}</span>` : ""}</span>
+          ${m.extra && !m.quellen.length ? `<button type="button" class="task-delete" onclick="event.preventDefault(); einheitMaterialEntfernen('${escapeAttr(m.key)}')" aria-label="${escapeAttr(m.text)} entfernen">${ic("x")}</button>` : ""}
+        </label>`).join("");
+    const spieleDrin = [...new Map(bs.filter((b) => b.spiel_id && spielVon(b.spiel_id)).map((b) => [String(b.spiel_id), spielVon(b.spiel_id)])).values()];
+    const reflSicht = reiterIstSichtbar(aktiverBereich, "reflexion");
+    const fertig = e.status === "durchgefuehrt";
+    const sterne = spieleDrin.length ? `<div class="einheit-sterne">${spieleDrin.map((s) => `<div class="einheit-stern-zeile"><span>${escapeHtml(s.titel)}</span>${spielSterne(s)}</div>`).join("")}</div>` : "";
+    const nachher = fertig
+      ? `<p class="rueck-satz">${ic("ok-kreis")} Durchgeführt${e.reflexion ? ":" : "."}</p>${e.reflexion ? `<p class="einheit-reflexion">${escapeHtml(e.reflexion)}</p>` : ""}
+         ${spieleDrin.length ? `<div class="schnell-label">Spiele bewerten</div>${sterne}` : ""}
+         <button type="button" class="btn-secondary" onclick="einheitAbschliessen('${eid}', 'geplant')">Wieder auf „geplant“</button>`
+      : `<textarea id="einheit-refl" class="schnell-notiz" rows="3" placeholder="Wie lief es? Was würdest du nächstes Mal anders machen?"></textarea>
+         ${reflSicht ? `<label class="fin-prognose-haken"><input type="checkbox" id="einheit-refl-auch" checked> auch als Reflexion speichern</label>` : ""}
+         ${spieleDrin.length ? `<div class="schnell-label">Spiele bewerten</div>${sterne}` : ""}
+         <button type="button" class="btn-primary" onclick="einheitAbschliessen('${eid}', 'durchgefuehrt')">Als durchgeführt speichern</button>`;
+    return `
+      <button type="button" class="link-btn einheit-zurueck" onclick="einheitSchliessen()">${ic("zurueck")}<span>Alle Einheiten</span></button>
+      <div class="einheit-kopf">
+        <h2>${escapeHtml(e.titel)}${fertig ? ` <span class="badge">durchgeführt</span>` : ""}</h2>
+        <p class="notiz-meta">${[einheitDatumText(e), e.ort, e.gruppe].filter(Boolean).map(escapeHtml).join(" · ")}</p>
+        ${e.ziel ? `<p class="einheit-ziel"><strong>Ziel:</strong> ${escapeHtml(e.ziel)}</p>` : ""}
+        ${e.notiz ? `<p class="notiz-meta">${escapeHtml(e.notiz)}</p>` : ""}
+        <div class="row einheit-aktionen">
+          <button type="button" class="btn-secondary" onclick="blattOeffnen('einheit','${eid}')">${ic("stift")}Bearbeiten</button>
+          <button type="button" class="btn-secondary" onclick="einheitKopieren('${eid}')">${ic("kopieren")}Kopieren</button>
+          <button type="button" class="btn-secondary" onclick="einheitDrucken('${eid}')">${ic("drucken")}Drucken</button>
+        </div>
+      </div>
+      <section class="einheit-block">
+        <h3>Ablauf</h3>
+        ${zeilen || `<p class="notiz-meta">Noch leer – füge Spiele aus der Kartei oder eigene Programmpunkte hinzu.</p>`}
+        ${bs.length ? `<p class="einheit-summe">Gesamt ${minutenText(lauf)}${ende}</p>` : ""}
+        <div class="row einheit-aktionen">
+          <button type="button" class="btn-primary" onclick="einheitSpielAuswahl('${eid}')">${ic("plus")}Spiel aus der Kartei</button>
+          <button type="button" class="btn-secondary" onclick="blattNeu('baustein', { einheit_id: '${eid}', dauer_min: 10 })">${ic("plus")}Eigener Punkt</button>
+        </div>
+      </section>
+      <section class="einheit-block">
+        <h3>Material${mat.length ? ` <span class="such-gruppe-zahl">${mat.filter((m) => m.erledigt).length}/${mat.length}</span>` : ""}</h3>
+        ${matHtml || `<p class="notiz-meta">Kommt automatisch aus dem Material der Spiele – oder hier ergänzen.</p>`}
+        <div class="row einheit-material-neu">
+          <input type="text" id="einheit-material-neu" placeholder="z. B. Erste-Hilfe-Set, Getränke" maxlength="80" autocomplete="off">
+          <button type="button" class="btn-secondary" onclick="einheitMaterialHinzu('${eid}')">${ic("plus")}Material</button>
+        </div>
+      </section>
+      <section class="einheit-block">
+        <h3>Nach der Einheit</h3>
+        ${nachher}
+      </section>`;
+  }
+
+  // Dauer ändern (beim Verlassen des Feldes) und Material abhaken
+  function einheitDetailBinden(e) {
+    document.querySelectorAll("#einheiten-bereich [data-baustein]").forEach((feld) => {
+      feld.addEventListener("change", async () => {
+        const b = einheitBausteine.find((x) => String(x.id) === feld.dataset.baustein);
+        if (!b) return;
+        const wert = Math.max(0, Math.min(600, Math.round(Number(feld.value) || 0)));
+        b.dauer_min = wert;
+        renderEinheiten();
+        try { await api("baustein_aktualisieren", { id: b.id, dauer_min: wert }); }
+        catch (err) { alert("Dauer nicht gespeichert: " + (err.message || "Fehler")); await ladeDaten(); }
+      });
+    });
+    document.querySelectorAll("#einheiten-bereich [data-material]").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const liste = new Set((e.material_erledigt || []).map((x) => String(x).toLowerCase()));
+        if (cb.checked) liste.add(cb.dataset.material); else liste.delete(cb.dataset.material);
+        e.material_erledigt = [...liste];
+        renderEinheiten();
+        api("einheit_material", { id: e.id, material_erledigt: e.material_erledigt })
+          .catch((err) => alert("Nicht gespeichert: " + (err.message || "Fehler")));
+      });
+    });
+    const neu = document.getElementById("einheit-material-neu");
+    if (neu) neu.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); window.einheitMaterialHinzu(String(e.id)); } });
+  }
+
+  window.einheitNeu = function() {
+    if (einheiten === null) {
+      alert("Für Einheiten bitte zuerst einheiten_setup.sql in Supabase ausführen und die neue index.ts einspielen.");
+      return;
+    }
+    window.blattNeu("einheit", {});
+  };
+  window.einheitOeffnen = function(id) {
+    einheitOffenId = id;
+    renderEinheiten();
+    window.scrollTo(0, 0);
+  };
+  window.einheitSchliessen = function() {
+    einheitOffenId = null;
+    renderEinheiten();
+  };
+  window.bausteinSchieben = async function(id, richtung) {
+    const b = einheitBausteine.find((x) => String(x.id) === String(id));
+    if (!b) return;
+    const liste = einheitBausteineVon(b.einheit_id);
+    const i = liste.indexOf(b), j = i + richtung;
+    if (j < 0 || j >= liste.length) return;
+    [liste[i], liste[j]] = [liste[j], liste[i]];
+    liste.forEach((x, k) => { x.position = k; });
+    renderEinheiten();
+    try { await api("bausteine_reihenfolge", { einheit_id: b.einheit_id, ids: liste.map((x) => x.id) }); }
+    catch (err) { alert("Reihenfolge nicht gespeichert: " + (err.message || "Fehler")); await ladeDaten(); }
+  };
+  window.bausteinEntfernen = async function(id) {
+    const b = einheitBausteine.find((x) => String(x.id) === String(id));
+    if (!b || !confirm(`„${bausteinTitel(b)}“ aus dem Ablauf entfernen?`)) return;
+    await api("baustein_loeschen", { id });
+    await ladeDaten();
+  };
+  window.einheitMaterialHinzu = async function(id) {
+    const e = (einheiten || []).find((x) => String(x.id) === String(id));
+    const feld = document.getElementById("einheit-material-neu");
+    const text = feld ? feld.value.trim() : "";
+    if (!e || !text) return;
+    e.material_extra = [...(e.material_extra || []), text];
+    renderEinheiten();
+    const neu = document.getElementById("einheit-material-neu");
+    if (neu) neu.focus();
+    try { await api("einheit_material", { id: e.id, material_extra: e.material_extra }); }
+    catch (err) { alert("Nicht gespeichert: " + (err.message || "Fehler")); await ladeDaten(); }
+  };
+  window.einheitMaterialEntfernen = async function(key) {
+    const e = (einheiten || []).find((x) => String(x.id) === String(einheitOffenId));
+    if (!e) return;
+    e.material_extra = (e.material_extra || []).filter((x) => String(x).toLowerCase() !== key);
+    e.material_erledigt = (e.material_erledigt || []).filter((x) => String(x).toLowerCase() !== key);
+    renderEinheiten();
+    try { await api("einheit_material", { id: e.id, material_extra: e.material_extra, material_erledigt: e.material_erledigt }); }
+    catch (err) { alert("Nicht gespeichert: " + (err.message || "Fehler")); await ladeDaten(); }
+  };
+  window.einheitKopieren = async function(id) {
+    const erg = await api("einheit_kopieren", { id });
+    if (erg && erg.id) einheitOffenId = erg.id;
+    await ladeDaten();
+    hinweisZeigen("Kopie angelegt – Datum eintragen über „Bearbeiten“");
+  };
+  window.einheitAbschliessen = async function(id, status) {
+    const e = (einheiten || []).find((x) => String(x.id) === String(id));
+    if (!e) return;
+    const feld = document.getElementById("einheit-refl");
+    const text = feld ? feld.value.trim() : (e.reflexion || "");
+    const auch = document.getElementById("einheit-refl-auch");
+    await api("einheit_abschliessen", { id, status, reflexion: status === "durchgefuehrt" ? text : e.reflexion });
+    if (status === "durchgefuehrt" && text && auch && auch.checked) {
+      const heute = heuteISO();
+      const datum = e.datum && e.datum <= heute ? e.datum : heute;
+      await api("reflexion_hinzufuegen", { text: `Einheit „${e.titel}“: ${text}`, datum, bereich: aktiverBereich });
+    }
+    await ladeDaten();
+    hinweisZeigen(status === "durchgefuehrt" ? "Einheit als durchgeführt gespeichert" : "Wieder geplant");
+  };
+
+  // Auswahl aus der Spielekartei (eigenes Blatt, bleibt für mehrere Spiele offen)
+  let einheitAuswahlId = null;
+  window.einheitSpielAuswahl = function(id) {
+    einheitAuswahlId = id;
+    const dlg = document.getElementById("einheit-spiel-dialog");
+    if (!dlg) return;
+    document.getElementById("einheit-spiel-suche").value = "";
+    document.getElementById("einheit-spiel-status").textContent = "";
+    einheitSpielListe();
+    if (typeof dlg.showModal === "function") { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute("open", "");
+    document.getElementById("einheit-spiel-suche").focus();
+  };
+  window.einheitSpielAuswahlSchliessen = function() {
+    const dlg = document.getElementById("einheit-spiel-dialog");
+    if (dlg && dlg.open && typeof dlg.close === "function") dlg.close(); else if (dlg) dlg.removeAttribute("open");
+  };
+  function einheitSpielListe() {
+    const box = document.getElementById("einheit-spiel-liste");
+    const eingabe = document.getElementById("einheit-spiel-suche").value;
+    const woerter = suchNorm(eingabe).split(/\s+/).filter(Boolean);
+    const drin = new Set(einheitBausteineVon(einheitAuswahlId).map((b) => String(b.spiel_id)));
+    const liste = spiele.filter((s) => {
+      const text = suchNorm([s.titel, s.kategorie, s.beschreibung, s.material].join(" "));
+      return woerter.every((w) => text.includes(w));
+    }).sort((a, b) => (Number(b.bewertung) || 0) - (Number(a.bewertung) || 0) || String(a.titel).localeCompare(String(b.titel), "de"));
+    if (!spiele.length) { box.innerHTML = `<p class="empty-text">Die Spielekartei ist noch leer.</p>`; return; }
+    if (!liste.length) { box.innerHTML = `<p class="empty-text">Kein Spiel gefunden.</p>`; return; }
+    box.innerHTML = liste.slice(0, 60).map((s) => {
+      const meta = [s.kategorie, s.dauer, s.altersgruppe, Number(s.bewertung) ? "★".repeat(Number(s.bewertung)) : ""].filter(Boolean).map(escapeHtml).join(" · ");
+      return `<button type="button" class="such-treffer" onclick="einheitSpielNehmen('${escapeAttr(String(s.id))}')">
+          <span class="such-titel">${drin.has(String(s.id)) ? "✓ " : ""}${suchMarkieren(s.titel, woerter, 90)}</span>
+          ${meta ? `<span class="notiz-meta such-meta">${meta}</span>` : ""}
+          ${s.material ? `<span class="such-auszug">${ic("werkzeug")} ${escapeHtml(s.material)}</span>` : ""}
+        </button>`;
+    }).join("") + (liste.length > 60 ? `<p class="notiz-meta">${liste.length - 60} weitere – Suchbegriff eingrenzen.</p>` : "");
+  }
+  window.einheitSpielNehmen = async function(spielId) {
+    const s = spielVon(spielId);
+    if (!s || !einheitAuswahlId) return;
+    const status = document.getElementById("einheit-spiel-status");
+    status.textContent = "Füge hinzu …";
+    try {
+      await api("baustein_hinzufuegen", { einheit_id: einheitAuswahlId, spiel_id: s.id, dauer_min: spielDauerMinuten(s) });
+    } catch (err) {
+      status.textContent = "Nicht hinzugefügt: " + (err.message || "Fehler");
+      return;
+    }
+    await ladeDaten();
+    status.textContent = `„${s.titel}“ hinzugefügt (${spielDauerMinuten(s)} Min.) – weitere antippen oder schließen.`;
+    einheitSpielListe();
+  };
+  (function einheitAuswahlEinrichten() {
+    const dlg = document.getElementById("einheit-spiel-dialog");
+    const feld = document.getElementById("einheit-spiel-suche");
+    if (!dlg || !feld) return;
+    feld.addEventListener("input", einheitSpielListe);
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) window.einheitSpielAuswahlSchliessen(); });
+  })();
+
+  // Ablaufplan drucken (Druckdialog, dort auch „Als PDF speichern“)
+  window.einheitDrucken = function(id) {
+    const e = (einheiten || []).find((x) => String(x.id) === String(id));
+    if (!e) return;
+    const bs = einheitBausteineVon(e.id);
+    const start = e.uhrzeit ? String(e.uhrzeit).slice(0, 5) : null;
+    let lauf = 0;
+    const zellen = "border:1px solid #999; padding:5px 7px; vertical-align:top; font-size:10.5pt;";
+    const zeilen = bs.map((b) => {
+      const s = b.spiel_id && spielVon(b.spiel_id);
+      const zeit = start ? uhrPlus(start, lauf) : `+${lauf} Min.`;
+      lauf += Number(b.dauer_min) || 0;
+      const info = [s && s.material ? "Material: " + s.material : "", b.notiz || "", s && s.beschreibung ? s.beschreibung.slice(0, 300) + (s.beschreibung.length > 300 ? " …" : "") : ""].filter(Boolean);
+      return `<tr><td style="${zellen} white-space:nowrap;">${zeit}</td><td style="${zellen} white-space:nowrap;">${Number(b.dauer_min) || 0} Min.</td>
+        <td style="${zellen}"><strong>${escapeHtml(bausteinTitel(b))}</strong>${info.map((x) => `<div style="margin-top:3px; color:#333;">${escapeHtml(x)}</div>`).join("")}</td></tr>`;
+    }).join("");
+    const mat = einheitMaterial(e);
+    htmlDrucken(`<div style="font-family: Arial, sans-serif; color:#000; max-width:180mm;">
+      <h1 style="font-size:17pt; margin:0 0 4px;">${escapeHtml(e.titel)}</h1>
+      <p style="margin:0 0 8px; font-size:10.5pt;">${[einheitDatumText(e), e.ort, e.gruppe].filter(Boolean).map(escapeHtml).join(" · ")}</p>
+      ${e.ziel ? `<p style="margin:0 0 10px; font-size:10.5pt;"><strong>Ziel:</strong> ${escapeHtml(e.ziel)}</p>` : ""}
+      <table style="border-collapse:collapse; width:100%; margin-top:6px;">
+        <thead><tr><th style="${zellen} text-align:left;">Zeit</th><th style="${zellen} text-align:left;">Dauer</th><th style="${zellen} text-align:left;">Programmpunkt</th></tr></thead>
+        <tbody>${zeilen || `<tr><td colspan="3" style="${zellen}">–</td></tr>`}</tbody>
+      </table>
+      <p style="font-size:10.5pt; margin:6px 0 14px;">Gesamt: ${minutenText(lauf)}${start ? ` · bis ca. ${uhrPlus(start, lauf)}` : ""}</p>
+      ${mat.length ? `<h2 style="font-size:13pt; margin:10px 0 4px;">Material</h2><ul style="list-style:none; padding:0; margin:0; columns:2; font-size:10.5pt;">${mat.map((m) => `<li style="margin:2px 0;">${m.erledigt ? "☑" : "☐"} ${escapeHtml(m.text)}</li>`).join("")}</ul>` : ""}
+      ${e.notiz ? `<h2 style="font-size:13pt; margin:14px 0 4px;">Notiz</h2><p style="font-size:10.5pt; white-space:pre-wrap;">${escapeHtml(e.notiz)}</p>` : ""}
+    </div>`);
+  };
+
+  // ==========================================================
   // Wochenrückblick (seit Session 37, Etappe 3): Blatt über ⋮-Menü und
   // Karte auf dem Start-Screen (Fr–Mo). Rechnet nur im Browser mit den
   // geladenen Daten des aktiven Bereichs. Abschnitte nur für eingeblendete
@@ -587,6 +962,7 @@
       aufgaben: aufg.filter((a) => !a.erledigt && inNaechster(a.faellig_am)).sort((a, c) => a.faellig_am.localeCompare(c.faellig_am)),
       vermietungen: sicht("raumplanung") ? meine(raumVermietungen).filter((v) => inNaechster(v.datum)).sort(nachZeit) : [],
       rueckgaben: sicht("schluessel") ? meine(schluesselAusgaben).filter((a) => !a.zurueck_am && inNaechster(a.rueckgabe_bis)) : [],
+      einheiten: sicht("einheiten") ? meine(einheiten || []).filter((e) => e.status !== "durchgefuehrt" && inNaechster(e.datum)).sort(nachZeit) : [],
     };
     return { mo, so, nMo, nSo, erledigtAmBekannt, erledigt, liegen, termineWoche, train, geld, wochenziele, refl, naechste };
   }
@@ -682,6 +1058,7 @@
     if (n.termine.length) nTeile.push(`<h4>Termine</h4>` + rueckListe(n.termine, (x) => `<li><span class="rueck-text">${escapeHtml(x.titel)}</span><span class="notiz-meta">${rueckTag(x.datum)}${x.uhrzeit ? " · " + String(x.uhrzeit).slice(0, 5) : ""}</span></li>`));
     if (n.aufgaben.length) nTeile.push(`<h4>Fällige Aufgaben</h4>` + rueckListe(n.aufgaben, (a) => `<li><span class="rueck-text">${escapeHtml(a.titel)}</span><span class="notiz-meta">${rueckTag(a.faellig_am)}</span></li>`));
     if (n.vermietungen.length) nTeile.push(`<h4>Vermietungen</h4>` + rueckListe(n.vermietungen, (v) => `<li><span class="rueck-text">${escapeHtml(v.mieter || "Vermietung")}</span><span class="notiz-meta">${rueckTag(v.datum)}</span></li>`));
+    if (n.einheiten.length) nTeile.push(`<h4>Einheiten</h4>` + rueckListe(n.einheiten, (e) => `<li><span class="rueck-text">${escapeHtml(e.titel)}</span><span class="notiz-meta">${rueckTag(e.datum)}${e.uhrzeit ? " · " + String(e.uhrzeit).slice(0, 5) : ""}</span></li>`));
     if (n.rueckgaben.length) nTeile.push(`<h4>Schlüssel-Rückgaben</h4>` + rueckListe(n.rueckgaben, (a) => `<li><span class="rueck-text">${escapeHtml(a.inhaber || "Schlüssel")}</span><span class="notiz-meta">bis ${rueckTag(a.rueckgabe_bis)}</span></li>`));
     bloecke.push(`<section class="rueck-block"><h3>${ic("weiter")} Nächste Woche · ${formatDatumKurz(d.nMo)}–${formatDatumKurz(d.nSo)}</h3>` +
       (nTeile.length ? nTeile.join("") : `<p class="notiz-meta">Noch nichts eingetragen.</p>`) + `</section>`);
@@ -855,6 +1232,10 @@
       { typ: "spiel", gruppe: "Spiele", tab: "spiele", liste: spiele, gemeinsam: true,
         felder: (s) => ({ titel: s.titel, texte: [s.kategorie, s.beschreibung, s.material], meta: [s.kategorie || ""] }),
         oeffnen: (s) => () => window.blattOeffnen("spiel", s.id) },
+      { typ: "einheit", gruppe: "Einheiten", tab: "einheiten", liste: einheiten || [],
+        felder: (e) => ({ titel: e.titel, texte: [e.ort, e.gruppe, e.ziel, e.notiz, e.reflexion],
+          meta: [e.datum ? suchDatum(e.datum) : "ohne Datum", e.status === "durchgefuehrt" ? "durchgeführt" : ""], datum: e.datum }),
+        vorher: (e) => () => { einheitOffenId = e.id; }, oeffnen: () => null },
       { typ: "training", gruppe: "Training", tab: "training", liste: training,
         felder: (x) => ({ titel: x.sportart, texte: [x.ort, x.notiz], meta: [suchDatum(x.datum), x.ort || ""], datum: x.datum }),
         oeffnen: (x) => () => window.trainingBearbeitenStart(x.id) },
@@ -1596,6 +1977,64 @@
       loeschen: (id) => api("ogs_idee_loeschen", { id }),
       loeschFrage: (i) => `Idee „${i.titel || ""}“ löschen?`,
       gespeichert: "Idee gespeichert",
+    },
+
+    // Einheit (seit Session 37) – Kopfdaten; Ablauf und Material im Reiter
+    einheit: {
+      titel: "Einheit bearbeiten",
+      titelNeu: "Neue Einheit",
+      finden: (id) => (einheiten || []).find((e) => String(e.id) === String(id)),
+      laden: (e) => ({
+        titel: e.titel || "", datum: e.datum || "", uhrzeit: e.uhrzeit ? String(e.uhrzeit).slice(0, 5) : "",
+        ort: e.ort || "", gruppe: e.gruppe || "", ziel: e.ziel || "", notiz: e.notiz || "",
+      }),
+      felder: [
+        { key: "titel", label: "Titel", typ: "text", pflicht: true, platzhalter: "z. B. Herbstferien Tag 2, Teamspiele 3b" },
+        { key: "datum", label: "Datum", typ: "datum", halb: true, hinweis: "optional" },
+        { key: "uhrzeit", label: "Beginn", typ: "zeit", halb: true, hinweis: "für die Uhrzeiten im Ablauf" },
+        { key: "ort", label: "Ort", typ: "text", halb: true, platzhalter: "optional" },
+        { key: "gruppe", label: "Gruppe", typ: "text", halb: true, platzhalter: "z. B. 8–12 J., 15 Kinder" },
+        { key: "ziel", label: "Ziel", typ: "text-lang", zeilen: 2, platzhalter: "Was soll die Einheit bewirken? (optional)" },
+        { key: "notiz", label: "Notiz", typ: "text-lang", zeilen: 2, platzhalter: "optional" },
+      ],
+      speichern: async (id, w) => {
+        const erg = await api("einheit_speichern", {
+          id, bereich: aktiverBereich, titel: w.titel, datum: w.datum, uhrzeit: w.uhrzeit, ort: w.ort, gruppe: w.gruppe, ziel: w.ziel, notiz: w.notiz,
+        });
+        if (!id && erg && erg.id) einheitOffenId = erg.id;
+        return erg;
+      },
+      loeschen: (id) => api("einheit_loeschen", { id }),
+      loeschFrage: (e) => `Einheit „${e.titel || ""}“ mit ihrem Ablauf löschen? Die Spiele in der Kartei bleiben.`,
+      gespeichert: "Einheit gespeichert",
+      danach: () => { if (aktiverTab === "einheiten") renderEinheiten(); },
+    },
+
+    // Baustein einer Einheit (Spiel aus der Kartei oder eigener Programmpunkt)
+    baustein: {
+      titel: "Baustein bearbeiten",
+      titelNeu: "Eigener Baustein",
+      finden: (id) => einheitBausteine.find((b) => String(b.id) === String(id)),
+      laden: (b) => ({
+        _einheit: b.einheit_id, _spiel: b.spiel_id || null,
+        spiel: b.spiel_id ? bausteinTitel(b) : "",
+        titel: b.spiel_id ? "" : (b.titel || ""),
+        dauer: b.dauer_min !== undefined && b.dauer_min !== null ? String(b.dauer_min) : "10",
+        notiz: b.notiz || "",
+      }),
+      felder: [
+        { key: "spiel", label: "Spiel aus der Kartei", typ: "info", wenn: (w) => !!w._spiel },
+        { key: "titel", label: "Programmpunkt", typ: "text", pflicht: true, wenn: (w) => !w._spiel, platzhalter: "z. B. Begrüßung, Pause, Abschlussrunde" },
+        { key: "dauer", label: "Dauer (Minuten)", typ: "zahl", min: 0, pflicht: true },
+        { key: "notiz", label: "Notiz", typ: "text-lang", zeilen: 3, platzhalter: "z. B. Varianten, Regeln, wer leitet an (optional)" },
+      ],
+      speichern: (id, w) => (id
+        ? api("baustein_aktualisieren", { id, titel: w._spiel ? undefined : w.titel, dauer_min: w.dauer, notiz: w.notiz })
+        : api("baustein_hinzufuegen", { einheit_id: w._einheit, titel: w.titel, dauer_min: w.dauer, notiz: w.notiz })),
+      loeschen: (id) => api("baustein_loeschen", { id }),
+      loeschFrage: (b) => `„${bausteinTitel(b)}“ aus dem Ablauf entfernen?`,
+      gespeichert: "Ablauf gespeichert",
+      danach: () => { if (aktiverTab === "einheiten") renderEinheiten(); },
     },
 
     // Sparziel (seit Session 37) – Rechnung in finSparzielRechnen
@@ -2422,6 +2861,9 @@
     finanzEinstellungen = data.finanz_einstellungen || [];
     kategorieRegeln = Array.isArray(data.kategorie_regeln) ? data.kategorie_regeln : null;
     sparziele = Array.isArray(data.sparziele) ? data.sparziele : null;
+    einheiten = Array.isArray(data.einheiten) ? data.einheiten : null;
+    einheitBausteine = Array.isArray(data.einheit_bausteine) ? data.einheit_bausteine : [];
+    if (aktiverTab === "einheiten") renderEinheiten();
     ogsIdeen = data.ogs_ideen || [];
     ogsInventar = data.ogs_inventar || [];
     ogsProjekte = data.ogs_projekte || [];
@@ -3138,6 +3580,7 @@
     if (aktiv === "ogsinventar") renderInventar();
     if (aktiv === "ogsprojekte") renderProjekte();
     if (aktiv === "spiele") renderSpiele();
+    if (aktiv === "einheiten") renderEinheiten();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
     if (aktiv === "schluessel") renderSchluessel();
@@ -8828,6 +9271,7 @@
     const neu = Number(vorher) === sterne ? null : sterne;
     s.bewertung = neu;
     renderSpiele();
+    if (aktiverTab === "einheiten") renderEinheiten();
     try {
       await api("spiel_bewerten", { id, bewertung: neu });
     } catch (e) {
@@ -10300,31 +10744,36 @@
   window.ausgabeDrucken = async function(id) {
     try {
       const antwort = await api("schluessel_ausgabe_laden", { id });
-      let bereich = document.getElementById("druck-bereich");
-      if (!bereich) {
-        bereich = document.createElement("div");
-        bereich.id = "druck-bereich";
-        document.body.appendChild(bereich);
-      }
-      if (!document.getElementById("druck-stil")) {
-        const stil = document.createElement("style");
-        stil.id = "druck-stil";
-        stil.textContent = "@media screen { #druck-bereich { display:none; } } " +
-          "@media print { body.druckmodus > *:not(#druck-bereich) { display:none !important; } " +
-          "body.druckmodus { background:#fff !important; } #druck-bereich { display:block !important; } " +
-          "@page { margin: 15mm; } }";
-        document.head.appendChild(stil);
-      }
-      bereich.innerHTML = protokollHtml(antwort.ausgabe);
-      document.body.classList.add("druckmodus");
-      const aufraeumen = () => { document.body.classList.remove("druckmodus"); window.removeEventListener("afterprint", aufraeumen); };
-      window.addEventListener("afterprint", aufraeumen);
-      // kurz warten, bis das Unterschriftsbild geladen ist
-      setTimeout(() => { window.print(); setTimeout(aufraeumen, 1000); }, 150);
+      htmlDrucken(protokollHtml(antwort.ausgabe));
     } catch (fehler) {
       alert(fehler.message);
     }
   };
+
+  // Druckt fertiges HTML über den Druckdialog (dort auch „Als PDF speichern“) – seit Session 37 allgemein
+  function htmlDrucken(html) {
+    let bereich = document.getElementById("druck-bereich");
+    if (!bereich) {
+      bereich = document.createElement("div");
+      bereich.id = "druck-bereich";
+      document.body.appendChild(bereich);
+    }
+    if (!document.getElementById("druck-stil")) {
+      const stil = document.createElement("style");
+      stil.id = "druck-stil";
+      stil.textContent = "@media screen { #druck-bereich { display:none; } } " +
+        "@media print { body.druckmodus > *:not(#druck-bereich) { display:none !important; } " +
+        "body.druckmodus { background:#fff !important; } #druck-bereich { display:block !important; } " +
+        "@page { margin: 15mm; } }";
+      document.head.appendChild(stil);
+    }
+    bereich.innerHTML = html;
+    document.body.classList.add("druckmodus");
+    const aufraeumen = () => { document.body.classList.remove("druckmodus"); window.removeEventListener("afterprint", aufraeumen); };
+    window.addEventListener("afterprint", aufraeumen);
+    // kurz warten, bis Bilder (z. B. Unterschriften) geladen sind
+    setTimeout(() => { window.print(); setTimeout(aufraeumen, 1000); }, 150);
+  }
 
   // ---------- Protokoll per Mail (seit Session 33) ----------
   // Erste Mailadresse aus einem Freitext (z. B. Feld Kontakt) oder ""
