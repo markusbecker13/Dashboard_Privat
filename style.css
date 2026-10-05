@@ -1838,3 +1838,37 @@
   .vorlesen-knopf { padding: 0; width: 36px; justify-content: center; }
   .vorlesen-knopf span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
+
+/* Ruhezeit im Blatt Benachrichtigungen (Session 38) */
+.push-ruhe-zeiten { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin: 0 0 0.5rem 1.75rem; }
+.push-ruhe-zeiten.aus { opacity: 0.55; }
+.push-ruhe-feld { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--ink-dim); }
+.push-ruhe-feld input[type="time"] { width: auto; min-width: 6.5rem; min-height: 44px; color: var(--ink); }
+.push-ruhe-hinweis { margin-top: 0.1rem; }
+.push-ruhe-fehlt code { font-size: 0.85em; }
+
+/* UE-Ziel der Weiterbildung (Session 38) */
+.wb-ziel { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.4rem; }
+.wb-ziel-kopf { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.wb-ziel-titel { font-weight: 700; overflow-wrap: anywhere; min-width: 0; }
+.wb-ziel-kopf .icon-knopf-klein { min-width: 44px; min-height: 44px; justify-content: center; }
+.wb-ziel-balken { display: flex; height: 12px; border-radius: var(--r-pille); background: var(--panel); overflow: hidden; border: 1px solid var(--border); }
+.wb-ziel-balken span { display: block; height: 100%; }
+.wb-ziel-bescheinigt { background: var(--accent); }
+.wb-ziel-besucht { background: color-mix(in srgb, var(--accent) 55%, var(--panel)); }
+.wb-ziel-geplant { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); }
+.wb-ziel-legende { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; margin: 0; }
+.wb-ziel-legende span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.wb-ziel-punkt { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; border: 1px solid var(--border); }
+.wb-ziel-text { font-size: 0.9rem; }
+.wb-ziel-text.erreicht { color: var(--ok-text); font-weight: 600; }
+.wb-ziel-text .ic { vertical-align: -0.18em; }
+.wb-ziel-setzen { margin-top: 0.4rem; min-height: 44px; }
+.wb-summe + .reiter-aktionen, .reiter-aktionen + .wb-ziel-setzen { margin-bottom: 0.8rem; }
+
+/* Zu Einheit hinzufügen (Session 38) */
+.spiel-zu-einheit { min-height: 36px; margin-top: 0.15rem; }
+.zu-einheit-spiel { margin: 0 0 0.2rem; font-weight: 600; color: var(--ink); }
+.zu-einheit-neu { margin-top: 0.8rem; min-height: 44px; display: inline-flex; align-items: center; gap: 0.35rem; }
+#zu-einheit-status .link-knopf { font-weight: 600; }
+#zu-einheit-status .ic { vertical-align: -0.18em; color: var(--ok-text); }
