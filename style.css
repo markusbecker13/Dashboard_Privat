@@ -1787,3 +1787,27 @@
   .methode-filter { flex-direction: column; }
   .methode-filter select { flex-basis: auto; }
 }
+
+/* Benachrichtigungen / Push (Session 37) */
+.push-block { padding: 0.2rem 0 0.9rem; border-bottom: 1px solid var(--border); margin-bottom: 0.9rem; }
+.push-block:last-of-type { border-bottom: 0; }
+.push-block h3 { font-size: var(--fs-mittel); margin: 0 0 0.5rem; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.push-fuer-alle { margin: 0; font-weight: 400; }
+.push-status { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.6rem; font-weight: 600; }
+.push-an { color: var(--ok-text); }
+.push-aus { color: var(--ink-dim); }
+.push-knoepfe { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+#push-einschalten { display: inline-flex; align-items: center; gap: 0.4rem; }
+.push-schalter { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-height: 44px; color: var(--ink); }
+.push-schalter input[type="checkbox"] { width: 1.25rem; height: 1.25rem; accent-color: var(--accent); flex: 0 0 auto; }
+.push-schalter input[type="time"] { width: auto; min-width: 6.5rem; }
+.push-erklaerung { margin: -0.3rem 0 0.4rem 1.75rem; }
+.push-chips { margin: 0.2rem 0 0.6rem; flex-wrap: wrap; }
+.push-label { margin-top: 0.4rem; }
+.push-speichern { margin-top: 0.3rem; }
+.push-geraete { list-style: none; padding: 0; margin: 0 0 0.6rem; }
+.push-geraete li { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 0.4rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); }
+.push-geraete li .notiz-meta { grid-column: 1; margin-top: 0.1rem; }
+.push-geraete li .icon-knopf-klein { grid-column: 2; grid-row: 1 / span 2; min-width: 44px; min-height: 44px; justify-content: center; }
+.push-geraet-name { overflow-wrap: anywhere; }
+.push-meldung:empty { display: none; }
