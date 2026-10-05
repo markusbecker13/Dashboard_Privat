@@ -43,6 +43,12 @@
   let einheiten = null; // Einheiten planen (seit Session 37); null = SQL/index.ts fehlt
   let einheitBausteine = [];
   let einheitOffenId = null; // geöffnete Einheit im Reiter Einheiten
+  let methodenAnsicht = "methoden"; // Reiter Methoden: "methoden" | "weiterbildung"
+  try { if (localStorage.getItem("methoden-ansicht") === "weiterbildung") methodenAnsicht = "weiterbildung"; } catch (_e) { /* egal */ }
+  let methodeFokusId = null;  // nach Suche/Anlegen aufklappen und hinscrollen
+  let modulFokusId = null;
+  let methodeSuche = "";
+  let methodePhaseFilter = "alle";
   let sparziele = null; // Sparziele (seit Session 37); null = SQL/index.ts fehlt // Block „Kategorie-Regeln“ in Buchungen aufgeklappt
   let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben"
   let finBearbeitetesFixkosten = null; // id oder null
@@ -66,7 +72,10 @@
   let ogsInventar = [];
   let ogsProjekte = [];
   let ogsProjektDateien = [];
-  let spiele = [];
+  let spiele = [];          // nur Spiele (art = 'spiel'), Methoden stehen in methoden
+  let methoden = [];        // seit Session 37: Methodenkartei (spiele mit art = 'methode')
+  let wbModule = null;      // Weiterbildungsmodule; null = methoden_weiterbildung_setup.sql fehlt
+  let wbDateien = [];
   let spieleDateien = [];
   let tabEinstellungen = [];
   let verleih = [];
@@ -103,7 +112,7 @@
   const VIEW_ELEMENTE = {
     heute: "view-heute", frei: "view-frei", aufgaben: "view-aufgaben", kalender: "view-kalender",
     planung: "view-planung", finanzen: "view-finanzen", notizen: "view-notizen", links: "view-links",
-    reflexion: "view-reflexion", spiele: "view-spiele", einheiten: "view-einheiten", einkauf: "view-einkauf", export: "view-export",
+    reflexion: "view-reflexion", spiele: "view-spiele", methoden: "view-methoden", einheiten: "view-einheiten", einkauf: "view-einkauf", export: "view-export",
     verlauf: "view-verlauf", anleitung: "view-anleitung", ogsideen: "view-ogs-ideen",
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
@@ -116,7 +125,7 @@
   const ALLE_REITER = [
     ["heute", "Start"], ["frei", "Frei"], ["aufgaben", "Aufgaben"], ["kalender", "Kalender"],
     ["planung", "Planung"], ["finanzen", "Finanzen"], ["notizen", "Notizen"], ["links", "Links"],
-    ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["einheiten", "Einheiten"], ["einkauf", "Einkauf"], ["export", "Export"],
+    ["reflexion", "Reflexion"], ["spiele", "Spiele"], ["methoden", "Methoden"], ["einheiten", "Einheiten"], ["einkauf", "Einkauf"], ["export", "Export"],
     ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
@@ -134,7 +143,7 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung"],
+      "reflexion", "spiele", "methoden", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel"],
@@ -157,7 +166,7 @@
     return [
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
       { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
-      { schluessel: "sammeln", label: "Sammeln", tabs: ["notizen", "links", "reflexion", "spiele", "einheiten", "einkauf", "rezepte", "training", "ernaehrung"] },
+      { schluessel: "sammeln", label: "Sammeln", tabs: ["notizen", "links", "reflexion", "spiele", "methoden", "einheiten", "einkauf", "rezepte", "training", "ernaehrung"] },
       { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
       { schluessel: "verwalten", label: "Verwalten", tabs: ["export", "verlauf", "anleitung"] },
     ];
@@ -515,7 +524,7 @@
     return einheitBausteine.filter((b) => String(b.einheit_id) === String(id)).sort((a, b) => a.position - b.position);
   }
   function spielVon(id) {
-    return spiele.find((s) => String(s.id) === String(id));
+    return spiele.find((s) => String(s.id) === String(id)) || methoden.find((s) => String(s.id) === String(id));
   }
   function bausteinTitel(b) {
     const s = b.spiel_id && spielVon(b.spiel_id);
@@ -805,14 +814,14 @@
     const eingabe = document.getElementById("einheit-spiel-suche").value;
     const woerter = suchNorm(eingabe).split(/\s+/).filter(Boolean);
     const drin = new Set(einheitBausteineVon(einheitAuswahlId).map((b) => String(b.spiel_id)));
-    const liste = spiele.filter((s) => {
-      const text = suchNorm([s.titel, s.kategorie, s.beschreibung, s.material].join(" "));
+    const liste = [...spiele, ...methoden].filter((s) => {
+      const text = suchNorm([s.titel, s.kategorie, s.beschreibung, s.material, s.art === "methode" ? "methode " + methodePhaseText(s.phase) : ""].join(" "));
       return woerter.every((w) => text.includes(w));
     }).sort((a, b) => (Number(b.bewertung) || 0) - (Number(a.bewertung) || 0) || String(a.titel).localeCompare(String(b.titel), "de"));
-    if (!spiele.length) { box.innerHTML = `<p class="empty-text">Die Spielekartei ist noch leer.</p>`; return; }
+    if (!spiele.length && !methoden.length) { box.innerHTML = `<p class="empty-text">Die Spielekartei ist noch leer.</p>`; return; }
     if (!liste.length) { box.innerHTML = `<p class="empty-text">Kein Spiel gefunden.</p>`; return; }
     box.innerHTML = liste.slice(0, 60).map((s) => {
-      const meta = [s.kategorie, s.dauer, s.altersgruppe, Number(s.bewertung) ? "★".repeat(Number(s.bewertung)) : ""].filter(Boolean).map(escapeHtml).join(" · ");
+      const meta = [s.art === "methode" ? "Methode" + (s.phase ? " · " + methodePhaseText(s.phase) : "") : "", s.kategorie, s.dauer, s.altersgruppe, Number(s.bewertung) ? "★".repeat(Number(s.bewertung)) : ""].filter(Boolean).map(escapeHtml).join(" · ");
       return `<button type="button" class="such-treffer" onclick="einheitSpielNehmen('${escapeAttr(String(s.id))}')">
           <span class="such-titel">${drin.has(String(s.id)) ? "✓ " : ""}${suchMarkieren(s.titel, woerter, 90)}</span>
           ${meta ? `<span class="notiz-meta such-meta">${meta}</span>` : ""}
@@ -902,6 +911,303 @@
     return `${RUECK_WOCHENTAG[new Date(iso + "T00:00:00").getDay()]} ${formatDatumKurz(iso)}`;
   }
 
+  // ==========================================================
+  // Methodenkartei + Weiterbildung (seit Session 37, Etappe 5)
+  // Methoden = spiele mit art 'methode' (Sterne, Dateien, Einheiten
+  // wie bei Spielen). Module haben keinen Bereich.
+  // ==========================================================
+  const METHODE_PHASEN = [
+    ["ankommen", "Ankommen & Warm-up"], ["kooperation", "Kooperation"], ["vertrauen", "Vertrauen"],
+    ["problemloesung", "Problemlösung"], ["herausforderung", "Herausforderung"], ["reflexion", "Reflexion & Abschluss"],
+  ];
+  const WB_STATUS_TEXT = { geplant: "geplant", besucht: "besucht", bescheinigt: "bescheinigt" };
+  const WB_ERLAUBTE_TYPEN = ["application/pdf", "image/jpeg", "image/png"];
+  function methodePhaseText(p) {
+    const f = METHODE_PHASEN.find(([k]) => k === p);
+    return f ? f[1] : "";
+  }
+  function wbZahl(n) {
+    return (Math.round(Number(n) * 10) / 10).toLocaleString("de-DE", { maximumFractionDigits: 1 });
+  }
+  function wbDatum(iso, mitJahr = true) {
+    const [j, m, t] = String(iso).split("-");
+    return `${t}.${m}.${mitJahr ? j : ""}`;
+  }
+  function wbZeitraum(m) {
+    if (!m.von) return "ohne Datum";
+    const bis = m.bis || m.von;
+    if (bis === m.von) return `${RUECK_WOCHENTAG[new Date(m.von + "T00:00:00").getDay()]} ${wbDatum(m.von)}`;
+    return `${wbDatum(m.von, m.von.slice(0, 4) !== bis.slice(0, 4))}–${wbDatum(bis)}`;
+  }
+  function wbSummen() {
+    const sum = { geplant: 0, besucht: 0, bescheinigt: 0, gesamt: 0 };
+    (wbModule || []).forEach((m) => {
+      const ue = Number(m.ue) || 0;
+      sum[m.status in sum ? m.status : "geplant"] += ue;
+      sum.gesamt += ue;
+    });
+    return sum;
+  }
+  // Mehrzeiliger Text sicher als HTML (Zeilenumbrüche bleiben über CSS pre-line)
+  function methodeText(t) {
+    return `<div class="methode-text">${escapeHtml(String(t || "").trim())}</div>`;
+  }
+
+  function renderMethoden() {
+    const el = document.getElementById("methoden-bereich");
+    if (!el) return;
+    const summen = wbSummen();
+    const umschalter = `<div class="schnell-chips methoden-umschalter" role="group" aria-label="Ansicht">
+        <button type="button" class="schnell-chip${methodenAnsicht === "methoden" ? " aktiv" : ""}" aria-pressed="${methodenAnsicht === "methoden"}" onclick="methodenAnsichtWechseln('methoden')">Methoden (${methoden.length})</button>
+        <button type="button" class="schnell-chip${methodenAnsicht === "weiterbildung" ? " aktiv" : ""}" aria-pressed="${methodenAnsicht === "weiterbildung"}" onclick="methodenAnsichtWechseln('weiterbildung')">Weiterbildung${summen.gesamt ? ` (${wbZahl(summen.gesamt)} UE)` : ""}</button>
+      </div>`;
+    if (wbModule === null) {
+      el.innerHTML = umschalter + `<p class="empty-text">Für Methoden und Weiterbildung bitte zuerst <code>methoden_weiterbildung_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+      return;
+    }
+    if (methodenAnsicht === "weiterbildung") {
+      el.innerHTML = umschalter + wbHtml(summen);
+      if (modulFokusId) {
+        const karte = document.getElementById("modul-" + modulFokusId);
+        modulFokusId = null;
+        if (karte) { karte.classList.add("fokus"); karte.scrollIntoView({ block: "center" }); }
+      }
+      return;
+    }
+    // Fokus aus der Suche: Filter so setzen, dass die Methode sichtbar ist
+    if (methodeFokusId) { methodeSuche = ""; methodePhaseFilter = "alle"; }
+    const anzahl = (p) => methoden.filter((m) => (m.phase || "") === p).length;
+    el.innerHTML = umschalter + `
+      <div class="reiter-aktionen"><button type="button" class="reiter-neu" onclick="methodeNeu()">${ic("plus")}Neue Methode</button></div>
+      ${methoden.length ? `<div class="methode-filter">
+        <input type="search" id="methode-suche" placeholder="Suchen: Titel, Ziel, Material …" value="${escapeAttr(methodeSuche)}" aria-label="Methoden durchsuchen" autocomplete="off">
+        <select id="methode-phase" aria-label="Phase">
+          <option value="alle">Alle Phasen (${methoden.length})</option>
+          ${METHODE_PHASEN.filter(([k]) => anzahl(k)).map(([k, t]) => `<option value="${k}"${methodePhaseFilter === k ? " selected" : ""}>${escapeHtml(t)} (${anzahl(k)})</option>`).join("")}
+          ${anzahl("") ? `<option value=""${methodePhaseFilter === "" ? " selected" : ""}>Ohne Phase (${anzahl("")})</option>` : ""}
+        </select>
+      </div>` : ""}
+      <div id="methode-liste"></div>`;
+    const suche = document.getElementById("methode-suche");
+    if (suche) {
+      suche.addEventListener("input", () => { methodeSuche = suche.value; methodeListeRendern(); });
+      document.getElementById("methode-phase").addEventListener("change", (e) => { methodePhaseFilter = e.target.value; methodeListeRendern(); });
+    }
+    methodeListeRendern();
+  }
+
+  function methodeListeRendern() {
+    const box = document.getElementById("methode-liste");
+    if (!box) return;
+    if (!methoden.length) {
+      box.innerHTML = `<p class="empty-text">Noch keine Methode. Mit „+ Neue Methode“ anlegen – mit Ziel, Setting, Ablauf, Sicherheitshinweisen und Reflexionsfragen. Methoden lassen sich wie Spiele in Einheiten einplanen.</p>`;
+      return;
+    }
+    const woerter = suchNorm(methodeSuche).split(/\s+/).filter(Boolean);
+    const liste = methoden.filter((m) => {
+      if (methodePhaseFilter !== "alle" && (m.phase || "") !== methodePhaseFilter) return false;
+      const text = suchNorm([m.titel, m.kategorie, m.ziele, m.setting, m.beschreibung, m.sicherheit, m.reflexion_fragen, m.material].join(" "));
+      return woerter.every((w) => text.includes(w));
+    });
+    if (!liste.length) { box.innerHTML = `<p class="empty-text">Keine Methode für diesen Filter.</p>`; return; }
+    const reihenfolge = [...METHODE_PHASEN.map(([k]) => k), ""];
+    const gruppen = reihenfolge.map((k) => [k, liste.filter((m) => (m.phase || "") === k)
+      .sort((a, b) => (Number(b.bewertung) || 0) - (Number(a.bewertung) || 0) || String(a.titel).localeCompare(String(b.titel), "de"))])
+      .filter(([, ms]) => ms.length);
+    box.innerHTML = gruppen.map(([k, ms]) => `
+      <section class="methode-gruppe">
+        <div class="schnell-label">${escapeHtml(k ? methodePhaseText(k) : "Ohne Phase")} · ${ms.length}</div>
+        ${ms.map((m) => methodeKarteHtml(m, woerter.length > 0)).join("")}
+      </section>`).join("");
+    if (methodeFokusId) {
+      const karte = document.getElementById("methode-" + methodeFokusId);
+      methodeFokusId = null;
+      if (karte) {
+        const d = karte.querySelector("details");
+        if (d) d.open = true;
+        karte.classList.add("fokus");
+        karte.scrollIntoView({ block: "center" });
+      }
+    }
+  }
+
+  function methodeKarteHtml(m, offen) {
+    const id = escapeAttr(String(m.id));
+    const meta = spielMetaZeile(m);
+    const modul = m.modul_id && (wbModule || []).find((x) => String(x.id) === String(m.modul_id));
+    const dateien = spieleDateien.filter((d) => String(d.spiel_id) === String(m.id));
+    const abschnitt = (titel, text, klasse = "") => (text && String(text).trim()
+      ? `<div class="methode-abschnitt${klasse}"><div class="methode-abschnitt-titel">${titel}</div>${methodeText(text)}</div>` : "");
+    const inhalt = [
+      abschnitt("Ziel", m.ziele),
+      abschnitt("Setting", m.setting),
+      abschnitt("Ablauf", m.beschreibung),
+      abschnitt(`${ic("warnung")} Sicherheit`, m.sicherheit, " methode-sicherheit"),
+      abschnitt("Reflexionsfragen", m.reflexion_fragen),
+    ].join("");
+    const dateiZeilen = dateien.map((d) => `
+        <div>${ic("anhang")} <button type="button" class="link-knopf" onclick="spielDateiOeffnen('${escapeAttr(String(d.id))}')">${escapeHtml(d.datei_name)}</button>
+          <button type="button" class="icon-knopf-klein" onclick="spielDateiLoeschen('${escapeAttr(String(d.id))}')" title="Datei entfernen" aria-label="Datei ${escapeAttr(d.datei_name)} entfernen">${ic("x")}</button></div>`).join("");
+    return `<article class="notiz-item methode-karte" id="methode-${id}">
+        <div class="methode-kopf">
+          <span class="notiz-text spiel-titel">${escapeHtml(m.titel)}</span>
+          ${spielSterne(m)}
+        </div>
+        ${m.ziele ? `<div class="notiz-meta methode-ziel-kurz">${escapeHtml(String(m.ziele).split("\n")[0])}</div>` : ""}
+        ${meta ? `<div class="notiz-meta">${meta}</div>` : ""}
+        ${m.sicherheit ? `<div class="methode-sicherheit-hinweis">${ic("warnung")} Sicherheitshinweise beachten</div>` : ""}
+        ${inhalt ? `<details class="methode-details"${offen ? " open" : ""}><summary>Ziel, Setting, Ablauf …</summary>${inhalt}</details>` : ""}
+        <div class="notiz-meta methode-fuss">
+          ${modul ? `<div>${ic("pokal")} aus ${escapeHtml(modul.titel)}</div>` : ""}
+          ${m.kategorie ? `<div>Stichwort: ${escapeHtml(m.kategorie)}</div>` : ""}
+          ${dateiZeilen}
+          <label class="link-knopf">${ic("anhang")} Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="hidden" onchange="spielDateiHinzufuegen('${id}', this)"></label>
+        </div>
+        <div class="methode-aktionen">
+          <button type="button" class="btn-secondary" onclick="blattOeffnen('methode','${id}')">${ic("stift")} Bearbeiten</button>
+          <button type="button" class="btn-secondary" onclick="methodeDrucken('${id}')">${ic("drucken")} Karte drucken</button>
+        </div>
+      </article>`;
+  }
+
+  function wbHtml(summen) {
+    const module = (wbModule || []).slice().sort((a, b) =>
+      (a.von ? 0 : 1) - (b.von ? 0 : 1) || String(a.von || "").localeCompare(String(b.von || "")) || a.titel.localeCompare(b.titel, "de"));
+    const ohneNachweis = module.filter((m) => m.status === "besucht" && !wbDateien.some((d) => String(d.modul_id) === String(m.id)));
+    const kopf = module.length ? `
+      <div class="wb-summe">
+        <div class="wb-summe-zahl"><strong>${wbZahl(summen.gesamt)}</strong> UE</div>
+        <div class="notiz-meta">${["bescheinigt", "besucht", "geplant"].filter((k) => summen[k]).map((k) => `${WB_STATUS_TEXT[k]} ${wbZahl(summen[k])}`).join(" · ") || "noch keine UE eingetragen"}</div>
+        <div class="notiz-meta">${module.length} ${module.length === 1 ? "Modul" : "Module"} · ${module.filter((m) => wbDateien.some((d) => String(d.modul_id) === String(m.id))).length} mit Nachweis</div>
+        ${ohneNachweis.length ? `<div class="wb-warnung">${ic("warnung")} ${ohneNachweis.length === 1 ? "1 besuchtes Modul" : ohneNachweis.length + " besuchte Module"} ohne Nachweis</div>` : ""}
+      </div>` : "";
+    const karten = module.map((m) => {
+      const id = escapeAttr(String(m.id));
+      const dateien = wbDateien.filter((d) => String(d.modul_id) === String(m.id));
+      const verkn = methoden.filter((x) => String(x.modul_id) === String(m.id));
+      const meta = [wbZeitraum(m), m.anbieter, m.ort, m.ue !== null && m.ue !== undefined && m.ue !== "" ? `${wbZahl(m.ue)} UE` : ""].filter(Boolean).map(escapeHtml).join(" · ");
+      return `<article class="notiz-item wb-karte" id="modul-${id}">
+          <div class="methode-kopf">
+            <span class="notiz-text spiel-titel">${escapeHtml(m.titel)}</span>
+            <span class="wb-status wb-status-${escapeAttr(m.status || "geplant")}">${WB_STATUS_TEXT[m.status] || "geplant"}</span>
+          </div>
+          <div class="notiz-meta">${meta}</div>
+          ${m.inhalte ? `<details class="methode-details"><summary>Inhalte</summary>${methodeText(m.inhalte)}</details>` : ""}
+          ${m.notiz ? `<div class="notiz-meta methode-text">${escapeHtml(m.notiz)}</div>` : ""}
+          ${verkn.length ? `<div class="notiz-meta">Methoden: ${verkn.map((x) => `<button type="button" class="link-knopf" onclick="methodeZeigen('${escapeAttr(String(x.id))}')">${escapeHtml(x.titel)}</button>`).join(", ")}</div>` : ""}
+          <div class="notiz-meta methode-fuss">
+            ${dateien.map((d) => `<div>${ic("anhang")} <button type="button" class="link-knopf" onclick="modulDateiOeffnen('${escapeAttr(String(d.id))}')">${escapeHtml(d.datei_name)}</button>
+              <span class="wb-datum-klein">(${new Date(d.hochgeladen_am).toLocaleDateString("de-DE")})</span>
+              <button type="button" class="icon-knopf-klein" onclick="modulDateiLoeschen('${escapeAttr(String(d.id))}')" title="Nachweis entfernen" aria-label="Nachweis ${escapeAttr(d.datei_name)} entfernen">${ic("x")}</button></div>`).join("")}
+            <label class="link-knopf">${ic("anhang")} Nachweis hochladen<input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" class="hidden" onchange="modulDateiHinzufuegen('${id}', this)"></label>
+          </div>
+          <div class="methode-aktionen">
+            <button type="button" class="btn-secondary" onclick="blattOeffnen('modul','${id}')">${ic("stift")} Bearbeiten</button>
+          </div>
+        </article>`;
+    }).join("");
+    return `<div class="reiter-aktionen">
+        <button type="button" class="reiter-neu" onclick="blattNeu('modul')">${ic("plus")}Neues Modul</button>
+        ${module.length ? `<button type="button" class="btn-secondary" onclick="wbUebersichtDrucken()">${ic("drucken")} Übersicht drucken</button>` : ""}
+      </div>` + kopf +
+      (module.length ? `<div class="wb-liste">${karten}</div>`
+        : `<p class="empty-text">Noch kein Modul. Lege die Module deiner Weiterbildung an – mit Zeitraum, UE und Stand – und lade Teilnahmebestätigungen und Bescheinigungen hoch (PDF, JPG, PNG, max. 5 MB).</p>`);
+  }
+
+  window.methodenAnsichtWechseln = function(a) {
+    methodenAnsicht = a === "weiterbildung" ? "weiterbildung" : "methoden";
+    try { localStorage.setItem("methoden-ansicht", methodenAnsicht); } catch (_e) { /* egal */ }
+    renderMethoden();
+  };
+  window.methodeNeu = function() {
+    // Neue Methode übernimmt die gefilterte Phase als Vorschlag
+    window.blattNeu("methode", methodePhaseFilter !== "alle" && methodePhaseFilter ? { phase: methodePhaseFilter } : {});
+  };
+  window.methodeZeigen = function(id) {
+    methodenAnsicht = "methoden";
+    methodeFokusId = id;
+    renderMethoden();
+  };
+
+  window.methodeDrucken = function(id) {
+    const m = methoden.find((x) => String(x.id) === String(id));
+    if (!m) return;
+    const zeile = (t, v) => (v ? `<tr><td style="padding:2px 10px 2px 0; color:#555; white-space:nowrap; vertical-align:top;">${t}</td><td style="padding:2px 0;">${escapeHtml(v)}</td></tr>` : "");
+    const block = (t, v, rahmen) => (v && String(v).trim() ? `<div style="margin:10px 0;${rahmen ? " border:2px solid #000; padding:6px 8px;" : ""}">
+        <div style="font-weight:bold; font-size:11pt; margin-bottom:2px;">${t}</div>
+        <div style="white-space:pre-line; font-size:11pt;">${escapeHtml(String(v).trim())}</div></div>` : "");
+    const modul = m.modul_id && (wbModule || []).find((x) => String(x.id) === String(m.modul_id));
+    htmlDrucken(`<div style="font-family: Arial, sans-serif; color:#000; max-width:180mm;">
+      <h1 style="font-size:17pt; margin:0 0 2px;">${escapeHtml(m.titel)}</h1>
+      <div style="font-size:10pt; color:#444; margin-bottom:8px;">${escapeHtml([methodePhaseText(m.phase), m.kategorie].filter(Boolean).join(" · ") || "Methode")}</div>
+      <table style="font-size:10.5pt; border-collapse:collapse;">
+        ${zeile("Teilnehmer", m.teilnehmerzahl)}${zeile("Alter", m.altersgruppe)}${zeile("Dauer", m.dauer)}${zeile("Material", m.material)}${zeile("Aus Modul", modul ? modul.titel : "")}
+      </table>
+      ${block("Ziel", m.ziele)}${block("Setting", m.setting)}${block("Ablauf", m.beschreibung)}
+      ${block("⚠ Sicherheit", m.sicherheit, true)}${block("Reflexionsfragen", m.reflexion_fragen)}
+    </div>`);
+  };
+
+  window.wbUebersichtDrucken = function() {
+    const module = (wbModule || []).slice().sort((a, b) => String(a.von || "9").localeCompare(String(b.von || "9")));
+    const s = wbSummen();
+    const zellen = "padding:4px 6px; border-bottom:1px solid #999; text-align:left; vertical-align:top;";
+    htmlDrucken(`<div style="font-family: Arial, sans-serif; color:#000; max-width:180mm;">
+      <h1 style="font-size:17pt; margin:0 0 4px;">Weiterbildung – Übersicht</h1>
+      <p style="font-size:10.5pt; margin:0 0 10px;">Stand ${new Date().toLocaleDateString("de-DE")} · gesamt ${wbZahl(s.gesamt)} UE (bescheinigt ${wbZahl(s.bescheinigt)}, besucht ${wbZahl(s.besucht)}, geplant ${wbZahl(s.geplant)})</p>
+      <table style="width:100%; border-collapse:collapse; font-size:10pt;">
+        <thead><tr><th style="${zellen}">Modul</th><th style="${zellen}">Zeitraum</th><th style="${zellen}">Anbieter / Ort</th><th style="${zellen} text-align:right;">UE</th><th style="${zellen}">Stand</th><th style="${zellen}">Nachweis</th></tr></thead>
+        <tbody>${module.map((m) => `<tr>
+          <td style="${zellen}">${escapeHtml(m.titel)}</td>
+          <td style="${zellen} white-space:nowrap;">${escapeHtml(wbZeitraum(m))}</td>
+          <td style="${zellen}">${escapeHtml([m.anbieter, m.ort].filter(Boolean).join(", "))}</td>
+          <td style="${zellen} text-align:right;">${m.ue !== null && m.ue !== undefined ? wbZahl(m.ue) : ""}</td>
+          <td style="${zellen}">${WB_STATUS_TEXT[m.status] || "geplant"}</td>
+          <td style="${zellen}">${wbDateien.some((d) => String(d.modul_id) === String(m.id)) ? "ja" : "–"}</td></tr>`).join("")}</tbody>
+      </table>
+    </div>`);
+  };
+
+  window.modulDateiHinzufuegen = async function(id, input) {
+    const datei = input.files[0];
+    input.value = "";
+    if (!datei) return;
+    if (!WB_ERLAUBTE_TYPEN.includes(datei.type)) { alert("Nur PDF, JPG oder PNG sind erlaubt."); return; }
+    if (datei.size > PROJ_MAX_BYTES) { alert("Die Datei ist größer als 5 MB."); return; }
+    try {
+      const datei_base64 = await dateiZuBase64(datei);
+      await api("modul_datei_hinzufuegen", { id, datei_base64, datei_name: datei.name, datei_typ: datei.type });
+    } catch (e) {
+      alert("Nachweis nicht gespeichert: " + (e.message || "Fehler"));
+      return;
+    }
+    modulFokusId = id;
+    await ladeDaten();
+    const m = (wbModule || []).find((x) => String(x.id) === String(id));
+    if (m && m.status !== "bescheinigt") {
+      hinweisZeigen("Nachweis gespeichert.", async () => {
+        try { await api("modul_speichern", { ...m, status: "bescheinigt" }); } catch (e) { alert("Nicht geändert: " + e.message); return; }
+        modulFokusId = id;
+        await ladeDaten();
+      }, "Als bescheinigt markieren");
+    } else {
+      hinweisZeigen("Nachweis gespeichert.");
+    }
+  };
+  window.modulDateiOeffnen = async function(dateiId) {
+    try {
+      const res = await api("modul_datei_url", { datei_id: dateiId });
+      window.open(res.url, "_blank", "noopener");
+    } catch (e) {
+      alert("Nachweis konnte nicht geöffnet werden: " + e.message);
+    }
+  };
+  window.modulDateiLoeschen = async function(dateiId) {
+    if (!confirm("Diesen Nachweis wirklich entfernen?")) return;
+    try { await api("modul_datei_loeschen", { datei_id: dateiId }); } catch (e) { alert("Nicht entfernt: " + e.message); return; }
+    await ladeDaten();
+  };
+
   // Alle Zahlen einer Woche (Montag mo) für den aktiven Bereich – ohne DOM
   function rueckDaten(mo) {
     const so = addTage(mo, 6);
@@ -963,6 +1269,8 @@
       vermietungen: sicht("raumplanung") ? meine(raumVermietungen).filter((v) => inNaechster(v.datum)).sort(nachZeit) : [],
       rueckgaben: sicht("schluessel") ? meine(schluesselAusgaben).filter((a) => !a.zurueck_am && inNaechster(a.rueckgabe_bis)) : [],
       einheiten: sicht("einheiten") ? meine(einheiten || []).filter((e) => e.status !== "durchgefuehrt" && inNaechster(e.datum)).sort(nachZeit) : [],
+      // Weiterbildungsmodule haben keinen Bereich: überall, wo der Reiter Methoden an ist
+      module: sicht("methoden") ? (wbModule || []).filter((m) => m.von && m.von <= nSo && (m.bis || m.von) >= nMo).sort((a, c) => a.von.localeCompare(c.von)) : [],
     };
     return { mo, so, nMo, nSo, erledigtAmBekannt, erledigt, liegen, termineWoche, train, geld, wochenziele, refl, naechste };
   }
@@ -1059,6 +1367,7 @@
     if (n.aufgaben.length) nTeile.push(`<h4>Fällige Aufgaben</h4>` + rueckListe(n.aufgaben, (a) => `<li><span class="rueck-text">${escapeHtml(a.titel)}</span><span class="notiz-meta">${rueckTag(a.faellig_am)}</span></li>`));
     if (n.vermietungen.length) nTeile.push(`<h4>Vermietungen</h4>` + rueckListe(n.vermietungen, (v) => `<li><span class="rueck-text">${escapeHtml(v.mieter || "Vermietung")}</span><span class="notiz-meta">${rueckTag(v.datum)}</span></li>`));
     if (n.einheiten.length) nTeile.push(`<h4>Einheiten</h4>` + rueckListe(n.einheiten, (e) => `<li><span class="rueck-text">${escapeHtml(e.titel)}</span><span class="notiz-meta">${rueckTag(e.datum)}${e.uhrzeit ? " · " + String(e.uhrzeit).slice(0, 5) : ""}</span></li>`));
+    if (n.module.length) nTeile.push(`<h4>Weiterbildung</h4>` + rueckListe(n.module, (m) => `<li><span class="rueck-text">${escapeHtml(m.titel)}</span><span class="notiz-meta">${m.bis && m.bis !== m.von ? `${rueckTag(m.von)}–${formatDatumKurz(m.bis)}` : rueckTag(m.von)}${m.ort ? " · " + escapeHtml(m.ort) : ""}</span></li>`));
     if (n.rueckgaben.length) nTeile.push(`<h4>Schlüssel-Rückgaben</h4>` + rueckListe(n.rueckgaben, (a) => `<li><span class="rueck-text">${escapeHtml(a.inhaber || "Schlüssel")}</span><span class="notiz-meta">bis ${rueckTag(a.rueckgabe_bis)}</span></li>`));
     bloecke.push(`<section class="rueck-block"><h3>${ic("weiter")} Nächste Woche · ${formatDatumKurz(d.nMo)}–${formatDatumKurz(d.nSo)}</h3>` +
       (nTeile.length ? nTeile.join("") : `<p class="notiz-meta">Noch nichts eingetragen.</p>`) + `</section>`);
@@ -1232,6 +1541,14 @@
       { typ: "spiel", gruppe: "Spiele", tab: "spiele", liste: spiele, gemeinsam: true,
         felder: (s) => ({ titel: s.titel, texte: [s.kategorie, s.beschreibung, s.material], meta: [s.kategorie || ""] }),
         oeffnen: (s) => () => window.blattOeffnen("spiel", s.id) },
+      { typ: "methode", gruppe: "Methoden", tab: "methoden", liste: methoden, gemeinsam: true,
+        felder: (m) => ({ titel: m.titel, texte: [m.kategorie, m.ziele, m.setting, m.beschreibung, m.sicherheit, m.reflexion_fragen, m.material],
+          meta: [methodePhaseText(m.phase), m.kategorie || ""] }),
+        vorher: (m) => () => { methodenAnsicht = "methoden"; methodeFokusId = m.id; }, oeffnen: () => null },
+      { typ: "modul", gruppe: "Weiterbildung", tab: "methoden", liste: wbModule || [], gemeinsam: true,
+        felder: (m) => ({ titel: m.titel, texte: [m.anbieter, m.ort, m.inhalte, m.notiz],
+          meta: [m.von ? suchDatum(m.von) : "ohne Datum", WB_STATUS_TEXT[m.status] || ""], datum: m.von }),
+        vorher: (m) => () => { methodenAnsicht = "weiterbildung"; modulFokusId = m.id; }, oeffnen: () => null },
       { typ: "einheit", gruppe: "Einheiten", tab: "einheiten", liste: einheiten || [],
         felder: (e) => ({ titel: e.titel, texte: [e.ort, e.gruppe, e.ziel, e.notiz, e.reflexion],
           meta: [e.datum ? suchDatum(e.datum) : "ohne Datum", e.status === "durchgefuehrt" ? "durchgeführt" : ""], datum: e.datum }),
@@ -2035,6 +2352,85 @@
       loeschFrage: (b) => `„${bausteinTitel(b)}“ aus dem Ablauf entfernen?`,
       gespeichert: "Ablauf gespeichert",
       danach: () => { if (aktiverTab === "einheiten") renderEinheiten(); },
+    },
+
+    // Methode (seit Session 37) – liegt in "spiele" mit art = 'methode'
+    methode: {
+      titel: "Methode bearbeiten",
+      titelNeu: "Neue Methode",
+      finden: (id) => methoden.find((m) => String(m.id) === String(id)),
+      laden: (m) => ({
+        titel: m.titel || "", phase: m.phase || "", kategorie: m.kategorie || "",
+        ziele: m.ziele || "", setting: m.setting || "", beschreibung: m.beschreibung || "",
+        sicherheit: m.sicherheit || "", reflexion: m.reflexion_fragen || "",
+        teilnehmer: m.teilnehmerzahl || "", alter: m.altersgruppe || "", dauer: m.dauer || "", material: m.material || "",
+        modul: m.modul_id || "",
+      }),
+      felder: [
+        { key: "titel", label: "Titel", typ: "text", pflicht: true, platzhalter: "z. B. Spinnennetz, Säureteich, Vertrauensfall" },
+        { key: "phase", label: "Phase", typ: "auswahl", halb: true, optionen: () => [["", "– ohne Phase –"], ...METHODE_PHASEN] },
+        { key: "kategorie", label: "Stichwort", typ: "text", halb: true, platzhalter: "z. B. Seilaufbau, Natur" },
+        { key: "ziele", label: "Ziel", typ: "text-lang", zeilen: 3, platzhalter: "Was soll die Methode bewirken? Kompetenzen, Gruppenprozess …" },
+        { key: "setting", label: "Setting", typ: "text-lang", zeilen: 2, platzhalter: "Gruppe, Gelände/Raum, Vorbereitung, Rolle der Leitung" },
+        { key: "teilnehmer", label: "Teilnehmerzahl", typ: "text", halb: true, platzhalter: "z. B. 8–14" },
+        { key: "alter", label: "Altersgruppe", typ: "text", halb: true, platzhalter: "z. B. ab 10" },
+        { key: "dauer", label: "Dauer", typ: "text", halb: true, platzhalter: "z. B. 30 Min." },
+        { key: "material", label: "Material", typ: "text", halb: true, platzhalter: "z. B. Seil, Augenbinden" },
+        { key: "beschreibung", label: "Ablauf", typ: "text-lang", zeilen: 6, platzhalter: "Aufbau, Anleitung, Regeln, Varianten" },
+        { key: "sicherheit", label: "Sicherheit", typ: "text-lang", zeilen: 3, platzhalter: "Risiken, Sicherung, Abbruchkriterien, Stopp-Regel, Freiwilligkeit" },
+        { key: "reflexion", label: "Reflexionsfragen", typ: "text-lang", zeilen: 3, platzhalter: "Fragen für die Auswertung – eine pro Zeile" },
+        { key: "modul", label: "Aus Weiterbildungsmodul", typ: "auswahl", wenn: () => Array.isArray(wbModule) && wbModule.length > 0,
+          optionen: () => [["", "– keins –"], ...(wbModule || []).slice().sort((a, b) => String(a.von || "9").localeCompare(String(b.von || "9"))).map((m) => [m.id, m.titel])] },
+      ],
+      speichern: async (id, w) => {
+        const erg = await api("methode_speichern", {
+          id, titel: w.titel, phase: w.phase || null, kategorie: w.kategorie, ziele: w.ziele, setting: w.setting,
+          beschreibung: w.beschreibung, sicherheit: w.sicherheit, reflexion_fragen: w.reflexion,
+          teilnehmerzahl: w.teilnehmer, altersgruppe: w.alter, dauer: w.dauer, material: w.material, modul_id: w.modul || null,
+        });
+        methodeFokusId = id || (erg && erg.id) || null;
+        return erg;
+      },
+      loeschen: (id) => api("spiel_loeschen", { id }),
+      loeschFrage: (m) => `Methode „${m.titel}“ inklusive Dateien löschen? In Einheiten bleibt der Programmpunkt als „gelöscht“ stehen.`,
+      gespeichert: "Methode gespeichert",
+      // kein danach: ladeDaten zeichnet den Reiter schon (sonst ginge der Fokus verloren)
+    },
+
+    // Weiterbildungsmodul (seit Session 37) – Nachweise im Reiter Methoden
+    modul: {
+      titel: "Modul bearbeiten",
+      titelNeu: "Neues Modul",
+      finden: (id) => (wbModule || []).find((m) => String(m.id) === String(id)),
+      laden: (m) => ({
+        titel: m.titel || "", status: m.status || "geplant", von: m.von || "", bis: m.bis || "",
+        anbieter: m.anbieter || "", ort: m.ort || "",
+        ue: m.ue !== undefined && m.ue !== null ? String(Number(m.ue)) : "",
+        inhalte: m.inhalte || "", notiz: m.notiz || "",
+      }),
+      felder: [
+        { key: "titel", label: "Modul", typ: "text", pflicht: true, platzhalter: "z. B. Modul 3: Klettern & Sichern" },
+        { key: "status", label: "Stand", typ: "chips", optionen: [["geplant", "Geplant"], ["besucht", "Besucht"], ["bescheinigt", "Bescheinigt"]] },
+        { key: "von", label: "Von", typ: "datum", halb: true },
+        { key: "bis", label: "Bis", typ: "datum", halb: true, hinweis: "leer = eintägig" },
+        { key: "anbieter", label: "Anbieter", typ: "text", halb: true, platzhalter: "optional" },
+        { key: "ort", label: "Ort", typ: "text", halb: true, platzhalter: "optional" },
+        { key: "ue", label: "Unterrichtseinheiten (UE)", typ: "zahl", min: 0, schritt: "0.5", platzhalter: "z. B. 16" },
+        { key: "inhalte", label: "Inhalte", typ: "text-lang", zeilen: 3, platzhalter: "Themen, gelernte Methoden, Sicherheitsstandards" },
+        { key: "notiz", label: "Notiz", typ: "text-lang", zeilen: 2, platzhalter: "z. B. offene Aufgaben, Praxisnachweis bis …" },
+      ],
+      pruefen: (w) => (w.von && w.bis && w.bis < w.von ? "„Bis“ liegt vor „Von“." : ""),
+      speichern: async (id, w) => {
+        const erg = await api("modul_speichern", {
+          id, titel: w.titel, status: w.status, von: w.von || null, bis: w.bis || null,
+          anbieter: w.anbieter, ort: w.ort, ue: w.ue, inhalte: w.inhalte, notiz: w.notiz,
+        });
+        modulFokusId = id || (erg && erg.id) || null;
+        return erg;
+      },
+      loeschen: (id) => api("modul_loeschen", { id }),
+      loeschFrage: (m) => `Modul „${m.titel}“ mit allen Nachweisen löschen? Verknüpfte Methoden bleiben.`,
+      gespeichert: "Modul gespeichert",
     },
 
     // Sparziel (seit Session 37) – Rechnung in finSparzielRechnen
@@ -2868,8 +3264,13 @@
     ogsInventar = data.ogs_inventar || [];
     ogsProjekte = data.ogs_projekte || [];
     ogsProjektDateien = data.ogs_projekt_dateien || [];
-    spiele = data.spiele || [];
+    // Methoden liegen seit Session 37 in derselben Tabelle (art = 'methode')
+    spiele = (data.spiele || []).filter((x) => x.art !== "methode");
+    methoden = (data.spiele || []).filter((x) => x.art === "methode");
     spieleDateien = data.spiele_dateien || [];
+    wbModule = Array.isArray(data.weiterbildung_module) ? data.weiterbildung_module : null;
+    wbDateien = Array.isArray(data.weiterbildung_dateien) ? data.weiterbildung_dateien : [];
+    if (aktiverTab === "methoden") renderMethoden();
     tabEinstellungen = data.tab_einstellungen || [];
     verleih = data.verleih || [];
     training = data.training || [];
@@ -3581,6 +3982,7 @@
     if (aktiv === "ogsprojekte") renderProjekte();
     if (aktiv === "spiele") renderSpiele();
     if (aktiv === "einheiten") renderEinheiten();
+    if (aktiv === "methoden") renderMethoden();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
     if (aktiv === "schluessel") renderSchluessel();
@@ -9265,18 +9667,20 @@
   // Stern antippen setzt die Bewertung; denselben Stern nochmal antippen entfernt sie.
   // Sofort anzeigen, Server im Hintergrund (wie beim Rezept-Favoriten).
   window.spielBewerten = async function(id, sterne) {
-    const s = spiele.find((x) => x.id === id);
+    const s = spielVon(id);
     if (!s) return;
     const vorher = s.bewertung ?? null;
     const neu = Number(vorher) === sterne ? null : sterne;
     s.bewertung = neu;
     renderSpiele();
     if (aktiverTab === "einheiten") renderEinheiten();
+    if (aktiverTab === "methoden") renderMethoden();
     try {
       await api("spiel_bewerten", { id, bewertung: neu });
     } catch (e) {
       s.bewertung = vorher;
       renderSpiele();
+      if (aktiverTab === "methoden") renderMethoden();
       alert("Bewertung konnte nicht gespeichert werden: " + e.message);
     }
   };
