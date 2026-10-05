@@ -392,6 +392,12 @@
         <div id="spiel-liste-bereich"></div>
       </div>
 
+      <div id="view-methoden" class="hidden">
+        <h1>Methoden <button class="hilfe-icon" data-hilfe="Methodenkartei für die Erlebnispädagogik: Methoden mit Ziel, Setting, Ablauf, Sicherheitshinweisen und Reflexionsfragen, sortiert nach Phasen. Unter „Weiterbildung“ die Module mit UE, Stand und hochgeladenen Nachweisen. Methoden und Module sind eine gemeinsame Kartei für alle Bereiche; Methoden lassen sich wie Spiele in Einheiten einplanen.">?</button></h1>
+        <p class="hero-text">Erlebnispädagogische Methoden sammeln und die Weiterbildung im Blick behalten.</p>
+        <div id="methoden-bereich"></div>
+      </div>
+
       <div id="view-einheiten" class="hidden">
         <h1>Einheiten <button class="hilfe-icon" data-hilfe="Plane Angebote und Gruppenstunden: Spiele aus der Kartei und eigene Programmpunkte (Begrüßung, Pause …) zu einem Ablauf zusammenstellen. Mit Beginn rechnet die App die Uhrzeiten, die Materialliste entsteht aus dem Material der Spiele. Kopieren als Vorlage, Drucken als Ablaufplan, nach der Einheit kurz reflektieren und die Spiele bewerten. Einheiten gehören zum Bereich, in dem du sie anlegst.">?</button></h1>
         <p class="hero-text">Spiele aus der Kartei zu einem Ablauf mit Zeiten und Materialliste zusammenstellen.</p>
@@ -779,7 +785,7 @@
       <div id="view-reiter-verwaltung" class="hidden">
         <h1>Reiter <button class="hilfe-icon" data-hilfe="Hier legst du fest, welche Reiter in Privat, OGS und AWO sichtbar sind – frei kombinierbar, auch außerhalb der ursprünglichen Zuordnung. Ausblenden entfernt einen Reiter nur aus der Seitenleiste – die Daten bleiben erhalten. Gilt geräteübergreifend, da serverseitig gespeichert.">?</button></h1>
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
-        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Raumplanung und Schlüssel sind ebenfalls bereichsgetrennt (Standard: AWO), Einheiten auch (Standard: Privat und OGS; die Spiele darin kommen aus der gemeinsamen Kartei). Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Ernährung gibt es nur in Privat und taucht hier bei den anderen Bereichen deshalb nicht auf.</p>
+        <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Raumplanung und Schlüssel sind ebenfalls bereichsgetrennt (Standard: AWO), Einheiten auch (Standard: Privat und OGS; die Spiele darin kommen aus der gemeinsamen Kartei). Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele und Methoden/Weiterbildung bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Ernährung gibt es nur in Privat und taucht hier bei den anderen Bereichen deshalb nicht auf.</p>
 
         <div id="reiter-verwaltung-liste"></div>
       </div>
@@ -1141,6 +1147,25 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Nach der Einheit:</strong> „Wie lief es?“ ausfüllen, Spiele mit Sternen bewerten (wirkt in der Spielekartei) und „Als durchgeführt speichern“ – auf Wunsch zusätzlich als Reflexion. Durchgeführte Einheiten stehen unten eingeklappt; „Wieder auf geplant“ nimmt es zurück</li>
                 <li><strong>Liste:</strong> geplante Einheiten nach Datum (ohne Datum am Ende), „vorbei“ wenn das Datum verstrichen ist. Einheiten der nächsten Woche stehen auch im Wochenrückblick, und die Suche findet sie</li>
                 <li><strong>Datenschutz:</strong> keine Namen von Kindern in Gruppe, Notiz oder Reflexion – Gruppe als „3b“ oder „8–12 J.“</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Methoden &amp; Weiterbildung <span class="anleitung-nur">(Standard: nur Privat, per Reiter-Verwaltung überall – gemeinsame Kartei)</span></summary>
+            <div class="anleitung-text">
+              <p>Methodenkartei für die Erlebnispädagogik und Nachweise der Weiterbildungsmodule (seit Session 37). Oben umschalten zwischen <strong>Methoden</strong> und <strong>Weiterbildung</strong> – die App merkt sich die Ansicht.</p>
+              <ul>
+                <li><strong>„+ Neue Methode“:</strong> Titel (Pflicht), Phase, Stichwort, Ziel, Setting, Teilnehmer, Alter, Dauer, Material, Ablauf, Sicherheit, Reflexionsfragen und optional das Modul, aus dem sie stammt. Ist oben eine Phase gefiltert, ist sie schon vorgewählt</li>
+                <li><strong>Phasen:</strong> Ankommen &amp; Warm-up, Kooperation, Vertrauen, Problemlösung, Herausforderung, Reflexion &amp; Abschluss – die Liste ist danach gruppiert, innerhalb der Phase beste Bewertung zuerst. Suche und Phasenfilter oben</li>
+                <li><strong>Karte:</strong> Titel, Sterne, erste Zeile des Ziels und die Eckdaten. <svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-warnung"></use></svg> „Sicherheitshinweise beachten“, sobald etwas im Feld Sicherheit steht. „Ziel, Setting, Ablauf …“ klappt alles auf, Sicherheit ist dort farbig umrandet</li>
+                <li><strong>Dateien</strong> (PDF, Word, max. 5 MB) wie bei den Spielen, <strong>Karte drucken</strong> öffnet den Druckdialog mit der ganzen Methode – die Sicherheit steht im Kasten</li>
+                <li><strong>In Einheiten:</strong> Methoden erscheinen in „+ Spiel aus der Kartei“ mit dem Zusatz „Methode“. Material und Dauer werden wie bei Spielen übernommen. In der Spielekartei selbst tauchen Methoden nicht auf</li>
+                <li><strong>Weiterbildung:</strong> „+ Neues Modul“ mit Stand (geplant, besucht, bescheinigt), Von/Bis (Bis leer = eintägig), Anbieter, Ort, UE, Inhalten und Notiz. Oben die UE-Summe gesamt und je Stand, dazu ein Hinweis auf besuchte Module ohne Nachweis</li>
+                <li><strong>Nachweise:</strong> „Nachweis hochladen“ nimmt PDF, JPG oder PNG bis 5 MB. Danach bietet die App an, das Modul als bescheinigt zu markieren. Öffnen über einen Link, der 5 Minuten gilt</li>
+                <li><strong>Übersicht drucken:</strong> Tabelle aller Module mit Zeitraum, UE, Stand und ob ein Nachweis da ist – praktisch für den Abschluss der Weiterbildung oder den Arbeitgeber</li>
+                <li>Methoden und Module findet die globale Suche; Module der nächsten Woche stehen im Wochenrückblick</li>
+                <li><strong>Datenschutz:</strong> Bescheinigungen enthalten deinen Namen und oft das Geburtsdatum. Sie liegen in einem eigenen, nicht öffentlichen Speicher und sind nur über kurzlebige Links erreichbar. Der Reiter ist nur in Privat an – blendest du ihn woanders ein, sind die Nachweise auch dort sichtbar</li>
               </ul>
             </div>
           </details>
