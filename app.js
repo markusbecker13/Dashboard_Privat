@@ -39,7 +39,8 @@
   let buchungen = [];
   let finanzEinstellungen = [];
   let kategorieRegeln = null; // Kategorie-Regeln (seit Session 36); null = SQL/index.ts fehlt
-  let finRegelnOffen = false; // Block „Kategorie-Regeln“ in Buchungen aufgeklappt
+  let finRegelnOffen = false;
+  let sparziele = null; // Sparziele (seit Session 37); null = SQL/index.ts fehlt // Block „Kategorie-Regeln“ in Buchungen aufgeklappt
   let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben"
   let finBearbeitetesFixkosten = null; // id oder null
   let finBearbeiteteSonderausgabe = null; // id oder null
@@ -1023,6 +1024,40 @@
       gespeichert: "Idee gespeichert",
     },
 
+    // Sparziel (seit Session 37) – Rechnung in finSparzielRechnen
+    sparziel: {
+      titel: "Sparziel bearbeiten",
+      titelNeu: "Neues Sparziel",
+      finden: (id) => (sparziele || []).find((s) => String(s.id) === String(id)),
+      laden: (s) => ({
+        titel: s.titel || "",
+        art: s.art === "kontostand" ? "kontostand" : "zuruecklegen",
+        betrag: s.betrag !== undefined && s.betrag !== null ? String(finZahl(s.betrag)) : "",
+        bis: s.bis || "",
+        start: s.start_stand !== undefined && s.start_stand !== null ? String(finZahl(s.start_stand)) : "",
+      }),
+      felder: [
+        { key: "titel", label: "Wofür?", typ: "text", pflicht: true, platzhalter: "z. B. Urlaub, Rücklage, neues Rad" },
+        { key: "art", label: "Art", typ: "chips", optionen: [["zuruecklegen", "Zurücklegen"], ["kontostand", "Kontostand erreichen"]] },
+        { key: "betrag", label: "Betrag (€)", typ: "zahl", min: 1, schritt: "0.01", pflicht: true, halb: true },
+        { key: "bis", label: "Bis", typ: "datum", pflicht: true, halb: true, hinweis: "zählt das Monatsende" },
+        { key: "start", label: "Ab Kontostand (€)", typ: "zahl", schritt: "0.01", wenn: (w) => w.art === "zuruecklegen",
+          hinweis: "Stand beim Anlegen – ab hier zählt, was du zurücklegst." },
+      ],
+      pruefen: (w) => {
+        if (!(finZahl(w.betrag) > 0)) return "Der Betrag muss größer als 0 sein.";
+        if (w.art === "zuruecklegen" && w.start === "") return "Bitte den Kontostand eintragen, ab dem gezählt wird.";
+        return "";
+      },
+      speichern: (id, w) => api("sparziel_speichern", {
+        id, bereich: aktiverBereich, titel: w.titel, art: w.art, betrag: w.betrag, bis: w.bis, start_stand: w.start,
+      }),
+      loeschen: (id) => api("sparziel_loeschen", { id }),
+      loeschFrage: (s) => `Sparziel „${s.titel || ""}“ löschen?`,
+      gespeichert: "Sparziel gespeichert",
+      danach: () => { if (aktiverTab === "finanzen" && finTyp === "prognose") renderFinPrognose(false); },
+    },
+
     // Kategorie-Regel (seit Session 36): „Buchungstext beginnt mit … → Kategorie“
     katregel: {
       titel: "Kategorie-Regel bearbeiten",
@@ -1811,6 +1846,7 @@
     buchungen = data.buchungen || [];
     finanzEinstellungen = data.finanz_einstellungen || [];
     kategorieRegeln = Array.isArray(data.kategorie_regeln) ? data.kategorie_regeln : null;
+    sparziele = Array.isArray(data.sparziele) ? data.sparziele : null;
     ogsIdeen = data.ogs_ideen || [];
     ogsInventar = data.ogs_inventar || [];
     ogsProjekte = data.ogs_projekte || [];
@@ -12220,6 +12256,133 @@
     });
   };
 
+  // ---- Sparziele (seit Session 37) ----
+  // Ein Ziel ist ein Kontostand am Ende des Ziel-Monats: bei „Zurücklegen“
+  // Start-Kontostand + Betrag, bei „Kontostand erreichen“ der Betrag selbst.
+  // Der erwartete Stand kommt aus der Prognose (inkl. Anpassung); liegt der
+  // Monat hinter dem Prognose-Zeitraum, wird mit dem Ø pro Monat weitergerechnet.
+  function sparzieleAktuell() {
+    return (sparziele || []).filter((s) => bereichVon(s) === aktiverBereich)
+      .sort((a, b) => String(a.bis).localeCompare(String(b.bis)));
+  }
+  function finMonateZwischen(von, bis) {
+    const [ja, ma] = von.split("-").map(Number);
+    const [jb, mb] = bis.split("-").map(Number);
+    return (jb - ja) * 12 + (mb - ma);
+  }
+  function finSparzielRechnen(z, r) {
+    const aktMonat = r.zeilen.find((x) => x.art === "jetzt").monat;
+    const betrag = finZahl(z.betrag);
+    const kontostandArt = z.art === "kontostand";
+    const basis = kontostandArt ? 0 : finZahl(z.start_stand);
+    const zielStand = kontostandArt ? betrag : basis + betrag;
+    const zielMonat = String(z.bis || "").slice(0, 7);
+    const diff = finMonateZwischen(aktMonat, zielMonat);
+    const gespart = r.heuteStand - basis;
+    const anteil = Math.max(0, Math.min(1, gespart / (zielStand - basis || 1)));
+    const erreicht = r.heuteStand >= zielStand;
+    const e = { z, kontostandArt, betrag, basis, zielStand, zielMonat, diff, gespart, anteil, erreicht,
+      standZiel: null, fehlt: null, proMonat: null, ausserhalb: false, status: "" };
+    if (erreicht) { e.status = "geschafft"; return e; }
+    if (diff < 0) { e.status = "abgelaufen"; return e; }
+    const zeile = r.zeilen.find((x) => x.monat === zielMonat && x.art !== "ist");
+    if (zeile) e.standZiel = zeile.kontostand;
+    else {
+      e.standZiel = r.ende.kontostand + r.saldo * finMonateZwischen(r.ende.monat, zielMonat);
+      e.ausserhalb = true;
+    }
+    e.fehlt = zielStand - e.standZiel;
+    if (e.fehlt <= 0) e.status = "aufKurs";
+    else {
+      e.status = "fehlt";
+      if (diff > 0) e.proMonat = Math.ceil(e.fehlt / diff / 5) * 5;
+    }
+    return e;
+  }
+
+  function finSparzieleHtml(r) {
+    if (sparziele === null) {
+      return `<div class="fin-chart-wrap fin-ziele" id="fin-ziele"><h3>Sparziele</h3>
+        <p class="empty-text" style="margin:0;">Für Sparziele bitte zuerst <code>sparziele_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p></div>`;
+    }
+    // Offene Ziele zuerst (nach Datum), danach geschaffte und abgelaufene
+    const erledigt = (e) => (e.status === "geschafft" || e.status === "abgelaufen" ? 1 : 0);
+    const liste = sparzieleAktuell().map((z) => finSparzielRechnen(z, r)).sort((a, b) => erledigt(a) - erledigt(b));
+    const monat = (k) => finMonatLabel(k);
+    const zeilen = liste.map((e) => {
+      const z = e.z;
+      const kopf = e.kontostandArt
+        ? `Kontostand ${finEuro(e.betrag)} bis ${monat(e.zielMonat)}`
+        : `${finEuro(e.betrag)} zurücklegen bis ${monat(e.zielMonat)}`;
+      const fortschritt = e.kontostandArt
+        ? `heute ${finEuro(r.heuteStand)} von ${finEuro(e.zielStand)}`
+        : `${finEuro(Math.max(0, e.gespart))} von ${finEuro(e.betrag)} zurückgelegt`;
+      const weiter = e.ausserhalb ? " (über den Prognose-Zeitraum hinaus mit dem Ø weitergerechnet)" : "";
+      let text = "";
+      let knopf = "";
+      if (e.status === "geschafft") text = `${ic("ok-kreis")} Geschafft – heute ${finEuro(r.heuteStand)}.`;
+      else if (e.status === "abgelaufen") text = `Zieldatum vorbei – heute fehlen ${finEuro(e.zielStand - r.heuteStand)}.`;
+      else if (e.status === "aufKurs") text = `Wie bisher klappt es: Ende ${monat(e.zielMonat)} etwa ${finEuro(e.standZiel)}, ${finEuro(-e.fehlt)} Puffer${weiter}.`;
+      else if (e.proMonat) {
+        text = `Wie bisher fehlen Ende ${monat(e.zielMonat)} etwa <strong>${finEuro(e.fehlt)}</strong>${weiter}. Dafür bräuchtest du rund <strong>${finEuro(e.proMonat)} mehr pro Monat</strong>.`;
+        knopf = `<button type="button" class="btn-secondary" onclick="finSparzielDurchrechnen('${escapeAttr(String(z.id))}')">In der Prognose durchrechnen</button>`;
+      } else text = `Bis Ende ${monat(e.zielMonat)} fehlen etwa <strong>${finEuro(e.fehlt)}</strong> – in diesem Monat kaum noch aufzuholen.`;
+      return `
+        <div class="fin-ziel fin-ziel-${e.status}">
+          <button type="button" class="fin-ziel-info" onclick="blattOeffnen('sparziel','${escapeAttr(String(z.id))}')">
+            <span class="fin-ziel-titel">${escapeHtml(z.titel)}</span>
+            <span class="notiz-meta">${kopf}</span>
+          </button>
+          <span class="fin-kat-balken fin-ziel-balken" aria-hidden="true"><span style="width:${Math.max(2, Math.round(e.anteil * 100))}%;"></span></span>
+          <span class="fin-kat-meta fin-ziel-meta">${fortschritt} · ${Math.round(e.anteil * 100)} %</span>
+          <p class="fin-ziel-text">${text}</p>
+          ${knopf}
+        </div>`;
+    }).join("");
+    const offen = liste.filter((e) => e.status !== "geschafft" && e.status !== "abgelaufen").length;
+    const hinweise = [];
+    if (offen > 1) hinweise.push("Jedes Ziel ist einzeln gerechnet – alle teilen sich dasselbe Konto.");
+    if (finZahl(finPrognoseOpt.anpassung)) hinweise.push(`Mit deiner Anpassung von ${finEuro(finZahl(finPrognoseOpt.anpassung))} pro Monat gerechnet.`);
+    return `
+      <div class="fin-chart-wrap fin-ziele" id="fin-ziele">
+        <div class="fin-ziele-kopf">
+          <h3>Sparziele</h3>
+          <button type="button" class="btn-secondary" onclick="finSparzielNeu()">${ic("plus")}Sparziel</button>
+        </div>
+        ${zeilen || `<p class="notiz-meta" style="margin:0;">Zum Beispiel „Urlaub: 1.500 € bis Juli“ – die App rechnet mit der Prognose, ob es klappt und was dafür pro Monat fehlt.</p>`}
+        ${hinweise.map((h) => `<p class="notiz-meta fin-ziele-hinweis">${escapeHtml(h)}</p>`).join("")}
+      </div>`;
+  }
+
+  window.finSparzielNeu = function() {
+    if (sparziele === null) {
+      alert("Für Sparziele bitte zuerst sparziele_setup.sql in Supabase ausführen und die neue index.ts einspielen.");
+      return;
+    }
+    const r = finPrognoseDaten ? finPrognoseRechnen(finPrognoseDaten, finPrognoseOpt, sonderausgabenAktuell()) : null;
+    const heute = new Date();
+    const bis = new Date(heute.getFullYear(), heute.getMonth() + 7, 0); // Ende des Monats in 6 Monaten
+    const bisIso = `${bis.getFullYear()}-${String(bis.getMonth() + 1).padStart(2, "0")}-${String(bis.getDate()).padStart(2, "0")}`;
+    window.blattNeu("sparziel", { art: "zuruecklegen", bis: bisIso, start_stand: r ? Math.round(r.heuteStand) : "" });
+  };
+
+  // Setzt die Anpassung so, dass das Ziel erreicht würde (mit Rückgängig)
+  window.finSparzielDurchrechnen = function(id) {
+    if (!finPrognoseDaten) return;
+    const z = (sparziele || []).find((s) => String(s.id) === String(id));
+    if (!z) return;
+    const r = finPrognoseRechnen(finPrognoseDaten, finPrognoseOpt, sonderausgabenAktuell());
+    const e = finSparzielRechnen(z, r);
+    if (!e.proMonat) return;
+    const vorher = finZahl(finPrognoseOpt.anpassung);
+    window.finPrognoseSetzen("anpassung", vorher + e.proMonat);
+    const aussage = document.querySelector("#fin-prognose-bereich .fin-prognose-aussage");
+    if (aussage) aussage.scrollIntoView({ behavior: "smooth", block: "center" });
+    hinweisZeigen(`Prognose mit ${finEuro(e.proMonat)} mehr pro Monat für „${z.titel}“`, () => {
+      window.finPrognoseSetzen("anpassung", vorher);
+    });
+  };
+
   // Liniendiagramm: Ist (durchgezogen) und Prognose (gestrichelt), Null-Linie
   function finChartPrognose(zeilen) {
     // Schmale Zeichenfläche, damit die Schrift am Handy lesbar bleibt
@@ -12350,6 +12513,8 @@
         </div>
       </div>
 
+      ${finSparzieleHtml(r)}
+
       <div class="fin-chart-wrap">
         <h3>Kontostand: bisher und Prognose</h3>
         ${finChartPrognose(r.zeilen)}
@@ -12376,6 +12541,7 @@
           <li><strong>Heute:</strong> Startkapital ${finPrognoseDaten.jahr} plus alle Buchungen seit 1. Januar = ${finEuro(r.heuteStand)}.</li>
           <li><strong>Laufender Monat:</strong> bereits gebucht ${finEuro(r.zeilen.find((z) => z.art === "jetzt").gebuchtE)} rein / ${finEuro(r.zeilen.find((z) => z.art === "jetzt").gebuchtA)} raus; was zum Durchschnitt noch fehlt, wird ergänzt.</li>
           <li><strong>Danach</strong> jeden Monat der Durchschnitt${finPrognoseOpt.sonder ? ", abzüglich geplanter Sonderausgaben mit Monat" : ""}${finZahl(finPrognoseOpt.anpassung) ? `, plus deine Anpassung von ${finEuro(finZahl(finPrognoseOpt.anpassung))}` : ""}.</li>
+          <li><strong>Sparziele:</strong> Ziel ist der Kontostand am Ende des Ziel-Monats – bei „Zurücklegen“ der Stand beim Anlegen plus Betrag. Verglichen wird mit dem Prognose-Kontostand in diesem Monat (inkl. Anpassung); liegt er hinter dem gewählten Zeitraum, mit dem Ø pro Monat weitergerechnet. „Pro Monat mehr“ = Fehlbetrag geteilt durch die Monate bis dahin, auf 5 € aufgerundet.</li>
           <li><strong>Wo geht das Geld hin?</strong> Gleiche Grundlage-Monate, nur Ausgaben, nach der Kategorie der Buchung. Empfänger = die ersten Wörter des Buchungstexts ohne Zahlen. „In der Prognose durchrechnen“ setzt 10 % der Kategorie als Anpassung oben ein.</li>
           <li><strong>Grenzen:</strong> Es ist eine Fortschreibung, kein Versprechen. Jährliche Zahlungen (Versicherung, Steuer) verteilt der Durchschnitt gleichmäßig – mit 12 oder 24 Monaten Grundlage sind sie am besten abgebildet. Einmalige große Posten der Grundlage-Monate ziehen den Schnitt mit.</li>
         </ul>
