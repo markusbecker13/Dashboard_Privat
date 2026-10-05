@@ -3739,6 +3739,7 @@
           // Seit Session 34: direkt im zuletzt genutzten Bereich starten
           appImLetztenBereichOeffnen();
         }
+        pushStillAuffrischen();
 
         if (googleCode) {
           try {
@@ -3891,6 +3892,274 @@
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
+    // Antippen einer Benachrichtigung bei offener App: Reiter wechseln
+    navigator.serviceWorker.addEventListener("message", (e) => {
+      const d = e.data || {};
+      if (d.typ === "push-tab" && VIEW_ELEMENTE[d.tab] && !document.getElementById("app").classList.contains("hidden")) {
+        if (aktiverBereich === "verwaltung" || !reiterIstSichtbar(aktiverBereich, d.tab)) {
+          const ziel = BEREICH_FARBWELT.find((b) => reiterIstSichtbar(b, d.tab));
+          if (ziel) window.bereichAuswaehlen(ziel);
+        }
+        tabWechseln(d.tab);
+      }
+    });
+  }
+
+  // ==========================================================
+  // Benachrichtigungen / Push (seit Session 37, Etappe 6)
+  // Abo je Gerät (PushManager), Einstellungen für alle Geräte auf dem
+  // Server, Versand per Cron in der Edge Function.
+  // ==========================================================
+  const push = { laden: false, fehlt: false, fehler: "", publicKey: "", einst: null, abos: [], abo: null, meldung: "" };
+  const PUSH_VORLAUF = [[0, "pünktlich"], [10, "10 Min."], [15, "15 Min."], [30, "30 Min."], [60, "1 Std."]];
+
+  function pushUnterstuetzt() {
+    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  }
+  function pushIstIos() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+  function pushIstInstalliert() {
+    return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+  }
+  function pushGeraetName() {
+    const ua = navigator.userAgent;
+    const sys = /Android/.test(ua) ? "Android" : pushIstIos() ? (/iPad/.test(ua) ? "iPad" : "iPhone") : /Windows/.test(ua) ? "Windows"
+      : /Mac OS X/.test(ua) ? "Mac" : /CrOS/.test(ua) ? "ChromeOS" : /Linux/.test(ua) ? "Linux" : "Gerät";
+    const br = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /SamsungBrowser/.test(ua) ? "Samsung Internet"
+      : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Browser";
+    return `${sys} · ${br}${pushIstInstalliert() ? " (App)" : ""}`;
+  }
+  function pushSchluesselBytes(b64) {
+    const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+    const roh = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(roh, (c) => c.charCodeAt(0));
+  }
+  function pushAboDaten(abo) {
+    const j = abo.toJSON();
+    return { endpoint: j.endpoint, p256dh: j.keys && j.keys.p256dh, auth: j.keys && j.keys.auth };
+  }
+  async function pushRegistrierung() {
+    if (!pushUnterstuetzt()) return null;
+    try { return await navigator.serviceWorker.ready; } catch (_e) { return null; }
+  }
+
+  window.pushOeffnen = async function() {
+    const dlg = document.getElementById("push-dialog");
+    if (!dlg) return;
+    if (typeof kontoMenuSchliessen === "function") kontoMenuSchliessen();
+    push.meldung = "";
+    if (typeof dlg.showModal === "function") { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute("open", "");
+    await pushLaden();
+  };
+  window.pushSchliessen = function() {
+    const dlg = document.getElementById("push-dialog");
+    if (dlg && dlg.open && typeof dlg.close === "function") dlg.close(); else if (dlg) dlg.removeAttribute("open");
+  };
+
+  async function pushLaden() {
+    push.laden = true; push.fehler = ""; pushRendern();
+    const reg = await pushRegistrierung();
+    push.abo = null;
+    if (reg && reg.pushManager) { try { push.abo = await reg.pushManager.getSubscription(); } catch (_e) { push.abo = null; } }
+    try {
+      const r = await api("push_status", { origin: location.origin, endpoint: push.abo ? push.abo.endpoint : null });
+      push.fehlt = !!r.fehlt;
+      push.publicKey = r.public_key || "";
+      push.einst = r.einstellungen || null;
+      push.abos = r.abos || [];
+    } catch (e) {
+      push.fehler = e.message || "Fehler";
+    }
+    push.laden = false;
+    pushRendern();
+  }
+
+  // Ist das lokale Abo auf dem Server bekannt?
+  function pushDiesesAktiv() {
+    return !!push.abo && push.abos.some((a) => a.dieses);
+  }
+
+  function pushRendern() {
+    const box = document.getElementById("push-inhalt");
+    if (!box) return;
+    if (push.laden && !push.einst) { box.innerHTML = `<p class="notiz-meta">Lade …</p>`; return; }
+    if (push.fehlt) { box.innerHTML = `<p class="empty-text">Für Push-Erinnerungen bitte zuerst <code>push_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`; return; }
+    if (push.fehler && !push.einst) { box.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(push.fehler)}</p>`; return; }
+    const e = push.einst || {};
+    const bereiche = Array.isArray(e.bereiche) ? e.bereiche : [];
+    // Dieses Gerät
+    let geraet;
+    if (!pushUnterstuetzt()) {
+      geraet = pushIstIos() && !pushIstInstalliert()
+        ? `<p class="notiz-meta">Auf iPhone und iPad gehen Benachrichtigungen nur aus der installierten App: in Safari „Teilen → Zum Home-Bildschirm“, dann die App von dort öffnen und hier einschalten.</p>`
+        : `<p class="notiz-meta">Dieser Browser kann keine Push-Benachrichtigungen.</p>`;
+    } else if (Notification.permission === "denied") {
+      geraet = `<p class="push-status push-aus">${ic("x-kreis")} Blockiert</p><p class="notiz-meta">Benachrichtigungen sind für diese Seite im Browser gesperrt. In den Website-Einstellungen (Schloss-Symbol neben der Adresse) „Benachrichtigungen → Zulassen“ wählen und hier neu öffnen.</p>`;
+    } else if (pushDiesesAktiv()) {
+      geraet = `<p class="push-status push-an">${ic("ok-kreis")} An – ${escapeHtml(pushGeraetName())}</p>
+        <div class="push-knoepfe"><button type="button" class="btn-secondary" onclick="pushTest(true)">Test an dieses Gerät</button>
+        <button type="button" class="btn-secondary" onclick="pushAusschalten()">Ausschalten</button></div>`;
+    } else {
+      geraet = `<p class="push-status push-aus">Aus</p>
+        <button type="button" class="btn-primary" id="push-einschalten" onclick="pushEinschalten()">${ic("glocke")} Auf diesem Gerät einschalten</button>`;
+    }
+    const chips = (name, liste, aktiv) => liste.map(([w, t]) => `<button type="button" class="schnell-chip${aktiv(w) ? " aktiv" : ""}" aria-pressed="${aktiv(w)}" onclick="pushWahl('${name}','${w}')">${escapeHtml(t)}</button>`).join("");
+    const geraete = push.abos.map((a) => `<li>
+        <span class="push-geraet-name">${escapeHtml(a.geraet || "Gerät")}${a.dieses ? " <em>(dieses)</em>" : ""}</span>
+        <span class="notiz-meta">seit ${new Date(a.erstellt_am).toLocaleDateString("de-DE")}${a.fehler ? ` · ${a.fehler} Fehlversuche` : ""}</span>
+        <button type="button" class="icon-knopf-klein" onclick="pushGeraetEntfernen('${escapeAttr(String(a.id))}')" aria-label="${escapeAttr(a.geraet || "Gerät")} entfernen" title="Entfernen">${ic("x")}</button>
+      </li>`).join("");
+    box.innerHTML = `
+      <section class="push-block">
+        <h3>Dieses Gerät</h3>
+        ${geraet}
+      </section>
+      <section class="push-block">
+        <h3>Was soll kommen? <span class="notiz-meta push-fuer-alle">gilt für alle Geräte</span></h3>
+        <label class="push-schalter"><input type="checkbox" id="push-morgens"${e.morgens_an ? " checked" : ""}> Morgen-Übersicht um
+          <input type="time" id="push-morgens-zeit" value="${escapeAttr(String(e.morgens_uhrzeit || "07:00").slice(0, 5))}" aria-label="Uhrzeit der Morgen-Übersicht"></label>
+        <p class="notiz-meta push-erklaerung">Termine, fällige Aufgaben, Einheiten und Weiterbildung des Tages – an leeren Tagen kommt nichts.</p>
+        <label class="push-schalter"><input type="checkbox" id="push-termine"${e.termine_an ? " checked" : ""}> Vor Terminen und Aufgaben mit Uhrzeit</label>
+        <div class="schnell-chips push-chips" role="group" aria-label="Vorlauf">${chips("vorlauf", PUSH_VORLAUF.map(([w, t]) => [String(w), t]), (w) => Number(w) === Number(e.vorlauf_min))}</div>
+        <div class="schnell-label push-label">Bereiche</div>
+        <div class="schnell-chips push-chips" role="group" aria-label="Bereiche">${chips("bereich", BEREICH_FARBWELT.map((b) => [b, BEREICH_KNOPF_TEXT[b] || b]), (w) => bereiche.includes(w))}</div>
+        <div class="schnell-label push-label">Auf dem Sperrbildschirm</div>
+        <div class="schnell-chips push-chips" role="group" aria-label="Sperrbildschirm">${chips("titel", [["mit", "Mit Titeln"], ["ohne", "Nur Uhrzeit"]], (w) => (w === "ohne") === !!e.ohne_titel)}</div>
+        <button type="button" class="btn-primary push-speichern" onclick="pushEinstellungenSpeichern()">Speichern</button>
+      </section>
+      <section class="push-block">
+        <h3>Angemeldete Geräte</h3>
+        ${push.abos.length ? `<ul class="push-geraete">${geraete}</ul>
+          <button type="button" class="btn-secondary" onclick="pushTest(false)">Test an alle senden</button>` : `<p class="notiz-meta">Noch kein Gerät.</p>`}
+      </section>
+      <p class="schnell-status push-meldung" role="status" aria-live="polite">${escapeHtml(push.meldung || push.fehler || "")}</p>`;
+    // Eingaben merken, damit Neuzeichnen (Chips) nichts verliert
+    const merk = () => {
+      if (!push.einst) return;
+      push.einst.morgens_an = document.getElementById("push-morgens").checked;
+      push.einst.morgens_uhrzeit = document.getElementById("push-morgens-zeit").value || "07:00";
+      push.einst.termine_an = document.getElementById("push-termine").checked;
+    };
+    ["push-morgens", "push-morgens-zeit", "push-termine"].forEach((id) => document.getElementById(id).addEventListener("change", merk));
+  }
+
+  window.pushWahl = function(name, wert) {
+    const e = push.einst;
+    if (!e) return;
+    if (name === "vorlauf") e.vorlauf_min = Number(wert);
+    if (name === "titel") e.ohne_titel = wert === "ohne";
+    if (name === "bereich") {
+      const b = new Set(Array.isArray(e.bereiche) ? e.bereiche : []);
+      if (b.has(wert)) b.delete(wert); else b.add(wert);
+      e.bereiche = BEREICH_FARBWELT.filter((x) => b.has(x));
+    }
+    pushRendern();
+  };
+
+  window.pushEinstellungenSpeichern = async function() {
+    const e = push.einst;
+    if (!e) return;
+    if (!e.bereiche || !e.bereiche.length) { push.meldung = "Bitte mindestens einen Bereich wählen."; pushRendern(); return; }
+    try {
+      await api("push_einstellungen_speichern", {
+        morgens_an: !!e.morgens_an, morgens_uhrzeit: String(e.morgens_uhrzeit || "07:00").slice(0, 5), termine_an: !!e.termine_an,
+        vorlauf_min: Number(e.vorlauf_min) || 0, bereiche: e.bereiche, ohne_titel: !!e.ohne_titel,
+      });
+      push.meldung = "Gespeichert.";
+    } catch (err) {
+      push.meldung = "Nicht gespeichert: " + (err.message || "Fehler");
+    }
+    pushRendern();
+  };
+
+  window.pushEinschalten = async function() {
+    const knopf = document.getElementById("push-einschalten");
+    if (knopf) knopf.disabled = true;
+    try {
+      const erlaubnis = await Notification.requestPermission();
+      if (erlaubnis !== "granted") {
+        push.meldung = erlaubnis === "denied" ? "Benachrichtigungen wurden abgelehnt." : "Keine Erlaubnis erteilt.";
+        pushRendern();
+        return;
+      }
+      const reg = await pushRegistrierung();
+      if (!reg || !push.publicKey) throw new Error("Service Worker nicht bereit – App neu laden und nochmal versuchen.");
+      let abo = await reg.pushManager.getSubscription();
+      // Abo mit einem anderen Schlüssel (z. B. alter Test) ersetzen
+      if (abo && abo.options && abo.options.applicationServerKey) {
+        const alt = new Uint8Array(abo.options.applicationServerKey);
+        const neu = pushSchluesselBytes(push.publicKey);
+        if (alt.length !== neu.length || alt.some((v, i) => v !== neu[i])) { await abo.unsubscribe(); abo = null; }
+      }
+      if (!abo) abo = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pushSchluesselBytes(push.publicKey) });
+      await api("push_abo_speichern", { ...pushAboDaten(abo), geraet: pushGeraetName() });
+      try { localStorage.setItem("push-an", "1"); } catch (_e) { /* egal */ }
+      push.meldung = "Eingeschaltet. Mit „Test an dieses Gerät“ prüfen.";
+    } catch (err) {
+      push.meldung = "Nicht eingeschaltet: " + (err.message || "Fehler");
+    }
+    await pushLaden();
+  };
+
+  window.pushAusschalten = async function() {
+    const abo = push.abo;
+    try {
+      if (abo) {
+        await api("push_abo_loeschen", { endpoint: abo.endpoint });
+        await abo.unsubscribe().catch(() => {});
+      }
+      try { localStorage.removeItem("push-an"); } catch (_e) { /* egal */ }
+      push.meldung = "Auf diesem Gerät ausgeschaltet.";
+    } catch (err) {
+      push.meldung = "Nicht ausgeschaltet: " + (err.message || "Fehler");
+    }
+    await pushLaden();
+  };
+
+  window.pushGeraetEntfernen = async function(id) {
+    const a = push.abos.find((x) => String(x.id) === String(id));
+    if (!a || !confirm(`„${a.geraet || "Gerät"}“ abmelden? Es bekommt dann keine Benachrichtigungen mehr.`)) return;
+    try {
+      await api("push_abo_loeschen", { id });
+      if (a.dieses && push.abo) { await push.abo.unsubscribe().catch(() => {}); try { localStorage.removeItem("push-an"); } catch (_e) { /* egal */ } }
+      push.meldung = "Gerät entfernt.";
+    } catch (err) {
+      push.meldung = "Nicht entfernt: " + (err.message || "Fehler");
+    }
+    await pushLaden();
+  };
+
+  window.pushTest = async function(nurDieses) {
+    push.meldung = "Sende …"; pushRendern();
+    try {
+      const r = await api("push_test", { endpoint: nurDieses && push.abo ? push.abo.endpoint : null });
+      push.meldung = r.gesendet === r.geraete
+        ? `Test verschickt (${r.gesendet} ${r.gesendet === 1 ? "Gerät" : "Geräte"}). Kommt nichts, die Benachrichtigungs-Einstellungen des Geräts prüfen.`
+        : `Test an ${r.gesendet} von ${r.geraete} Geräten zugestellt – nicht erreichbare Geräte werden nach einiger Zeit entfernt.`;
+    } catch (err) {
+      push.meldung = "Test fehlgeschlagen: " + (err.message || "Fehler");
+    }
+    await pushLaden();
+  };
+
+  // Beim Start still prüfen: War Push hier an, das Abo aber neu/abgelaufen,
+  // wird es neu angelegt und gemeldet (Browser erneuern Abos gelegentlich)
+  async function pushStillAuffrischen() {
+    let an = false;
+    try { an = localStorage.getItem("push-an") === "1"; } catch (_e) { an = false; }
+    if (!an || !pushUnterstuetzt() || Notification.permission !== "granted") return;
+    try {
+      const reg = await pushRegistrierung();
+      if (!reg) return;
+      let abo = await reg.pushManager.getSubscription();
+      if (!abo) {
+        const r = await api("push_status", { origin: location.origin });
+        if (!r.public_key) return;
+        abo = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pushSchluesselBytes(r.public_key) });
+      }
+      await api("push_abo_speichern", { ...pushAboDaten(abo), geraet: pushGeraetName() });
+    } catch (_e) { /* still: beim nächsten Start wieder */ }
   }
 
   // ==========================================================
