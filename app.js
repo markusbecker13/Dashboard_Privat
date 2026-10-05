@@ -500,6 +500,279 @@
   };
 
   // ==========================================================
+  // Globale Suche (seit Session 37, Etappe 2): Lupe oben in der Kopfzeile,
+  // „/“ oder Strg+K am PC. Durchsucht die schon geladenen Daten im Browser
+  // (nichts geht an einen Server). Nur Reiter, die im jeweiligen Bereich
+  // eingeblendet sind. Ein Treffer öffnet den Reiter und – wo möglich – den
+  // Eintrag im Bearbeiten-Blatt.
+  // ==========================================================
+  const such = { bereich: "aktiv", offeneGruppen: new Set(), treffer: [] };
+  const SUCH_PRO_GRUPPE = 5;
+
+  function suchNorm(s) {
+    return String(s ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ß/g, "ss");
+  }
+  function suchDatum(iso) {
+    return iso ? formatDatumKurz(String(iso).slice(0, 10)) : "";
+  }
+  function suchFinanzTab(typ, aktion) {
+    return () => { const k = document.getElementById("fintyp-" + typ); if (k) k.click(); if (aktion) aktion(); };
+  }
+
+  // Quellen: je Typ die Liste, der Reiter, die Felder und was ein Tipp öffnet.
+  // bereich: null = gemeinsame Daten (Spiele)
+  function suchQuellen() {
+    const inventarName = (id) => { const i = ogsInventar.find((x) => String(x.id) === String(id)); return i ? i.name : ""; };
+    const raumName = (id) => { const r = raeume.find((x) => String(x.id) === String(id)); return r ? r.name : ""; };
+    const projektName = (id) => { const p = projekte.find((x) => String(x.id) === String(id)); return p ? p.name : ""; };
+    return [
+      { typ: "aufgabe", gruppe: "Aufgaben", tab: "aufgaben", liste: aufgaben,
+        felder: (a) => ({ titel: a.titel, texte: [a.notiz, projektName(a.projekt_id)], meta: [a.faellig_am ? "fällig " + suchDatum(a.faellig_am) : "", a.erledigt ? "erledigt" : ""],
+          datum: a.faellig_am, nachrangig: !!a.erledigt }),
+        oeffnen: (a) => () => window.eintragBearbeiten("aufgabe", a.id) },
+      { typ: "termin", gruppe: "Termine", tab: "kalender", liste: termine,
+        felder: (x) => ({ titel: x.titel, texte: [x.notiz], meta: [suchDatum(x.datum) + (x.uhrzeit ? " · " + String(x.uhrzeit).slice(0, 5) : "")], datum: x.datum }),
+        oeffnen: (x) => () => window.eintragBearbeiten("termin", x.id) },
+      { typ: "notiz", gruppe: "Notizen", tab: "notizen", liste: notizen,
+        felder: (n) => ({ titel: String(n.text || "").split("\n")[0], texte: [n.text, projektName(n.projekt_id)], meta: [], datum: n.erstellt_am }),
+        oeffnen: (n) => () => window.blattOeffnen("notiz", n.id) },
+      { typ: "link", gruppe: "Links", tab: "links", liste: links,
+        felder: (l) => ({ titel: l.titel, texte: [l.url, l.notiz], meta: [], datum: l.erstellt_am }),
+        oeffnen: (l) => () => window.blattOeffnen("link", l.id) },
+      { typ: "idee", gruppe: "Ideen", tab: "ogsideen", liste: ogsIdeen,
+        felder: (i) => ({ titel: i.titel, texte: [i.beschreibung], meta: [OGS_IDEE_STATUS_LABEL[i.status] || i.status || ""], datum: i.erstellt_am }),
+        oeffnen: (i) => () => window.blattOeffnen("idee", i.id) },
+      { typ: "reflexion", gruppe: "Reflexion", tab: "reflexion", liste: reflexionen,
+        felder: (r) => ({ titel: suchDatum(r.datum), texte: [r.text], meta: [], datum: r.datum, textVorschau: true }),
+        oeffnen: (r) => () => window.blattOeffnen("reflexion", r.id) },
+      { typ: "einkauf", gruppe: "Einkaufsliste", tab: "einkauf", liste: einkaufsliste,
+        felder: (e) => ({ titel: e.text, texte: [], meta: [e.erledigt ? "erledigt" : "offen"], nachrangig: !!e.erledigt }),
+        oeffnen: () => null },
+      { typ: "rezept", gruppe: "Rezepte", tab: "rezepte", liste: rezepte,
+        felder: (r) => ({ titel: r.titel, texte: [r.kategorie, r.zutaten, r.notiz], meta: [r.kategorie || ""] }),
+        vorher: (r) => () => { rezeptOffenId = r.id; }, oeffnen: () => null },
+      { typ: "spiel", gruppe: "Spiele", tab: "spiele", liste: spiele, gemeinsam: true,
+        felder: (s) => ({ titel: s.titel, texte: [s.kategorie, s.beschreibung, s.material], meta: [s.kategorie || ""] }),
+        oeffnen: (s) => () => window.blattOeffnen("spiel", s.id) },
+      { typ: "training", gruppe: "Training", tab: "training", liste: training,
+        felder: (x) => ({ titel: x.sportart, texte: [x.ort, x.notiz], meta: [suchDatum(x.datum), x.ort || ""], datum: x.datum }),
+        oeffnen: (x) => () => window.trainingBearbeitenStart(x.id) },
+      { typ: "inventar", gruppe: "Inventar", tab: "ogsinventar", liste: ogsInventar,
+        felder: (i) => ({ titel: i.name, texte: [i.kategorie, i.standort, i.beschreibung], meta: [i.kategorie || "", i.standort || ""] }),
+        oeffnen: (i) => () => window.blattOeffnen("inventar", i.id) },
+      { typ: "projekt", gruppe: "Projekte", tab: "ogsprojekte", liste: ogsProjekte,
+        felder: (p) => ({ titel: p.titel, texte: [p.kategorie, p.beschreibung], meta: [p.kategorie || ""] }),
+        oeffnen: (p) => () => window.blattOeffnen("projekt", p.id) },
+      { typ: "verleih", gruppe: "Verleih", tab: "verleih", liste: verleih,
+        felder: (v) => ({ titel: inventarName(v.inventar_id) || "Verleih", texte: [v.ausgeliehen_an, v.notiz],
+          meta: [v.ausgeliehen_an || "", suchDatum(v.ausgeliehen_am), v.zurueckgegeben_am ? "zurück" : "offen"], datum: v.ausgeliehen_am, nachrangig: !!v.zurueckgegeben_am }),
+        oeffnen: (v) => () => window.blattOeffnen("verleih", v.id) },
+      { typ: "vermietung", gruppe: "Raumplanung", tab: "raumplanung", liste: raumVermietungen,
+        felder: (v) => ({ titel: v.mieter, texte: [v.zweck, v.notiz, v.kontakt, raumName(v.raum_id)], meta: [suchDatum(v.datum), raumName(v.raum_id)], datum: v.datum }),
+        oeffnen: (v) => () => window.raumBearbeitenStart(v.id, "liste") },
+      { typ: "schluessel", gruppe: "Schlüssel", tab: "schluessel", liste: schluesselListe,
+        felder: (s) => ({ titel: `${s.art === "key" ? "Key" : "Schlüssel"} ${s.seriennummer || ""}`.trim(), texte: [s.inhaber, s.verein, s.notiz],
+          meta: [s.inhaber || "", s.verein || ""] }),
+        oeffnen: (s) => () => window.blattOeffnen("schluessel", s.id) },
+      { typ: "buchung", gruppe: "Buchungen", tab: "finanzen", liste: buchungen,
+        felder: (b) => ({ titel: b.notiz || b.kategorie || "Buchung", texte: [b.kategorie],
+          meta: [suchDatum(b.datum), `${b.typ === "einnahme" ? "+" : "−"}${finEuro(b.betrag)}`, b.kategorie || ""], datum: b.datum }),
+        vorher: (b) => () => {
+          const [j, m] = String(b.datum || "").split("-").map(Number);
+          if (j && m) { finBuchJahr = j; finBuchMonat = m; }
+          finBearbeiteteBuchung = b.id;
+        },
+        oeffnen: () => suchFinanzTab("buchungen") },
+      { typ: "fixkosten", gruppe: "Fixkosten", tab: "finanzen", liste: fixkosten,
+        felder: (f) => ({ titel: f.bezeichnung, texte: [f.kategorie], meta: [f.typ === "einnahme" ? "Einnahme" : "Ausgabe"] }),
+        oeffnen: (f) => suchFinanzTab("fixkosten", () => window.fixkostenBearbeitenStart(f.id)) },
+      { typ: "sonderausgabe", gruppe: "Sonderausgaben", tab: "finanzen", liste: sonderausgaben,
+        felder: (s) => ({ titel: s.bezeichnung, texte: [s.notiz], meta: [finEuro(s.betrag)] }),
+        oeffnen: (s) => suchFinanzTab("sonderausgaben", () => window.sonderausgabeBearbeitenStart(s.id)) },
+    ];
+  }
+
+  // Bereich, in dem ein Treffer geöffnet wird (null bei gemeinsamen Daten:
+  // der aktive, wenn der Reiter dort sichtbar ist, sonst der erste passende)
+  function suchBereichFuer(quelle, eintrag) {
+    if (!quelle.gemeinsam) return bereichVon(eintrag);
+    if (reiterIstSichtbar(aktiverBereich, quelle.tab)) return aktiverBereich;
+    return BEREICH_FARBWELT.find((b) => reiterIstSichtbar(b, quelle.tab)) || null;
+  }
+
+  // Sucht in allen Quellen; jedes Wort muss irgendwo vorkommen
+  function suchen(eingabe, nurBereich) {
+    const woerter = suchNorm(eingabe).split(/\s+/).filter(Boolean);
+    if (!woerter.length || suchNorm(eingabe).replace(/\s/g, "").length < 2) return [];
+    const ergebnis = [];
+    for (const q of suchQuellen()) {
+      for (const e of q.liste || []) {
+        const bereich = suchBereichFuer(q, e);
+        if (!bereich || !reiterIstSichtbar(bereich, q.tab)) continue;
+        if (nurBereich && !q.gemeinsam && bereich !== aktiverBereich) continue;
+        const f = q.felder(e);
+        const titelN = suchNorm(f.titel);
+        const alles = titelN + " " + suchNorm((f.texte || []).filter(Boolean).join(" "));
+        if (!woerter.every((w) => alles.includes(w))) continue;
+        let punkte = woerter.every((w) => titelN.includes(w)) ? 2 : 0;
+        if (titelN.startsWith(woerter[0])) punkte += 1;
+        if (f.nachrangig) punkte -= 3;
+        ergebnis.push({ q, e, f, bereich, punkte, woerter });
+      }
+    }
+    return ergebnis.sort((a, b) => b.punkte - a.punkte || String(b.f.datum || "").localeCompare(String(a.f.datum || "")));
+  }
+
+  // Markiert Fundstellen (ohne Rücksicht auf Groß-/Kleinschreibung und Akzente);
+  // max: Ausschnitt um die erste Fundstelle
+  function suchMarkieren(text, woerter, max) {
+    const orig = String(text ?? "");
+    let norm = "";
+    const map = [];
+    for (let i = 0; i < orig.length; i++) {
+      for (const c of suchNorm(orig[i])) { norm += c; map.push(i); }
+    }
+    const bereiche = [];
+    woerter.forEach((w) => {
+      let p = norm.indexOf(w);
+      while (p !== -1 && w) {
+        bereiche.push([map[p], map[p + w.length - 1] + 1]);
+        p = norm.indexOf(w, p + w.length);
+      }
+    });
+    bereiche.sort((a, b) => a[0] - b[0]);
+    let von = 0, bis = orig.length, vorne = "", hinten = "";
+    if (max && orig.length > max) {
+      const erste = bereiche.length ? bereiche[0][0] : 0;
+      von = Math.max(0, Math.min(erste - 30, orig.length - max));
+      bis = Math.min(orig.length, von + max);
+      if (von > 0) vorne = "…";
+      if (bis < orig.length) hinten = "…";
+    }
+    let html = "", pos = von;
+    for (const [a, b] of bereiche) {
+      const s = Math.max(a, pos), en = Math.min(b, bis);
+      if (en <= s) continue;
+      html += escapeHtml(orig.slice(pos, s)) + "<mark>" + escapeHtml(orig.slice(s, en)) + "</mark>";
+      pos = en;
+    }
+    html += escapeHtml(orig.slice(pos, bis));
+    return vorne + html + hinten;
+  }
+
+  function suchRendern() {
+    const eingabe = document.getElementById("such-text").value;
+    const box = document.getElementById("such-ergebnis");
+    document.querySelectorAll("#such-bereiche .schnell-chip").forEach((k) => {
+      const an = k.dataset.wahl === such.bereich;
+      k.classList.toggle("aktiv", an);
+      k.setAttribute("aria-pressed", String(an));
+    });
+    const nurBereich = such.bereich === "aktiv";
+    if (suchNorm(eingabe).replace(/\s/g, "").length < 2) {
+      such.treffer = [];
+      box.innerHTML = `<p class="notiz-meta such-leer">Durchsucht Aufgaben, Termine, Notizen, Links, Ideen, Reflexion, Einkauf, Rezepte, Spiele, Training, Inventar, Projekte, Verleih, Raumplanung, Schlüssel und Finanzen – nur Reiter, die eingeblendet sind. Ab 2 Zeichen, jedes Wort muss vorkommen.</p>`;
+      return;
+    }
+    const treffer = suchen(eingabe, nurBereich);
+    such.treffer = treffer;
+    if (!treffer.length) {
+      box.innerHTML = `<p class="empty-text such-leer">Nichts gefunden für „${escapeHtml(eingabe.trim())}“.</p>` +
+        (nurBereich ? `<button type="button" class="btn-secondary" onclick="suchBereichSetzen('alle')">In allen Bereichen suchen</button>` : "");
+      return;
+    }
+    const gruppen = new Map();
+    treffer.forEach((t, i) => {
+      const g = gruppen.get(t.q.gruppe) || [];
+      g.push(i);
+      gruppen.set(t.q.gruppe, g);
+    });
+    let html = `<p class="notiz-meta such-anzahl" role="status">${treffer.length} ${treffer.length === 1 ? "Treffer" : "Treffer"}${nurBereich ? ` in ${escapeHtml(BEREICH_KNOPF_TEXT[aktiverBereich] || "")}` : " in allen Bereichen"}</p>`;
+    for (const [name, idx] of gruppen) {
+      const offen = such.offeneGruppen.has(name);
+      const zeigen = offen ? idx : idx.slice(0, SUCH_PRO_GRUPPE);
+      html += `<div class="such-gruppe"><div class="schnell-label such-gruppe-titel">${escapeHtml(name)} <span class="such-gruppe-zahl">${idx.length}</span></div>`;
+      html += zeigen.map((i) => {
+        const t = treffer[i];
+        const titelHtml = suchMarkieren(t.f.titel || "–", t.woerter, 90);
+        const titelTreffer = t.woerter.every((w) => suchNorm(t.f.titel).includes(w));
+        const textQuelle = (t.f.texte || []).filter(Boolean).find((x) => t.woerter.some((w) => suchNorm(x).includes(w)));
+        const auszug = (!titelTreffer || t.f.textVorschau) && textQuelle ? `<span class="such-auszug">${suchMarkieren(textQuelle, t.woerter, 110)}</span>` : "";
+        const meta = (t.f.meta || []).filter(Boolean);
+        if (!nurBereich && !t.q.gemeinsam) meta.unshift(BEREICH_KNOPF_TEXT[t.bereich] || t.bereich);
+        return `<button type="button" class="such-treffer${t.f.nachrangig ? " nachrangig" : ""}" onclick="suchTrefferOeffnen(${i})">
+            <span class="such-titel">${titelHtml}</span>${auszug}
+            ${meta.length ? `<span class="notiz-meta such-meta">${meta.map(escapeHtml).join(" · ")}</span>` : ""}
+          </button>`;
+      }).join("");
+      if (!offen && idx.length > SUCH_PRO_GRUPPE) {
+        html += `<button type="button" class="link-btn such-mehr" onclick="suchGruppeAufklappen('${escapeAttr(name)}')">+ ${idx.length - SUCH_PRO_GRUPPE} weitere</button>`;
+      }
+      html += `</div>`;
+    }
+    box.innerHTML = html;
+  }
+
+  window.sucheOeffnen = function() {
+    const dlg = document.getElementById("such-dialog");
+    if (!dlg) return;
+    if (typeof dlg.showModal === "function") { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute("open", "");
+    such.offeneGruppen = new Set();
+    suchRendern();
+    const feld = document.getElementById("such-text");
+    feld.focus();
+    feld.select();
+  };
+  window.sucheSchliessen = function() {
+    const dlg = document.getElementById("such-dialog");
+    if (!dlg) return;
+    if (typeof dlg.close === "function" && dlg.open) dlg.close(); else dlg.removeAttribute("open");
+  };
+  window.suchBereichSetzen = function(wahl) {
+    such.bereich = wahl === "alle" ? "alle" : "aktiv";
+    such.offeneGruppen = new Set();
+    suchRendern();
+  };
+  window.suchGruppeAufklappen = function(name) {
+    such.offeneGruppen.add(name);
+    suchRendern();
+  };
+  window.suchTrefferOeffnen = function(i) {
+    const t = such.treffer[i];
+    if (!t) return;
+    window.sucheSchliessen();
+    if (t.bereich && t.bereich !== aktiverBereich) window.bereichAuswaehlen(t.bereich);
+    if (t.q.vorher) t.q.vorher(t.e)();
+    tabWechseln(t.q.tab);
+    const aktion = t.q.oeffnen(t.e);
+    if (aktion) setTimeout(aktion, 0);
+  };
+
+  (function sucheEinrichten() {
+    const dlg = document.getElementById("such-dialog");
+    const feld = document.getElementById("such-text");
+    if (!dlg || !feld) return;
+    feld.addEventListener("input", () => { such.offeneGruppen = new Set(); suchRendern(); });
+    feld.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.isComposing && such.treffer.length) { e.preventDefault(); window.suchTrefferOeffnen(0); }
+    });
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) window.sucheSchliessen(); });
+    const knopf = document.getElementById("such-knopf");
+    if (knopf) knopf.addEventListener("click", () => window.sucheOeffnen());
+    // „/“ oder Strg+K öffnet die Suche (nicht beim Tippen in einem Feld)
+    document.addEventListener("keydown", (e) => {
+      const ziel = e.target;
+      const tippt = ziel && (ziel.tagName === "INPUT" || ziel.tagName === "TEXTAREA" || ziel.tagName === "SELECT" || ziel.isContentEditable);
+      const strgK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k";
+      if ((strgK || (e.key === "/" && !tippt)) && !document.getElementById("app").classList.contains("hidden")) {
+        if (document.querySelector("dialog[open]:not(#such-dialog)")) return;
+        e.preventDefault();
+        window.sucheOeffnen();
+      }
+    });
+  })();
+
+  // ==========================================================
   // Schnellerfassung (seit Session 34, Redesign Etappe 3): der „+“-Knopf
   // in der Mitte der Leiste unten öffnet ein Blatt mit Text, Art, Bereich
   // und Wann. Zusatzfelder (Ende, Projekt, Wiederholung, Notiz,
