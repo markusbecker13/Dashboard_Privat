@@ -1945,6 +1945,7 @@
       document.getElementById(id).value = "";
     });
     schnellMeldung("", false);
+    sprachKnopfZeigen();
     const reiterform = document.getElementById("schnell-reiterform");
     const formText = SCHNELL_REITERFORMULAR[aktiverTab];
     reiterform.classList.toggle("hidden", !formText);
@@ -2695,6 +2696,7 @@
 
   // Schließt die Schnellerfassung ohne zu speichern
   window.schnellSchliessen = function() {
+    if (sprachErkennung) { try { sprachErkennung.abort(); } catch (_e) { /* egal */ } }
     const dlg = document.getElementById("schnell-dialog");
     if (!dlg) return;
     if (typeof dlg.close === "function" && dlg.open) dlg.close(); else dlg.removeAttribute("open");
@@ -2949,7 +2951,9 @@
     if (!eingabe) { schnellMeldung("Bitte erst etwas eintragen.", true); document.getElementById("schnell-text").focus(); return; }
     // Erkanntes Datum/Uhrzeit aus dem Titel nehmen („Zahnarzt morgen 15 Uhr“ → „Zahnarzt“)
     const erkannt = schnell.erkannt;
-    const text = erkannt && erkannt.rest ? erkannt.rest : eingabe;
+    let text = erkannt && erkannt.rest ? erkannt.rest : eingabe;
+    // Gesprochenes: Titel mit großem Anfangsbuchstaben („den Antrag …“ → „Den Antrag …“)
+    if (schnell.ausSprache) text = sprachGross(text);
     const bereich = schnell.bereich;
     const datum = schnellDatum();
     if (schnell.art === "termin" && !datum) { schnellMeldung("Ein Termin braucht ein Datum.", true); return; }
@@ -2982,7 +2986,10 @@
       } else if (schnell.art === "notiz") {
         await api("notiz_hinzufuegen", { ...basis, text, projekt_id });
       } else if (schnell.art === "einkauf") {
-        await api("einkauf_hinzufuegen", { ...basis, text });
+        // „Milch, Brot, Eier“ → drei Artikel (seit Session 37, v. a. für Spracheingabe)
+        const artikel = text.split(/\s*[,;]\s*/).map((x) => x.trim()).filter(Boolean).map(sprachGross);
+        if (artikel.length > 1) await api("einkauf_mehrere_hinzufuegen", { ...basis, texte: artikel });
+        else await api("einkauf_hinzufuegen", { ...basis, text });
       } else if (schnell.art === "idee") {
         await api("ogs_idee_hinzufuegen", { ...basis, titel: text, beschreibung: notiz });
       }
@@ -3050,6 +3057,336 @@
       if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.schnellSpeichern(); }
     });
   })();
+
+  // ==========================================================
+  // Sprache (seit Session 37, Weg A): Mikrofon im „+“-Blatt mit
+  // Zuordnung nach Regeln, und „Tag vorlesen“ auf Start.
+  // Spracherkennung und Online-Stimmen laufen über den Browser-Anbieter
+  // (Google bei Chrome, Apple bei Safari) – siehe Anleitung, Datenschutz.
+  // ==========================================================
+  let sprachErkennung = null;
+  function sprachErkennerKlasse() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  }
+  function sprachKnopfZeigen() {
+    const k = document.getElementById("schnell-mikro");
+    if (!k) return;
+    k.classList.toggle("hidden", !sprachErkennerKlasse());
+    k.classList.remove("aktiv");
+    k.setAttribute("aria-pressed", "false");
+  }
+  function sprachGross(t) {
+    const x = String(t || "").trim();
+    return x ? x.charAt(0).toLocaleUpperCase("de-DE") + x.slice(1) : x;
+  }
+
+  // Befehlswörter am Anfang („Termin …“, „Erinnere mich …“) bzw. am Ende
+  // („… kaufen“, „… auf die Einkaufsliste“)
+  const SPRACH_ARTEN = [
+    ["termin", /^(?:neuer\s+|einen\s+|ein\s+)?termin(?:\s*[:,.]\s*|\s+)/i],
+    ["aufgabe", /^(?:neue\s+|eine\s+)?aufgabe(?:\s*[:,.]\s*|\s+)|^erinnere?\s+mich(?:\s+daran)?(?:\s*,\s*|\s+)(?:dass\s+ich\s+|an\s+)?|^ich\s+muss\s+|^nicht\s+vergessen\s*[:,]?\s*|^to-?do\s*[:,]?\s*/i],
+    ["notiz", /^(?:neue\s+|eine\s+)?notiz(?:\s*[:,.]\s*|\s+)|^notier(?:e|en)?(?:\s+mir)?\s*[:,]?\s*|^merk(?:e|en)?(?:\s+dir)?\s*[:,]?\s*/i],
+    ["einkauf", /^(?:auf\s+die\s+)?einkaufsliste\s*[:,]?\s*|^einkauf(?:en)?\s*[:,]?\s*|^(?:wir\s+)?brauchen\s+|^kaufen\s*[:,]?\s*/i],
+    ["idee", /^(?:neue\s+|eine\s+)?idee(?:\s*[:,.]\s*|\s+)/i],
+  ];
+  const SPRACH_BEREICHE = [
+    ["ogs", "ogs|rapunzel|kinderhaus"],
+    ["awo", "awo|ortsverein|liblar"],
+    ["business", "business|zwischen\\s*kaffee\\s*und\\s*chaos"],
+    ["privat", "privat"],
+  ];
+
+  // Ordnet einen gesprochenen Satz zu: { art, bereich, text, artQuelle }
+  // art = null → Art bleibt, wie sie im Blatt steht
+  function sprachZuordnen(roh) {
+    let text = String(roh || "").replace(/\s+/g, " ").trim().replace(/[.!]+$/, "");
+    let art = null, artQuelle = "";
+    for (const [a, re] of SPRACH_ARTEN) {
+      const m = text.match(re);
+      if (m) { art = a; artQuelle = "wort"; text = text.slice(m[0].length).trim(); break; }
+    }
+    // Bereich: „für die OGS“ / „bei der AWO“ / „im Bereich Privat“ fällt aus dem Text, das bloße Wort bleibt stehen
+    let bereich = null;
+    for (const [b, woerter] of SPRACH_BEREICHE) {
+      const mitPraep = new RegExp(`(?:^|\\s)(?:für|in|bei|im\\s+bereich)\\s+(?:die\\s+|der\\s+|dem\\s+|den\\s+|das\\s+)?(?:${woerter})(?=$|[\\s.,!?])`, "i");
+      const bloss = new RegExp(`(?:^|[\\s(])(?:${woerter})(?=$|[\\s.,!?)])`, "i");
+      if (mitPraep.test(text)) { bereich = b; text = text.replace(mitPraep, " ").replace(/\s+/g, " ").trim(); break; }
+      if (bloss.test(text)) { bereich = b; break; }
+    }
+    // „… kaufen“, „… besorgen“, „… auf die Einkaufsliste“ (ohne Datum) → Einkauf
+    const ende = text.match(/\s+(?:kaufen|besorgen|auf\s+die\s+einkaufsliste(?:\s+setzen)?)$/i);
+    if (ende && (!art || (art === "aufgabe" && /^ich\s+muss/i.test(roh.trim()))) && !textDatumErkennen(text)) {
+      art = "einkauf"; artQuelle = "wort"; text = text.slice(0, ende.index).trim();
+    }
+    // Ohne Befehlswort: Uhrzeit → Termin, nur Datum → Aufgabe
+    if (!art) {
+      const e = textDatumErkennen(text);
+      if (e && e.uhrzeit) { art = "termin"; artQuelle = "zeit"; }
+      else if (e && e.datum) { art = "aufgabe"; artQuelle = "zeit"; }
+    }
+    if (art === "einkauf") {
+      text = text.replace(/\s+und\s+/gi, ", ").split(/\s*,\s*/).filter(Boolean).map(sprachGross).join(", ");
+    }
+    return { art, bereich, text: sprachGross(text.replace(/^[,;:–-]\s*/, "")), artQuelle };
+  }
+
+  // Übernimmt das Gesprochene ins Blatt: Art, Bereich, Text, dann Datum/Uhrzeit wie beim Tippen
+  function sprachUebernehmen(roh) {
+    const z = sprachZuordnen(roh);
+    const hinweise = [];
+    if (z.bereich && BEREICH_FARBWELT.includes(z.bereich)) schnell.bereich = z.bereich;
+    const arten = schnellArtenFuer(schnell.bereich);
+    if (z.art && arten.some((a) => a.art === z.art)) schnell.art = z.art;
+    else if (z.art) hinweise.push(`${(SCHNELL_ARTEN.find((a) => a.art === z.art) || {}).label || z.art} gibt es in diesem Bereich nicht`);
+    if (!arten.some((a) => a.art === schnell.art)) schnell.art = "aufgabe";
+    if (schnell.art === "termin" && schnell.wann === "ohne") schnell.wann = "heute";
+    schnell.erkennungAus = false;
+    schnell.ausSprache = true;
+    document.getElementById("schnell-text").value = z.text;
+    schnellTextPruefen();
+    const artLabel = (SCHNELL_ARTEN.find((a) => a.art === schnell.art) || {}).label || "";
+    const bereichName = (BEREICH_UMSCHALTER.find((b) => b.bereich === schnell.bereich) || {}).name || schnell.bereich;
+    schnellMeldung(`Gehört: ${artLabel} · ${bereichName}${hinweise.length ? " (" + hinweise.join(", ") + ")" : ""} – prüfen und speichern`, false);
+    document.getElementById("schnell-text").focus();
+  }
+
+  const SPRACH_FEHLER = {
+    "not-allowed": "Mikrofon nicht erlaubt – im Browser beim Schloss neben der Adresse erlauben.",
+    "service-not-allowed": "Spracherkennung ist in diesem Browser gesperrt.",
+    "no-speech": "Nichts gehört – nochmal aufs Mikrofon tippen.",
+    "audio-capture": "Kein Mikrofon gefunden.",
+    "network": "Die Spracherkennung braucht eine Internetverbindung.",
+    "language-not-supported": "Deutsch wird hier nicht unterstützt.",
+  };
+
+  window.schnellSprechen = function() {
+    const SR = sprachErkennerKlasse();
+    const knopf = document.getElementById("schnell-mikro");
+    const feld = document.getElementById("schnell-text");
+    if (!SR || !knopf || !feld) return;
+    if (sprachErkennung) { sprachErkennung.stop(); return; }
+    const r = new SR();
+    r.lang = "de-DE";
+    r.interimResults = true;
+    r.continuous = false;
+    r.maxAlternatives = 1;
+    const vorher = feld.value;
+    let gehoert = "", fehler = false;
+    r.onresult = (ev) => {
+      let t = "";
+      for (let i = 0; i < ev.results.length; i++) t += ev.results[i][0].transcript;
+      gehoert = t;
+      feld.value = t;
+    };
+    r.onerror = (ev) => {
+      if (ev.error === "aborted") return;
+      fehler = true;
+      schnellMeldung(SPRACH_FEHLER[ev.error] || "Spracherkennung fehlgeschlagen.", true);
+    };
+    r.onend = () => {
+      sprachErkennung = null;
+      knopf.classList.remove("aktiv");
+      knopf.setAttribute("aria-pressed", "false");
+      if (gehoert.trim()) sprachUebernehmen(gehoert);
+      else {
+        feld.value = vorher;
+        if (!fehler) schnellMeldung("", false);
+      }
+    };
+    try {
+      r.start();
+    } catch (_e) {
+      schnellMeldung("Spracherkennung konnte nicht starten.", true);
+      return;
+    }
+    sprachErkennung = r;
+    knopf.classList.add("aktiv");
+    knopf.setAttribute("aria-pressed", "true");
+    schnellMeldung("Ich höre zu … z. B. „Termin Zahnarzt morgen um 15 Uhr“", false);
+  };
+
+  // ---- Tag vorlesen ----
+  const VORLESEN_TEMPO = [["0.9", "Ruhig"], ["1", "Normal"], ["1.15", "Zügig"]];
+  function vorlesenEinst() {
+    const lies = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (_e) { return d; } };
+    return { auto: lies("vorlesen-auto", "0") === "1", stimme: lies("vorlesen-stimme", ""), tempo: Number(lies("vorlesen-tempo", "1")) || 1 };
+  }
+  function vorlesenMerken(k, v) {
+    try { localStorage.setItem(k, v); } catch (_e) { /* egal */ }
+  }
+  function vorlesenMoeglich() {
+    return "speechSynthesis" in window && typeof window.SpeechSynthesisUtterance === "function";
+  }
+  function deutscheStimmen() {
+    if (!vorlesenMoeglich()) return [];
+    return speechSynthesis.getVoices().filter((v) => /^de(-|_|$)/i.test(v.lang));
+  }
+  // Gewählte Stimme, sonst eine deutsche auf dem Gerät (lokal vor online)
+  function vorlesenStimme() {
+    const alle = deutscheStimmen();
+    const e = vorlesenEinst();
+    return alle.find((v) => v.name === e.stimme) || alle.find((v) => v.localService) || alle[0] || null;
+  }
+  function sprechZeit(z) {
+    const [h, m] = String(z).slice(0, 5).split(":").map(Number);
+    return m ? `${h} Uhr ${m}` : `${h} Uhr`;
+  }
+  function sprechListe(teile) {
+    if (teile.length <= 1) return teile.join("");
+    return teile.slice(0, -1).join(", ") + " und " + teile[teile.length - 1];
+  }
+
+  // Der Text zum Vorlesen: Start des aktiven Bereichs plus Einheiten,
+  // Weiterbildung, Vermietungen und der erste Termin morgen
+  function tagesText(jetzt = new Date()) {
+    const heute = heuteISO();
+    const morgen = addTage(heute, 1);
+    const b = aktiverBereich;
+    const h = jetzt.getHours();
+    const saetze = [];
+    saetze.push(h < 11 ? "Guten Morgen." : h < 18 ? "Hallo." : "Guten Abend.");
+    saetze.push(`Heute ist ${jetzt.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}.`);
+    const offen = aufgaben.filter((a) => bereichVon(a) === b && !a.erledigt).map(enrich);
+    const eintraege = heuteEintraegeSammeln(heute, offen).filter((e) => !e.erledigt);
+    const mitZeit = eintraege.filter((e) => e.typ === "termin" && e.start);
+    const ganz = eintraege.filter((e) => e.typ === "termin" && !e.start);
+    const auf = eintraege.filter((e) => e.typ === "aufgabe");
+    const ueber = offen.filter((a) => a.status === "ueberfaellig");
+    let etwas = false;
+    if (mitZeit.length) {
+      etwas = true;
+      saetze.push(`Du hast ${mitZeit.length === 1 ? "einen Termin" : mitZeit.length + " Termine"}: ${sprechListe(mitZeit.map((e) => `um ${sprechZeit(e.start)} ${e.titel}`))}.`);
+    }
+    if (ganz.length) { etwas = true; saetze.push(`Ganztägig: ${sprechListe(ganz.map((e) => e.titel))}.`); }
+    if (reiterIstSichtbar(b, "einheiten")) {
+      const ei = einheitenAktuell().filter((e) => e.datum === heute && e.status !== "durchgefuehrt");
+      ei.forEach((e) => { etwas = true; saetze.push(`Einheit${e.uhrzeit ? " um " + sprechZeit(e.uhrzeit) : ""}: ${e.titel}.`); });
+    }
+    if (reiterIstSichtbar(b, "raumplanung")) {
+      const rv = (raumVermietungen || []).filter((v) => bereichVon(v) === b && v.datum === heute);
+      if (rv.length) { etwas = true; saetze.push(`${rv.length === 1 ? "Eine Vermietung" : rv.length + " Vermietungen"} heute.`); }
+    }
+    if (reiterIstSichtbar(b, "methoden")) {
+      (wbModule || []).filter((m) => m.von && m.von <= heute && (m.bis || m.von) >= heute)
+        .forEach((m) => { etwas = true; saetze.push(`Weiterbildung: ${m.titel}.`); });
+    }
+    if (auf.length) {
+      etwas = true;
+      const namen = auf.slice(0, 6).map((a) => (a.start ? `${a.titel} um ${sprechZeit(a.start)}` : a.titel));
+      saetze.push(`${auf.length === 1 ? "Eine Aufgabe" : auf.length + " Aufgaben"} für heute: ${sprechListe(namen)}${auf.length > 6 ? `, und ${auf.length - 6} weitere` : ""}.`);
+    }
+    if (ueber.length) {
+      etwas = true;
+      const namen = ueber.slice(0, 3).map((a) => a.titel);
+      saetze.push(`Überfällig ${ueber.length === 1 ? "ist" : "sind"} ${ueber.length === 1 ? "eine Aufgabe" : ueber.length + " Aufgaben"}: ${sprechListe(namen)}${ueber.length > 3 ? `, und ${ueber.length - 3} weitere` : ""}.`);
+    }
+    if (!etwas) saetze.push("Heute steht nichts an. Freie Bahn.");
+    const tm = termine.filter((t) => t.datum === morgen && bereichVon(t) === b)
+      .sort((x, y) => (x.uhrzeit || "00").localeCompare(y.uhrzeit || "00"));
+    if (tm.length) {
+      const t = tm.find((x) => x.uhrzeit) || tm[0];
+      saetze.push(`Morgen ${t.uhrzeit ? "um " + sprechZeit(t.uhrzeit) : "ganztägig"}: ${t.titel}${tm.length > 1 ? `, und ${tm.length - 1} ${tm.length === 2 ? "weiterer Termin" : "weitere Termine"}` : ""}.`);
+    }
+    return saetze;
+  }
+
+  let vorlesenLaeuft = false;
+  function vorlesenKnopfStand() {
+    const k = document.getElementById("vorlesen-knopf");
+    if (!k) return;
+    k.classList.toggle("hidden", !vorlesenMoeglich());
+    k.classList.toggle("aktiv", vorlesenLaeuft);
+    k.setAttribute("aria-pressed", String(vorlesenLaeuft));
+    k.setAttribute("aria-label", vorlesenLaeuft ? "Vorlesen stoppen" : "Tag vorlesen");
+    const span = k.querySelector("span");
+    if (span) span.textContent = vorlesenLaeuft ? "Stopp" : "Vorlesen";
+  }
+  // Satzweise vorlesen (lange Texte bricht Chrome sonst teils ab)
+  function vorlesenSaetze(saetze) {
+    if (!vorlesenMoeglich()) return;
+    speechSynthesis.cancel();
+    const stimme = vorlesenStimme();
+    const tempo = vorlesenEinst().tempo;
+    vorlesenLaeuft = true;
+    vorlesenKnopfStand();
+    saetze.forEach((satz, i) => {
+      const u = new SpeechSynthesisUtterance(satz);
+      u.lang = stimme ? stimme.lang : "de-DE";
+      if (stimme) u.voice = stimme;
+      u.rate = tempo;
+      if (i === saetze.length - 1) u.onend = u.onerror = () => { vorlesenLaeuft = false; vorlesenKnopfStand(); };
+      speechSynthesis.speak(u);
+    });
+  }
+  window.tagVorlesen = function() {
+    if (!vorlesenMoeglich()) return;
+    if (vorlesenLaeuft) {
+      speechSynthesis.cancel();
+      vorlesenLaeuft = false;
+      vorlesenKnopfStand();
+      return;
+    }
+    vorlesenMerken("vorlesen-zuletzt", heuteISO());
+    vorlesenSaetze(tagesText());
+  };
+  // „Beim Öffnen vorlesen“: Browser lassen Sprache erst nach einem Tippen zu –
+  // deshalb liest die App beim ersten Tippen des Tages vor
+  function vorlesenBeimStartVorbereiten() {
+    vorlesenKnopfStand();
+    if (!vorlesenMoeglich() || !vorlesenEinst().auto) return;
+    const los = (ev) => {
+      document.removeEventListener("pointerdown", los, true);
+      document.removeEventListener("keydown", los, true);
+      let zuletzt = "";
+      try { zuletzt = localStorage.getItem("vorlesen-zuletzt") || ""; } catch (_e) { zuletzt = ""; }
+      if (zuletzt === heuteISO()) return;
+      // Tipp auf den Vorlesen-Knopf selbst erledigt der Knopf
+      if (ev.target && ev.target.closest && ev.target.closest("#vorlesen-knopf")) return;
+      if (document.getElementById("app").classList.contains("hidden")) return;
+      window.tagVorlesen();
+    };
+    document.addEventListener("pointerdown", los, true);
+    document.addEventListener("keydown", los, true);
+  }
+  if (vorlesenMoeglich() && typeof speechSynthesis.addEventListener === "function") {
+    speechSynthesis.addEventListener("voiceschanged", () => {
+      const dlg = document.getElementById("push-dialog");
+      if (dlg && dlg.open) pushRendern();
+    });
+  }
+
+  // Einstellungen im Blatt „Benachrichtigungen“ (gelten nur für dieses Gerät)
+  function vorlesenEinstHtml() {
+    if (!vorlesenMoeglich()) return `<section class="push-block"><h3>Vorlesen</h3><p class="notiz-meta">Dieser Browser kann nicht vorlesen.</p></section>`;
+    const e = vorlesenEinst();
+    const stimmen = deutscheStimmen();
+    const aktiv = vorlesenStimme();
+    const optionen = stimmen.length
+      ? stimmen.map((v) => `<option value="${escapeAttr(v.name)}"${aktiv && aktiv.name === v.name ? " selected" : ""}>${escapeHtml(v.name)}${v.localService ? "" : " (online)"}</option>`).join("")
+      : `<option value="">Standardstimme</option>`;
+    return `<section class="push-block">
+        <h3>Vorlesen <span class="notiz-meta push-fuer-alle">nur dieses Gerät</span></h3>
+        <label class="push-schalter"><input type="checkbox" id="vorlesen-auto"${e.auto ? " checked" : ""}> Beim ersten Tippen am Tag den Tag vorlesen</label>
+        <p class="notiz-meta push-erklaerung">Browser erlauben Sprache erst nach einem Tippen – deshalb liest die App beim ersten Antippen nach dem Öffnen vor, einmal am Tag. Sonst „Vorlesen“ oben auf Start.</p>
+        <label class="push-feld"><span class="schnell-label push-label">Stimme</span><select id="vorlesen-stimme">${optionen}</select></label>
+        <div class="schnell-label push-label">Tempo</div>
+        <div class="schnell-chips push-chips" role="group" aria-label="Tempo">${VORLESEN_TEMPO.map(([w, t]) => `<button type="button" class="schnell-chip${Number(w) === e.tempo ? " aktiv" : ""}" aria-pressed="${Number(w) === e.tempo}" onclick="vorlesenTempo('${w}')">${t}</button>`).join("")}</div>
+        <button type="button" class="btn-secondary" onclick="vorlesenProbe()">${ic("lautsprecher")} Probe hören</button>
+      </section>`;
+  }
+  function vorlesenEinstBinden() {
+    const auto = document.getElementById("vorlesen-auto");
+    if (!auto) return;
+    auto.addEventListener("change", () => vorlesenMerken("vorlesen-auto", auto.checked ? "1" : "0"));
+    document.getElementById("vorlesen-stimme").addEventListener("change", (ev) => vorlesenMerken("vorlesen-stimme", ev.target.value));
+  }
+  window.vorlesenTempo = function(w) {
+    vorlesenMerken("vorlesen-tempo", w);
+    pushRendern();
+  };
+  window.vorlesenProbe = function() {
+    vorlesenSaetze(["So klingt das Vorlesen.", `Heute ist ${new Date().toLocaleDateString("de-DE", { weekday: "long" })}.`]);
+  };
 
   // ==========================================================
   // Reiter-Formulare hinter „+ Neu …“ und Einstellungen hinter ⚙ (seit
@@ -3740,6 +4077,7 @@
           appImLetztenBereichOeffnen();
         }
         pushStillAuffrischen();
+        vorlesenBeimStartVorbereiten();
 
         if (googleCode) {
           try {
@@ -3984,7 +4322,7 @@
     const box = document.getElementById("push-inhalt");
     if (!box) return;
     if (push.laden && !push.einst) { box.innerHTML = `<p class="notiz-meta">Lade …</p>`; return; }
-    if (push.fehlt) { box.innerHTML = `<p class="empty-text">Für Push-Erinnerungen bitte zuerst <code>push_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`; return; }
+    if (push.fehlt) { box.innerHTML = `<p class="empty-text">Für Push-Erinnerungen bitte zuerst <code>push_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>` + vorlesenEinstHtml(); vorlesenEinstBinden(); return; }
     if (push.fehler && !push.einst) { box.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(push.fehler)}</p>`; return; }
     const e = push.einst || {};
     const bereiche = Array.isArray(e.bereiche) ? e.bereiche : [];
@@ -4033,6 +4371,7 @@
         ${push.abos.length ? `<ul class="push-geraete">${geraete}</ul>
           <button type="button" class="btn-secondary" onclick="pushTest(false)">Test an alle senden</button>` : `<p class="notiz-meta">Noch kein Gerät.</p>`}
       </section>
+      ${vorlesenEinstHtml()}
       <p class="schnell-status push-meldung" role="status" aria-live="polite">${escapeHtml(push.meldung || push.fehler || "")}</p>`;
     // Eingaben merken, damit Neuzeichnen (Chips) nichts verliert
     const merk = () => {
@@ -4042,6 +4381,7 @@
       push.einst.termine_an = document.getElementById("push-termine").checked;
     };
     ["push-morgens", "push-morgens-zeit", "push-termine"].forEach((id) => document.getElementById(id).addEventListener("change", merk));
+    vorlesenEinstBinden();
   }
 
   window.pushWahl = function(name, wert) {
@@ -4723,6 +5063,7 @@
       statusEl.innerHTML = text;
     }
     renderTagesZitat();
+    if (typeof vorlesenKnopfStand === "function") vorlesenKnopfStand();
 
     // ---- Inhalt ----
     const einkaufOffen = einkaufsliste.filter((e) => bereichVon(e) === aktiverBereich && !e.erledigt);
