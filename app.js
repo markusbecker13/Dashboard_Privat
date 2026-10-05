@@ -500,6 +500,307 @@
   };
 
   // ==========================================================
+  // Wochenrückblick (seit Session 37, Etappe 3): Blatt über ⋮-Menü und
+  // Karte auf dem Start-Screen (Fr–Mo). Rechnet nur im Browser mit den
+  // geladenen Daten des aktiven Bereichs. Abschnitte nur für eingeblendete
+  // Reiter. Erledigt-Zeitpunkt: aufgaben.erledigt_am (seit Session 37).
+  // ==========================================================
+  let rueckWoche = null; // Montag (ISO) der angezeigten Woche
+  const RUECK_WOCHENTAG = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+
+  // Fr–So: die laufende Woche, Mo–Do: die Woche davor
+  function rueckStandardWoche() {
+    const heute = heuteISO();
+    const tag = new Date(heute + "T00:00:00").getDay();
+    const mo = wochenstartISO(heute);
+    return tag === 5 || tag === 6 || tag === 0 ? mo : addTage(mo, -7);
+  }
+  function kalenderwoche(iso) {
+    const d = new Date(iso + "T00:00:00");
+    const u = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const tag = u.getUTCDay() || 7;
+    u.setUTCDate(u.getUTCDate() + 4 - tag);
+    const jahr = new Date(Date.UTC(u.getUTCFullYear(), 0, 1));
+    return Math.ceil(((u - jahr) / 86400000 + 1) / 7);
+  }
+  function rueckTag(iso) {
+    return `${RUECK_WOCHENTAG[new Date(iso + "T00:00:00").getDay()]} ${formatDatumKurz(iso)}`;
+  }
+
+  // Alle Zahlen einer Woche (Montag mo) für den aktiven Bereich – ohne DOM
+  function rueckDaten(mo) {
+    const so = addTage(mo, 6);
+    const nMo = addTage(mo, 7), nSo = addTage(mo, 13);
+    const inWoche = (d) => !!d && d >= mo && d <= so;
+    const inNaechster = (d) => !!d && d >= nMo && d <= nSo;
+    const b = aktiverBereich;
+    const sicht = (tab) => reiterIstSichtbar(b, tab);
+    const meine = (liste) => (liste || []).filter((x) => bereichVon(x) === b);
+    const nachZeit = (a, c) => String(a.datum || "").localeCompare(String(c.datum || "")) || String(a.uhrzeit || "").localeCompare(String(c.uhrzeit || ""));
+
+    const aufg = meine(aufgaben);
+    const erledigtAmBekannt = aufg.length === 0 || aufg.some((a) => Object.prototype.hasOwnProperty.call(a, "erledigt_am"));
+    const erledigt = aufg.filter((a) => a.erledigt && a.erledigt_am && inWoche(datumLokalISO(new Date(a.erledigt_am))))
+      .sort((a, c) => String(a.erledigt_am).localeCompare(String(c.erledigt_am)));
+    const liegen = aufg.filter((a) => !a.erledigt && a.faellig_am && a.faellig_am <= so)
+      .sort((a, c) => a.faellig_am.localeCompare(c.faellig_am));
+    const termineWoche = sicht("kalender") ? meine(termine).filter((x) => inWoche(x.datum)).sort(nachZeit) : null;
+
+    let train = null;
+    if (sicht("training")) {
+      const liste = meine(training).filter((x) => inWoche(x.datum));
+      train = { anzahl: liste.length, minuten: liste.reduce((s, x) => s + (Number(x.dauer_minuten) || 0), 0),
+        ziel: trainingWochenziel(""), sportarten: [...new Set(liste.map((x) => x.sportart).filter(Boolean))] };
+    }
+
+    let geld = null;
+    if (sicht("finanzen")) {
+      const buch = meine(buchungen).filter((x) => x.typ !== "einnahme");
+      const woche = buch.filter((x) => inWoche(x.datum));
+      const summe = woche.reduce((s, x) => s + finZahl(x.betrag), 0);
+      const kats = new Map();
+      woche.forEach((x) => kats.set(x.kategorie || "Sonstiges", (kats.get(x.kategorie || "Sonstiges") || 0) + finZahl(x.betrag)));
+      // Vergleich: Ø der bis zu 12 Wochen davor, sobald Buchungen so weit zurückreichen (mind. 4 Wochen)
+      const erste = buch.reduce((m, x) => (!m || x.datum < m ? x.datum : m), null);
+      let schnitt = null;
+      if (erste) {
+        const ab = Math.max(0, Math.ceil((new Date(mo + "T00:00:00") - new Date(wochenstartISO(erste) + "T00:00:00")) / (7 * 86400000)));
+        const wochen = Math.min(12, ab);
+        if (wochen >= 4) {
+          const von = addTage(mo, -7 * wochen);
+          schnitt = buch.filter((x) => x.datum >= von && x.datum < mo).reduce((s, x) => s + finZahl(x.betrag), 0) / wochen;
+        }
+      }
+      geld = { summe, anzahl: woche.length, schnitt, top: [...kats.entries()].sort((a, c) => c[1] - a[1]).slice(0, 3) };
+    }
+
+    const wochenziele = b === "privat" && sicht("planung")
+      ? ziele.filter((z) => z.zeitraum_typ === "woche" && z.zeitraum_start === mo).map((z) => {
+        const schritte = zielSchritte.filter((s) => s.ziel_id === z.id);
+        return { z, gesamt: schritte.length, fertig: schritte.filter((s) => s.erledigt).length };
+      })
+      : null;
+    const refl = sicht("reflexion") ? meine(reflexionen).filter((x) => inWoche(x.datum)).sort((a, c) => String(a.datum).localeCompare(String(c.datum))) : null;
+
+    const naechste = {
+      termine: sicht("kalender") ? meine(termine).filter((x) => inNaechster(x.datum)).sort(nachZeit) : [],
+      aufgaben: aufg.filter((a) => !a.erledigt && inNaechster(a.faellig_am)).sort((a, c) => a.faellig_am.localeCompare(c.faellig_am)),
+      vermietungen: sicht("raumplanung") ? meine(raumVermietungen).filter((v) => inNaechster(v.datum)).sort(nachZeit) : [],
+      rueckgaben: sicht("schluessel") ? meine(schluesselAusgaben).filter((a) => !a.zurueck_am && inNaechster(a.rueckgabe_bis)) : [],
+    };
+    return { mo, so, nMo, nSo, erledigtAmBekannt, erledigt, liegen, termineWoche, train, geld, wochenziele, refl, naechste };
+  }
+
+  function rueckListe(eintraege, zeile, max = 8) {
+    if (!eintraege.length) return "";
+    const zeigen = eintraege.slice(0, max).map(zeile).join("");
+    const rest = eintraege.length > max ? `<li class="rueck-mehr notiz-meta">+ ${eintraege.length - max} weitere</li>` : "";
+    return `<ul class="rueck-liste">${zeigen}${rest}</ul>`;
+  }
+
+  function rueckRendern() {
+    const box = document.getElementById("rueck-inhalt");
+    if (!box) return;
+    const d = rueckDaten(rueckWoche);
+    const heute = heuteISO();
+    const istAktuell = rueckWoche === wochenstartISO(heute);
+    const titel = `KW ${kalenderwoche(d.mo)} · ${formatDatumKurz(d.mo)}–${formatDatumKurz(d.so)}${istAktuell ? " · diese Woche" : ""}`;
+    const zielMontag = d.nMo > heute ? d.nMo : heute;
+    const zielText = zielMontag === heute ? "heute" : rueckTag(zielMontag);
+
+    const fazit = [];
+    if (d.erledigtAmBekannt) fazit.push(`<span class="rueck-zahl"><strong>${d.erledigt.length}</strong> erledigt</span>`);
+    fazit.push(`<span class="rueck-zahl${d.liegen.length ? " warn" : ""}"><strong>${d.liegen.length}</strong> liegen geblieben</span>`);
+    if (d.termineWoche) fazit.push(`<span class="rueck-zahl"><strong>${d.termineWoche.length}</strong> ${d.termineWoche.length === 1 ? "Termin" : "Termine"}</span>`);
+    if (d.train) fazit.push(`<span class="rueck-zahl"><strong>${d.train.anzahl}</strong> ${d.train.anzahl === 1 ? "Training" : "Trainings"}</span>`);
+
+    const bloecke = [];
+    // Erledigt
+    bloecke.push(`<section class="rueck-block"><h3>${ic("ok-kreis")} Erledigt</h3>` + (d.erledigtAmBekannt
+      ? (d.erledigt.length
+        ? rueckListe(d.erledigt, (a) => `<li><span class="rueck-text">${escapeHtml(a.titel)}</span><span class="notiz-meta">${rueckTag(datumLokalISO(new Date(a.erledigt_am)))}</span></li>`)
+        : `<p class="notiz-meta">In dieser Woche wurde keine Aufgabe abgehakt.</p>`)
+      : `<p class="notiz-meta">Für diese Liste bitte <code>aufgaben_erledigt_am_setup.sql</code> ausführen und die neue <code>index.ts</code> einspielen – gezählt wird ab dann.</p>`) + `</section>`);
+    // Liegen geblieben
+    if (d.liegen.length) {
+      bloecke.push(`<section class="rueck-block"><h3>${ic("warnung")} Liegen geblieben</h3>
+        <p class="notiz-meta" style="margin-top:0;">Offen und bis ${formatDatumKurz(d.so)} fällig.</p>` +
+        rueckListe(d.liegen, (a) => `<li><button type="button" class="rueck-eintrag" onclick="rueckOeffnen('aufgabe','${escapeAttr(String(a.id))}')"><span class="rueck-text">${escapeHtml(a.titel)}</span><span class="notiz-meta">fällig ${formatDatumKurz(a.faellig_am)}</span></button>
+          <button type="button" class="btn-secondary rueck-schieben" onclick="rueckVerschieben(['${escapeAttr(String(a.id))}'])" aria-label="${escapeAttr(a.titel)} auf ${escapeAttr(zielText)} verschieben">→ ${zielMontag === heute ? "heute" : RUECK_WOCHENTAG[1]}</button></li>`, 12) +
+        `<button type="button" class="btn-secondary" onclick="rueckVerschieben(null)">${ic("wiederholen")}Alle ${d.liegen.length} auf ${escapeHtml(zielText)}</button></section>`);
+    }
+    // Termine
+    if (d.termineWoche && d.termineWoche.length) {
+      bloecke.push(`<section class="rueck-block"><h3>${ic("kalender")} Termine</h3>` +
+        rueckListe(d.termineWoche, (x) => `<li><span class="rueck-text">${escapeHtml(x.titel)}</span><span class="notiz-meta">${rueckTag(x.datum)}${x.uhrzeit ? " · " + String(x.uhrzeit).slice(0, 5) : ""}</span></li>`) + `</section>`);
+    }
+    // Training
+    if (d.train) {
+      const ziel = d.train.ziel;
+      const erreicht = ziel && d.train.anzahl >= ziel;
+      bloecke.push(`<section class="rueck-block"><h3>${ic("aktivitaet")} Training</h3>
+        <p class="rueck-satz">${d.train.anzahl ? `${d.train.anzahl} ${d.train.anzahl === 1 ? "Training" : "Trainings"}${d.train.minuten ? `, zusammen ${d.train.minuten} Minuten` : ""}${d.train.sportarten.length ? ` (${escapeHtml(d.train.sportarten.join(", "))})` : ""}.` : "Kein Training eingetragen."}
+        ${ziel ? (erreicht ? ` Wochenziel ${ziel} erreicht ✓` : ` Wochenziel: ${ziel}.`) : ""}</p></section>`);
+    }
+    // Geld
+    if (d.geld) {
+      let satz;
+      if (!d.geld.anzahl) satz = "Keine Ausgaben gebucht – kommen die Buchungen per CSV-Import, fehlen sie hier evtl. noch.";
+      else {
+        satz = `Ausgaben ${finEuro(d.geld.summe)} (${d.geld.anzahl} ${d.geld.anzahl === 1 ? "Buchung" : "Buchungen"})`;
+        if (d.geld.schnitt !== null) {
+          const diff = d.geld.summe - d.geld.schnitt;
+          satz += Math.abs(diff) < Math.max(10, d.geld.schnitt * 0.1)
+            ? ` – etwa wie im Schnitt (${finEuro(d.geld.schnitt)} pro Woche).`
+            : ` – ${finEuro(Math.abs(diff))} ${diff > 0 ? "mehr" : "weniger"} als im Schnitt (${finEuro(d.geld.schnitt)} pro Woche).`;
+        } else satz += ".";
+      }
+      const top = d.geld.top.length ? `<p class="notiz-meta">Am meisten: ${d.geld.top.map(([k, v]) => `${escapeHtml(k)} ${finEuro(v)}`).join(" · ")}</p>` : "";
+      bloecke.push(`<section class="rueck-block"><h3>${ic("statistik")} Geld</h3><p class="rueck-satz">${satz}</p>${top}</section>`);
+    }
+    // Wochenziele
+    if (d.wochenziele && d.wochenziele.length) {
+      bloecke.push(`<section class="rueck-block"><h3>${ic("pokal")} Wochenziele</h3>` +
+        rueckListe(d.wochenziele, (w) => `<li><span class="rueck-text">${escapeHtml(w.z.titel)}</span><span class="notiz-meta">${w.gesamt ? `${w.fertig} / ${w.gesamt} Schritte${w.fertig === w.gesamt ? " ✓" : ""}` : "ohne Schritte"}</span></li>`) + `</section>`);
+    }
+    // Reflexion
+    if (d.refl) {
+      const datum = d.so < heute ? d.so : heute;
+      bloecke.push(`<section class="rueck-block"><h3>${ic("stift")} Reflexion</h3>` +
+        (d.refl.length ? rueckListe(d.refl, (r) => `<li class="rueck-refl"><span class="notiz-meta">${rueckTag(r.datum)}</span><span class="rueck-text">${escapeHtml(String(r.text || "").slice(0, 160))}${String(r.text || "").length > 160 ? "…" : ""}</span></li>`, 3) : "") +
+        `<div class="schnell-chips rueck-impulse" role="group" aria-label="Impulse">
+          ${["Was lief gut?", "Was war schwierig?", "Was nehme ich mit?", "Was lasse ich nächste Woche weg?"].map((f) =>
+            `<button type="button" class="schnell-chip" onclick="rueckImpuls(this)">${escapeHtml(f)}</button>`).join("")}
+        </div>
+        <textarea id="rueck-refl-text" class="schnell-notiz" rows="4" placeholder="Wie war die Woche?"></textarea>
+        <button type="button" class="btn-secondary" id="rueck-refl-speichern" onclick="rueckReflexionSpeichern('${datum}')">Als Reflexion speichern (${formatDatumKurz(datum)})</button>
+        </section>`);
+    }
+    // Nächste Woche
+    const n = d.naechste;
+    const nTeile = [];
+    if (n.termine.length) nTeile.push(`<h4>Termine</h4>` + rueckListe(n.termine, (x) => `<li><span class="rueck-text">${escapeHtml(x.titel)}</span><span class="notiz-meta">${rueckTag(x.datum)}${x.uhrzeit ? " · " + String(x.uhrzeit).slice(0, 5) : ""}</span></li>`));
+    if (n.aufgaben.length) nTeile.push(`<h4>Fällige Aufgaben</h4>` + rueckListe(n.aufgaben, (a) => `<li><span class="rueck-text">${escapeHtml(a.titel)}</span><span class="notiz-meta">${rueckTag(a.faellig_am)}</span></li>`));
+    if (n.vermietungen.length) nTeile.push(`<h4>Vermietungen</h4>` + rueckListe(n.vermietungen, (v) => `<li><span class="rueck-text">${escapeHtml(v.mieter || "Vermietung")}</span><span class="notiz-meta">${rueckTag(v.datum)}</span></li>`));
+    if (n.rueckgaben.length) nTeile.push(`<h4>Schlüssel-Rückgaben</h4>` + rueckListe(n.rueckgaben, (a) => `<li><span class="rueck-text">${escapeHtml(a.inhaber || "Schlüssel")}</span><span class="notiz-meta">bis ${rueckTag(a.rueckgabe_bis)}</span></li>`));
+    bloecke.push(`<section class="rueck-block"><h3>${ic("weiter")} Nächste Woche · ${formatDatumKurz(d.nMo)}–${formatDatumKurz(d.nSo)}</h3>` +
+      (nTeile.length ? nTeile.join("") : `<p class="notiz-meta">Noch nichts eingetragen.</p>`) + `</section>`);
+
+    box.innerHTML = `
+      <div class="rueck-nav">
+        <button type="button" class="btn-secondary ern-pfeil" onclick="rueckBlaettern(-1)" aria-label="Vorige Woche">${ic("zurueck")}</button>
+        <strong class="rueck-titel">${titel}</strong>
+        <button type="button" class="btn-secondary ern-pfeil" onclick="rueckBlaettern(1)" aria-label="Nächste Woche"${rueckWoche >= wochenstartISO(heute) ? " disabled" : ""}>${ic("weiter")}</button>
+      </div>
+      <div class="rueck-fazit">${fazit.join("")}</div>
+      ${bloecke.join("")}`;
+  }
+
+  window.wochenrueckblickOeffnen = function(mo) {
+    const dlg = document.getElementById("rueck-dialog");
+    if (!dlg) return;
+    if (typeof kontoMenuSchliessen === "function") kontoMenuSchliessen();
+    rueckWoche = mo || rueckStandardWoche();
+    rueckRendern();
+    if (typeof dlg.showModal === "function") { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute("open", "");
+    const inhalt = document.getElementById("rueck-inhalt");
+    if (inhalt) inhalt.scrollTop = 0;
+    dlg.scrollTop = 0;
+  };
+  window.wochenrueckblickSchliessen = function() {
+    const dlg = document.getElementById("rueck-dialog");
+    if (!dlg) return;
+    if (typeof dlg.close === "function" && dlg.open) dlg.close(); else dlg.removeAttribute("open");
+  };
+  window.rueckBlaettern = function(richtung) {
+    const neu = addTage(rueckWoche, 7 * richtung);
+    if (richtung > 0 && neu > wochenstartISO(heuteISO())) return;
+    rueckWoche = neu;
+    rueckRendern();
+  };
+  // Tipp auf einen Eintrag: Blatt schließen und den Eintrag bearbeiten
+  window.rueckOeffnen = function(typ, id) {
+    window.wochenrueckblickSchliessen();
+    window.eintragBearbeiten(typ, id);
+  };
+  // Liegengebliebenes auf den nächsten Montag (bzw. heute) verschieben; ids = null → alle
+  window.rueckVerschieben = async function(ids) {
+    const d = rueckDaten(rueckWoche);
+    const heute = heuteISO();
+    const ziel = d.nMo > heute ? d.nMo : heute;
+    const liste = ids ? d.liegen.filter((a) => ids.includes(String(a.id))) : d.liegen;
+    if (!liste.length) return;
+    let fehler = 0;
+    for (const a of liste) {
+      try {
+        await api("aufgabe_aktualisieren", {
+          id: a.id, titel: a.titel, projekt_id: a.projekt_id || null, faellig_am: ziel,
+          uhrzeit: a.uhrzeit || null, ende_uhrzeit: a.ende_uhrzeit || null, erinnere_alle_tage: a.erinnere_alle_tage || null,
+        });
+      } catch (e) { fehler++; }
+    }
+    await ladeDaten();
+    rueckRendern();
+    hinweisZeigen(fehler ? `${fehler} von ${liste.length} nicht verschoben` : `${liste.length} ${liste.length === 1 ? "Aufgabe" : "Aufgaben"} auf ${ziel === heute ? "heute" : rueckTag(ziel)} verschoben`);
+  };
+  window.rueckImpuls = function(knopf) {
+    const feld = document.getElementById("rueck-refl-text");
+    if (!feld) return;
+    const zeile = knopf.textContent.trim() + " ";
+    feld.value = feld.value ? feld.value.replace(/\s*$/, "") + "\n" + zeile : zeile;
+    feld.focus();
+    feld.setSelectionRange(feld.value.length, feld.value.length);
+  };
+  window.rueckReflexionSpeichern = async function(datum) {
+    const feld = document.getElementById("rueck-refl-text");
+    const text = feld ? feld.value.trim() : "";
+    if (!text) { if (feld) feld.focus(); return; }
+    const knopf = document.getElementById("rueck-refl-speichern");
+    if (knopf) knopf.disabled = true;
+    try {
+      await api("reflexion_hinzufuegen", { text, datum, bereich: aktiverBereich });
+    } catch (e) {
+      if (knopf) knopf.disabled = false;
+      alert("Nicht gespeichert: " + (e.message || "Fehler"));
+      return;
+    }
+    await ladeDaten();
+    rueckRendern();
+    hinweisZeigen("Reflexion gespeichert");
+  };
+
+  // Karte auf dem Start-Screen (Fr–Mo, bis „Später“ für diese Woche)
+  function heuteRueckblickHtml() {
+    if (aktiverBereich === "verwaltung") return "";
+    const tag = new Date().getDay();
+    if (![5, 6, 0, 1].includes(tag)) return "";
+    const mo = rueckStandardWoche();
+    try { if (localStorage.getItem("rueckblick-weg-" + aktiverBereich) === mo) return ""; } catch (_e) { /* egal */ }
+    const d = rueckDaten(mo);
+    const teile = [];
+    if (d.erledigtAmBekannt) teile.push(`${d.erledigt.length} erledigt`);
+    if (d.liegen.length) teile.push(`${d.liegen.length} liegen geblieben`);
+    if (d.train) teile.push(`${d.train.anzahl} ${d.train.anzahl === 1 ? "Training" : "Trainings"}`);
+    return `
+      <section class="heute-block rueck-karte">
+        <button type="button" class="rueck-karte-knopf" onclick="wochenrueckblickOeffnen()">
+          <span class="rueck-karte-titel">${ic("statistik")} Wochenrückblick · KW ${kalenderwoche(mo)}</span>
+          <span class="notiz-meta">${escapeHtml(teile.join(" · ") || "Woche ansehen und die nächste planen")}</span>
+        </button>
+        <button type="button" class="schnell-zu" onclick="rueckKarteWeg('${mo}')" aria-label="Wochenrückblick ausblenden" title="Später">${ic("x")}</button>
+      </section>`;
+  }
+  window.rueckKarteWeg = function(mo) {
+    try { localStorage.setItem("rueckblick-weg-" + aktiverBereich, mo); } catch (_e) { /* egal */ }
+    renderHeute();
+  };
+
+  (function rueckEinrichten() {
+    const dlg = document.getElementById("rueck-dialog");
+    if (dlg) dlg.addEventListener("click", (e) => { if (e.target === dlg) window.wochenrueckblickSchliessen(); });
+  })();
+
+  // ==========================================================
   // Globale Suche (seit Session 37, Etappe 2): Lupe oben in der Kopfzeile,
   // „/“ oder Strg+K am PC. Durchsucht die schon geladenen Daten im Browser
   // (nichts geht an einen Server). Nur Reiter, die im jeweiligen Bereich
@@ -1981,9 +2282,10 @@
     const el = document.getElementById("menu-verwalten");
     if (!el) return;
     const eintraege = aktiverBereich === "verwaltung" ? [] : MENU_VERWALTEN.filter(([tab]) => reiterIstSichtbar(aktiverBereich, tab));
-    el.innerHTML = eintraege.map(([tab, label, icon]) =>
+    const rueck = aktiverBereich === "verwaltung" ? "" : `<button class="link-btn" onclick="wochenrueckblickOeffnen()">${ic("statistik")}<span>Wochenrückblick</span></button>`;
+    el.innerHTML = rueck + eintraege.map(([tab, label, icon]) =>
       `<button class="link-btn${tab === aktiverTab ? " aktiv" : ""}" onclick="tabWechseln('${tab}')">${ic(icon)}<span>${label}</span></button>`).join("");
-    el.classList.toggle("hidden", eintraege.length === 0);
+    el.classList.toggle("hidden", !rueck && eintraege.length === 0);
   }
 
   // Zeigt den im Browser gespeicherten Dashboard-Namen in der Kopfzeile an
@@ -3318,6 +3620,7 @@
     let html = "";
     html += heuteDeinTagHtml(heuteIso, jetztDate, jetztMinuten);
     html += heuteNaechstesHtml(eintraege, jetztMinuten);
+    html += heuteRueckblickHtml();
     html += heuteModuleHtml(heuteIso);
     html += heuteListeHtml(eintraege, jetztMinuten);
     html += heuteUeberfaelligHtml(ueberfaellig, heuteIso);
