@@ -76,6 +76,7 @@
   let methoden = [];        // seit Session 37: Methodenkartei (spiele mit art = 'methode')
   let wbModule = null;      // Weiterbildungsmodule; null = methoden_weiterbildung_setup.sql fehlt
   let wbDateien = [];
+  let wbZiel = false;       // seit Session 38: { ziel_ue, bezeichnung } | null (kein Ziel) | false (SQL fehlt)
   let spieleDateien = [];
   let tabEinstellungen = [];
   let verleih = [];
@@ -884,6 +885,113 @@
   };
 
   // ==========================================================
+  // „Zu Einheit hinzufügen“ aus Spiele- und Methodenkartei (seit Session 38).
+  // Zeigt geplante Einheiten aller Bereiche, in denen der Reiter Einheiten
+  // eingeblendet ist; ein Tipp hängt das Spiel hinten an den Ablauf.
+  // ==========================================================
+  let zuEinheitSpielId = null;
+  let einheitStartSpielId = null; // neue Einheit direkt mit diesem Spiel anlegen
+  let einheitNachSpeichernZeigen = false; // nach dem Anlegen zur Einheit springen
+  function zuEinheitBereiche() {
+    return BEREICH_FARBWELT.filter((b) => reiterIstSichtbar(b, "einheiten"));
+  }
+  function zuEinheitMoeglich() {
+    return einheiten !== null && zuEinheitBereiche().length > 0;
+  }
+  // Geplante Einheiten: aktiver Bereich zuerst, dann nach Datum (ohne Datum, vorbei am Ende)
+  function zuEinheitListe() {
+    const heute = heuteISO();
+    const bereiche = zuEinheitBereiche();
+    return (einheiten || []).filter((e) => e.status !== "durchgefuehrt" && bereiche.includes(bereichVon(e)))
+      .map((e) => ({ e, vorbei: !!e.datum && e.datum < heute }))
+      .sort((a, b) => (bereichVon(a.e) === aktiverBereich ? 0 : 1) - (bereichVon(b.e) === aktiverBereich ? 0 : 1)
+        || (a.vorbei ? 1 : 0) - (b.vorbei ? 1 : 0)
+        || (a.e.datum ? 0 : 1) - (b.e.datum ? 0 : 1)
+        || String(a.e.datum || "").localeCompare(String(b.e.datum || ""))
+        || String(a.e.titel).localeCompare(String(b.e.titel), "de"));
+  }
+  function zuEinheitRendern() {
+    const box = document.getElementById("zu-einheit-liste");
+    const s = spielVon(zuEinheitSpielId);
+    if (!box || !s) return;
+    document.getElementById("zu-einheit-spiel").textContent = `${s.art === "methode" ? "Methode" : "Spiel"}: ${s.titel} · ${spielDauerMinuten(s)} Min.`;
+    const liste = zuEinheitListe();
+    const neuMoeglich = reiterIstSichtbar(aktiverBereich, "einheiten");
+    const neuKnopf = neuMoeglich
+      ? `<button type="button" class="btn-secondary zu-einheit-neu" onclick="zuEinheitNeu()">${ic("plus")} Neue Einheit mit ${s.art === "methode" ? "dieser Methode" : "diesem Spiel"}</button>`
+      : "";
+    if (!liste.length) {
+      box.innerHTML = `<p class="empty-text">Noch keine geplante Einheit${neuMoeglich ? "" : " – im Reiter Einheiten anlegen"}.</p>${neuKnopf}`;
+      return;
+    }
+    const mehrereBereiche = new Set(liste.map((x) => bereichVon(x.e))).size > 1 || bereichVon(liste[0].e) !== aktiverBereich;
+    box.innerHTML = liste.slice(0, 40).map(({ e, vorbei }) => {
+      const bs = einheitBausteineVon(e.id);
+      const drin = bs.some((b) => String(b.spiel_id) === String(s.id));
+      const dauer = bs.reduce((x, b) => x + (Number(b.dauer_min) || 0), 0);
+      const meta = [mehrereBereiche ? BEREICH_KNOPF_TEXT[bereichVon(e)] : "", einheitDatumText(e), e.gruppe,
+        `${bs.length} ${bs.length === 1 ? "Baustein" : "Bausteine"}${dauer ? ` · ${minutenText(dauer)}` : ""}`].filter(Boolean).map(escapeHtml).join(" · ");
+      return `<button type="button" class="such-treffer" onclick="zuEinheitNehmen('${escapeAttr(String(e.id))}')">
+          <span class="such-titel">${drin ? "✓ " : ""}${escapeHtml(e.titel)}${vorbei ? ` <span class="badge overdue">vorbei</span>` : ""}</span>
+          <span class="notiz-meta such-meta">${meta}${drin ? " · schon im Ablauf" : ""}</span>
+        </button>`;
+    }).join("") + neuKnopf;
+  }
+  window.zuEinheitOeffnen = function(spielId) {
+    const dlg = document.getElementById("zu-einheit-dialog");
+    if (!dlg || !spielVon(spielId)) return;
+    zuEinheitSpielId = spielId;
+    document.getElementById("zu-einheit-status").innerHTML = "";
+    zuEinheitRendern();
+    if (typeof dlg.showModal === "function") { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute("open", "");
+  };
+  window.zuEinheitSchliessen = function() {
+    const dlg = document.getElementById("zu-einheit-dialog");
+    if (dlg && dlg.open && typeof dlg.close === "function") dlg.close(); else if (dlg) dlg.removeAttribute("open");
+  };
+  window.zuEinheitNehmen = async function(einheitId) {
+    const s = spielVon(zuEinheitSpielId);
+    const e = (einheiten || []).find((x) => String(x.id) === String(einheitId));
+    const status = document.getElementById("zu-einheit-status");
+    if (!s || !e) return;
+    const schonDrin = einheitBausteineVon(e.id).some((b) => String(b.spiel_id) === String(s.id));
+    if (schonDrin && !confirm(`„${s.titel}“ steht schon im Ablauf von „${e.titel}“. Noch einmal anhängen?`)) return;
+    status.textContent = "Füge hinzu …";
+    try {
+      await api("baustein_hinzufuegen", { einheit_id: e.id, spiel_id: s.id, dauer_min: spielDauerMinuten(s), aktiver_bereich: bereichVon(e) });
+    } catch (err) {
+      status.textContent = "Nicht hinzugefügt: " + (err.message || "Fehler");
+      return;
+    }
+    await ladeDaten();
+    status.innerHTML = `${ic("ok-kreis")} „${escapeHtml(s.titel)}“ steht jetzt am Ende von „${escapeHtml(e.titel)}“. `
+      + `<button type="button" class="link-knopf" onclick="zuEinheitZeigen('${escapeAttr(String(e.id))}')">Einheit öffnen</button>`;
+    zuEinheitRendern();
+  };
+  // Springt zur Einheit (bei Bedarf in ihren Bereich)
+  window.zuEinheitZeigen = function(einheitId) {
+    const e = (einheiten || []).find((x) => String(x.id) === String(einheitId));
+    if (!e) return;
+    window.zuEinheitSchliessen();
+    if (bereichVon(e) !== aktiverBereich) window.bereichAuswaehlen(bereichVon(e));
+    einheitOffenId = e.id;
+    tabWechseln("einheiten");
+  };
+  // Neue Einheit anlegen, das Spiel kommt nach dem Speichern als erster Baustein dazu
+  window.zuEinheitNeu = function() {
+    einheitStartSpielId = zuEinheitSpielId;
+    window.zuEinheitSchliessen();
+    window.blattNeu("einheit", {});
+  };
+  (function zuEinheitEinrichten() {
+    const dlg = document.getElementById("zu-einheit-dialog");
+    if (dlg) dlg.addEventListener("click", (e) => { if (e.target === dlg) window.zuEinheitSchliessen(); });
+    // Blatt geschlossen (gespeichert hat es das Startspiel schon verbraucht) → nichts mehr vormerken
+    const blattDlg = document.getElementById("blatt-dialog");
+    if (blattDlg) blattDlg.addEventListener("close", () => { einheitStartSpielId = null; });
+  })();
+
+  // ==========================================================
   // Wochenrückblick (seit Session 37, Etappe 3): Blatt über ⋮-Menü und
   // Karte auf dem Start-Screen (Fr–Mo). Rechnet nur im Browser mit den
   // geladenen Daten des aktiven Bereichs. Abschnitte nur für eingeblendete
@@ -953,13 +1061,62 @@
     return `<div class="methode-text">${escapeHtml(String(t || "").trim())}</div>`;
   }
 
+  // ---- UE-Ziel (seit Session 38) ----
+  function wbZielUe() {
+    return wbZiel && Number(wbZiel.ziel_ue) > 0 ? Number(wbZiel.ziel_ue) : 0;
+  }
+  // Rechnet den Stand gegen das Ziel: absolviert = besucht + bescheinigt
+  function wbZielStand(summen) {
+    const ziel = wbZielUe();
+    if (!ziel) return null;
+    const absolviert = summen.besucht + summen.bescheinigt;
+    const anteil = (x) => Math.max(0, Math.min(100, (x / ziel) * 100));
+    return {
+      ziel, absolviert,
+      prozent: Math.min(100, Math.round((absolviert / ziel) * 100)),
+      fehlen: Math.max(0, Math.round((ziel - absolviert) * 10) / 10),
+      unverplant: Math.max(0, Math.round((ziel - absolviert - summen.geplant) * 10) / 10),
+      erreicht: absolviert >= ziel,
+      balken: { bescheinigt: anteil(summen.bescheinigt), besucht: anteil(summen.besucht), geplant: anteil(summen.geplant) },
+    };
+  }
+  function wbZielHtml(summen) {
+    const st = wbZielStand(summen);
+    if (!st) return "";
+    const b = st.balken;
+    // Balken gestapelt: bescheinigt, besucht, geplant (zusammen höchstens 100 %)
+    const besucht = Math.min(b.besucht, 100 - b.bescheinigt);
+    const geplant = Math.min(b.geplant, 100 - b.bescheinigt - besucht);
+    const titel = wbZiel.bezeichnung ? escapeHtml(wbZiel.bezeichnung) : "Ziel";
+    const zeile = st.erreicht
+      ? `${ic("ok-kreis")} Ziel erreicht${st.absolviert > st.ziel ? ` – ${wbZahl(st.absolviert - st.ziel)} UE darüber` : ""}`
+      : `noch ${wbZahl(st.fehlen)} UE${summen.geplant ? `, davon ${wbZahl(Math.min(summen.geplant, st.fehlen))} schon geplant` : ""}`;
+    return `<div class="wb-ziel">
+        <div class="wb-ziel-kopf">
+          <span class="wb-ziel-titel">${titel}</span>
+          <button type="button" class="icon-knopf-klein" onclick="blattOeffnen('wbziel', 1)" aria-label="UE-Ziel ändern" title="UE-Ziel ändern">${ic("stift")}</button>
+        </div>
+        <div class="wb-summe-zahl"><strong>${wbZahl(st.absolviert)}</strong> von ${wbZahl(st.ziel)} UE · ${st.prozent} %</div>
+        <div class="wb-ziel-balken" role="img" aria-label="${escapeAttr(`${wbZahl(st.absolviert)} von ${wbZahl(st.ziel)} UE absolviert, ${wbZahl(summen.geplant)} geplant`)}">
+          <span class="wb-ziel-bescheinigt" style="width:${b.bescheinigt.toFixed(1)}%"></span><span class="wb-ziel-besucht" style="width:${besucht.toFixed(1)}%"></span><span class="wb-ziel-geplant" style="width:${geplant.toFixed(1)}%"></span>
+        </div>
+        <div class="wb-ziel-legende notiz-meta">
+          <span><i class="wb-ziel-punkt wb-ziel-bescheinigt"></i>bescheinigt ${wbZahl(summen.bescheinigt)}</span>
+          <span><i class="wb-ziel-punkt wb-ziel-besucht"></i>besucht ${wbZahl(summen.besucht)}</span>
+          <span><i class="wb-ziel-punkt wb-ziel-geplant"></i>geplant ${wbZahl(summen.geplant)}</span>
+        </div>
+        <div class="wb-ziel-text${st.erreicht ? " erreicht" : ""}">${zeile}</div>
+        ${!st.erreicht && st.unverplant > 0 ? `<div class="wb-warnung">${ic("warnung")} ${wbZahl(st.unverplant)} UE sind noch nicht eingeplant</div>` : ""}
+      </div>`;
+  }
+
   function renderMethoden() {
     const el = document.getElementById("methoden-bereich");
     if (!el) return;
     const summen = wbSummen();
     const umschalter = `<div class="schnell-chips methoden-umschalter" role="group" aria-label="Ansicht">
         <button type="button" class="schnell-chip${methodenAnsicht === "methoden" ? " aktiv" : ""}" aria-pressed="${methodenAnsicht === "methoden"}" onclick="methodenAnsichtWechseln('methoden')">Methoden (${methoden.length})</button>
-        <button type="button" class="schnell-chip${methodenAnsicht === "weiterbildung" ? " aktiv" : ""}" aria-pressed="${methodenAnsicht === "weiterbildung"}" onclick="methodenAnsichtWechseln('weiterbildung')">Weiterbildung${summen.gesamt ? ` (${wbZahl(summen.gesamt)} UE)` : ""}</button>
+        <button type="button" class="schnell-chip${methodenAnsicht === "weiterbildung" ? " aktiv" : ""}" aria-pressed="${methodenAnsicht === "weiterbildung"}" onclick="methodenAnsichtWechseln('weiterbildung')">Weiterbildung${wbZielUe() ? ` (${wbZahl(summen.besucht + summen.bescheinigt)}/${wbZahl(wbZielUe())} UE)` : summen.gesamt ? ` (${wbZahl(summen.gesamt)} UE)` : ""}</button>
       </div>`;
     if (wbModule === null) {
       el.innerHTML = umschalter + `<p class="empty-text">Für Methoden und Weiterbildung bitte zuerst <code>methoden_weiterbildung_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
@@ -1066,6 +1223,7 @@
         <div class="methode-aktionen">
           <button type="button" class="btn-secondary" onclick="blattOeffnen('methode','${id}')">${ic("stift")} Bearbeiten</button>
           <button type="button" class="btn-secondary" onclick="methodeDrucken('${id}')">${ic("drucken")} Karte drucken</button>
+          ${zuEinheitMoeglich() ? `<button type="button" class="btn-secondary" onclick="zuEinheitOeffnen('${id}')">${ic("plus")} Zu Einheit</button>` : ""}
         </div>
       </article>`;
   }
@@ -1074,13 +1232,15 @@
     const module = (wbModule || []).slice().sort((a, b) =>
       (a.von ? 0 : 1) - (b.von ? 0 : 1) || String(a.von || "").localeCompare(String(b.von || "")) || a.titel.localeCompare(b.titel, "de"));
     const ohneNachweis = module.filter((m) => m.status === "besucht" && !wbDateien.some((d) => String(d.modul_id) === String(m.id)));
-    const kopf = module.length ? `
+    const zielHtml = wbZielHtml(summen);
+    const kopf = module.length || zielHtml ? `
       <div class="wb-summe">
-        <div class="wb-summe-zahl"><strong>${wbZahl(summen.gesamt)}</strong> UE</div>
-        <div class="notiz-meta">${["bescheinigt", "besucht", "geplant"].filter((k) => summen[k]).map((k) => `${WB_STATUS_TEXT[k]} ${wbZahl(summen[k])}`).join(" · ") || "noch keine UE eingetragen"}</div>
+        ${zielHtml || `<div class="wb-summe-zahl"><strong>${wbZahl(summen.gesamt)}</strong> UE</div>`}
+        ${zielHtml ? "" : `<div class="notiz-meta">${["bescheinigt", "besucht", "geplant"].filter((k) => summen[k]).map((k) => `${WB_STATUS_TEXT[k]} ${wbZahl(summen[k])}`).join(" · ") || "noch keine UE eingetragen"}</div>`}
         <div class="notiz-meta">${module.length} ${module.length === 1 ? "Modul" : "Module"} · ${module.filter((m) => wbDateien.some((d) => String(d.modul_id) === String(m.id))).length} mit Nachweis</div>
         ${ohneNachweis.length ? `<div class="wb-warnung">${ic("warnung")} ${ohneNachweis.length === 1 ? "1 besuchtes Modul" : ohneNachweis.length + " besuchte Module"} ohne Nachweis</div>` : ""}
-      </div>` : "";
+        ${zielHtml ? "" : `<button type="button" class="link-knopf wb-ziel-setzen" onclick="blattNeu('wbziel', {})">${ic("pokal")} UE-Ziel festlegen</button>`}
+      </div>` : `<button type="button" class="link-knopf wb-ziel-setzen" onclick="blattNeu('wbziel', {})">${ic("pokal")} UE-Ziel festlegen</button>`;
     const karten = module.map((m) => {
       const id = escapeAttr(String(m.id));
       const dateien = wbDateien.filter((d) => String(d.modul_id) === String(m.id));
@@ -1155,6 +1315,7 @@
     htmlDrucken(`<div style="font-family: Arial, sans-serif; color:#000; max-width:180mm;">
       <h1 style="font-size:17pt; margin:0 0 4px;">Weiterbildung – Übersicht</h1>
       <p style="font-size:10.5pt; margin:0 0 10px;">Stand ${new Date().toLocaleDateString("de-DE")} · gesamt ${wbZahl(s.gesamt)} UE (bescheinigt ${wbZahl(s.bescheinigt)}, besucht ${wbZahl(s.besucht)}, geplant ${wbZahl(s.geplant)})</p>
+      ${(() => { const st = wbZielStand(s); return st ? `<p style="font-size:10.5pt; margin:0 0 10px;"><strong>${escapeHtml(wbZiel.bezeichnung || "Ziel")}:</strong> ${wbZahl(st.ziel)} UE · absolviert ${wbZahl(st.absolviert)} (${st.prozent} %)${st.erreicht ? " · erreicht" : ` · es fehlen ${wbZahl(st.fehlen)} UE`}</p>` : ""; })()}
       <table style="width:100%; border-collapse:collapse; font-size:10pt;">
         <thead><tr><th style="${zellen}">Modul</th><th style="${zellen}">Zeitraum</th><th style="${zellen}">Anbieter / Ort</th><th style="${zellen} text-align:right;">UE</th><th style="${zellen}">Stand</th><th style="${zellen}">Nachweis</th></tr></thead>
         <tbody>${module.map((m) => `<tr>
@@ -2319,13 +2480,26 @@
         const erg = await api("einheit_speichern", {
           id, bereich: aktiverBereich, titel: w.titel, datum: w.datum, uhrzeit: w.uhrzeit, ort: w.ort, gruppe: w.gruppe, ziel: w.ziel, notiz: w.notiz,
         });
-        if (!id && erg && erg.id) einheitOffenId = erg.id;
+        if (!id && erg && erg.id) {
+          einheitOffenId = erg.id;
+          // Aus der Spielekartei angelegt (seit Session 38): Spiel gleich als ersten Baustein
+          const s = einheitStartSpielId && spielVon(einheitStartSpielId);
+          einheitStartSpielId = null;
+          if (s) {
+            try { await api("baustein_hinzufuegen", { einheit_id: erg.id, spiel_id: s.id, dauer_min: spielDauerMinuten(s) }); }
+            catch (err) { alert("Einheit angelegt, aber das Spiel konnte nicht hinzugefügt werden: " + (err.message || "Fehler")); }
+            einheitNachSpeichernZeigen = true;
+          }
+        }
         return erg;
       },
       loeschen: (id) => api("einheit_loeschen", { id }),
       loeschFrage: (e) => `Einheit „${e.titel || ""}“ mit ihrem Ablauf löschen? Die Spiele in der Kartei bleiben.`,
       gespeichert: "Einheit gespeichert",
-      danach: () => { if (aktiverTab === "einheiten") renderEinheiten(); },
+      danach: () => {
+        if (einheitNachSpeichernZeigen) { einheitNachSpeichernZeigen = false; tabWechseln("einheiten"); return; }
+        if (aktiverTab === "einheiten") renderEinheiten();
+      },
     },
 
     // Baustein einer Einheit (Spiel aus der Kartei oder eigener Programmpunkt)
@@ -2432,6 +2606,31 @@
       loeschen: (id) => api("modul_loeschen", { id }),
       loeschFrage: (m) => `Modul „${m.titel}“ mit allen Nachweisen löschen? Verknüpfte Methoden bleiben.`,
       gespeichert: "Modul gespeichert",
+    },
+
+    // UE-Ziel der Weiterbildung (seit Session 38) – eine Zeile, id 1
+    wbziel: {
+      titel: "UE-Ziel ändern",
+      titelNeu: "UE-Ziel festlegen",
+      finden: () => (wbZiel && typeof wbZiel === "object" ? { ...wbZiel, id: 1 } : null),
+      laden: (z) => ({
+        _fehlt: wbZiel === false,
+        ziel: z && z.ziel_ue !== undefined && z.ziel_ue !== null ? String(Number(z.ziel_ue)) : "",
+        bezeichnung: (z && z.bezeichnung) || "",
+        hinweisFehlt: "Dafür bitte zuerst ruhezeiten_ue_ziel_setup.sql in Supabase ausführen und die neue index.ts einspielen.",
+      }),
+      felder: [
+        { key: "hinweisFehlt", label: "Hinweis", typ: "info", wenn: (w) => w._fehlt },
+        { key: "ziel", label: "Ziel (UE)", typ: "zahl", min: 1, schritt: "0.5", pflicht: true, platzhalter: "z. B. 120",
+          hinweis: "Gezählt werden besuchte und bescheinigte Module." },
+        { key: "bezeichnung", label: "Name der Weiterbildung", typ: "text", platzhalter: "z. B. Zusatzqualifikation Erlebnispädagogik (optional)" },
+      ],
+      pruefen: (w) => (!(Number(String(w.ziel).replace(",", ".")) > 0) ? "Das Ziel muss größer als 0 sein." : ""),
+      speichern: (_id, w) => api("weiterbildung_ziel_speichern", { ziel_ue: w.ziel, bezeichnung: w.bezeichnung }),
+      loeschen: () => api("weiterbildung_ziel_speichern", { ziel_ue: "" }),
+      loeschFrage: () => "UE-Ziel entfernen? Die Module bleiben, wie sie sind.",
+      gespeichert: "UE-Ziel gespeichert",
+      danach: () => { if (aktiverTab === "methoden") renderMethoden(); },
     },
 
     // Sparziel (seit Session 37) – Rechnung in finSparzielRechnen
@@ -3607,6 +3806,8 @@
     spieleDateien = data.spiele_dateien || [];
     wbModule = Array.isArray(data.weiterbildung_module) ? data.weiterbildung_module : null;
     wbDateien = Array.isArray(data.weiterbildung_dateien) ? data.weiterbildung_dateien : [];
+    wbZiel = data.weiterbildung_ziel && typeof data.weiterbildung_ziel === "object" ? data.weiterbildung_ziel
+      : data.weiterbildung_ziel === null ? null : false;
     if (aktiverTab === "methoden") renderMethoden();
     tabEinstellungen = data.tab_einstellungen || [];
     verleih = data.verleih || [];
@@ -4364,6 +4565,7 @@
         <div class="schnell-chips push-chips" role="group" aria-label="Bereiche">${chips("bereich", BEREICH_FARBWELT.map((b) => [b, BEREICH_KNOPF_TEXT[b] || b]), (w) => bereiche.includes(w))}</div>
         <div class="schnell-label push-label">Auf dem Sperrbildschirm</div>
         <div class="schnell-chips push-chips" role="group" aria-label="Sperrbildschirm">${chips("titel", [["mit", "Mit Titeln"], ["ohne", "Nur Uhrzeit"]], (w) => (w === "ohne") === !!e.ohne_titel)}</div>
+        ${pushRuheHtml(e, chips)}
         <button type="button" class="btn-primary push-speichern" onclick="pushEinstellungenSpeichern()">Speichern</button>
       </section>
       <section class="push-block">
@@ -4379,14 +4581,68 @@
       push.einst.morgens_an = document.getElementById("push-morgens").checked;
       push.einst.morgens_uhrzeit = document.getElementById("push-morgens-zeit").value || "07:00";
       push.einst.termine_an = document.getElementById("push-termine").checked;
+      const ruheAn = document.getElementById("push-ruhe-an");
+      if (ruheAn) {
+        push.einst.ruhe_an = ruheAn.checked;
+        push.einst.ruhe_von = document.getElementById("push-ruhe-von").value || push.einst.ruhe_von;
+        push.einst.ruhe_bis = document.getElementById("push-ruhe-bis").value || push.einst.ruhe_bis;
+      }
     };
     ["push-morgens", "push-morgens-zeit", "push-termine"].forEach((id) => document.getElementById(id).addEventListener("change", merk));
+    // Ruhezeit: Änderung sofort zeigen (Hinweise, Felder an/aus)
+    ["push-ruhe-an", "push-ruhe-von", "push-ruhe-bis"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("change", () => { merk(); pushRendern(); });
+    });
     vorlesenEinstBinden();
+  }
+
+  // ---- Ruhezeit (seit Session 38) ----
+  function pushZeitMin(z) {
+    const m = /^(\d{1,2}):(\d{2})/.exec(String(z || ""));
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  }
+  // Liegt eine Uhrzeit (Minuten) in der Ruhezeit? Über Mitternacht wird beachtet
+  function pushInRuhe(e, minuten) {
+    if (!e || !e.ruhe_an) return false;
+    const von = pushZeitMin(e.ruhe_von), bis = pushZeitMin(e.ruhe_bis);
+    if (von === null || bis === null || von === bis || minuten === null) return false;
+    return von < bis ? minuten >= von && minuten < bis : minuten >= von || minuten < bis;
+  }
+  // Block „Ruhezeit“ im Blatt Benachrichtigungen
+  function pushRuheHtml(e, chips) {
+    if (!Object.prototype.hasOwnProperty.call(e, "ruhe_an")) {
+      return `<div class="schnell-label push-label">Ruhezeit</div>
+        <p class="notiz-meta push-erklaerung push-ruhe-fehlt">Für Ruhezeiten bitte zuerst <code>ruhezeiten_ue_ziel_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    const von = String(e.ruhe_von || "22:00").slice(0, 5), bis = String(e.ruhe_bis || "07:00").slice(0, 5);
+    const nachholen = e.ruhe_nachholen !== false;
+    const hinweise = [];
+    if (e.ruhe_an) {
+      if (von === bis) hinweise.push("Beginn und Ende sind gleich – so gilt keine Ruhezeit.");
+      else {
+        hinweise.push(nachholen
+          ? `Von ${von} bis ${bis} kommt nichts. Erinnerungen an Einträge in dieser Zeit kommen gesammelt um ${bis}.`
+          : `Von ${von} bis ${bis} kommt nichts. Erinnerungen an Einträge in dieser Zeit entfallen – nur was nach ${bis} beginnt, wird noch erinnert.`);
+        if (e.morgens_an && pushInRuhe(e, pushZeitMin(e.morgens_uhrzeit))) {
+          hinweise.push(`Die Morgen-Übersicht (${String(e.morgens_uhrzeit || "07:00").slice(0, 5)}) liegt in der Ruhezeit und kommt deshalb erst um ${bis}.`);
+        }
+      }
+    }
+    return `<div class="schnell-label push-label">Ruhezeit</div>
+      <label class="push-schalter"><input type="checkbox" id="push-ruhe-an"${e.ruhe_an ? " checked" : ""}> Nachts nichts schicken</label>
+      <div class="push-ruhe-zeiten${e.ruhe_an ? "" : " aus"}">
+        <label class="push-ruhe-feld">von <input type="time" id="push-ruhe-von" value="${escapeAttr(von)}" aria-label="Ruhezeit Beginn"${e.ruhe_an ? "" : " disabled"}></label>
+        <label class="push-ruhe-feld">bis <input type="time" id="push-ruhe-bis" value="${escapeAttr(bis)}" aria-label="Ruhezeit Ende"${e.ruhe_an ? "" : " disabled"}></label>
+      </div>
+      ${e.ruhe_an ? `<div class="schnell-chips push-chips" role="group" aria-label="Was in der Ruhezeit lag">${chips("ruhe", [["nachholen", "Danach nachholen"], ["weglassen", "Weglassen"]], (w) => (w === "nachholen") === nachholen)}</div>` : ""}
+      ${hinweise.map((h) => `<p class="notiz-meta push-erklaerung push-ruhe-hinweis">${escapeHtml(h)}</p>`).join("")}`;
   }
 
   window.pushWahl = function(name, wert) {
     const e = push.einst;
     if (!e) return;
+    if (name === "ruhe") e.ruhe_nachholen = wert === "nachholen";
     if (name === "vorlauf") e.vorlauf_min = Number(wert);
     if (name === "titel") e.ohne_titel = wert === "ohne";
     if (name === "bereich") {
@@ -4401,10 +4657,17 @@
     const e = push.einst;
     if (!e) return;
     if (!e.bereiche || !e.bereiche.length) { push.meldung = "Bitte mindestens einen Bereich wählen."; pushRendern(); return; }
+    const mitRuhe = Object.prototype.hasOwnProperty.call(e, "ruhe_an");
+    if (mitRuhe && e.ruhe_an && String(e.ruhe_von).slice(0, 5) === String(e.ruhe_bis).slice(0, 5)) {
+      push.meldung = "Beginn und Ende der Ruhezeit sind gleich."; pushRendern(); return;
+    }
     try {
       await api("push_einstellungen_speichern", {
         morgens_an: !!e.morgens_an, morgens_uhrzeit: String(e.morgens_uhrzeit || "07:00").slice(0, 5), termine_an: !!e.termine_an,
         vorlauf_min: Number(e.vorlauf_min) || 0, bereiche: e.bereiche, ohne_titel: !!e.ohne_titel,
+        // Ruhezeit nur, wenn der Server sie kennt (SQL eingespielt)
+        ...(mitRuhe ? { ruhe_an: !!e.ruhe_an, ruhe_von: String(e.ruhe_von || "22:00").slice(0, 5),
+          ruhe_bis: String(e.ruhe_bis || "07:00").slice(0, 5), ruhe_nachholen: e.ruhe_nachholen !== false } : {}),
       });
       push.meldung = "Gespeichert.";
     } catch (err) {
@@ -10225,6 +10488,7 @@
               <div class="notiz-meta" style="margin-top:0.3rem;">
                 ${dateiZeilen}
                 <label style="text-decoration:underline; cursor:pointer;">${ic("anhang")} Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="spielDateiHinzufuegen('${s.id}', this)"></label>
+                ${zuEinheitMoeglich() ? `<div><button type="button" class="link-knopf spiel-zu-einheit" onclick="zuEinheitOeffnen('${escapeAttr(String(s.id))}')">${ic("plus")} Zu Einheit hinzufügen</button></div>` : ""}
               </div>
             </div>
             <div class="spiel-karte-knoepfe">
