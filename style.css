@@ -1729,3 +1729,61 @@
 .einheit-stern-zeile { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 .einheit-block .btn-primary, .einheit-block > .btn-secondary { min-height: 44px; margin-top: 0.4rem; }
 .einheit-block textarea { width: 100%; }
+
+/* Methoden & Weiterbildung (Session 37) */
+.methoden-umschalter { margin: -0.4rem 0 1rem; }
+.methode-filter { display: flex; gap: 0.5rem; margin-bottom: 0.9rem; }
+.methode-filter input { flex: 1 1 8rem; min-width: 0; }
+.methode-filter select { flex: 1 1 9.5rem; min-width: 0; max-width: 13rem; }
+#methoden-bereich .reiter-aktionen { flex-wrap: wrap; }
+#methoden-bereich .reiter-aktionen > * { white-space: nowrap; }
+#methoden-bereich .reiter-aktionen .btn-secondary { display: inline-flex; align-items: center; gap: 0.3rem; }
+.methode-gruppe { margin-bottom: 1rem; }
+.methode-gruppe > .schnell-label { margin-bottom: 0.4rem; }
+.methode-karte, .wb-karte { display: block; margin-bottom: 0.6rem; }
+.methode-karte.fokus, .wb-karte.fokus { box-shadow: 0 0 0 2px var(--accent); }
+.methode-kopf { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.methode-kopf .spiel-titel { min-width: 0; overflow-wrap: anywhere; }
+.methode-ziel-kurz { margin-top: 0.15rem; }
+.methode-text { white-space: pre-line; overflow-wrap: anywhere; }
+.methode-sicherheit-hinweis {
+  display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.35rem; padding: 0.15rem 0.55rem;
+  border: 1px solid var(--overdue-border); border-radius: var(--r-pille); background: var(--overdue-bg);
+  color: var(--overdue-text); font-size: var(--fs-klein);
+}
+.methode-details { margin-top: 0.45rem; }
+.methode-details > summary { cursor: pointer; color: var(--accent); font-size: var(--fs-klein); min-height: 32px; display: flex; align-items: center; }
+.methode-abschnitt { margin: 0.5rem 0; font-size: var(--fs-klein); color: var(--ink); }
+.methode-abschnitt-titel { font-weight: 600; margin-bottom: 0.1rem; display: flex; align-items: center; gap: 0.3rem; }
+.methode-sicherheit { padding: 0.5rem 0.65rem; border: 1.5px solid var(--overdue-border); border-radius: var(--r-klein); background: var(--overdue-bg); }
+.methode-sicherheit .methode-abschnitt-titel { color: var(--overdue-text); }
+.methode-fuss { margin-top: 0.45rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.methode-aktionen { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.55rem; }
+.methode-aktionen .btn-secondary { display: inline-flex; align-items: center; gap: 0.3rem; }
+.link-knopf {
+  background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline;
+  cursor: pointer; text-align: left; overflow-wrap: anywhere; display: inline-flex; align-items: center; gap: 0.25rem;
+}
+.link-knopf:focus-visible, .icon-knopf-klein:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.icon-knopf-klein {
+  background: none; border: 0; padding: 0.15rem; margin-left: 0.2rem; color: var(--ink-dim); cursor: pointer;
+  display: inline-flex; align-items: center; vertical-align: middle;
+}
+.wb-summe {
+  padding: 0.8rem 0.95rem; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: var(--r-karte);
+  background: var(--akzent-flaeche); color: var(--ink);
+}
+.wb-summe-zahl { font-size: var(--fs-mittel); }
+.wb-summe-zahl strong { font-size: var(--fs-gross); font-family: var(--font-display); }
+.wb-warnung { margin-top: 0.35rem; display: flex; align-items: center; gap: 0.3rem; color: var(--overdue-text); font-size: var(--fs-klein); }
+.wb-status {
+  flex: 0 0 auto; padding: 0.1rem 0.55rem; border-radius: var(--r-pille); font-size: var(--fs-klein);
+  border: 1px solid var(--border); color: var(--ink-dim);
+}
+.wb-status-besucht { border-color: var(--today-border); background: var(--today-bg); color: var(--today-text); }
+.wb-status-bescheinigt { border-color: var(--ok-rand); background: var(--ok-bg); color: var(--ok-text); }
+.wb-datum-klein { opacity: 0.7; }
+@media (max-width: 380px) {
+  .methode-filter { flex-direction: column; }
+  .methode-filter select { flex-basis: auto; }
+}
