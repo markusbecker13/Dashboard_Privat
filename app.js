@@ -3654,9 +3654,11 @@
     if (!el) return;
     const eintraege = aktiverBereich === "verwaltung" ? [] : MENU_VERWALTEN.filter(([tab]) => reiterIstSichtbar(aktiverBereich, tab));
     const rueck = aktiverBereich === "verwaltung" ? "" : `<button class="link-btn" onclick="wochenrueckblickOeffnen()">${ic("statistik")}<span>Wochenrückblick</span></button>`;
-    el.innerHTML = rueck + eintraege.map(([tab, label, icon]) =>
+    // Komplett-Backup (seit Session 39) immer erreichbar, auch ohne Reiter Export
+    const backup = aktiverBereich === "verwaltung" ? "" : `<button class="link-btn" onclick="komplettBackup()">${ic("export")}<span>Komplett-Backup</span></button>`;
+    el.innerHTML = rueck + backup + eintraege.map(([tab, label, icon]) =>
       `<button class="link-btn${tab === aktiverTab ? " aktiv" : ""}" onclick="tabWechseln('${tab}')">${ic(icon)}<span>${label}</span></button>`).join("");
-    el.classList.toggle("hidden", !rueck && eintraege.length === 0);
+    el.classList.toggle("hidden", !rueck && !backup && eintraege.length === 0);
   }
 
   // Zeigt den im Browser gespeicherten Dashboard-Namen in der Kopfzeile an
@@ -11101,9 +11103,187 @@
     }
   };
 
+  // ==========================================================
+  // Komplett-Backup (seit Session 39, To-do A): alle eigenen Daten als
+  // eine JSON-Datei. Läuft nur über bestehende Server-Aktionen (kein
+  // neues Backend): „liste“ (alle Tabellen der App, volle Zeilen mit ID),
+  // dazu Ernährung (Einträge, Gewicht, Profil, Ziel-Stände, Schritte,
+  // MET-Werte, eigene Lebensmittel), Unterschriften der Schlüssel-
+  // protokolle und die Push-Einstellungen. Bewusst nicht enthalten:
+  // Login-Sessions, Google-Zugang, Push-Schlüssel, BLS-Lebensmittel,
+  // hochgeladene Dateien (nur ihre Liste). Wiederherstellen kommt später.
+  // ==========================================================
+  const BACKUP_ZULETZT = "backup-zuletzt";
+  const BACKUP_ERN_AB = "2020-01-01"; // frühestes Datum für Ernährungseinträge
+  let backupLaeuft = false;
+
+  // Datum des letzten Backups auf diesem Gerät (ISO) oder ""
+  function backupZuletzt() {
+    try { return localStorage.getItem(BACKUP_ZULETZT) || ""; } catch (_e) { return ""; }
+  }
+
+  // Karte oben im Reiter Export
+  function backupKarteHtml() {
+    const zuletzt = backupZuletzt();
+    let stand = "Auf diesem Gerät wurde noch kein Komplett-Backup gespeichert.";
+    if (zuletzt) {
+      const tage = Math.round((new Date(heuteISO() + "T00:00:00") - new Date(zuletzt + "T00:00:00")) / 86400000);
+      stand = `Letztes Backup auf diesem Gerät: ${datumDE(zuletzt)}${tage > 0 ? ` (vor ${tage} ${tage === 1 ? "Tag" : "Tagen"})` : " (heute)"}.`;
+      if (tage > 30) stand += " Zeit für ein neues.";
+    }
+    return `
+      <div class="sync-karte backup-karte" style="margin-bottom:1.2rem;">
+        <div class="sync-kopf">${ic("export")}<span>Komplett-Backup</span></div>
+        <p class="hero-text" style="margin:0.3rem 0 0.6rem;">Alle deine Daten aus allen Bereichen in einer JSON-Datei – zum Sichern vor größeren Umbauten. Ändert nichts an den gespeicherten Daten.</p>
+        <button type="button" class="btn-primary" id="btn-backup" onclick="komplettBackup()">${ic("export")}Komplett-Backup herunterladen</button>
+        <p class="notiz-meta" id="backup-status" role="status" aria-live="polite" style="margin:0.5rem 0 0;">${escapeHtml(stand)}</p>
+        <p class="notiz-meta" style="margin:0.4rem 0 0;">Enthält auch Gesundheitsdaten (Ernährung) und Daten Dritter (Schlüssel, Vermietungen): nur lokal oder verschlüsselt ablegen, nicht unverschlüsselt in fremde Clouds.</p>
+      </div>`;
+  }
+
+  // Ernährungseinträge in Abschnitten von 1000 Tagen holen (Server erlaubt max. ca. 3 Jahre)
+  async function backupErnaehrungEintraege() {
+    const heute = heuteISO();
+    const eintraege = [];
+    const gewichte = [];
+    for (let von = BACKUP_ERN_AB; von <= heute; von = addTage(von, 1001)) {
+      const bis = addTage(von, 1000) < heute ? addTage(von, 1000) : heute;
+      const res = await api("ernaehrung_export", { von, bis });
+      eintraege.push(...(res.eintraege || []));
+      gewichte.push(...(res.gewichte || []));
+    }
+    return { eintraege, gewichte };
+  }
+
+  // Schlüsselprotokolle mit Unterschriftsbildern nachladen (liste liefert sie ohne)
+  async function backupAusgabenMitUnterschrift(ausgaben, meldung) {
+    const ergebnis = [];
+    let n = 0;
+    for (const a of ausgaben || []) {
+      if (a.hat_unterschrift_ausgabe || a.hat_unterschrift_rueckgabe) {
+        n++;
+        meldung(`Lade Unterschriften (${n}) …`);
+        const res = await api("schluessel_ausgabe_laden", { id: a.id });
+        ergebnis.push(res.ausgabe || a);
+      } else ergebnis.push(a);
+    }
+    return ergebnis;
+  }
+
+  // Sammelt alle Daten und lädt die JSON-Datei herunter
+  window.komplettBackup = async function() {
+    if (backupLaeuft) return;
+    if (typeof kontoMenuSchliessen === "function") kontoMenuSchliessen();
+    if (!confirm("Komplett-Backup herunterladen?\n\nDie Datei enthält alle deine Daten – auch Gesundheitsdaten (Ernährung) und Daten Dritter (Schlüssel, Vermietungen). Bitte nur lokal oder verschlüsselt ablegen.")) return;
+    backupLaeuft = true;
+    const knopf = document.getElementById("btn-backup");
+    if (knopf) knopf.disabled = true;
+    const meldung = (t) => {
+      const el = document.getElementById("backup-status");
+      if (el) el.textContent = t; else hinweisZeigen(t);
+    };
+    const luecken = []; // was nicht gesichert werden konnte
+    try {
+      meldung("Lade alle Tabellen …");
+      const liste = await api("liste");
+      delete liste.mail_eingerichtet; // nur ein Schalter, keine Daten
+
+      meldung("Lade Schlüsselprotokolle …");
+      try {
+        liste.schluessel_ausgaben = await backupAusgabenMitUnterschrift(liste.schluessel_ausgaben, meldung);
+      } catch (e) {
+        if (e.message === "unauthorized") throw e;
+        luecken.push("Unterschriften der Schlüsselprotokolle: " + e.message);
+      }
+
+      meldung("Lade Ernährung …");
+      const ernaehrung = {};
+      try {
+        const p = await api("ernaehrung_profil");
+        Object.assign(ernaehrung, {
+          profil: p.profil || null, ziel_versionen: p.versionen ?? null,
+          schritte: p.schritte ?? null, training_met: p.met || [],
+        });
+      } catch (e) {
+        if (e.message === "unauthorized") throw e;
+        luecken.push("Ernährungsprofil: " + e.message);
+      }
+      try {
+        const { eintraege, gewichte } = await backupErnaehrungEintraege();
+        ernaehrung.eintraege = eintraege;
+        ernaehrung.koerpergewicht = gewichte;
+      } catch (e) {
+        if (e.message === "unauthorized") throw e;
+        luecken.push("Ernährungseinträge und Gewicht: " + e.message);
+      }
+      try {
+        const res = await api("lebensmittel_eigene");
+        ernaehrung.eigene_lebensmittel = res.lebensmittel || [];
+      } catch (e) {
+        if (e.message === "unauthorized") throw e;
+        luecken.push("Eigene Lebensmittel: " + e.message);
+      }
+
+      meldung("Lade Einstellungen …");
+      let pushEinstellungen = null;
+      try {
+        const r = await api("push_status", { origin: location.origin, endpoint: null });
+        pushEinstellungen = r.fehlt ? null : (r.einstellungen || null);
+      } catch (e) {
+        if (e.message === "unauthorized") throw e;
+        luecken.push("Push-Einstellungen: " + e.message);
+      }
+
+      // Anzahl je Tabelle für den schnellen Überblick
+      const anzahl = {};
+      Object.entries(liste).forEach(([k, v]) => { if (Array.isArray(v)) anzahl[k] = v.length; });
+      Object.entries(ernaehrung).forEach(([k, v]) => { if (Array.isArray(v)) anzahl["ernaehrung." + k] = v.length; });
+
+      const jetzt = new Date();
+      const backup = {
+        typ: "dashboard_backup",
+        version: 1,
+        erstellt_am: jetzt.toISOString(),
+        erstellt_lokal: `${heuteISO()} ${String(jetzt.getHours()).padStart(2, "0")}:${String(jetzt.getMinutes()).padStart(2, "0")}`,
+        hinweise: [
+          "Enthält Gesundheitsdaten (Ernährung) und Daten Dritter (Schlüssel, Vermietungen) – nur lokal oder verschlüsselt aufbewahren.",
+          "Nicht enthalten: Login-Sessions, Google-Zugang, Push-Schlüssel und angemeldete Geräte, BLS-Lebensmittel (jederzeit neu importierbar), gespeicherte Open-Food-Facts-Produkte (werden beim Scannen neu geholt).",
+          "Hochgeladene Dateien (Projekt- und Spieldateien, Rezeptfotos, Bilder im Training, Weiterbildungsnachweise) liegen nur im Supabase-Speicher; die Datei listet sie auf, enthält sie aber nicht.",
+          "Verlauf: nur die letzten 50 Einträge je Bereich (so viel liefert die App).",
+          "Ernährungseinträge in der Form des Ernährungs-Exports (ohne interne IDs).",
+        ],
+        luecken,
+        anzahl,
+        tabellen: liste,
+        ernaehrung,
+        push_einstellungen: pushEinstellungen,
+      };
+
+      meldung("Erstelle Datei …");
+      const datei = `dashboard-backup-${heuteISO()}.json`;
+      downloadDatei(datei, JSON.stringify(backup, null, 1), "application/json");
+      try { localStorage.setItem(BACKUP_ZULETZT, heuteISO()); } catch (_e) { /* privater Modus */ }
+      const zeilen = Object.values(anzahl).reduce((s, n) => s + n, 0);
+      const text = `Fertig: ${datei} mit ${zeilen.toLocaleString("de-DE")} Einträgen.` +
+        (luecken.length ? ` Nicht gesichert: ${luecken.join("; ")}` : "");
+      if (aktiverTab === "export") renderExport();
+      meldung(text);
+      hinweisZeigen(luecken.length ? "Backup gespeichert – mit Lücken, siehe Export" : "Backup gespeichert");
+    } catch (e) {
+      if (e.message !== "unauthorized") {
+        meldung("Backup fehlgeschlagen: " + (e.message || "Fehler"));
+        alert("Backup fehlgeschlagen: " + (e.message || "Fehler"));
+      }
+    } finally {
+      backupLaeuft = false;
+      const k = document.getElementById("btn-backup");
+      if (k) k.disabled = false;
+    }
+  };
+
   // Rendert die Exportliste mit Excel-/Word-Knöpfen für alles und je Kategorie
   function renderExport() {
-    let html = `
+    let html = backupKarteHtml() + `
       <div class="export-row export-alle">
         <span class="export-name">Alles</span>
         <div class="export-buttons">
