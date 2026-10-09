@@ -2119,6 +2119,46 @@
   };
 
   // ==========================================================
+  // Notiz in Aufgabe umwandeln (seit Session 41, To-do 1): öffnet das
+  // „+“-Blatt als neue Aufgabe – Titel = erste Zeile, Notiz = der Rest,
+  // Bereich und Projekt der Notiz, Datum/Uhrzeit aus dem Text erkannt.
+  // Gespeichert wird erst mit „Speichern“; danach löscht schnellSpeichern
+  // die Notiz und bietet „Rückgängig“ an. Was im Notiz-Blatt gerade
+  // geändert, aber nicht gespeichert war, wird mit übernommen.
+  // ==========================================================
+  window.notizInAufgabe = function() {
+    const n = blatt && blatt.art === "notiz" ? notizen.find((x) => String(x.id) === String(blatt.id)) : null;
+    if (!n) return;
+    const feld = document.getElementById("blatt-f-text");
+    const projektFeld = document.getElementById("blatt-f-projekt");
+    const voll = String(feld ? feld.value : n.text || "").replace(/\r\n/g, "\n").trim();
+    if (!voll) return;
+    const zeilen = voll.split("\n");
+    let titel = zeilen.shift().trim();
+    let rest = zeilen.join("\n").trim();
+    // Sehr lange erste Zeile: auf 200 Zeichen kürzen, der Rest wandert in die Notiz
+    if (titel.length > 200) {
+      const schnitt = titel.lastIndexOf(" ", 200) > 80 ? titel.lastIndexOf(" ", 200) : 200;
+      rest = (titel.slice(schnitt).trim() + (rest ? "\n" + rest : "")).trim();
+      titel = titel.slice(0, schnitt).trim() + " …";
+    }
+    const projektId = projektFeld ? projektFeld.value : (n.projekt_id || "");
+    window.blattSchliessen();
+    window.schnellOeffnen();
+    const bereich = BEREICH_FARBWELT.includes(bereichVon(n)) ? bereichVon(n) : "privat";
+    Object.assign(schnell, { art: "aufgabe", bereich, wann: "ohne", details: true,
+      ausNotiz: { id: n.id, text: n.text || voll, projekt_id: n.projekt_id || null, bereich } });
+    document.getElementById("schnell-reiterform").classList.add("hidden");
+    document.getElementById("schnell-text").value = titel;
+    document.getElementById("schnell-notiz").value = rest;
+    schnellRendern();
+    document.getElementById("schnell-projekt").value = projektId ? String(projektId) : "";
+    schnellTextPruefen(); // Datum/Uhrzeit aus dem Titel („… bis Freitag“)
+    document.getElementById("schnell-projekt").value = projektId ? String(projektId) : "";
+    schnellMeldung("Aus Notiz – nach dem Speichern wird die Notiz gelöscht.", false);
+  };
+
+  // ==========================================================
   // Bearbeiten im selben Blatt (seit Session 35): Aufgaben und Termine aus
   // Aufgaben, Kalender, Frei und Heute öffnen das „+“-Blatt ausgefüllt, mit
   // Speichern und Löschen. Ersetzt die früheren Inline-Formulare.
@@ -2139,7 +2179,8 @@
     document.getElementById("schnell-uhrzeit").value = zeit(e.uhrzeit);
     document.getElementById("schnell-ende").value = zeit(e.ende_uhrzeit);
     document.getElementById("schnell-intervall").value = typ === "aufgabe" && e.erinnere_alle_tage ? e.erinnere_alle_tage : "";
-    document.getElementById("schnell-notiz").value = typ === "termin" ? (e.notiz || "") : "";
+    // Aufgaben haben seit Session 41 auch eine Notiz
+    document.getElementById("schnell-notiz").value = e.notiz || "";
     schnellMeldung("", false);
     document.getElementById("schnell-reiterform").classList.add("hidden");
     schnellRendern();
@@ -2421,6 +2462,10 @@
         { key: "text", label: "Notiz", typ: "text-lang", zeilen: 5, pflicht: true },
         { key: "projekt", label: "Projekt", typ: "auswahl",
           optionen: () => [["", "Ohne Projekt"], ...projekteAktuell().map((p) => [p.id, p.name])] },
+        // Seit Session 41: Notiz in eine Aufgabe umwandeln
+        { key: "_umwandeln", label: "Daraus eine Aufgabe machen", typ: "html",
+          html: () => `<button type="button" class="link-btn" onclick="notizInAufgabe()">${ic("weiter")}In Aufgabe umwandeln</button>
+            <span class="blatt-hinweis">Erste Zeile wird Titel, der Rest die Notiz der Aufgabe. Datum und Uhrzeit im Text werden erkannt. Nach dem Speichern wird die Notiz gelöscht (mit Rückgängig).</span>` },
       ],
       speichern: (id, w) => api("notiz_aktualisieren", { id, text: w.text, projekt_id: w.projekt || null }),
       loeschen: (id) => api("notiz_loeschen", { id }),
@@ -3118,8 +3163,9 @@
     document.getElementById("schnell-ende-zeile").classList.toggle("hidden", !(zeigen && mitWann && !ohneZeit));
     document.getElementById("schnell-projekt-zeile").classList.toggle("hidden", !(zeigen && (schnell.art === "aufgabe" || schnell.art === "notiz")));
     document.getElementById("schnell-intervall-zeile").classList.toggle("hidden", !(zeigen && schnell.art === "aufgabe"));
-    document.getElementById("schnell-notiz-zeile").classList.toggle("hidden", !(zeigen && (schnell.art === "termin" || schnell.art === "idee")));
-    document.getElementById("schnell-notiz").placeholder = schnell.art === "idee" ? "Beschreibung (optional)" : "Notiz zum Termin (optional)";
+    document.getElementById("schnell-notiz-zeile").classList.toggle("hidden", !(zeigen && ["termin", "idee", "aufgabe"].includes(schnell.art)));
+    document.getElementById("schnell-notiz").placeholder = schnell.art === "idee" ? "Beschreibung (optional)"
+      : schnell.art === "aufgabe" ? "Notiz zur Aufgabe (optional)" : "Notiz zum Termin (optional)";
 
     // Projekte des gewählten Bereichs
     const select = document.getElementById("schnell-projekt");
@@ -3177,11 +3223,11 @@
     schnellMeldung("Speichere …", false);
     try {
       if (bearbeiten && schnell.art === "aufgabe") {
-        await api("aufgabe_aktualisieren", { ...basis, id: schnell.id, titel: text, projekt_id, faellig_am: datum, uhrzeit, ende_uhrzeit, erinnere_alle_tage: intervall || null });
+        await api("aufgabe_aktualisieren", { ...basis, id: schnell.id, titel: text, projekt_id, faellig_am: datum, uhrzeit, ende_uhrzeit, erinnere_alle_tage: intervall || null, notiz });
       } else if (bearbeiten && schnell.art === "termin") {
         await api("termin_aktualisieren", { ...basis, id: schnell.id, titel: text, datum, uhrzeit, ende_uhrzeit, notiz });
       } else if (schnell.art === "aufgabe") {
-        await api("aufgabe_hinzufuegen", { ...basis, titel: text, projekt_id, faellig_am: datum, uhrzeit, ende_uhrzeit, erinnere_alle_tage: intervall || null });
+        await api("aufgabe_hinzufuegen", { ...basis, titel: text, projekt_id, faellig_am: datum, uhrzeit, ende_uhrzeit, erinnere_alle_tage: intervall || null, ...(notiz ? { notiz } : {}) });
       } else if (schnell.art === "termin") {
         await api("termin_hinzufuegen", { ...basis, titel: text, datum, uhrzeit, ende_uhrzeit, notiz });
       } else if (schnell.art === "notiz") {
@@ -3203,7 +3249,22 @@
     const artLabel = SCHNELL_ARTEN.find((a) => a.art === schnell.art).label;
     const bereichName = (BEREICH_UMSCHALTER.find((b) => b.bereich === bereich) || {}).name || bereich;
     window.schnellSchliessen();
-    hinweisZeigen(`${artLabel} gespeichert${bereich !== aktiverBereich ? ` · ${bereichName}` : ""}`);
+    // Aus einer Notiz umgewandelt (seit Session 41): Notiz löschen, mit Rückgängig
+    const ausNotiz = !bearbeiten && schnell.art === "aufgabe" ? schnell.ausNotiz : null;
+    if (ausNotiz) {
+      try {
+        await api("notiz_loeschen", { id: ausNotiz.id, aktiver_bereich: ausNotiz.bereich });
+        hinweisZeigen(`Aufgabe gespeichert, Notiz gelöscht${bereich !== aktiverBereich ? ` · ${bereichName}` : ""}`, async () => {
+          await api("notiz_hinzufuegen", { text: ausNotiz.text, projekt_id: ausNotiz.projekt_id, bereich: ausNotiz.bereich, aktiver_bereich: ausNotiz.bereich });
+          await ladeDaten();
+          hinweisZeigen("Notiz wiederhergestellt");
+        });
+      } catch (e) {
+        hinweisZeigen("Aufgabe gespeichert – die Notiz konnte nicht gelöscht werden");
+      }
+    } else {
+      hinweisZeigen(`${artLabel} gespeichert${bereich !== aktiverBereich ? ` · ${bereichName}` : ""}`);
+    }
     // Verschoben? Frei und Kalender springen mit, damit der Eintrag sichtbar bleibt
     if (bearbeiten && datum && datum !== schnell.altDatum) {
       if (aktiverTab === "frei") freiTag = new Date(datum + "T00:00:00");
@@ -3893,6 +3954,7 @@
         <button class="task-check ${done ? "done" : ""}" onclick="umschalten('${a.id}')">${done ? "✓" : ""}</button>
         <div class="task-info">
           <span class="task-titel ${done ? "done" : ""}">${escapeHtml(a.titel)}</span>
+          ${a.notiz ? `<span class="task-notiz" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-line; font-size:var(--fs-klein); color:var(--ink-dim); margin-top:0.15rem;">${escapeHtml(a.notiz)}</span>` : ""}
           <div class="task-meta">${meta}</div>
         </div>
         ${snoozeBtn}
@@ -10817,6 +10879,7 @@
         Beginn: a.uhrzeit ? a.uhrzeit.slice(0, 5) : "",
         Ende: a.ende_uhrzeit ? a.ende_uhrzeit.slice(0, 5) : "",
         "Erinnerung alle X Tage": a.erinnere_alle_tage || "",
+        Notiz: a.notiz || "",
         "Erstellt am": a.erstellt_am ? a.erstellt_am.slice(0, 10) : "",
       };
     });
