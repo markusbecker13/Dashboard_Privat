@@ -226,11 +226,13 @@
       </div>
 
       <div id="view-kalender" class="hidden">
-        <h1>Kalender <button class="hilfe-icon" data-hilfe="Termine im Monatsüberblick. Bei verbundenem Google-Kalender läuft der Abgleich automatisch alle 15 Minuten in beide Richtungen; neuere Änderung gewinnt bei Konflikten. Blockzeiten (über das Zahnrad) sind feste, wiederkehrende oder einmalige 'nicht stören'-Zeiten.">?</button></h1>
+        <h1>Kalender <button class="hilfe-icon" data-hilfe="Termine im Monatsüberblick. Kategorie (Farbe) und Wiederholung (wöchentlich, monatlich, jährlich) stellst du im +-Blatt unter Details ein; Kategorien verwaltest du über das Zahnrad. Bei verbundenem Google-Kalender läuft der Abgleich automatisch alle 15 Minuten in beide Richtungen; neuere Änderung gewinnt bei Konflikten. Blockzeiten (über das Zahnrad) sind feste, wiederkehrende oder einmalige 'nicht stören'-Zeiten.">?</button></h1>
         <p class="hero-text">Termine eintragen und im Monatsüberblick behalten.</p>
-        <div class="reiter-aktionen"><button type="button" class="reiter-zahnrad" data-formular="einst-kalender" aria-expanded="false" aria-controls="einst-kalender" aria-label="Blockzeiten verwalten" title="Blockzeiten verwalten"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg></button></div>
+        <div class="reiter-aktionen"><button type="button" class="reiter-zahnrad" data-formular="einst-kalender" aria-expanded="false" aria-controls="einst-kalender" aria-label="Kategorien und Blockzeiten verwalten" title="Kategorien und Blockzeiten verwalten"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-zahnrad"></use></svg></button></div>
         <div class="reiter-einstellungen hidden" id="einst-kalender">
-        <div class="project-heading" style="margin-top:0;">Blockzeiten <button type="button" class="hilfe-icon" data-hilfe="Wiederkehrend: an bestimmten Wochentagen jede Woche aktiv. Einmalig: nur an einem konkreten Datum. Blockzeiten werden im Reiter 'Frei' bei der Berechnung freier Zeiten mit ausgeschlossen.">?</button></div>
+        <div class="project-heading" style="margin-top:0;">Kategorien <button type="button" class="hilfe-icon" data-hilfe="Termin-Kategorien mit Farbe, je Bereich. Die Farbe erscheint als Punkt und Streifen in Kalender, Heute und Frei. Art Geburtstag zeigt ein Kuchen-Symbol und bei jährlichen Terminen mit Geburtsjahr das Alter. Die Kategorie wählst du im +-Blatt unter Details.">?</button></div>
+        <div id="termin-kategorien-bereich"></div>
+        <div class="project-heading">Blockzeiten <button type="button" class="hilfe-icon" data-hilfe="Wiederkehrend: an bestimmten Wochentagen jede Woche aktiv. Einmalig: nur an einem konkreten Datum. Blockzeiten werden im Reiter 'Frei' bei der Berechnung freier Zeiten mit ausgeschlossen.">?</button></div>
         <p class="hero-text" style="margin:0 0 0.8rem;">Feste "nicht stören"-Zeiten – wiederkehrend oder einmalig. Der Reiter Frei zieht sie bei den freien Zeiten ab.</p>
         <div id="blockzeiten-liste"></div>
         <div style="margin:0.8rem 0 1.6rem;">
@@ -901,7 +903,10 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <ul>
                 <li>Mit ‹ › zwischen Monaten wechseln</li>
                 <li>Tag anklicken öffnet ein Panel mit den Terminen dieses Tages plus Formular zum Eintragen. Uhrzeiten im Titel werden erkannt („Flohmarkt 8-14 Uhr“ setzt Beginn und Ende); steht ein anderes Datum drin („Elternabend 12.11. 19 Uhr“), landet der Termin an diesem Tag und der Kalender springt dorthin. Beim Bearbeiten wird nichts erkannt</li>
-                <li>Tage mit Terminen zeigen einen kleinen Punkt; oben die nächsten 5 anstehenden Termine</li>
+                <li>Tage mit Terminen zeigen einen kleinen Punkt (seit Session 42 in der Farbe der Kategorie, Geburtstage zuerst); oben die nächsten 5 anstehenden Termine</li>
+                <li><strong>Wiederholen</strong> (seit Session 42): im „+“-Blatt unter „▸ Details“ bei einem Termin „Nie / Wöchentlich / Monatlich / Jährlich“, optional „bis“ (letzter möglicher Tag). Der Termin erscheint dann an allen Tagen – im Kalender, in Heute, Frei, Planung, Wochenrückblick, beim Vorlesen und in den Push-Erinnerungen. Monatlich am 31. heißt in kürzeren Monaten am letzten Tag, jährlich am 29.2. in Nicht-Schaltjahren am 28.2. Eine Serie ist <em>ein</em> Eintrag: Stift (oder Antippen in Heute) ändert alle Termine, das X löscht nach Rückfrage die ganze Serie. Einzelne Termine einer Serie lassen sich nicht abhaken, wischen oder einzeln verschieben – dort steht ein Serien-Symbol. Ausfälle (z. B. Ferien) gibt es noch nicht; dann die Serie mit „bis“ beenden und neu anlegen. Wiederholte Termine bleiben im Dashboard und gehen nicht zu Google; Termine, die aus Google kommen, lassen sich hier nicht wiederholen (Serie in Google anlegen)</li>
+                <li><strong>Kategorien mit Farbe</strong> (seit Session 42): im „+“-Blatt unter Details wählen. Die Farbe erscheint als Punkt vor dem Titel und als Streifen im Tagespanel, in Heute und den nächsten Terminen; der Name steht klein dabei. Verwalten über das Zahnrad → „Kategorien“ (je Bereich): Name, Farbe aus neun festen Tönen, Art „Normal“ oder „Geburtstag“. Startkategorien: Privat Geburtstag/Familie/Arzt/Sport, OGS Team/Eltern, AWO Sitzung/Veranstaltung, Business Arbeit. Geburtstag gibt es bewusst nur in Privat – in OGS, AWO und Business wären das Daten Dritter im dienstlichen Rahmen. Löschen einer Kategorie lässt die Termine stehen, nur ohne Kategorie</li>
+                <li><strong>Geburtstage</strong> (seit Session 42): Kategorie „Geburtstag“ wählen – die Wiederholung springt auf „Jährlich“. Mit Geburtsjahr eingetragen (z. B. Datum 12.05.1986 oder „Oma Geburtstag 12.5.1946“ im Text) steht „wird 40“ dabei. Ohne Geburtsjahr (Datum aus diesem Jahr) zeigt die App kein Alter. Ganztägige Geburtstage blockieren in Frei keine Zeit. Geburtstage, die neu aus Google kommen, bekommen automatisch die Geburtstags-Kategorie von Privat; schon importierte bleiben, wie sie sind. <strong>Keine Geburtstage von OGS-Kindern</strong> eintragen; Geburtstage von Familie und Freunden in Privat fallen unter die private Haushaltsausnahme (Einschätzung, keine Rechtsprüfung)</li>
                 <li><strong>Blockzeiten:</strong> feste Zeitfenster, wiederkehrend an bestimmten Wochentagen oder einmalig an einem festen Datum. Sie bilden den Rahmen, aus dem der Frei-Tab die freien Zeiten berechnet. Der Stift öffnet das Bearbeiten-Blatt</li>
               </ul>
               <p><strong>Google-Kalender-Sync</strong> – Karte oben im Tab:</p>
@@ -1895,6 +1900,17 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <label class="schnell-feld" id="schnell-projekt-zeile">Projekt <select id="schnell-projekt"></select></label>
         <label class="schnell-feld" id="schnell-intervall-zeile">wiederholen alle <input type="number" id="schnell-intervall" min="1" inputmode="numeric" aria-label="Wiederholen alle X Tage"> Tage</label>
         <div class="schnell-feld-block" id="schnell-notiz-zeile"><textarea id="schnell-notiz" class="schnell-notiz" rows="2" aria-label="Notiz oder Beschreibung"></textarea></div>
+        <!-- Termine: Kategorie und Wiederholung (seit Session 42) -->
+        <div class="schnell-feld-block hidden" id="schnell-kat-zeile">
+          <span class="schnell-label">Kategorie</span>
+          <div class="schnell-chips" id="schnell-kat" role="group" aria-label="Kategorie"></div>
+          <span class="notiz-meta hidden" id="schnell-kat-hinweis">Mit Geburtsjahr eintragen (Datum, z. B. „12.05.1986“), dann steht das Alter dabei.</span>
+        </div>
+        <div class="schnell-feld-block hidden" id="schnell-wdh-zeile">
+          <span class="schnell-label">Wiederholen</span>
+          <div class="schnell-chips" id="schnell-wdh" role="group" aria-label="Wiederholen"></div>
+          <label class="schnell-feld hidden" id="schnell-wdh-bis-zeile">bis (optional) <input type="date" id="schnell-wdh-bis" aria-label="Wiederholen bis (optional)"></label>
+        </div>
       </div>
       <p class="schnell-status" id="schnell-status" role="status" aria-live="polite"></p>
       <button type="button" class="btn-primary schnell-speichern" id="schnell-speichern" onclick="schnellSpeichern()">Speichern</button>
