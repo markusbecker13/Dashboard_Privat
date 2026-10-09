@@ -52,6 +52,8 @@
   let sparziele = null; // Sparziele (seit Session 37); null = SQL/index.ts fehlt // Block „Kategorie-Regeln“ in Buchungen aufgeklappt
   let finTyp = "fixkosten"; // "fixkosten" | "sonderausgaben"
   let finBearbeitetesFixkosten = null; // id oder null
+  let finFixJahr = new Date().getFullYear(); // im Reiter Fixkosten gewähltes Jahr (seit Session 40)
+  const FIN_FIX_VORAUS = 3; // Fixkosten planbar bis 3 Jahre in die Zukunft
   let finBearbeiteteSonderausgabe = null; // id oder null
   let finBearbeiteteBuchung = null; // id oder null
   let buchungTypAusgewaehlt = "ausgabe"; // "ausgabe" | "einnahme"
@@ -1744,8 +1746,8 @@
         },
         oeffnen: () => suchFinanzTab("buchungen") },
       { typ: "fixkosten", gruppe: "Fixkosten", tab: "finanzen", liste: fixkosten,
-        felder: (f) => ({ titel: f.bezeichnung, texte: [f.kategorie], meta: [f.typ === "einnahme" ? "Einnahme" : "Ausgabe"] }),
-        oeffnen: (f) => suchFinanzTab("fixkosten", () => window.fixkostenBearbeitenStart(f.id)) },
+        felder: (f) => ({ titel: f.bezeichnung, texte: [f.kategorie], meta: [f.typ === "einnahme" ? "Einnahme" : "Ausgabe", String(fixJahr(f))] }),
+        oeffnen: (f) => suchFinanzTab("fixkosten", () => { finFixJahr = fixJahr(f); window.fixkostenBearbeitenStart(f.id); }) },
       { typ: "sonderausgabe", gruppe: "Sonderausgaben", tab: "finanzen", liste: sonderausgaben,
         felder: (s) => ({ titel: s.bezeichnung, texte: [s.notiz], meta: [finEuro(s.betrag)] }),
         oeffnen: (s) => suchFinanzTab("sonderausgaben", () => window.sonderausgabeBearbeitenStart(s.id)) },
@@ -4781,9 +4783,19 @@
     return projekte.filter((p) => bereichVon(p) === aktiverBereich);
   }
 
-  // Liefert die Fixkosten des aktiven Bereichs
+  // Liefert die Fixkosten des aktiven Bereichs (alle Jahre)
   function fixkostenAktuell() {
     return fixkosten.filter((f) => bereichVon(f) === aktiverBereich);
+  }
+
+  // Fixkosten nach Jahren (seit Session 40): Jahr einer Zeile. Zeilen ohne
+  // Jahr (vor fixkosten_jahr_setup.sql) zählen zum laufenden Jahr.
+  function fixJahr(f) {
+    return Number(f && f.jahr) || new Date().getFullYear();
+  }
+  // Fixkosten des aktiven Bereichs für ein Jahr
+  function fixkostenJahrListe(jahr) {
+    return fixkostenAktuell().filter((f) => fixJahr(f) === jahr);
   }
 
   // Liefert die Sonderausgaben des aktiven Bereichs
@@ -13157,15 +13169,37 @@
     else renderFinUebersicht();
   }
 
-  // Kommende Monate (seit Session 31): Die Tabelle gilt immer für das
-  // laufende Jahr. Monate nach dem aktuellen sind Planwerte und farblich
-  // abgesetzt; der aktuelle Monat ist hervorgehoben. Ein Planwert, der vom
-  // Vormonat abweicht, ist als Anpassung markiert (↑/↓). Sobald beim
-  // CSV-Import eine Buchung für den Monat kommt, ersetzt sie den Planwert.
-  function finMonatArt(i) {
-    const aktuell = new Date().getMonth();
+  // Kommende Monate (seit Session 31): Monate nach dem aktuellen sind
+  // Planwerte und farblich abgesetzt; der aktuelle Monat ist hervorgehoben.
+  // Ein Planwert, der vom Vormonat abweicht, ist als Anpassung markiert
+  // (↑/↓). Sobald beim CSV-Import eine Buchung für den Monat kommt, ersetzt
+  // sie den Planwert. Seit Session 40 gilt die Tabelle für das gewählte Jahr
+  // (finFixJahr): in einem kommenden Jahr sind alle Monate Planwerte, in
+  // einem vergangenen keiner.
+  function finMonatArt(i, jahr = finFixJahr) {
+    const heute = new Date();
+    if (jahr > heute.getFullYear()) return "kommend";
+    if (jahr < heute.getFullYear()) return "vergangen";
+    const aktuell = heute.getMonth();
     if (i === aktuell) return "aktuell";
     return i > aktuell ? "kommend" : "vergangen";
+  }
+  // Monatsindex „heute“ für die Planlogik eines Jahres (finMonateMitPlan):
+  // laufendes Jahr = aktueller Monat, vergangenes = 12 (alles gebucht),
+  // kommendes = 0 (alles Plan)
+  function finFixAktMonat(jahr) {
+    const heute = new Date();
+    if (jahr < heute.getFullYear()) return 12;
+    if (jahr > heute.getFullYear()) return 0;
+    return heute.getMonth();
+  }
+  // Gleiche Position (Typ + Erkennungsschlüssel) in späteren Jahren
+  function finFixFolgejahrZeilen(f) {
+    const schluessel = finFixSchluessel(f);
+    if (!schluessel) return [];
+    return fixkostenAktuell()
+      .filter((x) => x.id !== f.id && x.typ === f.typ && fixJahr(x) > fixJahr(f) && finFixSchluessel(x) === schluessel)
+      .sort((a, b) => fixJahr(a) - fixJahr(b));
   }
   // Liefert die CSS-Klasse für aktuellen/kommenden Monat, leer bei vergangenen
   function finMonatKlasse(i) {
@@ -13215,7 +13249,14 @@
         <tr data-fk-id="${f.id}">
           <td class="fin-bez">
             <input type="text" id="fk-bez-${f.id}" value="${escapeAttr(f.bezeichnung)}">
-            <label class="fin-folge-check" style="display:flex; align-items:center; gap:0.35rem; margin-top:0.35rem; font-size:0.75rem; color:var(--ink-dim); white-space:normal; min-height:32px;"><input type="checkbox" id="fk-folge-${f.id}" checked style="width:1rem; height:1rem;"> Geänderten Betrag auch für die Folgemonate</label>
+            <label class="fin-folge-check" style="display:flex; align-items:center; gap:0.35rem; margin-top:0.35rem; font-size:0.75rem; color:var(--ink-dim); white-space:normal; min-height:32px;"><input type="checkbox" id="fk-folge-${f.id}"${fixJahr(f) >= new Date().getFullYear() ? " checked" : ""} style="width:1rem; height:1rem;"> Geänderten Betrag auch für die Folgemonate</label>
+            ${(() => {
+              const spaeter = finFixFolgejahrZeilen(f);
+              if (!spaeter.length) return "";
+              const jahre = [...new Set(spaeter.map(fixJahr))];
+              const text = jahre.length > 1 ? `${jahre[0]}–${jahre[jahre.length - 1]}` : String(jahre[0]);
+              return `<label class="fin-folge-check" style="display:flex; align-items:center; gap:0.35rem; font-size:0.75rem; color:var(--ink-dim); white-space:normal; min-height:32px;"><input type="checkbox" id="fk-folgejahr-${f.id}" checked style="width:1rem; height:1rem;"> Neuen Dezember-Betrag auch in ${text} übernehmen</label>`;
+            })()}
           </td>
           ${FIN_MONATE.map((m, i) => `<td class="${finMonatKlasse(i)}"${finMonatStil(i)}><input type="number" step="0.01" id="fk-${m}-${f.id}" value="${finZahl(f[m])}" aria-label="${FIN_MONATSNAMEN_KURZ[i]}"></td>`).join("")}
           <td>${finEuro(summe)}</td>
@@ -13236,7 +13277,7 @@
 
   // Erzeugt die Fixkosten-Tabelle eines Typs (Ausgabe/Einnahme) mit Monatssummen
   function fixkostenTabelleHtml(typ, titel) {
-    const zeilen = fixkostenAktuell().filter((f) => f.typ === typ);
+    const zeilen = fixkostenJahrListe(finFixJahr).filter((f) => f.typ === typ);
     const summenProMonat = FIN_MONATE.map((m) => zeilen.reduce((s, f) => s + finZahl(f[m]), 0));
     const summeGesamt = summenProMonat.reduce((s, x) => s + x, 0);
     return `
@@ -13244,7 +13285,7 @@
         <table class="fin-tabelle">
           <thead>
             <tr>
-              <th class="fin-bez-th">${titel} ${new Date().getFullYear()}</th>
+              <th class="fin-bez-th">${titel} ${finFixJahr}</th>
               ${FIN_MONATSNAMEN_KURZ.map((m, i) => `<th class="${finMonatKlasse(i)}"${finMonatStil(i, "var(--panel)", finMonatArt(i) === "aktuell" ? "color:var(--ink); font-weight:700;" : "")}${finMonatArt(i) === "aktuell" ? ' aria-current="date"' : ""}>${m}</th>`).join("")}
               <th>Summe</th>
               <th></th>
@@ -13268,15 +13309,21 @@
   // Rendert den Fixkosten-Reiter mit beiden Tabellen, Legende, Neu-Formular und Aufräumen-Knopf
   function renderFinFixkosten() {
     const el = document.getElementById("fin-fixkosten-bereich");
+    const { min, max } = finFixJahrSpanne();
+    finFixJahr = Math.min(max, Math.max(min, finFixJahr));
     el.innerHTML = `
+      ${finFixJahrKopfHtml(min, max)}
       ${fixkostenTabelleHtml("ausgabe", "Fixkosten")}
       ${fixkostenTabelleHtml("einnahme", "Feste Einnahmen")}
       <p class="notiz-meta" style="margin:-0.9rem 0 1.4rem; line-height:1.6;">
         <span style="display:inline-block; width:0.9rem; height:0.9rem; border-radius:3px; border:1px solid var(--border); vertical-align:-0.12rem; margin-right:0.2rem; background:${finMonatFarbe("aktuell")};"></span>aktueller Monat ·
         <span style="display:inline-block; width:0.9rem; height:0.9rem; border-radius:3px; border:1px solid var(--border); vertical-align:-0.12rem; margin-right:0.2rem; background:${finMonatFarbe("kommend")};"></span>kommende Monate (Planwerte) ·
         <span style="${FIN_ANPASSUNG_STIL}">↑ ↓</span> Anpassung zum Vormonat.<br>
-        Neuer Beitrag: Zeile antippen, Betrag im Monat ändern, ✓ – gilt dann auch für die Folgemonate. Kommt die Buchung per CSV-Import, ersetzt der echte Betrag den Planwert.
+        Neuer Beitrag: Zeile antippen, Betrag im Monat ändern, ✓ – gilt dann auch für die Folgemonate mit dem alten Betrag (und auf Wunsch für dieselbe Position in den Folgejahren). Kommt die Buchung per CSV-Import, ersetzt der echte Betrag den Planwert.
       </p>
+      ${finFixJahr + 1 <= new Date().getFullYear() + FIN_FIX_VORAUS && fixkostenJahrListe(finFixJahr).length
+        ? `<button class="link-btn" onclick="finFixJahrUebernehmen(${finFixJahr})" title="Positionen dieses Jahres als Planwerte für ${finFixJahr + 1} anlegen">${ic("weiter")}Ins nächste Jahr übernehmen (${finFixJahr + 1})</button>`
+        : ""}
 
       <button class="link-btn" id="toggle-fixkosten-form">▸ Neue Position anlegen</button>
       <button class="link-btn" id="btn-fixkosten-aufraeumen" title="Doppelte Positionen zusammenführen und Monatswerte aus den Buchungen übernehmen">${ic("funkeln")}Doppelte zusammenführen &amp; Monate aktualisieren</button>
@@ -13305,10 +13352,133 @@
     const betrag = document.getElementById("neue-fk-betrag").value;
     const zahlung = {};
     FIN_MONATE.forEach((m) => { zahlung[m] = betrag; });
-    await api("fixkosten_hinzufuegen", { bezeichnung, typ, ...zahlung, bereich: aktiverBereich });
+    await api("fixkosten_hinzufuegen", { bezeichnung, typ, ...zahlung, jahr: finFixJahr, bereich: aktiverBereich });
     await ladeDaten();
     renderFinanzen();
   }
+
+  // ---- Fixkosten nach Jahren (seit Session 40, To-do 6) ----
+  // Wählbar: vom ältesten Jahr mit Fixkosten (mindestens Vorjahr) bis
+  // laufendes Jahr + 3. Vergangene Jahre bleiben bearbeitbar.
+  function finFixJahrSpanne() {
+    const akt = new Date().getFullYear();
+    const jahre = fixkostenAktuell().map(fixJahr);
+    return { min: Math.min(akt - 1, ...jahre), max: akt + FIN_FIX_VORAUS };
+  }
+
+  // Jahreswähler, Hinweis zum Jahr und Übernahme-Karte über den Tabellen
+  function finFixJahrKopfHtml(min, max) {
+    const heute = new Date();
+    const akt = heute.getFullYear();
+    const j = finFixJahr;
+    let info = "";
+    if (j < akt) info = "Vergangenes Jahr – die Werte bleiben bearbeitbar.";
+    else if (j > akt) info = "Planjahr – alle Monate sind Planwerte. Der CSV-Import ersetzt sie durch die echten Beträge.";
+    let karte = "";
+    const karteHtml = (titel, text, von) => `
+      <div class="sync-karte" style="margin:0 0 1.2rem;">
+        <div class="sync-kopf">${ic("kalender")}<span>${escapeHtml(titel)}</span></div>
+        <p class="hero-text" style="margin:0.3rem 0 0.6rem;">${escapeHtml(text)}</p>
+        <button type="button" class="btn-primary" onclick="finFixJahrUebernehmen(${von})">${ic("weiter")}Aus ${von} übernehmen</button>
+      </div>`;
+    if (!fixkostenJahrListe(j).length && fixkostenJahrListe(j - 1).length) {
+      karte = karteHtml(`Für ${j} sind noch keine Fixkosten angelegt`,
+        `Übernimm die Positionen aus ${j - 1} als Planwerte: monatliche mit dem Dezember-Betrag, jährliche und vierteljährliche im selben Monat.`, j - 1);
+    } else if (j === akt && heute.getMonth() === 11 && fixkostenJahrListe(akt).length && !fixkostenJahrListe(akt + 1).length) {
+      karte = karteHtml(`Das Jahr endet – Fixkosten für ${akt + 1} anlegen`,
+        `Übernimm die Positionen aus ${akt} jetzt ins neue Jahr. Sonst schlägt der erste CSV-Import ${akt + 1} sie als neue Fixkosten vor.`, akt);
+    }
+    return `
+      <div class="cal-header">
+        <div class="cal-nav"><button onclick="finFixJahrVerschieben(-1)" aria-label="Vorjahr"${j <= min ? " disabled" : ""}>${ic("zurueck")}</button></div>
+        <h2>${j}</h2>
+        <div class="cal-nav"><button onclick="finFixJahrVerschieben(1)" aria-label="Nächstes Jahr"${j >= max ? " disabled" : ""}>${ic("weiter")}</button></div>
+      </div>
+      ${info ? `<p class="notiz-meta" style="margin:-0.4rem 0 1rem; text-align:center;">${escapeHtml(info)}</p>` : ""}
+      ${karte}`;
+  }
+
+  // Blättert im Reiter Fixkosten zum Vor- oder Folgejahr
+  window.finFixJahrVerschieben = function (delta) {
+    const { min, max } = finFixJahrSpanne();
+    finFixJahr = Math.min(max, Math.max(min, finFixJahr + delta));
+    finBearbeitetesFixkosten = null;
+    renderFinFixkosten();
+  };
+
+  // Monatswerte fürs Folgejahr aus den Werten eines Jahres:
+  // - monatlich (die letzten beiden belegten Monate hintereinander) und bis
+  //   mindestens November gebucht/geplant: alle 12 Monate mit dem letzten Betrag
+  // - monatlich, aber vor November zu Ende: nicht übernehmen (wohl gekündigt)
+  // - sonst (jährlich, halb-/vierteljährlich): dieselben Monate, gleiche Beträge
+  // - ganz leer: nicht übernehmen
+  // Rückgabe: Array mit 12 Werten oder null
+  function finFixFolgejahrWerte(werte) {
+    let zuletzt = -1;
+    for (let i = 11; i >= 0; i--) { if (werte[i]) { zuletzt = i; break; } }
+    if (zuletzt < 0) return null;
+    const monatlich = zuletzt >= 1 && !!werte[zuletzt - 1];
+    if (monatlich) return zuletzt >= 10 ? new Array(12).fill(werte[zuletzt]) : null;
+    return werte.slice();
+  }
+
+  // Plant die Übernahme der Fixkosten eines Jahres ins Folgejahr
+  function finFixJahrPlanen(vonJahr) {
+    const nach = vonJahr + 1;
+    const belegt = new Set(fixkostenJahrListe(nach).map((f) => f.typ + "|" + (finFixSchluessel(f) || f.bezeichnung)));
+    const positionen = [];
+    const beendet = [];
+    const leer = [];
+    let vorhanden = 0;
+    for (const f of fixkostenJahrListe(vonJahr)) {
+      const schluessel = finFixSchluessel(f);
+      const key = f.typ + "|" + (schluessel || f.bezeichnung);
+      if (belegt.has(key)) { vorhanden++; continue; }
+      const werte = FIN_MONATE.map((m) => finZahl(f[m]));
+      const neu = finFixFolgejahrWerte(werte);
+      if (!neu) { (werte.some((w) => w) ? beendet : leer).push(f.bezeichnung); continue; }
+      belegt.add(key);
+      const p = { typ: f.typ, bezeichnung: f.bezeichnung, kategorie: f.kategorie || null, erkennung: schluessel || null };
+      FIN_MONATE.forEach((m, i) => { p[m] = neu[i]; });
+      positionen.push(p);
+    }
+    return { von: vonJahr, nach, positionen, beendet, leer, vorhanden };
+  }
+
+  // Legt die geplanten Positionen im Folgejahr an (ohne Rückfrage); liefert die Anzahl
+  async function finFixJahrUebernahmeAusfuehren(plan) {
+    const res = await api("fixkosten_jahr_uebernehmen", { jahr: plan.nach, positionen: plan.positionen, bereich: aktiverBereich });
+    return Number(res.angelegt) || 0;
+  }
+  // Übernimmt die Positionen eines Jahres nach Rückfrage ins Folgejahr
+  window.finFixJahrUebernehmen = async function (vonJahr) {
+    const plan = finFixJahrPlanen(vonJahr);
+    const kurz = (t) => (String(t || "").length > 40 ? String(t).slice(0, 39) + "…" : String(t || ""));
+    if (!plan.positionen.length) {
+      let text = `Nichts zu übernehmen nach ${plan.nach}.`;
+      if (plan.vorhanden) text += `\n\n${plan.vorhanden} Position(en) gibt es dort schon.`;
+      if (plan.beendet.length) text += `\n\nEndeten vor November (nicht übernommen): ${plan.beendet.map(kurz).join(", ")}`;
+      alert(text);
+      return;
+    }
+    let text = `Fixkosten ${plan.von} → ${plan.nach} übernehmen?\n\n` +
+      `${plan.positionen.length} Position(en) werden als Planwerte angelegt: monatliche mit dem letzten Betrag (meist Dezember) für alle 12 Monate, jährliche und vierteljährliche im selben Monat wie ${plan.von}.`;
+    if (plan.vorhanden) text += `\n\nSchon in ${plan.nach} vorhanden, bleibt unverändert: ${plan.vorhanden}`;
+    if (plan.beendet.length) text += `\n\nNicht übernommen, endeten vor November: ${plan.beendet.map(kurz).join(", ")}`;
+    if (plan.leer.length) text += `\n\nNicht übernommen, ohne Beträge: ${plan.leer.length}`;
+    text += `\n\n${plan.von} bleibt unverändert. Beträge kannst du danach in ${plan.nach} anpassen.`;
+    if (!confirm(text)) return;
+    try {
+      const angelegt = await finFixJahrUebernahmeAusfuehren(plan);
+      finFixJahr = plan.nach;
+      finBearbeitetesFixkosten = null;
+      await ladeDaten();
+      renderFinanzen();
+      hinweisZeigen(`${angelegt} Position(en) für ${plan.nach} angelegt`);
+    } catch (fehler) {
+      alert("Übernehmen fehlgeschlagen: " + fehler.message);
+    }
+  };
 
   // Öffnet die Bearbeiten-Zeile einer Fixkosten-Position
   window.fixkostenBearbeitenStart = function (id) {
@@ -13335,20 +13505,50 @@
       zahlung.kategorie = alt.kategorie || null;
     }
     const neu = FIN_MONATE.map((m) => finZahl(document.getElementById("fk-" + m + "-" + id).value));
-    // Beitragsanpassung: ein geänderter aktueller/kommender Monat gilt auch
-    // für die Folgemonate, die du nicht selbst geändert hast
+    const gleich = (a, b) => Math.abs(a - b) <= 0.004;
+    // Beitragsanpassung: ein geänderter Monat gilt auch für die Folgemonate,
+    // die du nicht selbst geändert hast und die noch den alten Betrag haben
+    // (seit Session 40; vorher wurden auch leere Monate gefüllt – bei
+    // jährlichen Zahlungen falsch). Im laufenden Jahr ab dem aktuellen Monat.
     const folge = document.getElementById("fk-folge-" + id);
+    const vorher = alt ? FIN_MONATE.map((m) => finZahl(alt[m])) : null;
     if (alt && folge && folge.checked) {
-      const vorher = FIN_MONATE.map((m) => finZahl(alt[m]));
-      const geaendert = neu.map((w, i) => Math.abs(w - vorher[i]) > 0.004);
-      const ab = new Date().getMonth();
+      const geaendert = neu.map((w, i) => !gleich(w, vorher[i]));
+      const ab = fixJahr(alt) === new Date().getFullYear() ? new Date().getMonth() : 0;
       for (let i = ab; i < 12; i++) {
         if (!geaendert[i]) continue;
-        for (let j = i + 1; j < 12 && !geaendert[j]; j++) neu[j] = neu[i];
+        for (let j = i + 1; j < 12 && !geaendert[j] && gleich(vorher[j], vorher[i]); j++) neu[j] = neu[i];
+      }
+    }
+    // Folgejahre (seit Session 40): ein neuer Dezember-Betrag ersetzt in
+    // derselben Position der späteren Jahre die Monate mit dem alten Betrag
+    // (fortlaufend ab Januar bzw. ab dem aktuellen Monat, bis zum ersten
+    // abweichenden Wert). Nur, wenn der alte Dezember-Betrag nicht leer war.
+    const folgeAenderungen = [];
+    const folgeJahr = document.getElementById("fk-folgejahr-" + id);
+    if (alt && folgeJahr && folgeJahr.checked && vorher[11] && !gleich(neu[11], vorher[11])) {
+      for (const f of finFixFolgejahrZeilen(alt)) {
+        const aenderung = { id: f.id };
+        let weiter = true;
+        let geaendert = false;
+        for (let i = finFixAktMonat(fixJahr(f)); i < 12; i++) {
+          if (!gleich(finZahl(f[FIN_MONATE[i]]), vorher[11])) { weiter = false; break; }
+          aenderung[FIN_MONATE[i]] = neu[11];
+          geaendert = true;
+        }
+        if (geaendert) folgeAenderungen.push(aenderung);
+        if (!weiter) break; // abweichender Wert = eigene Planung, spätere Jahre nicht anfassen
       }
     }
     FIN_MONATE.forEach((m, i) => { zahlung[m] = neu[i]; });
     await api("fixkosten_aktualisieren", zahlung);
+    if (folgeAenderungen.length) {
+      try {
+        await api("fixkosten_abgleich", { aenderungen: folgeAenderungen, loeschen: [], bereich: aktiverBereich });
+      } catch (fehler) {
+        alert("Gespeichert, aber die Folgejahre konnten nicht angepasst werden: " + fehler.message);
+      }
+    }
     finBearbeitetesFixkosten = null;
     await ladeDaten();
     renderFinanzen();
@@ -13808,25 +14008,58 @@
 
     await ladeDaten();
 
-    // Seit Session 29: vorhandene Fixkosten-Positionen bekommen die Beträge
-    // der neu gebuchten Monate (laufendes Jahr) eingetragen, statt dass die
-    // Erkennung dafür neue Zeilen vorschlägt. Löscht nichts – doppelte Zeilen
-    // legt der Knopf im Reiter Fixkosten zusammen.
-    try {
-      const plan = finFixAbgleichPlanen({ zusammenfuehren: false });
-      if (plan.aenderungen.length) {
-        await api("fixkosten_abgleich", { aenderungen: plan.aenderungen, loeschen: [], bereich: aktiverBereich });
+    // Seit Session 40 je Jahr der Buchungen: Jahre in der Datei
+    const aktJahr = new Date().getFullYear();
+    const importJahre = [...new Set(zeilen.map((z) => Number(String(z.datum || "").slice(0, 4))))]
+      .filter((j) => j >= 2000 && j <= aktJahr + FIN_FIX_VORAUS).sort((a, b) => a - b);
+
+    // Neues Jahr ohne Fixkosten (z. B. erster Import im Januar): erst
+    // anbieten, die Positionen aus dem Vorjahr zu übernehmen – sonst schlägt
+    // die Erkennung sie alle als neu vor.
+    for (const j of importJahre) {
+      if (fixkostenJahrListe(j).length || !fixkostenJahrListe(j - 1).length) continue;
+      const plan = finFixJahrPlanen(j - 1);
+      if (!plan.positionen.length) continue;
+      if (!confirm(`In der Datei sind Buchungen aus ${j}, für ${j} sind aber noch keine Fixkosten angelegt.\n\n` +
+        `${plan.positionen.length} Position(en) aus ${j - 1} jetzt als Planwerte übernehmen? Sonst schlägt die Erkennung sie als neu vor.`)) continue;
+      try {
+        const angelegt = await finFixJahrUebernahmeAusfuehren(plan);
         await ladeDaten();
-        if (plan.monateAktualisiert) {
-          meldung += `\n\nFixkosten: Monatswerte ${plan.jahr} bei ${plan.monateAktualisiert} Position(en) aus den Buchungen aktualisiert.`;
-        }
+        meldung += `\n\nFixkosten: ${angelegt} Position(en) aus ${j - 1} nach ${j} übernommen.`;
+      } catch (fehler) {
+        meldung += `\n\nFixkosten nach ${j} übernehmen fehlgeschlagen: ${fehler.message}`;
       }
-    } catch (fehler) {
-      meldung += `\n\nFixkosten-Monate konnten nicht aktualisiert werden: ${fehler.message}`;
+    }
+
+    // Seit Session 29: vorhandene Fixkosten-Positionen bekommen die Beträge
+    // der neu gebuchten Monate eingetragen, statt dass die Erkennung dafür
+    // neue Zeilen vorschlägt. Seit Session 40 je Jahr der Buchungen (bis
+    // dahin nur das laufende Jahr). Löscht nichts – doppelte Zeilen legt der
+    // Knopf im Reiter Fixkosten zusammen.
+    for (const j of importJahre) {
+      if (!fixkostenJahrListe(j).length) continue;
+      try {
+        const plan = finFixAbgleichPlanen({ zusammenfuehren: false, jahr: j });
+        if (plan.aenderungen.length) {
+          await api("fixkosten_abgleich", { aenderungen: plan.aenderungen, loeschen: [], bereich: aktiverBereich });
+          await ladeDaten();
+          if (plan.monateAktualisiert) {
+            meldung += `\n\nFixkosten: Monatswerte ${plan.jahr} bei ${plan.monateAktualisiert} Position(en) aus den Buchungen aktualisiert.`;
+          }
+        }
+      } catch (fehler) {
+        meldung += `\n\nFixkosten-Monate ${j} konnten nicht aktualisiert werden: ${fehler.message}`;
+      }
     }
     alert(meldung);
 
-    const kandidaten = erkennKandidatenFin(buchungenAktuell(), fixkostenAktuell());
+    // Wiederkehrend-Erkennung für das Jahr der Buchungen (seit Session 40),
+    // höchstens Vorjahr bis laufendes Jahr – ältere Jahre bei einem Import
+    // der ganzen Kontohistorie würden sonst Dutzende Vorschläge liefern.
+    const kandidaten = [];
+    for (const j of importJahre.filter((x) => x >= aktJahr - 1 && x <= aktJahr).reverse()) {
+      kandidaten.push(...erkennKandidatenFin(buchungenAktuell(), fixkostenJahrListe(j), 2, 0.2, j));
+    }
     if (kandidaten.length) {
       zeigeErkennungsModal(kandidaten);
     } else {
@@ -14111,13 +14344,13 @@
   }
 
   // Plant den Fixkosten-Abgleich: Duplikate zusammenführen, Monatswerte aus Buchungen, Schlüssel, Kurznamen
-  function finFixAbgleichPlanen({ zusammenfuehren }) {
-    const jahr = new Date().getFullYear();
-    const aktuellerMonat = new Date().getMonth();
+  function finFixAbgleichPlanen({ zusammenfuehren, jahr = finFixJahr }) {
+    // Seit Session 40 je Jahr: Positionen und Buchungen dieses Jahres
+    const aktuellerMonat = finFixAktMonat(jahr);
     const ist = finIstMonate(buchungenAktuell(), jahr);
     const einheiten = [];
     const gruppen = new Map();
-    for (const f of fixkostenAktuell()) {
+    for (const f of fixkostenJahrListe(jahr)) {
       const schluessel = finFixSchluessel(f);
       if (!schluessel || !zusammenfuehren) {
         einheiten.push({ schluessel, zeilen: [f] });
@@ -14216,7 +14449,7 @@
   }
 
   // Erkennt wiederkehrende Buchungen (gleicher Schlüssel in mehreren Monaten) als Fixkosten-Kandidaten
-  function erkennKandidatenFin(alleBuchungen, fixkostenListe = [], minMonate = 2, varianzSchwelle = 0.2) {
+  function erkennKandidatenFin(alleBuchungen, fixkostenListe = [], minMonate = 2, varianzSchwelle = 0.2, jahr = new Date().getFullYear()) {
     // Buchungen, die schon zu einer Fixkosten-Position passen, gar nicht erst
     // vorschlagen – über den Erkennungsschlüssel (seit Session 29) oder wie
     // bisher über die Bezeichnung als Stichwort.
@@ -14226,7 +14459,6 @@
       const text = (notiz || "").toUpperCase();
       return fixWoerter.some((w) => text.includes(w));
     };
-    const jahr = new Date().getFullYear();
     const gruppen = new Map();
     for (const b of alleBuchungen) {
       if (passtZuFixkosten(b.notiz)) continue;
@@ -14245,7 +14477,7 @@
       const schluessel = key.slice(key.indexOf("|") + 1);
       const monate = new Set(eintraege.map((e) => (e.datum || "").slice(0, 7)).filter(Boolean));
       if (monate.size < minMonate) continue;
-      // Nur, was im laufenden Jahr gebucht wurde – daraus kommen die Monatswerte
+      // Nur, was im Jahr gebucht wurde – daraus kommen die Monatswerte
       const monatsWerte = ist.get(key);
       if (!monatsWerte || !monatsWerte.some((w) => w)) continue;
 
@@ -14363,9 +14595,9 @@
         // Seit Session 31: monatlich gebuchte Kosten gleich für die kommenden
         // Monate vormerken (Planwerte, beim Import durch echte Beträge ersetzt)
         const ist = FIN_MONATE.map((_m, idx) => finZahl(k.monate[idx]));
-        const monate = finMonateMitPlan(ist, new Array(12).fill(0), new Date().getMonth());
+        const monate = finMonateMitPlan(ist, new Array(12).fill(0), finFixAktMonat(k.jahr));
         FIN_MONATE.forEach((m, idx) => { zahlung[m] = monate[idx]; });
-        await api("fixkosten_hinzufuegen", { ...zahlung, bereich: aktiverBereich });
+        await api("fixkosten_hinzufuegen", { ...zahlung, jahr: k.jahr, bereich: aktiverBereich });
         angelegt++;
       }
     } catch (fehler) {
@@ -15068,8 +15300,8 @@
         <div class="fin-ml-body">
           <p class="fin-ml-hinweis">
             Löscht endgültig und ohne Papierkorb. Zeitraum gilt für Buchungen (Datum)
-            und Sonderausgaben (Jahr) – Fixkosten haben kein Datum und werden nur nach
-            Typ/Kategorie gefiltert. Leer gelassene Filter wirken nicht einschränkend.
+            sowie Fixkosten und Sonderausgaben (Jahr). Leer gelassene Filter wirken
+            nicht einschränkend – ohne Zeitraum also Fixkosten aller Jahre.
           </p>
 
           <div class="fin-ml-bereiche">
