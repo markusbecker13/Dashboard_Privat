@@ -11279,6 +11279,8 @@
         "Zurückgenommen von": a.zurueck_von || "",
         "Unterschrift Ausgabe": a.hat_unterschrift_ausgabe ? "digital" : "",
         "Unterschrift Rückgabe": a.hat_unterschrift_rueckgabe ? "digital" : "",
+        // Seit Session 43: gemeinsames Protokoll mehrerer Schlüssel
+        "Gemeinsames Protokoll mit": a.gruppe_id ? schluesselAusgaben.filter((x) => x.gruppe_id === a.gruppe_id && x.id !== a.id).map((x) => x.seriennummer).join(", ") : "",
         Notiz: a.notiz || "",
       }));
   }
@@ -11954,6 +11956,11 @@
   let schluesselSuche = "";
   let schluesselFilterArt = "alle";
   let schluesselFilterZugang = "alle";
+  // Seit Session 43: Filter nach Person, Gruppierung nach Verein oder Person,
+  // Sammelausgabe mehrerer Schlüssel an eine Person (ein Protokoll)
+  let schluesselFilterPerson = "alle";
+  let schluesselGruppierung = (() => { try { return localStorage.getItem("schluessel-gruppierung") === "person" ? "person" : "verein"; } catch (_e) { return "verein"; } })();
+  let schluesselSammel = null; // null | { ids: Set<id>, formular: bool }
   const SCHLUESSEL_ART = { schluessel: { icon: "schluessel", text: "Schlüssel" }, key: { icon: "funk", text: "Elektronischer Key" } };
   const SCHLUESSEL_OHNE_VEREIN = "Ohne Verein";
 
@@ -12026,6 +12033,17 @@
       `<option value="${z.id}" ${z.id === schluesselFilterZugang ? "selected" : ""}>${escapeHtml(z.name)}</option>`).join("");
     filter.classList.toggle("hidden", !zugaenge.length);
 
+    // Personenfilter mit Anzahl (seit Session 43)
+    const personen = new Map();
+    alle.forEach((k) => { const n = (k.inhaber || "").trim(); if (n) personen.set(n, (personen.get(n) || 0) + 1); });
+    const personNamen = [...personen.keys()].sort((a, b) => a.localeCompare(b, "de"));
+    if (schluesselFilterPerson !== "alle" && !personen.has(schluesselFilterPerson)) schluesselFilterPerson = "alle";
+    const pFilter = document.getElementById("schluessel-filter-person");
+    pFilter.innerHTML = `<option value="alle">Alle Personen</option>` + personNamen.map((n) =>
+      `<option value="${escapeAttr(n)}" ${n === schluesselFilterPerson ? "selected" : ""}>${escapeHtml(n)} (${personen.get(n)})</option>`).join("");
+    pFilter.classList.toggle("hidden", !personNamen.length);
+    document.getElementById("schluessel-gruppierung").value = schluesselGruppierung;
+
     const anzSchl = alle.filter((k) => k.art !== "key").length;
     const anzKey = alle.length - anzSchl;
     document.getElementById("schluessel-zusammenfassung").textContent = alle.length
@@ -12064,6 +12082,7 @@
     const gefiltert = alle.filter((k) => {
       if (schluesselFilterArt !== "alle" && (k.art || "schluessel") !== schluesselFilterArt) return false;
       if (schluesselFilterZugang !== "alle" && !(k.zugaenge || []).includes(schluesselFilterZugang)) return false;
+      if (schluesselFilterPerson !== "alle" && (k.inhaber || "").trim() !== schluesselFilterPerson) return false;
       if (schluesselFilterStatus === "ausgegeben" && !offeneAusgabe(k)) return false;
       if (schluesselFilterStatus === "ueberfaellig" && !ausgabeUeberfaellig(offeneAusgabe(k))) return false;
       if (schluesselFilterStatus === "bestand" && schluesselStatus(k) !== "bestand") return false;
@@ -12071,18 +12090,23 @@
       if (!suche) return true;
       return [k.seriennummer, k.inhaber, k.verein, k.notiz, ...schluesselZugangNamen(k)].some((t) => (t || "").toLowerCase().includes(suche));
     });
+    renderSchluesselSammel();
     if (!gefiltert.length) {
       liste.innerHTML = `<p class="empty-text">Nichts gefunden.</p>`;
       return;
     }
 
+    // Gruppierung nach Verein (wie bisher) oder nach Person (seit Session 43)
+    const nachPerson = schluesselGruppierung === "person";
     const gruppen = {};
     gefiltert.forEach((k) => {
-      const v = schluesselStatus(k) === "bestand" ? SCHLUESSEL_BESTAND : ((k.verein || "").trim() || SCHLUESSEL_OHNE_VEREIN);
+      const v = schluesselStatus(k) === "bestand" ? SCHLUESSEL_BESTAND
+        : nachPerson ? ((k.inhaber || "").trim() || SCHLUESSEL_OHNE_NAME)
+        : ((k.verein || "").trim() || SCHLUESSEL_OHNE_VEREIN);
       (gruppen[v] = gruppen[v] || []).push(k);
     });
-    // Reihenfolge: Vereine alphabetisch, dann „Ohne Verein“, zuletzt der Bestand
-    const rang = (n) => (n === SCHLUESSEL_BESTAND ? 2 : n === SCHLUESSEL_OHNE_VEREIN ? 1 : 0);
+    // Reihenfolge: alphabetisch, dann „Ohne Verein“/„Ohne Name“, zuletzt der Bestand
+    const rang = (n) => (n === SCHLUESSEL_BESTAND ? 2 : n === SCHLUESSEL_OHNE_VEREIN || n === SCHLUESSEL_OHNE_NAME ? 1 : 0);
     const namen = Object.keys(gruppen).sort((a, b) => rang(a) - rang(b) || a.localeCompare(b, "de"));
 
     const karte = (k) => {
@@ -12094,10 +12118,16 @@
       }
       const zug = schluesselZugangNamen(k);
       const meta = [art.text, k.notiz ? escapeHtml(k.notiz) : ""].filter(Boolean).join(" · ");
+      // Sammelausgabe: freie Schlüssel ankreuzbar
+      const sammelHaken = schluesselSammel && !schluesselSammel.formular && !offeneAusgabe(k)
+        ? `<input type="checkbox" ${schluesselSammel.ids.has(k.id) ? "checked" : ""} onclick="event.stopPropagation(); schluesselSammelUmschalten('${k.id}')"
+            aria-label="Nr. ${escapeAttr(k.seriennummer)} auswählen" style="width:1.3rem; height:1.3rem; margin:0.2rem 0.6rem 0 0; flex:0 0 auto; accent-color:var(--accent);">`
+        : "";
       return `
         <div class="notiz-item">
-          <div style="flex:1; cursor:pointer;" onclick="schluesselBearbeitenStart('${k.id}')">
-            <span class="notiz-text">${ic(art.icon)}<span class="nur-vorleser">${art.text}:</span> ${k.inhaber ? escapeHtml(k.inhaber) : (schluesselStatus(k) === "bestand" ? "frei" : `<em>ohne Name</em>`)}</span>
+          ${sammelHaken}
+          <div style="flex:1; cursor:pointer;" onclick="${sammelHaken ? `schluesselSammelUmschalten('${k.id}')` : `schluesselBearbeitenStart('${k.id}')`}">
+            <span class="notiz-text">${ic(art.icon)}<span class="nur-vorleser">${art.text}:</span> ${nachPerson && k.inhaber ? `Nr. ${escapeHtml(k.seriennummer)}${k.verein ? ` <span class="notiz-meta">(${escapeHtml(k.verein)})</span>` : ""}` : k.inhaber ? escapeHtml(k.inhaber) : (schluesselStatus(k) === "bestand" ? "frei" : `<em>ohne Name</em>`)}</span>
             <span class="notiz-meta" style="display:block;">Nr. <strong>${escapeHtml(k.seriennummer)}</strong> · ${meta}</span>
             ${zug.length ? `<span class="notiz-meta" style="display:block;">${ic("tuer")} ${zug.map(escapeHtml).join(", ")}</span>` : ""}
             ${schluesselStatusHtml(k)}
@@ -12112,18 +12142,134 @@
       const s = eintraege.filter((k) => k.art !== "key").length;
       const kz = eintraege.length - s;
       const zahl = [s ? `<span title="Schlüssel">${ic("schluessel")} ${s}</span>` : "", kz ? `<span title="Elektronische Keys">${ic("funk")} ${kz}</span>` : ""].filter(Boolean).join(" ");
+      // Je Person: welche Türen sie mit ihren Schlüsseln öffnen kann
+      let personInfo = "";
+      if (nachPerson && v !== SCHLUESSEL_BESTAND && v !== SCHLUESSEL_OHNE_NAME) {
+        const tueren = [...new Set(eintraege.flatMap(schluesselZugangNamen))].sort((a, b) => a.localeCompare(b, "de"));
+        const vereine = [...new Set(eintraege.map((k) => (k.verein || "").trim()).filter(Boolean))];
+        personInfo = `<p class="notiz-meta" style="margin:0.2rem 0 0.4rem;">${vereine.length ? escapeHtml(vereine.join(", ")) + " · " : ""}${tueren.length ? `${ic("tuer")} öffnet: ${tueren.map(escapeHtml).join(", ")}` : "keine Zugänge eingetragen"}</p>`;
+      }
       return `
         <details class="spiel-gruppe" open>
           <summary class="spiel-gruppe-kopf">
             <span class="spiel-gruppe-titel">${v === SCHLUESSEL_BESTAND ? ic("eingang") + " " : ""}${escapeHtml(v)}</span>
             <span class="zl-gruppe-zahl">${zahl}</span>
           </summary>
+          ${personInfo}
           <div class="notiz-list">${eintraege.map(karte).join("")}</div>
         </details>`;
     }).join("");
     // Offenes Ausgabe-/Rücknahme-Formular: Unterschriftsfeld wieder zeichenbereit machen
     if (schluesselAktion) unterschriftAktivieren((schluesselAktion.modus === "ausgeben" ? "sa-sig-" : "sr-sig-") + schluesselAktion.id);
   }
+
+  // ---------- Mehrere Schlüssel an eine Person (seit Session 43) ----------
+  // Leiste bzw. Formular über der Liste
+  function renderSchluesselSammel() {
+    const el = document.getElementById("schluessel-sammel");
+    if (!el) return;
+    const knopf = document.getElementById("btn-schluessel-sammel");
+    if (knopf) knopf.classList.toggle("hidden", !!schluesselSammel);
+    if (!schluesselSammel) { el.innerHTML = ""; return; }
+    const gewaehlt = schluesselAktuell().filter((k) => schluesselSammel.ids.has(k.id) && !offeneAusgabe(k))
+      .sort((a, b) => (a.seriennummer || "").localeCompare(b.seriennummer || "", "de", { numeric: true }));
+    if (!schluesselSammel.formular) {
+      el.innerHTML = `
+        <div class="sync-karte" style="margin:0.4rem 0 0.8rem;">
+          <p class="notiz-text" style="margin:0 0 0.4rem;">${ic("ausgeben")} Freie Schlüssel/Keys unten ankreuzen – <strong>${gewaehlt.length}</strong> ausgewählt</p>
+          ${gewaehlt.length ? `<p class="notiz-meta" style="margin:0 0 0.4rem;">Nr. ${gewaehlt.map((k) => escapeHtml(k.seriennummer)).join(", ")}</p>` : ""}
+          <div class="row" style="margin:0; flex-wrap:wrap;">
+            <button class="btn-primary" onclick="schluesselSammelWeiter()"${gewaehlt.length < 2 ? " disabled" : ""}>Weiter zum Protokoll</button>
+            <button class="link-btn" onclick="schluesselSammelAbbrechen()">Abbrechen</button>
+          </div>
+          ${gewaehlt.length < 2 ? `<p class="notiz-meta" style="margin:0.4rem 0 0;">Mindestens zwei auswählen – einen einzelnen gibst du über „Ausgeben“ am Eintrag aus.</p>` : ""}
+        </div>`;
+      return;
+    }
+    const gleich = (feld) => { const w = [...new Set(gewaehlt.map((k) => (k[feld] || "").trim()))]; return w.length === 1 ? w[0] : ""; };
+    const id = "sammel";
+    el.innerHTML = `
+      <div class="notiz-item" style="display:block; margin:0.4rem 0 0.8rem;">
+        <p class="notiz-text" style="margin:0 0 0.4rem;">${ic("ausgeben")} ${gewaehlt.length} Schlüssel/Keys an eine Person ausgeben – ein gemeinsames Protokoll</p>
+        <ul class="notiz-meta" style="margin:0 0 0.6rem; padding-left:1.2rem;">${gewaehlt.map((k) => {
+          const zug = schluesselZugangNamen(k);
+          return `<li>${ic((SCHLUESSEL_ART[k.art] || SCHLUESSEL_ART.schluessel).icon)} Nr. <strong>${escapeHtml(k.seriennummer)}</strong>${zug.length ? " · " + zug.map(escapeHtml).join(", ") : ""}</li>`;
+        }).join("")}</ul>
+        <div class="task-edit-felder">
+          <label class="ern-feld">Name *<input type="text" id="sa-name-${id}" value="${escapeAttr(gleich("inhaber"))}" maxlength="120" list="schluessel-namen-vorschlaege"></label>
+          <label class="ern-feld">Verein<input type="text" id="sa-verein-${id}" value="${escapeAttr(gleich("verein"))}" maxlength="120" list="schluessel-vereine-vorschlaege"></label>
+          <label class="ern-feld">Kontakt (Tel./Mail)<input type="text" id="sa-kontakt-${id}" maxlength="200" oninput="schluesselKontaktZuMail('${id}')"></label>
+          <label class="ern-feld">Ausgegeben am<input type="date" id="sa-am-${id}" value="${heuteISO()}"></label>
+          <label class="ern-feld">Ausgegeben von<input type="text" id="sa-von-${id}" value="${escapeAttr(letzterAusgeber())}" maxlength="120"></label>
+          <label class="ern-feld">Rückgabe bis (optional)<input type="date" id="sa-bis-${id}"></label>
+          <label class="ern-feld ern-feld-breit">Notiz (optional)<input type="text" id="sa-notiz-${id}" maxlength="500"></label>
+          ${unterschriftFeldHtml("sa-sig-" + id, "Unterschrift Empfänger/in (für alle)")}
+          ${mailFeldHtml("sa-mail-" + id, "")}
+        </div>
+        <p class="notiz-meta" style="margin:0.3rem 0;">Ohne Unterschrift hier: „Ausgeben &amp; drucken“ und das Protokoll auf Papier unterschreiben lassen. Zurückgeben lassen sich die Schlüssel später einzeln oder zusammen.</p>
+        <div class="row" style="margin:0.4rem 0 0; flex-wrap:wrap;">
+          <button class="btn-primary" onclick="schluesselSammelSpeichern(false)">Ausgeben</button>
+          <button class="btn-secondary" onclick="schluesselSammelSpeichern(true)">Ausgeben &amp; drucken</button>
+          <button class="link-btn" onclick="schluesselSammelZurueck()">Auswahl ändern</button>
+          <button class="link-btn" onclick="schluesselSammelAbbrechen()">Abbrechen</button>
+        </div>
+      </div>`;
+    unterschriftAktivieren("sa-sig-" + id);
+  }
+  // Startet die Auswahl (Haken an freien Schlüsseln)
+  window.schluesselSammelStart = function() {
+    schluesselAktion = null;
+    schluesselSammel = { ids: new Set(), formular: false };
+    renderSchluesselListe();
+  };
+  window.schluesselSammelUmschalten = function(id) {
+    if (!schluesselSammel) return;
+    if (schluesselSammel.ids.has(id)) schluesselSammel.ids.delete(id); else schluesselSammel.ids.add(id);
+    renderSchluesselListe();
+  };
+  window.schluesselSammelWeiter = function() {
+    if (!schluesselSammel || schluesselSammel.ids.size < 2) return;
+    schluesselSammel.formular = true;
+    renderSchluesselListe();
+    const el = document.getElementById("schluessel-sammel");
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  window.schluesselSammelZurueck = function() {
+    if (!schluesselSammel) return;
+    schluesselSammel.formular = false;
+    renderSchluesselListe();
+  };
+  window.schluesselSammelAbbrechen = function() {
+    schluesselSammel = null;
+    renderSchluesselListe();
+  };
+  // Gibt alle ausgewählten Schlüssel mit einem gemeinsamen Protokoll aus
+  window.schluesselSammelSpeichern = async function(drucken) {
+    if (!schluesselSammel) return;
+    const id = "sammel";
+    const wert = (f) => document.getElementById(`sa-${f}-${id}`).value.trim();
+    const ids = schluesselAktuell().filter((k) => schluesselSammel.ids.has(k.id) && !offeneAusgabe(k)).map((k) => k.id);
+    const daten = {
+      schluessel_ids: ids, inhaber: wert("name"), verein: wert("verein"), kontakt: wert("kontakt"),
+      ausgegeben_am: wert("am"), ausgegeben_von: wert("von"), rueckgabe_bis: wert("bis"), notiz: wert("notiz"),
+      unterschrift: unterschriftLesen("sa-sig-" + id),
+    };
+    if (ids.length < 2) { alert("Bitte mindestens zwei freie Schlüssel auswählen."); return; }
+    if (!daten.inhaber) { alert("Bitte den Namen der Person angeben."); return; }
+    try {
+      const mailEl = document.getElementById("sa-mail-" + id);
+      const mail = mailEl ? mailEl.value.trim() : "";
+      const antwort = await api("schluessel_ausgeben", daten);
+      ausgeberMerken(daten.ausgegeben_von);
+      schluesselSammel = null;
+      await ladeDaten();
+      hinweisZeigen(`${ids.length} Schlüssel/Keys ausgegeben – ein Protokoll`);
+      if (antwort && antwort.id) await mailNachSpeichern(antwort.id, mail);
+      if (drucken && antwort && antwort.id) await window.ausgabeDrucken(antwort.id);
+    } catch (fehler) {
+      alert(fehler.message);
+    }
+  };
 
   document.getElementById("btn-schluessel-neu").addEventListener("click", async () => {
     const status = document.getElementById("schluessel-status");
@@ -12170,6 +12316,16 @@
   });
   document.getElementById("schluessel-filter-zugang").addEventListener("change", (e) => {
     schluesselFilterZugang = e.target.value;
+    renderSchluesselListe();
+  });
+  // Seit Session 43: Person und Gruppierung (Gruppierung pro Gerät gemerkt)
+  document.getElementById("schluessel-filter-person").addEventListener("change", (e) => {
+    schluesselFilterPerson = e.target.value;
+    renderSchluesselListe();
+  });
+  document.getElementById("schluessel-gruppierung").addEventListener("change", (e) => {
+    schluesselGruppierung = e.target.value === "person" ? "person" : "verein";
+    try { localStorage.setItem("schluessel-gruppierung", schluesselGruppierung); } catch (_e) { /* egal */ }
     renderSchluesselListe();
   });
   // Bearbeiten eines Schlüssels/Keys: seit Session 35 im Bearbeiten-Blatt
@@ -12230,6 +12386,7 @@
   let ausgabeBearbeitenId = null;
   let schluesselFilterStatus = "alle";
   const SCHLUESSEL_BESTAND = "Im Bestand";
+  const SCHLUESSEL_OHNE_NAME = "Ohne Name";
   const PROTOKOLL_ALT_TAGE = 365;
 
   // Offene (noch nicht zurückgegebene) Ausgabe eines Schlüssels oder undefined
@@ -12240,6 +12397,12 @@
   function ausgabenVonSchluessel(k) {
     return schluesselAusgaben.filter((a) => a.schluessel_id === k.id)
       .sort((a, b) => (b.ausgegeben_am || "").localeCompare(a.ausgegeben_am || ""));
+  }
+  // Alle Zeilen eines gemeinsamen Protokolls (seit Session 43), sonst nur a selbst
+  function ausgabeGruppe(a) {
+    if (!a || !a.gruppe_id) return a ? [a] : [];
+    return schluesselAusgaben.filter((x) => x.gruppe_id === a.gruppe_id)
+      .sort((x, y) => (x.seriennummer || "").localeCompare(y.seriennummer || "", "de", { numeric: true }));
   }
   // Ausgaben des aktiven Bereichs
   function ausgabenAktuell() {
@@ -12359,6 +12522,15 @@
         <div class="task-edit-felder">
           <label class="ern-feld">Zurück am<input type="date" id="sr-am-${id}" value="${heuteISO()}"></label>
           <label class="ern-feld">Zurückgenommen von<input type="text" id="sr-von-${id}" value="${escapeAttr(letzterAusgeber())}" maxlength="120"></label>
+          ${(() => {
+            // Gemeinsames Protokoll (seit Session 43): weitere noch ausgegebene Schlüssel gleich mit zurücknehmen
+            const weitere = ausgabeGruppe(a).filter((x) => x.id !== a.id && !x.zurueck_am);
+            if (!weitere.length) return "";
+            return `<div class="ern-feld ern-feld-breit"><span>Gemeinsames Protokoll – gleich mit zurück:</span>
+              <div id="sr-weitere-${id}" style="display:flex; flex-wrap:wrap; gap:0.3rem 1rem;">${weitere.map((x) =>
+                `<label style="display:flex; align-items:center; gap:0.4rem; font-weight:normal; min-height:32px;"><input type="checkbox" value="${x.id}" style="width:1.1rem; height:1.1rem; accent-color:var(--accent);"> Nr. ${escapeHtml(x.seriennummer)}</label>`).join("")}</div>
+              <span class="notiz-meta">Nicht angehakte bleiben ausgegeben und kommen später einzeln zurück.</span></div>`;
+          })()}
           ${unterschriftFeldHtml("sr-sig-" + id, "Unterschrift (Rückgabe bestätigt)")}
           ${mailFeldHtml("sr-mail-" + id, mailAusText(a.kontakt))}
         </div>
@@ -12373,7 +12545,9 @@
   function schluesselStatusHtml(k) {
     const a = offeneAusgabe(k);
     if (a) {
-      const sig = a.hat_unterschrift_ausgabe ? ` · <span title="digital unterschrieben">${ic("unterschrift")}<span class="nur-vorleser">digital unterschrieben</span></span>` : "";
+      const gruppeN = ausgabeGruppe(a).length;
+      const sig = (a.hat_unterschrift_ausgabe ? ` · <span title="digital unterschrieben">${ic("unterschrift")}<span class="nur-vorleser">digital unterschrieben</span></span>` : "") +
+        (gruppeN > 1 ? ` · gemeinsames Protokoll (${gruppeN})` : "");
       if (ausgabeUeberfaellig(a)) {
         return `<span class="notiz-meta" style="display:block; color:var(--accent); font-weight:600;">${ic("warnung")} Rückgabe überfällig seit ${datumDE(a.rueckgabe_bis)} · ausgegeben ${datumDE(a.ausgegeben_am)}${sig}</span>`;
       }
@@ -12450,8 +12624,11 @@
   };
   // Nimmt den Schlüssel zurück (Rückgabe ins Protokoll, Schlüssel wieder im Bestand)
   window.schluesselZuruecknehmenSpeichern = async function(id, ausgabeId, drucken) {
+    const weitereEl = document.getElementById(`sr-weitere-${id}`);
+    const weitere = weitereEl ? [...weitereEl.querySelectorAll("input[type=checkbox]:checked")].map((c) => c.value) : [];
     const daten = {
       id: ausgabeId,
+      ...(weitere.length ? { ids: [ausgabeId, ...weitere] } : {}),
       zurueck_am: document.getElementById(`sr-am-${id}`).value,
       zurueck_von: document.getElementById(`sr-von-${id}`).value.trim(),
       unterschrift: unterschriftLesen("sr-sig-" + id),
@@ -12472,9 +12649,13 @@
 
   // ---------- Protokoll drucken ----------
   // Baut das Protokoll als HTML (Muster-Texte – vom Vorstand prüfen lassen)
-  function protokollHtml(a) {
+  function protokollHtml(a, gruppe) {
+    // Seit Session 43: gemeinsames Protokoll für mehrere Schlüssel (gleicher Aufbau wie das PDF)
+    const alle = gruppe && gruppe.length > 1 ? gruppe : [a];
+    const mehrere = alle.length > 1;
     const org = (BEREICH_LOGO[bereichVon(a)] || {}).alt || (BEREICH_KNOPF_TEXT[bereichVon(a)] || "");
     const art = a.art === "key" ? "Elektronischer Key" : "Schlüssel";
+    const artVon = (x) => (x.art === "key" ? "Elektronischer Key" : "Schlüssel");
     const zeile = (l, w) => `<tr><th style="text-align:left; width:38%; padding:4px 8px; border:1px solid #999; background:#f2f2f2;">${escapeHtml(l)}</th><td style="padding:4px 8px; border:1px solid #999;">${escapeHtml(w || "")}&nbsp;</td></tr>`;
     const tabelle = (zeilen) => `<table style="width:100%; border-collapse:collapse; margin:0 0 10px; font-size:12pt;">${zeilen}</table>`;
     const sigBox = (bild, beschriftung) => `
@@ -12486,23 +12667,44 @@
       <div style="font-family:Arial, Helvetica, sans-serif; color:#000; background:#fff; padding:10px; max-width:780px; margin:0 auto;">
         <div style="font-size:11pt;">${escapeHtml(org)}</div>
         <h1 style="font-size:18pt; margin:4px 0 12px;">Schlüsselausgabeprotokoll</h1>
-        <h2 style="font-size:13pt; margin:8px 0 4px;">Schlüssel</h2>
-        ${tabelle(zeile("Art", art) + zeile("Seriennummer", a.seriennummer) + zeile("Zugänge", a.zugaenge_text))}
+        <h2 style="font-size:13pt; margin:8px 0 4px;">${mehrere ? `Schlüssel (${alle.length})` : "Schlüssel"}</h2>
+        ${mehrere
+          ? tabelle(alle.map((x) => zeile("Nr. " + x.seriennummer, artVon(x) + (x.zugaenge_text ? " · " + x.zugaenge_text : ""))).join(""))
+          : tabelle(zeile("Art", art) + zeile("Seriennummer", a.seriennummer) + zeile("Zugänge", a.zugaenge_text))}
         <h2 style="font-size:13pt; margin:8px 0 4px;">Empfänger/in</h2>
         ${tabelle(zeile("Name", a.inhaber) + zeile("Verein", a.verein) + zeile("Kontakt", a.kontakt))}
         <h2 style="font-size:13pt; margin:8px 0 4px;">Ausgabe</h2>
         ${tabelle(zeile("Ausgegeben am", datumDE(a.ausgegeben_am)) + zeile("Ausgegeben von", a.ausgegeben_von) + zeile("Rückgabe bis", datumDE(a.rueckgabe_bis)) + (a.notiz ? zeile("Notiz", a.notiz) : ""))}
-        <p style="font-size:10.5pt; margin:8px 0;">Ich bestätige, den oben genannten Schlüssel bzw. Key erhalten zu haben. Ich gebe ihn nicht an Dritte weiter, lasse keine Nachschlüssel anfertigen, melde einen Verlust unverzüglich dem Vorstand und gebe ihn auf Verlangen, spätestens zum vereinbarten Rückgabedatum, zurück.</p>
+        <p style="font-size:10.5pt; margin:8px 0;">${mehrere
+          ? "Ich bestätige, die oben genannten Schlüssel bzw. Keys erhalten zu haben. Ich gebe sie nicht an Dritte weiter, lasse keine Nachschlüssel anfertigen, melde einen Verlust unverzüglich dem Vorstand und gebe sie auf Verlangen, spätestens zum vereinbarten Rückgabedatum, zurück."
+          : "Ich bestätige, den oben genannten Schlüssel bzw. Key erhalten zu haben. Ich gebe ihn nicht an Dritte weiter, lasse keine Nachschlüssel anfertigen, melde einen Verlust unverzüglich dem Vorstand und gebe ihn auf Verlangen, spätestens zum vereinbarten Rückgabedatum, zurück."}</p>
         <div style="display:flex; gap:24px; margin:14px 0 6px; flex-wrap:wrap;">
           ${sigBox(a.unterschrift_ausgabe, "Ort, Datum, Unterschrift Empfänger/in")}
           ${sigBox(null, "Unterschrift Ausgebende/r")}
         </div>
         <h2 style="font-size:13pt; margin:18px 0 4px;">Rückgabe</h2>
+        ${mehrere ? (() => {
+          // Je Schlüssel, je Rückgabe-Termin ein Unterschriftenpaar, für Offenes ein leeres
+          const termine = new Map();
+          alle.filter((x) => x.zurueck_am).forEach((x) => {
+            const key = `${x.zurueck_am}|${x.zurueck_von || ""}|${x.unterschrift_rueckgabe || ""}`;
+            if (!termine.has(key)) termine.set(key, { datum: x.zurueck_am, bild: x.unterschrift_rueckgabe || null, nummern: [] });
+            termine.get(key).nummern.push(x.seriennummer);
+          });
+          const offen = alle.filter((x) => !x.zurueck_am).map((x) => x.seriennummer);
+          const paar = (bild, titel) => `<p style="font-size:10pt; color:#333; margin:10px 0 0;">${escapeHtml(titel)}</p>
+            <div style="display:flex; gap:24px; margin:6px 0 6px; flex-wrap:wrap;">${sigBox(bild, "Unterschrift Empfänger/in (Rückgabe)")}${sigBox(null, "Unterschrift Zurücknehmende/r")}</div>`;
+          return tabelle(alle.map((x) => zeile("Nr. " + x.seriennummer, x.zurueck_am
+              ? `zurück am ${datumDE(x.zurueck_am)}${x.zurueck_von ? " · " + x.zurueck_von : ""}` : "noch ausgegeben")).join("")) +
+            [...termine.values()].sort((p, q) => p.datum.localeCompare(q.datum))
+              .map((t) => paar(t.bild, `Rückgabe am ${datumDE(t.datum)}: Nr. ${t.nummern.join(", ")}`)).join("") +
+            (offen.length ? paar(null, `Rückgabe ${offen.length === alle.length ? "" : "der übrigen "}Nr. ${offen.join(", ")}: Datum ____________`) : "");
+        })() : `
         ${tabelle(zeile("Zurück am", datumDE(a.zurueck_am)) + zeile("Zurückgenommen von", a.zurueck_von))}
         <div style="display:flex; gap:24px; margin:14px 0 6px; flex-wrap:wrap;">
           ${sigBox(a.unterschrift_rueckgabe, "Unterschrift Empfänger/in (Rückgabe)")}
           ${sigBox(null, "Unterschrift Zurücknehmende/r")}
-        </div>
+        </div>`}
         <p style="font-size:9pt; color:#333; margin-top:16px;">Datenschutz: Die Angaben werden ausschließlich zur Verwaltung der Schlüssel durch ${escapeHtml(org || "den Verein")} verarbeitet und gelöscht, sobald sie dafür nach der Rückgabe nicht mehr benötigt werden.</p>
       </div>`;
   }
@@ -12510,7 +12712,7 @@
   window.ausgabeDrucken = async function(id) {
     try {
       const antwort = await api("schluessel_ausgabe_laden", { id });
-      htmlDrucken(protokollHtml(antwort.ausgabe));
+      htmlDrucken(protokollHtml(antwort.ausgabe, antwort.gruppe));
     } catch (fehler) {
       alert(fehler.message);
     }
@@ -12600,7 +12802,19 @@
   function renderAusgabeProtokolle() {
     const ziel = document.getElementById("schluessel-protokolle");
     if (!ziel) return;
-    const alle = ausgabenAktuell().sort((a, b) =>
+    // Seit Session 43: ein gemeinsames Protokoll ist EIN Eintrag (erste Zeile
+    // steht für die Gruppe, _gruppe = alle Zeilen); offen = mind. einer noch aus
+    const gesehen = new Set();
+    const alle = [];
+    ausgabenAktuell().forEach((a) => {
+      if (a.gruppe_id) {
+        if (gesehen.has(a.gruppe_id)) return;
+        gesehen.add(a.gruppe_id);
+        const g = ausgabeGruppe(a);
+        alle.push({ ...g[0], _gruppe: g, zurueck_am: g.every((x) => x.zurueck_am) ? g.map((x) => x.zurueck_am).sort().pop() : null });
+      } else alle.push(a);
+    });
+    alle.sort((a, b) =>
       (a.zurueck_am ? 1 : 0) - (b.zurueck_am ? 1 : 0) || (b.ausgegeben_am || "").localeCompare(a.ausgegeben_am || ""));
     document.getElementById("schluessel-protokolle-zahl").textContent = alle.length ? `(${alle.length})` : "";
     if (!alle.length) { ziel.innerHTML = `<p class="empty-text">Noch keine Ausgaben protokolliert.</p>`; return; }
@@ -12609,15 +12823,22 @@
       <p class="notiz-meta" style="color:var(--accent);">${alt.length} Protokoll${alt.length === 1 ? " ist" : "e sind"} seit mehr als einem Jahr abgeschlossen. Nicht mehr benötigte Protokolle bitte löschen (Datenschutz).
         <button class="link-btn" onclick="alteProtokolleLoeschen()">Alte löschen</button></p>` : "";
     html += `<div class="notiz-list">${alle.map((a) => {
-      if (ausgabeBearbeitenId === a.id) return ausgabeBearbeitenHtml(a);
+      const g = a._gruppe || [a];
+      if (g.some((x) => x.id === ausgabeBearbeitenId)) return ausgabeBearbeitenHtml(a);
       const icon = ic(a.art === "key" ? "funk" : "schluessel");
+      const zurueckZahl = g.filter((x) => x.zurueck_am).length;
       const status = a.zurueck_am
-        ? `zurück ${datumDE(a.zurueck_am)}${a.hat_unterschrift_rueckgabe ? " " + ic("unterschrift") : ""}`
-        : (ausgabeUeberfaellig(a) ? `<strong style="color:var(--accent);">überfällig seit ${datumDE(a.rueckgabe_bis)}</strong>` : "noch ausgegeben");
+        ? `${g.length > 1 ? "alle " : ""}zurück ${datumDE(a.zurueck_am)}${a.hat_unterschrift_rueckgabe ? " " + ic("unterschrift") : ""}`
+        : g.some(ausgabeUeberfaellig) ? `<strong style="color:var(--accent);">überfällig seit ${datumDE(a.rueckgabe_bis)}</strong>${zurueckZahl ? ` · ${zurueckZahl} von ${g.length} zurück` : ""}`
+        : zurueckZahl ? `${zurueckZahl} von ${g.length} zurück` : "noch ausgegeben";
+      const titel = g.length > 1
+        ? `${g.length} Schlüssel/Keys · ${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""}`
+        : `${escapeHtml(a.seriennummer)} · ${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""}`;
       return `
         <div class="notiz-item">
           <div style="flex:1; cursor:pointer;" onclick="ausgabeBearbeitenStart('${a.id}')">
-            <span class="notiz-text">${icon} ${escapeHtml(a.seriennummer)} · ${escapeHtml(a.inhaber)}${a.verein ? " (" + escapeHtml(a.verein) + ")" : ""}</span>
+            <span class="notiz-text">${icon} ${titel}</span>
+            ${g.length > 1 ? `<span class="notiz-meta" style="display:block;">Nr. ${g.map((x) => escapeHtml(x.seriennummer) + (x.zurueck_am ? " ✓" : "")).join(", ")}</span>` : ""}
             <span class="notiz-meta" style="display:block;">ausgegeben ${datumDE(a.ausgegeben_am)}${a.hat_unterschrift_ausgabe ? " " + ic("unterschrift") : ""}${a.ausgegeben_von ? " von " + escapeHtml(a.ausgegeben_von) : ""} · ${status}${ausgabeIstAlt(a) ? " · älter als 1 Jahr" : ""}</span>
           </div>
           <button class="task-edit-btn" onclick="event.stopPropagation(); ausgabeDrucken('${a.id}')" aria-label="Protokoll drucken" title="Drucken">${ic("drucken")}</button>
@@ -12631,6 +12852,7 @@
   // Bearbeiten-Formular eines Protokolls (Tippfehler korrigieren; Unterschriften bleiben)
   function ausgabeBearbeitenHtml(a) {
     const id = a.id;
+    const gruppe = (a._gruppe || [a]).length > 1;
     const feld = (f, label, wert, typ = "text", max = 120) =>
       `<label class="ern-feld">${label}<input type="${typ}" id="sp-${f}-${id}" value="${escapeAttr(wert || "")}"${typ === "text" ? ` maxlength="${max}"` : ""}></label>`;
     return `
@@ -12642,10 +12864,10 @@
           ${feld("am", "Ausgegeben am", a.ausgegeben_am, "date")}
           ${feld("von", "Ausgegeben von", a.ausgegeben_von)}
           ${feld("bis", "Rückgabe bis", a.rueckgabe_bis, "date")}
-          ${a.zurueck_am ? feld("zam", "Zurück am", a.zurueck_am, "date") + feld("zvon", "Zurückgenommen von", a.zurueck_von) : ""}
+          ${a.zurueck_am && !gruppe ? feld("zam", "Zurück am", a.zurueck_am, "date") + feld("zvon", "Zurückgenommen von", a.zurueck_von) : ""}
           ${feld("notiz", "Notiz", a.notiz, "text", 500)}
         </div>
-        <p class="notiz-meta" style="margin:0.3rem 0;">Unterschriften und Schlüsseldaten lassen sich nicht ändern.</p>
+        <p class="notiz-meta" style="margin:0.3rem 0;">Unterschriften und Schlüsseldaten lassen sich nicht ändern.${gruppe ? " Gemeinsames Protokoll: die Angaben gelten für alle Schlüssel darin; Rückgabedaten bleiben je Schlüssel, wie sie sind." : ""}</p>
         <div class="row" style="margin:0.4rem 0 0;">
           <button class="btn-primary" onclick="ausgabeSpeichern('${id}')">Speichern</button>
           <button class="link-btn" onclick="ausgabeBearbeitenAbbrechen()">Abbrechen</button>
@@ -12679,11 +12901,13 @@
   // Löscht ein Protokoll inkl. Unterschriften nach Rückfrage
   window.ausgabeLoeschen = async function(id) {
     const a = schluesselAusgaben.find((x) => x.id === id);
-    const offen = a && !a.zurueck_am;
-    if (!confirm(`Protokoll ${a ? a.seriennummer + " · " + a.inhaber : ""} inkl. Unterschriften löschen?` +
-      (offen ? " Der Schlüssel ist noch ausgegeben – er steht danach wieder im Bestand." : ""))) return;
+    const g = ausgabeGruppe(a);
+    const offen = g.filter((x) => !x.zurueck_am).length;
+    const nummern = g.map((x) => x.seriennummer).join(", ");
+    if (!confirm(`Protokoll ${a ? (g.length > 1 ? `Nr. ${nummern}` : a.seriennummer) + " · " + a.inhaber : ""} inkl. Unterschriften löschen?` +
+      (offen ? (g.length > 1 ? ` ${offen} davon ${offen === 1 ? "ist" : "sind"} noch ausgegeben – ${offen === 1 ? "steht" : "stehen"} danach wieder im Bestand.` : " Der Schlüssel ist noch ausgegeben – er steht danach wieder im Bestand.") : ""))) return;
     try {
-      await api("schluessel_ausgabe_loeschen", { id });
+      await api("schluessel_ausgabe_loeschen", { id: g.length > 1 ? g.map((x) => x.id) : id });
       await ladeDaten();
     } catch (fehler) {
       alert(fehler.message);
@@ -12691,7 +12915,8 @@
   };
   // Löscht alle Protokolle, deren Rückgabe über ein Jahr zurückliegt
   window.alteProtokolleLoeschen = async function() {
-    const alt = ausgabenAktuell().filter(ausgabeIstAlt);
+    // Gemeinsame Protokolle nur, wenn alle Zeilen alt sind (seit Session 43)
+    const alt = ausgabenAktuell().filter((a) => ausgabeGruppe(a).every(ausgabeIstAlt));
     if (!alt.length) return;
     if (!confirm(`${alt.length} abgeschlossene Protokoll${alt.length === 1 ? "" : "e"} (Rückgabe vor über einem Jahr) inkl. Unterschriften löschen?`)) return;
     try {
