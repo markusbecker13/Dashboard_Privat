@@ -2422,17 +2422,24 @@
       laden: (k) => ({
         _id: k.id,
         _ausgegeben: !!offeneAusgabe(k),
+        _gruppeN: ausgabeGruppe(offeneAusgabe(k)).length,
         art: k.art === "key" ? "key" : "schluessel", nr: k.seriennummer || "", name: k.inhaber || "", verein: k.verein || "",
         zugaenge: (k.zugaenge || []).slice(), notiz: k.notiz || "",
+        _protokollhinweis: (() => {
+          const n = ausgabeGruppe(offeneAusgabe(k)).length;
+          return `Name und Verein werden auch im Ausgabeprotokoll geändert${n > 1 ? ` – für alle ${n} Schlüssel des gemeinsamen Protokolls` : ""}. Bekommt eine andere Person den Schlüssel, lieber „Zurück“ und neu ausgeben.`;
+        })(),
       }),
       felder: [
         { key: "art", label: "Art", typ: "chips", optionen: [["schluessel", "Schlüssel"], ["key", "Elektronischer Key"]] },
         { key: "nr", label: "Seriennummer", typ: "text", pflicht: true },
-        // Ist der Schlüssel ausgegeben, ändern sich Name/Verein nur über das Protokoll
-        { key: "name", label: "Name", typ: "text", halb: true, liste: "schluessel-namen-vorschlaege", platzhalter: "optional",
-          gesperrt: (w) => w._ausgegeben, gesperrtHinweis: "ausgegeben – über das Protokoll ändern" },
-        { key: "verein", label: "Verein", typ: "text", halb: true, liste: "schluessel-vereine-vorschlaege", platzhalter: "optional",
-          gesperrt: (w) => w._ausgegeben, gesperrtHinweis: "ausgegeben – über das Protokoll ändern" },
+        // Seit Session 44 auch bei ausgegebenen Schlüsseln änderbar – dann wird
+        // das offene Protokoll mit korrigiert (bei gemeinsamen: für alle darin)
+        { key: "name", label: "Name", typ: "text", halb: true, liste: "schluessel-namen-vorschlaege", platzhalter: "optional" },
+        { key: "verein", label: "Verein", typ: "text", halb: true, liste: "schluessel-vereine-vorschlaege", platzhalter: "optional" },
+        { key: "_protokollhinweis", label: "Ausgegeben", typ: "info", wenn: (w) => w._ausgegeben,
+          // info zeigt w[key] – der Text steht deshalb in den Werten (siehe laden)
+        },
         { key: "zugaenge", label: "Zugänge", typ: "mehrfach", icon: "tuer",
           optionen: () => zugaengeAktuell().map((z) => [z.id, z.name, z.beschreibung || ""]),
           leer: `Noch keine Zugänge – über ${ic("zahnrad")} oben („Zugänge verwalten“) anlegen.` },
@@ -2444,11 +2451,26 @@
               <button type="button" class="link-btn" onclick="ausgabePdf('${a.id}')">${ic("export")}PDF</button>${mailEingerichtet ? `
               <button type="button" class="link-btn" onclick="ausgabeMailen('${a.id}')">${ic("mail")}Mail</button>` : ""}</span></div>`).join("") },
       ],
-      speichern: (id, w) => api("schluessel_aktualisieren", {
-        id, art: w.art, seriennummer: w.nr, inhaber: w.name, verein: w.verein, notiz: w.notiz,
-        // Zugänge nur mitschicken, wenn es welche gibt (sonst bleibt die Spalte unberührt)
-        ...(zugaengeAktuell().length ? { zugaenge: w.zugaenge } : {}),
-      }),
+      pruefen: (w) => (w._ausgegeben && !String(w.name || "").trim()
+        ? "Ein ausgegebener Schlüssel braucht einen Namen – zum Freigeben „Zurück“ nutzen." : ""),
+      speichern: async (id, w) => {
+        // Ausgegeben und Name/Verein geändert: zuerst das offene Protokoll
+        // korrigieren (zieht Name/Verein am Schlüssel mit), dann den Rest
+        const k = schluesselListe.find((x) => String(x.id) === String(id));
+        const a = k && offeneAusgabe(k);
+        if (a && ((w.name || "").trim() !== (a.inhaber || "") || (w.verein || "").trim() !== (a.verein || ""))) {
+          await api("schluessel_ausgabe_aktualisieren", {
+            id: a.id, inhaber: (w.name || "").trim(), verein: (w.verein || "").trim(), kontakt: a.kontakt || "",
+            ausgegeben_am: a.ausgegeben_am, ausgegeben_von: a.ausgegeben_von || "", rueckgabe_bis: a.rueckgabe_bis || "",
+            notiz: a.notiz || "", zurueck_am: "", zurueck_von: "",
+          });
+        }
+        return api("schluessel_aktualisieren", {
+          id, art: w.art, seriennummer: w.nr, inhaber: w.name, verein: w.verein, notiz: w.notiz,
+          // Zugänge nur mitschicken, wenn es welche gibt (sonst bleibt die Spalte unberührt)
+          ...(zugaengeAktuell().length ? { zugaenge: w.zugaenge } : {}),
+        });
+      },
       loeschen: (id) => api("schluessel_loeschen", { id }),
       loeschFrage: (k) => {
         const protokolle = ausgabenVonSchluessel(k).length;
@@ -11959,7 +11981,6 @@
   // Seit Session 43: Filter nach Person, Gruppierung nach Verein oder Person,
   // Sammelausgabe mehrerer Schlüssel an eine Person (ein Protokoll)
   let schluesselFilterPerson = "alle";
-  let schluesselGruppierung = (() => { try { return localStorage.getItem("schluessel-gruppierung") === "person" ? "person" : "verein"; } catch (_e) { return "verein"; } })();
   let schluesselSammel = null; // null | { ids: Set<id>, formular: bool }
   const SCHLUESSEL_ART = { schluessel: { icon: "schluessel", text: "Schlüssel" }, key: { icon: "funk", text: "Elektronischer Key" } };
   const SCHLUESSEL_OHNE_VEREIN = "Ohne Verein";
@@ -12042,7 +12063,6 @@
     pFilter.innerHTML = `<option value="alle">Alle Personen</option>` + personNamen.map((n) =>
       `<option value="${escapeAttr(n)}" ${n === schluesselFilterPerson ? "selected" : ""}>${escapeHtml(n)} (${personen.get(n)})</option>`).join("");
     pFilter.classList.toggle("hidden", !personNamen.length);
-    document.getElementById("schluessel-gruppierung").value = schluesselGruppierung;
 
     const anzSchl = alle.filter((k) => k.art !== "key").length;
     const anzKey = alle.length - anzSchl;
@@ -12075,6 +12095,7 @@
     if (!liste) return;
     const alle = schluesselAktuell();
     if (!alle.length) {
+      renderSchluesselSammel();
       liste.innerHTML = `<p class="empty-text">Noch keine Schlüssel oder Keys eingetragen.</p>`;
       return;
     }
@@ -12096,20 +12117,23 @@
       return;
     }
 
-    // Gruppierung nach Verein (wie bisher) oder nach Person (seit Session 43)
-    const nachPerson = schluesselGruppierung === "person";
+    // Seit Session 44: Verein → darunter je Name EIN aufklappbarer Block mit
+    // allen Schlüsseln dieser Person. Der Bestand bleibt eine flache Liste.
     const gruppen = {};
     gefiltert.forEach((k) => {
-      const v = schluesselStatus(k) === "bestand" ? SCHLUESSEL_BESTAND
-        : nachPerson ? ((k.inhaber || "").trim() || SCHLUESSEL_OHNE_NAME)
-        : ((k.verein || "").trim() || SCHLUESSEL_OHNE_VEREIN);
+      const v = schluesselStatus(k) === "bestand" ? SCHLUESSEL_BESTAND : ((k.verein || "").trim() || SCHLUESSEL_OHNE_VEREIN);
       (gruppen[v] = gruppen[v] || []).push(k);
     });
-    // Reihenfolge: alphabetisch, dann „Ohne Verein“/„Ohne Name“, zuletzt der Bestand
-    const rang = (n) => (n === SCHLUESSEL_BESTAND ? 2 : n === SCHLUESSEL_OHNE_VEREIN || n === SCHLUESSEL_OHNE_NAME ? 1 : 0);
+    // Reihenfolge: Vereine alphabetisch, dann „Ohne Verein“, zuletzt der Bestand
+    const rang = (n) => (n === SCHLUESSEL_BESTAND ? 2 : n === SCHLUESSEL_OHNE_VEREIN ? 1 : 0);
     const namen = Object.keys(gruppen).sort((a, b) => rang(a) - rang(b) || a.localeCompare(b, "de"));
+    // Mit aktiver Suche/Filter sind alle Namen aufgeklappt, sonst wie gemerkt
+    const filterAktiv = !!suche || schluesselFilterPerson !== "alle" || schluesselFilterArt !== "alle" ||
+      schluesselFilterStatus !== "alle" || schluesselFilterZugang !== "alle";
+    const nummernVergleich = (a, b) => (a.art || "").localeCompare(b.art || "") ||
+      (a.seriennummer || "").localeCompare(b.seriennummer || "", "de", { numeric: true });
 
-    const karte = (k) => {
+    const karte = (k, imNamen) => {
       const art = SCHLUESSEL_ART[k.art] || SCHLUESSEL_ART.schluessel;
       if (schluesselAktion && schluesselAktion.id === k.id) {
         const offen = offeneAusgabe(k);
@@ -12117,8 +12141,12 @@
         if (schluesselAktion.modus === "ausgeben" && !offen) return ausgabeFormularHtml(k);
       }
       const zug = schluesselZugangNamen(k);
-      const meta = [art.text, k.notiz ? escapeHtml(k.notiz) : ""].filter(Boolean).join(" · ");
-      // Sammelausgabe: freie Schlüssel ankreuzbar
+      // Im Namensblock steht die Nummer oben (der Name steht schon im Kopf)
+      const titel = imNamen
+        ? `Nr. <strong>${escapeHtml(k.seriennummer)}</strong>`
+        : (k.inhaber ? escapeHtml(k.inhaber) : (schluesselStatus(k) === "bestand" ? "frei" : `<em>ohne Name</em>`));
+      const meta = [imNamen ? "" : `Nr. <strong>${escapeHtml(k.seriennummer)}</strong>`, art.text, k.notiz ? escapeHtml(k.notiz) : ""].filter(Boolean).join(" · ");
+      // Sammelauswahl: alle ohne offene Ausgabe ankreuzbar
       const sammelHaken = schluesselSammel && !schluesselSammel.formular && !offeneAusgabe(k)
         ? `<input type="checkbox" ${schluesselSammel.ids.has(k.id) ? "checked" : ""} onclick="event.stopPropagation(); schluesselSammelUmschalten('${k.id}')"
             aria-label="Nr. ${escapeAttr(k.seriennummer)} auswählen" style="width:1.3rem; height:1.3rem; margin:0.2rem 0.6rem 0 0; flex:0 0 auto; accent-color:var(--accent);">`
@@ -12127,8 +12155,8 @@
         <div class="notiz-item">
           ${sammelHaken}
           <div style="flex:1; cursor:pointer;" onclick="${sammelHaken ? `schluesselSammelUmschalten('${k.id}')` : `schluesselBearbeitenStart('${k.id}')`}">
-            <span class="notiz-text">${ic(art.icon)}<span class="nur-vorleser">${art.text}:</span> ${nachPerson && k.inhaber ? `Nr. ${escapeHtml(k.seriennummer)}${k.verein ? ` <span class="notiz-meta">(${escapeHtml(k.verein)})</span>` : ""}` : k.inhaber ? escapeHtml(k.inhaber) : (schluesselStatus(k) === "bestand" ? "frei" : `<em>ohne Name</em>`)}</span>
-            <span class="notiz-meta" style="display:block;">Nr. <strong>${escapeHtml(k.seriennummer)}</strong> · ${meta}</span>
+            <span class="notiz-text">${ic(art.icon)}<span class="nur-vorleser">${art.text}:</span> ${titel}</span>
+            <span class="notiz-meta" style="display:block;">${meta}</span>
             ${zug.length ? `<span class="notiz-meta" style="display:block;">${ic("tuer")} ${zug.map(escapeHtml).join(", ")}</span>` : ""}
             ${schluesselStatusHtml(k)}
           </div>
@@ -12137,17 +12165,49 @@
         </div>`;
     };
 
+    // Ein Namensblock: Kopf mit Name und Anzahl, aufgeklappt Türen und Schlüssel
+    const namensBlock = (verein, name, ks) => {
+      ks.sort(nummernVergleich);
+      const schluessel = `${aktiverBereich}|${verein}|${name}`;
+      const offen = filterAktiv || schluesselPersonenOffen.has(schluessel) ||
+        ks.some((k) => (schluesselAktion && schluesselAktion.id === k.id) || (schluesselSammel && schluesselSammel.ids.has(k.id)));
+      const s = ks.filter((k) => k.art !== "key").length;
+      const kz = ks.length - s;
+      const ueber = ks.filter((k) => ausgabeUeberfaellig(offeneAusgabe(k))).length;
+      const ohneProt = ks.filter((k) => schluesselStatus(k) === "zugeordnet").length;
+      const zahl = [s ? `${ic("schluessel")} ${s}` : "", kz ? `${ic("funk")} ${kz}` : ""].filter(Boolean).join(" ");
+      const hinweise = [ueber ? `<span style="color:var(--accent); font-weight:600;">${ic("warnung")} ${ueber} überfällig</span>` : "",
+        ohneProt ? `${ohneProt} ohne Protokoll` : ""].filter(Boolean).join(" · ");
+      const tueren = [...new Set(ks.flatMap(schluesselZugangNamen))].sort((a, b) => a.localeCompare(b, "de"));
+      return `
+        <details class="schluessel-person" data-key="${escapeAttr(schluessel)}" ${offen ? "open" : ""} ontoggle="schluesselPersonUmschalten(this)"
+          style="margin:0 0 0.45rem; border:1px solid var(--border); border-radius:var(--r-mittel); background:var(--panel);">
+          <summary style="cursor:pointer; padding:0.55rem 0.75rem; display:flex; flex-wrap:wrap; gap:0.3rem 0.6rem; align-items:center; min-height:44px;">
+            <span style="flex:1; min-width:8rem; font-weight:600;">${escapeHtml(name)}</span>
+            ${hinweise ? `<span class="notiz-meta">${hinweise}</span>` : ""}
+            <span class="zl-gruppe-zahl">${zahl}</span>
+          </summary>
+          <p class="notiz-meta" style="margin:0 0.75rem 0.35rem;">${tueren.length ? `${ic("tuer")} öffnet: ${tueren.map(escapeHtml).join(", ")}` : "keine Zugänge eingetragen"}</p>
+          <div class="notiz-list" style="padding:0 0.4rem 0.4rem;">${ks.map((k) => karte(k, true)).join("")}</div>
+        </details>`;
+    };
+
     liste.innerHTML = namen.map((v) => {
-      const eintraege = gruppen[v].sort(schluesselVergleich);
+      const eintraege = gruppen[v];
       const s = eintraege.filter((k) => k.art !== "key").length;
       const kz = eintraege.length - s;
       const zahl = [s ? `<span title="Schlüssel">${ic("schluessel")} ${s}</span>` : "", kz ? `<span title="Elektronische Keys">${ic("funk")} ${kz}</span>` : ""].filter(Boolean).join(" ");
-      // Je Person: welche Türen sie mit ihren Schlüsseln öffnen kann
-      let personInfo = "";
-      if (nachPerson && v !== SCHLUESSEL_BESTAND && v !== SCHLUESSEL_OHNE_NAME) {
-        const tueren = [...new Set(eintraege.flatMap(schluesselZugangNamen))].sort((a, b) => a.localeCompare(b, "de"));
-        const vereine = [...new Set(eintraege.map((k) => (k.verein || "").trim()).filter(Boolean))];
-        personInfo = `<p class="notiz-meta" style="margin:0.2rem 0 0.4rem;">${vereine.length ? escapeHtml(vereine.join(", ")) + " · " : ""}${tueren.length ? `${ic("tuer")} öffnet: ${tueren.map(escapeHtml).join(", ")}` : "keine Zugänge eingetragen"}</p>`;
+      let inhalt;
+      if (v === SCHLUESSEL_BESTAND) {
+        inhalt = `<div class="notiz-list">${eintraege.sort(nummernVergleich).map((k) => karte(k, false)).join("")}</div>`;
+      } else {
+        const personen = {};
+        eintraege.forEach((k) => { const n = (k.inhaber || "").trim() || SCHLUESSEL_OHNE_NAME; (personen[n] = personen[n] || []).push(k); });
+        const reihenfolge = Object.keys(personen).sort((a, b) =>
+          (a === SCHLUESSEL_OHNE_NAME) - (b === SCHLUESSEL_OHNE_NAME) || a.localeCompare(b, "de"));
+        const anzahlPersonen = reihenfolge.filter((n) => n !== SCHLUESSEL_OHNE_NAME).length;
+        inhalt = `<p class="notiz-meta" style="margin:0.2rem 0 0.4rem;">${anzahlPersonen} ${anzahlPersonen === 1 ? "Person" : "Personen"}</p>` +
+          reihenfolge.map((n) => namensBlock(v, n, personen[n])).join("");
       }
       return `
         <details class="spiel-gruppe" open>
@@ -12155,13 +12215,23 @@
             <span class="spiel-gruppe-titel">${v === SCHLUESSEL_BESTAND ? ic("eingang") + " " : ""}${escapeHtml(v)}</span>
             <span class="zl-gruppe-zahl">${zahl}</span>
           </summary>
-          ${personInfo}
-          <div class="notiz-list">${eintraege.map(karte).join("")}</div>
+          ${inhalt}
         </details>`;
     }).join("");
     // Offenes Ausgabe-/Rücknahme-Formular: Unterschriftsfeld wieder zeichenbereit machen
     if (schluesselAktion) unterschriftAktivieren((schluesselAktion.modus === "ausgeben" ? "sa-sig-" : "sr-sig-") + schluesselAktion.id);
   }
+
+  // Auf-/zugeklappte Namensblöcke merken (je Gerät, Schlüssel bereich|Verein|Name)
+  const schluesselPersonenOffen = new Set((() => {
+    try { return JSON.parse(localStorage.getItem("schluessel-personen-offen") || "[]"); } catch (_e) { return []; }
+  })());
+  window.schluesselPersonUmschalten = function(el) {
+    const key = el.dataset.key;
+    if (!key) return;
+    if (el.open) schluesselPersonenOffen.add(key); else schluesselPersonenOffen.delete(key);
+    try { localStorage.setItem("schluessel-personen-offen", JSON.stringify([...schluesselPersonenOffen])); } catch (_e) { /* egal */ }
+  };
 
   // ---------- Mehrere Schlüssel an eine Person (seit Session 43) ----------
   // Leiste bzw. Formular über der Liste
@@ -12176,13 +12246,12 @@
     if (!schluesselSammel.formular) {
       el.innerHTML = `
         <div class="sync-karte" style="margin:0.4rem 0 0.8rem;">
-          <p class="notiz-text" style="margin:0 0 0.4rem;">${ic("ausgeben")} Freie Schlüssel/Keys unten ankreuzen – <strong>${gewaehlt.length}</strong> ausgewählt</p>
+          <p class="notiz-text" style="margin:0 0 0.4rem;">${ic("ausgeben")} Schlüssel/Keys ohne Protokoll unten ankreuzen (Bestand und „ohne Protokoll“) – <strong>${gewaehlt.length}</strong> ausgewählt</p>
           ${gewaehlt.length ? `<p class="notiz-meta" style="margin:0 0 0.4rem;">Nr. ${gewaehlt.map((k) => escapeHtml(k.seriennummer)).join(", ")}</p>` : ""}
           <div class="row" style="margin:0; flex-wrap:wrap;">
-            <button class="btn-primary" onclick="schluesselSammelWeiter()"${gewaehlt.length < 2 ? " disabled" : ""}>Weiter zum Protokoll</button>
+            <button class="btn-primary" onclick="schluesselSammelWeiter()"${gewaehlt.length < 1 ? " disabled" : ""}>Weiter</button>
             <button class="link-btn" onclick="schluesselSammelAbbrechen()">Abbrechen</button>
           </div>
-          ${gewaehlt.length < 2 ? `<p class="notiz-meta" style="margin:0.4rem 0 0;">Mindestens zwei auswählen – einen einzelnen gibst du über „Ausgeben“ am Eintrag aus.</p>` : ""}
         </div>`;
       return;
     }
@@ -12190,7 +12259,7 @@
     const id = "sammel";
     el.innerHTML = `
       <div class="notiz-item" style="display:block; margin:0.4rem 0 0.8rem;">
-        <p class="notiz-text" style="margin:0 0 0.4rem;">${ic("ausgeben")} ${gewaehlt.length} Schlüssel/Keys an eine Person ausgeben – ein gemeinsames Protokoll</p>
+        <p class="notiz-text" style="margin:0 0 0.4rem;">${ic("ausgeben")} ${gewaehlt.length} ${gewaehlt.length === 1 ? "Schlüssel/Key" : "Schlüssel/Keys"} an eine Person ausgeben${gewaehlt.length > 1 ? " – ein gemeinsames Protokoll" : ""}</p>
         <ul class="notiz-meta" style="margin:0 0 0.6rem; padding-left:1.2rem;">${gewaehlt.map((k) => {
           const zug = schluesselZugangNamen(k);
           return `<li>${ic((SCHLUESSEL_ART[k.art] || SCHLUESSEL_ART.schluessel).icon)} Nr. <strong>${escapeHtml(k.seriennummer)}</strong>${zug.length ? " · " + zug.map(escapeHtml).join(", ") : ""}</li>`;
@@ -12206,10 +12275,11 @@
           ${unterschriftFeldHtml("sa-sig-" + id, "Unterschrift Empfänger/in (für alle)")}
           ${mailFeldHtml("sa-mail-" + id, "")}
         </div>
-        <p class="notiz-meta" style="margin:0.3rem 0;">Ohne Unterschrift hier: „Ausgeben &amp; drucken“ und das Protokoll auf Papier unterschreiben lassen. Zurückgeben lassen sich die Schlüssel später einzeln oder zusammen.</p>
+        <p class="notiz-meta" style="margin:0.3rem 0;">Ohne Unterschrift hier: „Ausgeben &amp; drucken“ und das Protokoll auf Papier unterschreiben lassen. Zurückgeben lassen sich die Schlüssel später einzeln oder zusammen. Schon früher ausgegeben? „Ausgegeben am“ zurückdatieren – oder „Nur zuordnen“: trägt nur Name und Verein ein, ohne Protokoll.</p>
         <div class="row" style="margin:0.4rem 0 0; flex-wrap:wrap;">
           <button class="btn-primary" onclick="schluesselSammelSpeichern(false)">Ausgeben</button>
           <button class="btn-secondary" onclick="schluesselSammelSpeichern(true)">Ausgeben &amp; drucken</button>
+          <button class="btn-secondary" onclick="schluesselSammelZuordnen()" title="Nur Name und Verein eintragen, ohne Ausgabeprotokoll">Nur zuordnen</button>
           <button class="link-btn" onclick="schluesselSammelZurueck()">Auswahl ändern</button>
           <button class="link-btn" onclick="schluesselSammelAbbrechen()">Abbrechen</button>
         </div>
@@ -12228,7 +12298,7 @@
     renderSchluesselListe();
   };
   window.schluesselSammelWeiter = function() {
-    if (!schluesselSammel || schluesselSammel.ids.size < 2) return;
+    if (!schluesselSammel || schluesselSammel.ids.size < 1) return;
     schluesselSammel.formular = true;
     renderSchluesselListe();
     const el = document.getElementById("schluessel-sammel");
@@ -12243,6 +12313,30 @@
     schluesselSammel = null;
     renderSchluesselListe();
   };
+  // Nur zuordnen (seit Session 44): Name/Verein an den ausgewählten Schlüsseln
+  // eintragen, ohne Ausgabeprotokoll – z. B. für Schlüssel, die schon vor der
+  // App ausgegeben wurden. Später lässt sich über „Protokoll“ eins nachtragen.
+  window.schluesselSammelZuordnen = async function() {
+    if (!schluesselSammel) return;
+    const wert = (f) => document.getElementById(`sa-${f}-sammel`).value.trim();
+    const inhaber = wert("name"), verein = wert("verein");
+    if (!inhaber && !verein) { alert("Bitte Name oder Verein angeben."); return; }
+    const ks = schluesselAktuell().filter((k) => schluesselSammel.ids.has(k.id) && !offeneAusgabe(k));
+    if (!ks.length) return;
+    if (!confirm(`${ks.length} ${ks.length === 1 ? "Schlüssel" : "Schlüssel/Keys"} ohne Protokoll ${inhaber || verein} zuordnen?`)) return;
+    let fehler = 0;
+    for (const k of ks) {
+      try {
+        await api("schluessel_aktualisieren", {
+          id: k.id, art: k.art, seriennummer: k.seriennummer, inhaber, verein, notiz: k.notiz || "",
+          ...(zugaengeAktuell().length ? { zugaenge: k.zugaenge || [] } : {}),
+        });
+      } catch (_e) { fehler++; }
+    }
+    schluesselSammel = null;
+    await ladeDaten();
+    hinweisZeigen(fehler ? `${ks.length - fehler} zugeordnet, ${fehler} fehlgeschlagen` : `${ks.length} zugeordnet – ohne Protokoll`);
+  };
   // Gibt alle ausgewählten Schlüssel mit einem gemeinsamen Protokoll aus
   window.schluesselSammelSpeichern = async function(drucken) {
     if (!schluesselSammel) return;
@@ -12254,7 +12348,7 @@
       ausgegeben_am: wert("am"), ausgegeben_von: wert("von"), rueckgabe_bis: wert("bis"), notiz: wert("notiz"),
       unterschrift: unterschriftLesen("sa-sig-" + id),
     };
-    if (ids.length < 2) { alert("Bitte mindestens zwei freie Schlüssel auswählen."); return; }
+    if (!ids.length) { alert("Bitte mindestens einen Schlüssel auswählen."); return; }
     if (!daten.inhaber) { alert("Bitte den Namen der Person angeben."); return; }
     try {
       const mailEl = document.getElementById("sa-mail-" + id);
@@ -12263,7 +12357,7 @@
       ausgeberMerken(daten.ausgegeben_von);
       schluesselSammel = null;
       await ladeDaten();
-      hinweisZeigen(`${ids.length} Schlüssel/Keys ausgegeben – ein Protokoll`);
+      hinweisZeigen(ids.length > 1 ? `${ids.length} Schlüssel/Keys ausgegeben – ein Protokoll` : "Schlüssel ausgegeben");
       if (antwort && antwort.id) await mailNachSpeichern(antwort.id, mail);
       if (drucken && antwort && antwort.id) await window.ausgabeDrucken(antwort.id);
     } catch (fehler) {
@@ -12318,16 +12412,12 @@
     schluesselFilterZugang = e.target.value;
     renderSchluesselListe();
   });
-  // Seit Session 43: Person und Gruppierung (Gruppierung pro Gerät gemerkt)
+  // Seit Session 43: Filter nach Person
   document.getElementById("schluessel-filter-person").addEventListener("change", (e) => {
     schluesselFilterPerson = e.target.value;
     renderSchluesselListe();
   });
-  document.getElementById("schluessel-gruppierung").addEventListener("change", (e) => {
-    schluesselGruppierung = e.target.value === "person" ? "person" : "verein";
-    try { localStorage.setItem("schluessel-gruppierung", schluesselGruppierung); } catch (_e) { /* egal */ }
-    renderSchluesselListe();
-  });
+
   // Bearbeiten eines Schlüssels/Keys: seit Session 35 im Bearbeiten-Blatt
   window.schluesselBearbeitenStart = function(id) {
     window.blattOeffnen("schluessel", id);
