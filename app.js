@@ -20,6 +20,7 @@
   let projekte = [];
   let aufgaben = [];
   let termine = [];
+  let terminKategorien = null; // Termin-Kategorien (seit Session 42); null = SQL fehlt
   let notizen = [];
   let links = [];
   let reflexionen = [];
@@ -1388,7 +1389,7 @@
       .sort((a, c) => String(a.erledigt_am).localeCompare(String(c.erledigt_am)));
     const liegen = aufg.filter((a) => !a.erledigt && a.faellig_am && a.faellig_am <= so)
       .sort((a, c) => a.faellig_am.localeCompare(c.faellig_am));
-    const termineWoche = sicht("kalender") ? meine(termine).filter((x) => inWoche(x.datum)).sort(nachZeit) : null;
+    const termineWoche = sicht("kalender") ? termineVorkommen(meine(termine), mo, so) : null;
 
     let train = null;
     if (sicht("training")) {
@@ -1427,7 +1428,7 @@
     const refl = sicht("reflexion") ? meine(reflexionen).filter((x) => inWoche(x.datum)).sort((a, c) => String(a.datum).localeCompare(String(c.datum))) : null;
 
     const naechste = {
-      termine: sicht("kalender") ? meine(termine).filter((x) => inNaechster(x.datum)).sort(nachZeit) : [],
+      termine: sicht("kalender") ? termineVorkommen(meine(termine), nMo, nSo) : [],
       aufgaben: aufg.filter((a) => !a.erledigt && inNaechster(a.faellig_am)).sort((a, c) => a.faellig_am.localeCompare(c.faellig_am)),
       vermietungen: sicht("raumplanung") ? meine(raumVermietungen).filter((v) => inNaechster(v.datum)).sort(nachZeit) : [],
       rueckgaben: sicht("schluessel") ? meine(schluesselAusgaben).filter((a) => !a.zurueck_am && inNaechster(a.rueckgabe_bis)) : [],
@@ -1681,7 +1682,7 @@
           datum: a.faellig_am, nachrangig: !!a.erledigt }),
         oeffnen: (a) => () => window.eintragBearbeiten("aufgabe", a.id) },
       { typ: "termin", gruppe: "Termine", tab: "kalender", liste: termine,
-        felder: (x) => ({ titel: x.titel, texte: [x.notiz], meta: [suchDatum(x.datum) + (x.uhrzeit ? " · " + String(x.uhrzeit).slice(0, 5) : "")], datum: x.datum }),
+        felder: (x) => ({ titel: x.titel, texte: [x.notiz, (terminKat(x) || {}).name], meta: [suchDatum(x.datum) + (x.uhrzeit ? " · " + String(x.uhrzeit).slice(0, 5) : "") + (x.wiederholung ? " · " + TERMIN_WDH[x.wiederholung] : "")], datum: x.datum }),
         oeffnen: (x) => () => window.eintragBearbeiten("termin", x.id) },
       { typ: "notiz", gruppe: "Notizen", tab: "notizen", liste: notizen,
         felder: (n) => ({ titel: String(n.text || "").split("\n")[0], texte: [n.text, projektName(n.projekt_id)], meta: [], datum: n.erstellt_am }),
@@ -2102,9 +2103,9 @@
     const bereich = BEREICH_FARBWELT.includes(aktiverBereich) ? aktiverBereich : "privat";
     const wunsch = SCHNELL_ART_VON_TAB[aktiverTab] || "aufgabe";
     const art = schnellArtenFuer(bereich).some((a) => a.art === wunsch) ? wunsch : "aufgabe";
-    schnell = { art, bereich, wann: art === "termin" ? "heute" : "ohne", details: false, erkannt: null, erkennungAus: false, vorErkennung: null, modus: "neu", id: null };
+    schnell = { art, bereich, wann: art === "termin" ? "heute" : "ohne", details: false, erkannt: null, erkennungAus: false, vorErkennung: null, modus: "neu", id: null, wdh: "", kat: "" };
     document.getElementById("schnell-text").value = "";
-    ["schnell-datum", "schnell-uhrzeit", "schnell-ende", "schnell-intervall", "schnell-notiz"].forEach((id) => {
+    ["schnell-datum", "schnell-uhrzeit", "schnell-ende", "schnell-intervall", "schnell-notiz", "schnell-wdh-bis"].forEach((id) => {
       document.getElementById(id).value = "";
     });
     schnellMeldung("", false);
@@ -2172,7 +2173,9 @@
     const datum = (typ === "termin" ? e.datum : e.faellig_am) || null;
     const wann = !datum ? "ohne" : datum === heute ? "heute" : datum === addTage(heute, 1) ? "morgen" : "datum";
     const bereich = BEREICH_FARBWELT.includes(bereichVon(e)) ? bereichVon(e) : "privat";
-    schnell = { art: typ, bereich, wann, details: true, erkannt: null, erkennungAus: false, vorErkennung: null, modus: "bearbeiten", id: e.id, altDatum: datum };
+    schnell = { art: typ, bereich, wann, details: true, erkannt: null, erkennungAus: false, vorErkennung: null, modus: "bearbeiten", id: e.id, altDatum: datum,
+      wdh: typ === "termin" ? (e.wiederholung || "") : "", kat: typ === "termin" ? (e.kategorie_id || "") : "" };
+    document.getElementById("schnell-wdh-bis").value = typ === "termin" ? (e.wiederholung_bis || "") : "";
     const zeit = (z) => (z ? String(z).slice(0, 5) : "");
     document.getElementById("schnell-text").value = e.titel || "";
     document.getElementById("schnell-datum").value = wann === "datum" ? datum : "";
@@ -2181,7 +2184,8 @@
     document.getElementById("schnell-intervall").value = typ === "aufgabe" && e.erinnere_alle_tage ? e.erinnere_alle_tage : "";
     // Aufgaben haben seit Session 41 auch eine Notiz
     document.getElementById("schnell-notiz").value = e.notiz || "";
-    schnellMeldung("", false);
+    schnellMeldung(typ === "termin" && e.wiederholung
+      ? `Serie (${TERMIN_WDH[e.wiederholung]}, ab ${formatDatumKurz(e.datum)}${e.datum.slice(0, 4) !== heute.slice(0, 4) ? e.datum.slice(0, 4) : ""}) – Änderungen gelten für alle Termine.` : "", false);
     document.getElementById("schnell-reiterform").classList.add("hidden");
     schnellRendern();
     document.getElementById("schnell-projekt").value = typ === "aufgabe" && e.projekt_id ? String(e.projekt_id) : "";
@@ -2749,6 +2753,35 @@
       },
       danach: () => finNachRegelAenderung(),
     },
+
+    // Termin-Kategorien (seit Session 42), Verwaltung im Kalender hinter dem Zahnrad
+    terminkat: {
+      titel: "Kategorie bearbeiten",
+      titelNeu: "Neue Kategorie",
+      finden: (id) => (terminKategorien || []).find((k) => String(k.id) === String(id)),
+      laden: (k) => ({ name: k.name || "", farbe: k.farbe || "blau", geburtstag: k.geburtstag ? "ja" : "nein" }),
+      felder: [
+        { key: "name", label: "Name", typ: "text", pflicht: true, platzhalter: "z. B. Arzt" },
+        { key: "farbe", label: "Farbe", typ: "chips", optionen: () => Object.keys(TERMIN_FARBEN).map((f) => [f, TERMIN_FARB_NAMEN[f]]) },
+        { key: "vorschau", label: "So sieht es aus", typ: "html", html: (w) => terminKatVorschauHtml(w) },
+        { key: "geburtstag", label: "Art", typ: "chips", optionen: [["nein", "Normal"], ["ja", "Geburtstag"]],
+          hinweis: "Geburtstag: Kuchen-Symbol; bei jährlichen Terminen mit Geburtsjahr steht das Alter dabei („wird 40“)." },
+      ],
+      speichern: (id, w) => api("termin_kategorie_speichern", {
+        id, bereich: aktiverBereich, name: w.name, farbe: w.farbe, geburtstag: w.geburtstag === "ja",
+      }),
+      loeschen: (id) => api("termin_kategorie_loeschen", { id }),
+      loeschFrage: (k) => {
+        const n = termine.filter((t) => String(t.kategorie_id) === String(k.id)).length;
+        return `Kategorie „${k.name}“ löschen?` + (n ? ` ${n} ${n === 1 ? "Termin bleibt" : "Termine bleiben"} erhalten, nur ohne Kategorie.` : "");
+      },
+      gespeichert: "Kategorie gespeichert",
+      beimTippen: (w) => {
+        const el = document.getElementById("blatt-f-vorschau");
+        if (el) el.innerHTML = terminKatVorschauHtml(w);
+      },
+      danach: () => { if (aktiverTab === "kalender") renderKalender(); },
+    },
   };
 
   let blatt = null; // { art, id, werte }
@@ -2952,6 +2985,8 @@
   window.schnellSetzen = function(feld, wert) {
     if (feld === "wann" && schnell.erkannt) schnellErkennungAbschalten(false);
     schnell[feld] = wert;
+    // Kategorie Geburtstag gewählt und noch keine Wiederholung → jährlich (seit Session 42)
+    if (feld === "kat" && wert && !schnell.wdh && ((terminKategorien || []).find((k) => String(k.id) === String(wert)) || {}).geburtstag) schnell.wdh = "jaehrlich";
     if (feld === "bereich" && !schnellArtenFuer(wert).some((a) => a.art === schnell.art)) schnell.art = "aufgabe";
     if (feld === "art") {
       if (wert === "termin" && schnell.wann === "ohne") schnell.wann = "heute";
@@ -3167,6 +3202,22 @@
     document.getElementById("schnell-notiz").placeholder = schnell.art === "idee" ? "Beschreibung (optional)"
       : schnell.art === "aufgabe" ? "Notiz zur Aufgabe (optional)" : "Notiz zum Termin (optional)";
 
+    // Termine: Kategorie und Wiederholung (seit Session 42; ohne SQL ausgeblendet)
+    const mitSerie = zeigen && schnell.art === "termin" && terminKategorien !== null;
+    document.getElementById("schnell-kat-zeile").classList.toggle("hidden", !mitSerie);
+    document.getElementById("schnell-wdh-zeile").classList.toggle("hidden", !mitSerie);
+    if (mitSerie) {
+      const kats = terminKategorien.filter((k) => bereichVon(k) === schnell.bereich);
+      if (schnell.kat && !kats.some((k) => String(k.id) === String(schnell.kat))) schnell.kat = "";
+      document.getElementById("schnell-kat").innerHTML = schnellChip("kat", "", "Keine", !schnell.kat) +
+        kats.map((k) => schnellChip("kat", k.id, `${terminMarkeHtml({ kategorie_id: k.id })}${escapeHtml(k.name)}`, String(k.id) === String(schnell.kat))).join("");
+      const gewaehlt = kats.find((k) => String(k.id) === String(schnell.kat));
+      document.getElementById("schnell-kat-hinweis").classList.toggle("hidden", !(gewaehlt && gewaehlt.geburtstag));
+      document.getElementById("schnell-wdh").innerHTML = [["", "Nie"], ["woechentlich", "Wöchentlich"], ["monatlich", "Monatlich"], ["jaehrlich", "Jährlich"]]
+        .map(([w, l]) => schnellChip("wdh", w, l, w === schnell.wdh)).join("");
+      document.getElementById("schnell-wdh-bis-zeile").classList.toggle("hidden", !schnell.wdh);
+    }
+
     // Projekte des gewählten Bereichs
     const select = document.getElementById("schnell-projekt");
     const bisher = select.value;
@@ -3217,6 +3268,14 @@
     const notiz = (zeigeDetails && document.getElementById("schnell-notiz").value.trim()) || null;
     // Verlauf-Eintrag dem Zielbereich zuordnen, nicht dem gerade offenen
     const basis = { bereich, aktiver_bereich: bereich };
+    // Termine: Wiederholung und Kategorie (seit Session 42) – nur mit SQL und offenen Details
+    let serie = {};
+    if (schnell.art === "termin" && zeigeDetails && terminKategorien !== null) {
+      const bis = schnell.wdh ? document.getElementById("schnell-wdh-bis").value || null : null;
+      if (bis && datum && bis < datum) { schnellMeldung("„bis“ liegt vor dem ersten Termin.", true); return; }
+      const katGueltig = terminKategorien.some((k) => String(k.id) === String(schnell.kat) && bereichVon(k) === bereich);
+      serie = { wiederholung: schnell.wdh || null, wiederholung_bis: bis, kategorie_id: katGueltig ? schnell.kat : null };
+    }
 
     const knopf = document.getElementById("schnell-speichern");
     knopf.disabled = true;
@@ -3225,11 +3284,11 @@
       if (bearbeiten && schnell.art === "aufgabe") {
         await api("aufgabe_aktualisieren", { ...basis, id: schnell.id, titel: text, projekt_id, faellig_am: datum, uhrzeit, ende_uhrzeit, erinnere_alle_tage: intervall || null, notiz });
       } else if (bearbeiten && schnell.art === "termin") {
-        await api("termin_aktualisieren", { ...basis, id: schnell.id, titel: text, datum, uhrzeit, ende_uhrzeit, notiz });
+        await api("termin_aktualisieren", { ...basis, id: schnell.id, titel: text, datum, uhrzeit, ende_uhrzeit, notiz, ...serie });
       } else if (schnell.art === "aufgabe") {
         await api("aufgabe_hinzufuegen", { ...basis, titel: text, projekt_id, faellig_am: datum, uhrzeit, ende_uhrzeit, erinnere_alle_tage: intervall || null, ...(notiz ? { notiz } : {}) });
       } else if (schnell.art === "termin") {
-        await api("termin_hinzufuegen", { ...basis, titel: text, datum, uhrzeit, ende_uhrzeit, notiz });
+        await api("termin_hinzufuegen", { ...basis, titel: text, datum, uhrzeit, ende_uhrzeit, notiz, ...serie });
       } else if (schnell.art === "notiz") {
         await api("notiz_hinzufuegen", { ...basis, text, projekt_id });
       } else if (schnell.art === "einkauf") {
@@ -3543,7 +3602,7 @@
       saetze.push(`Überfällig ${ueber.length === 1 ? "ist" : "sind"} ${ueber.length === 1 ? "eine Aufgabe" : ueber.length + " Aufgaben"}: ${sprechListe(namen)}${ueber.length > 3 ? `, und ${ueber.length - 3} weitere` : ""}.`);
     }
     if (!etwas) saetze.push("Heute steht nichts an. Freie Bahn.");
-    const tm = termine.filter((t) => t.datum === morgen && bereichVon(t) === b)
+    const tm = termineVorkommen(termine.filter((t) => bereichVon(t) === b), morgen, morgen)
       .sort((x, y) => (x.uhrzeit || "00").localeCompare(y.uhrzeit || "00"));
     if (tm.length) {
       const t = tm.find((x) => x.uhrzeit) || tm[0];
@@ -3843,6 +3902,7 @@
     projekte = data.projekte || [];
     aufgaben = data.aufgaben || [];
     termine = data.termine || [];
+    terminKategorien = Array.isArray(data.termin_kategorien) ? data.termin_kategorien : null;
     notizen = data.notizen || [];
     links = data.links || [];
     reflexionen = data.reflexionen || [];
@@ -5338,22 +5398,25 @@
   // Sammelt alles, was heute im aktiven Bereich ansteht (ohne Überfälliges), nach Uhrzeit sortiert
   function heuteEintraegeSammeln(heuteIso, offenEnriched) {
     const liste = [];
-    termine
-      .filter((t) => t.datum === heuteIso && !t.uhrzeit && bereichVon(t) === aktiverBereich)
+    // Seit Session 42 inkl. wiederholter Termine (Serie: nicht abhakbar, nicht wischbar)
+    const heuteTermine = termineAmTag(heuteIso);
+    const zusatz = (t) => { const z = terminZusatz(t, heuteIso); return z ? ` · ${z}` : ""; };
+    heuteTermine
+      .filter((t) => !t.uhrzeit)
       .sort((a, b) => a.titel.localeCompare(b.titel))
       .forEach((t) => liste.push({
-        id: t.id, typ: "termin", zeit: "ganzt.", titel: t.titel, meta: "Termin · ganztägig",
-        tab: "kalender", sort: -1, erledigt: !!t.erledigt,
+        id: t.id, typ: "termin", zeit: "ganzt.", titel: t.titel, meta: "Termin · ganztägig" + zusatz(t),
+        tab: "kalender", sort: -1, erledigt: !!t.erledigt, serie: !!t._serie, marke: terminMarkeHtml(t),
       }));
-    termine
-      .filter((t) => t.datum === heuteIso && t.uhrzeit && bereichVon(t) === aktiverBereich)
+    heuteTermine
+      .filter((t) => t.uhrzeit)
       .forEach((t) => {
         const start = t.uhrzeit.slice(0, 5);
         const endeEcht = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0, 5) : null;
         liste.push({
           id: t.id, typ: "termin", zeit: start, start, ende: endeEcht || minutenZuZeit(zeitZuMinuten(start) + 30), endeEcht,
-          titel: t.titel, meta: "Termin" + (endeEcht ? ` bis ${endeEcht}` : ""), tab: "kalender",
-          sort: zeitZuMinuten(start), erledigt: !!t.erledigt,
+          titel: t.titel, meta: "Termin" + (endeEcht ? ` bis ${endeEcht}` : "") + zusatz(t), tab: "kalender",
+          sort: zeitZuMinuten(start), erledigt: !!t.erledigt, serie: !!t._serie, marke: terminMarkeHtml(t),
         });
       });
     offenEnriched
@@ -5574,6 +5637,21 @@
     const klassen = ["heute-zeile"];
     if (laeuftJetzt) klassen.push("jetzt");
     if (e.erledigt) klassen.push("erledigt");
+    // Termin aus einer Serie (seit Session 42): kein Abhaken, kein Wischen –
+    // das würde die ganze Serie treffen. Antippen öffnet die Serie.
+    if (e.serie) {
+      return `
+      <div class="${klassen.join(" ")}">
+        <div class="heute-zeile-vorne">
+        <span class="zl-check" aria-hidden="true" style="border-color:transparent; display:inline-flex; align-items:center; justify-content:center; color:var(--ink-dim);">${ic("serie")}</span>
+        <span class="heute-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
+        <button class="heute-zeile-inhalt" onclick="eintragBearbeiten('${e.typ}','${e.id}')" title="Serie bearbeiten">
+          <span class="heute-zeile-titel">${e.marke || ""}${escapeHtml(e.titel)}</span>
+          <span class="heute-zeile-meta">${escapeHtml(e.meta)}</span>
+        </button>
+        </div>
+      </div>`;
+    }
     const links = heuteWischLinks(e);
     klassen.push("wisch-zeile");
     return `
@@ -5584,7 +5662,7 @@
           title="${e.erledigt ? "Wieder offen" : "Erledigt"}" aria-label="${escapeAttr(e.titel)} ${e.erledigt ? "wieder öffnen" : "als erledigt markieren"}"></button>
         <span class="heute-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
         <button class="heute-zeile-inhalt" onclick="eintragBearbeiten('${e.typ}','${e.id}')" title="${e.typ === "termin" ? "Termin bearbeiten" : "Aufgabe bearbeiten"}">
-          <span class="heute-zeile-titel">${escapeHtml(e.titel)}</span>
+          <span class="heute-zeile-titel">${e.marke || ""}${escapeHtml(e.titel)}</span>
           <span class="heute-zeile-meta">${escapeHtml(e.meta)}</span>
         </button>
         </div>
@@ -5856,9 +5934,151 @@
     return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
   }
 
-  // Liefert die Termine des aktiven Bereichs an einem Tag, nach Uhrzeit sortiert
+  // ==========================================================
+  // Termine wiederholen, Kategorien mit Farbe, Geburtstage (seit Session 42,
+  // To-do 3 + 4 + 5). Ein wiederholter Termin ist EINE Zeile (wiederholung =
+  // woechentlich | monatlich | jaehrlich, optional wiederholung_bis); die
+  // Tage rechnet termineVorkommen() aus – gleiche Regeln wie terminAmTag in
+  // index.ts: monatlich am 31. → letzter Tag kürzerer Monate, jährlich am
+  // 29.2. → in Nicht-Schaltjahren am 28.2. Vorkommen sind Kopien mit datum =
+  // Tag des Vorkommens, _serie = true, _start = erster Termin; sie lassen
+  // sich nicht einzeln abhaken, verschieben oder löschen (Stift = ganze Serie).
+  // ==========================================================
+  // Farben für Streifen und Punkte – alle mit mind. 3:1 gegen helle und
+  // dunkle Flächen aller Bereiche (WCAG 1.4.11), nie als Schriftfarbe
+  const TERMIN_FARBEN = {
+    rot: "#d9414f", orange: "#c96a0a", gelb: "#a67c00", gruen: "#2b9350", tuerkis: "#178f8f",
+    blau: "#3b7be0", lila: "#9a5ad6", pink: "#d6488f", grau: "#7f858e",
+  };
+  const TERMIN_FARB_NAMEN = {
+    rot: "Rot", orange: "Orange", gelb: "Gelb", gruen: "Grün", tuerkis: "Türkis",
+    blau: "Blau", lila: "Lila", pink: "Pink", grau: "Grau",
+  };
+  const TERMIN_WDH = { woechentlich: "wöchentlich", monatlich: "monatlich", jaehrlich: "jährlich" };
+
+  // Tage eines Monats (m = 1–12)
+  function tageImMonat(j, m) {
+    return new Date(Date.UTC(j, m, 0)).getUTCDate();
+  }
+  // ISO-Datum aus Jahr, Monat (1–12), Tag
+  function isoAusTeilen(j, m, t) {
+    return `${String(j).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(t).padStart(2, "0")}`;
+  }
+  // Tage eines wiederholten Termins zwischen von und bis (beide inklusive)
+  function terminSerienTage(t, von, bis) {
+    const tage = [];
+    if (!t.datum || von > bis) return tage;
+    const [, sm, st] = t.datum.split("-").map(Number);
+    if (t.wiederholung === "woechentlich") {
+      const schritte = Math.max(0, Math.ceil(tageSeitIso(t.datum, von) / 7));
+      for (let iso = addTage(t.datum, schritte * 7); iso <= bis; iso = addTage(iso, 7)) tage.push(iso);
+    } else if (t.wiederholung === "monatlich") {
+      let [j, m] = von.split("-").map(Number);
+      for (;;) {
+        const iso = isoAusTeilen(j, m, Math.min(st, tageImMonat(j, m)));
+        if (iso > bis) break;
+        if (iso >= von) tage.push(iso);
+        m++; if (m > 12) { m = 1; j++; }
+      }
+    } else if (t.wiederholung === "jaehrlich") {
+      for (let j = Number(von.slice(0, 4)); ; j++) {
+        const iso = isoAusTeilen(j, sm, Math.min(st, tageImMonat(j, sm)));
+        if (iso > bis) break;
+        if (iso >= von) tage.push(iso);
+      }
+    }
+    return tage;
+  }
+  // Alle Termine (Einzel- und Vorkommen von Serien) zwischen von und bis, sortiert
+  function termineVorkommen(liste, von, bis) {
+    const ergebnis = [];
+    for (const t of liste || []) {
+      if (!t.wiederholung) {
+        if (t.datum >= von && t.datum <= bis) ergebnis.push(t);
+        continue;
+      }
+      if (!t.datum || t.datum > bis) continue;
+      const ende = t.wiederholung_bis && t.wiederholung_bis < bis ? t.wiederholung_bis : bis;
+      const ab = von > t.datum ? von : t.datum;
+      for (const iso of terminSerienTage(t, ab, ende)) {
+        ergebnis.push({ ...t, datum: iso, erledigt: false, _serie: true, _start: t.datum });
+      }
+    }
+    return ergebnis.sort((a, b) => (a.datum + (a.uhrzeit || "99:99")).localeCompare(b.datum + (b.uhrzeit || "99:99")));
+  }
+  // Kategorie eines Termins (oder null)
+  function terminKat(t) {
+    if (!t || !t.kategorie_id || !terminKategorien) return null;
+    return terminKategorien.find((k) => String(k.id) === String(t.kategorie_id)) || null;
+  }
+  // Farbe eines Termins (Hex) oder ""
+  function terminFarbe(t) {
+    const k = terminKat(t);
+    return k ? (TERMIN_FARBEN[k.farbe] || "") : "";
+  }
+  // Alter bei Geburtstagen: nur bei jährlichen Terminen der Kategorie
+  // Geburtstag, deren erstes Datum vor dem Anlegejahr liegt (= mit
+  // Geburtsjahr eingetragen). Sonst null.
+  function terminAlter(t, iso) {
+    const k = terminKat(t);
+    if (!k || !k.geburtstag || t.wiederholung !== "jaehrlich") return null;
+    const start = Number(String(t._start || t.datum || "").slice(0, 4));
+    const angelegt = Number(String(t.erstellt_am || "").slice(0, 4)) || new Date().getFullYear();
+    const alter = Number(String(iso || t.datum).slice(0, 4)) - start;
+    return start && start < angelegt && alter > 0 ? alter : null;
+  }
+  // Farbpunkt (+ Kuchen bei Geburtstagen) vor dem Titel
+  function terminMarkeHtml(t) {
+    const k = terminKat(t);
+    if (!k) return "";
+    const farbe = TERMIN_FARBEN[k.farbe] || "";
+    return `<span aria-hidden="true" style="display:inline-block; width:0.6rem; height:0.6rem; border-radius:50%; background:${farbe}; margin-right:0.35rem; vertical-align:0.05rem;"></span>` +
+      (k.geburtstag ? `<span style="color:${farbe};" aria-hidden="true">${ic("kuchen")}</span> ` : "");
+  }
+  // Kurzer Zusatz: „Geburtstag · wird 40 · jährlich“
+  function terminZusatz(t, iso) {
+    const teile = [];
+    const k = terminKat(t);
+    if (k) teile.push(k.name);
+    const alter = terminAlter(t, iso);
+    if (alter) teile.push(`wird ${alter}`);
+    if (t.wiederholung) teile.push(TERMIN_WDH[t.wiederholung] || "wiederholt");
+    return teile.join(" · ");
+  }
+
+  // Vorschau einer Kategorie im Blatt (Punkt, ggf. Kuchen, Name)
+  function terminKatVorschauHtml(w) {
+    const farbe = TERMIN_FARBEN[w.farbe] || TERMIN_FARBEN.blau;
+    return `<span style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.35rem 0.6rem; border-radius:var(--r-mittel); box-shadow: inset 4px 0 0 ${farbe}; background:var(--bg);">` +
+      `<span aria-hidden="true" style="display:inline-block; width:0.6rem; height:0.6rem; border-radius:50%; background:${farbe};"></span>` +
+      (w.geburtstag === "ja" ? `<span style="color:${farbe};" aria-hidden="true">${ic("kuchen")}</span>` : "") +
+      `<span>${escapeHtml(w.name || "Kategorie")}</span></span>`;
+  }
+
+  // Kategorien des aktiven Bereichs im Kalender hinter dem Zahnrad
+  function renderTerminKategorien() {
+    const el = document.getElementById("termin-kategorien-bereich");
+    if (!el) return;
+    if (terminKategorien === null) {
+      el.innerHTML = `<p class="notiz-meta" style="margin:0 0 1.2rem;">Für Kategorien und wiederholte Termine bitte zuerst <code>termine_wiederholung_kategorien_setup.sql</code> im Supabase SQL Editor ausführen.</p>`;
+      return;
+    }
+    const liste = terminKategorien.filter((k) => bereichVon(k) === aktiverBereich);
+    const zeilen = liste.map((k) => {
+      const n = termine.filter((t) => String(t.kategorie_id) === String(k.id)).length;
+      return `
+        <div class="termin-item" style="box-shadow: inset 4px 0 0 ${TERMIN_FARBEN[k.farbe] || ""}; padding-left:0.7rem;">
+          <span class="termin-titel">${terminMarkeHtml({ kategorie_id: k.id })}${escapeHtml(k.name)}<span class="termin-notiz">${TERMIN_FARB_NAMEN[k.farbe] || ""}${k.geburtstag ? " · Geburtstag" : ""} · ${n} ${n === 1 ? "Termin" : "Termine"}</span></span>
+          <button class="task-snooze" onclick="blattOeffnen('terminkat','${k.id}')" title="Bearbeiten" aria-label="${escapeAttr(k.name)} bearbeiten">${ic("stift")}</button>
+        </div>`;
+    }).join("");
+    el.innerHTML = (zeilen || `<p class="empty-text" style="margin:0 0 0.6rem;">Noch keine Kategorien in diesem Bereich.</p>`) +
+      `<button class="link-btn" onclick="blattNeu('terminkat', { farbe: 'blau' })" style="margin:0.4rem 0 1.4rem;">${ic("plus")}Neue Kategorie</button>`;
+  }
+
+  // Liefert die Termine des aktiven Bereichs an einem Tag (inkl. Serien), nach Uhrzeit sortiert
   function termineAmTag(isoDatum) {
-    return termine.filter((t) => t.datum === isoDatum && bereichVon(t) === aktiverBereich).sort((a,b) => (a.uhrzeit||"99:99").localeCompare(b.uhrzeit||"99:99"));
+    return termineVorkommen(termine.filter((t) => bereichVon(t) === aktiverBereich), isoDatum, isoDatum);
   }
 
   document.getElementById("cal-prev").addEventListener("click", () => {
@@ -5888,27 +6108,31 @@
 
     for (let tag = 1; tag <= anzahlTage; tag++) {
       const iso = dateToISO(new Date(jahr, monat, tag));
-      const anzahl = termineAmTag(iso).length;
+      const amTag = termineAmTag(iso);
+      const anzahl = amTag.length;
+      // Punkt in der Farbe des ersten Termins mit Kategorie (Geburtstage zuerst)
+      const mitKat = amTag.find((t) => (terminKat(t) || {}).geburtstag) || amTag.find((t) => terminFarbe(t));
+      const punktFarbe = mitKat ? terminFarbe(mitKat) : "";
       const classes = ["cal-day"];
       if (iso === heuteIso) classes.push("today");
       if (iso === calAusgewaehlterTag) classes.push("selected");
       html += `<div class="${classes.join(" ")}" onclick="calTagAuswaehlen('${iso}')">
         <span>${tag}</span>
-        ${anzahl > 0 ? '<span class="dot"></span>' : ""}
+        ${anzahl > 0 ? `<span class="dot"${punktFarbe ? ` style="background:${punktFarbe};"` : ""}></span>` : ""}
       </div>`;
     }
     document.getElementById("cal-grid").innerHTML = html;
 
     renderUpcoming();
     renderCalDayPanel();
+    renderTerminKategorien();
   }
 
   // Rendert die nächsten fünf Termine des aktiven Bereichs ab heute
   function renderUpcoming() {
     const heuteIso = dateToISO(new Date());
-    const kommende = termine
-      .filter((t) => t.datum >= heuteIso && bereichVon(t) === aktiverBereich)
-      .sort((a,b) => (a.datum + (a.uhrzeit||"99:99")).localeCompare(b.datum + (b.uhrzeit||"99:99")))
+    // Seit Session 42 mit Serien (bis gut ein Jahr voraus)
+    const kommende = termineVorkommen(termine.filter((t) => bereichVon(t) === aktiverBereich), heuteIso, addTage(heuteIso, 400))
       .slice(0, 5);
 
     if (kommende.length === 0) {
@@ -5918,7 +6142,7 @@
     const html = kommende.map((t) => `
       <div class="upcoming-item">
         <span class="upcoming-datum">${formatDatumKurz(t.datum)}${t.uhrzeit ? " · " + t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
-        <span>${escapeHtml(t.titel)}</span>
+        <span>${terminMarkeHtml(t)}${escapeHtml(t.titel)}${terminAlter(t, t.datum) ? ` <span class="notiz-meta">wird ${terminAlter(t, t.datum)}</span>` : ""}</span>
       </div>`).join("");
     document.getElementById("upcoming-bereich").innerHTML =
       `<div class="project-heading">Nächste Termine</div><div class="upcoming-list">${html}</div>`;
@@ -5971,13 +6195,16 @@
 
     const itemsHtml = liste.length === 0
       ? `<p class="empty-text" style="margin:0 0 0.6rem;">Noch keine Termine an diesem Tag.</p>`
-      : liste.map((t) => `
-          <div class="termin-item">
+      : liste.map((t) => {
+          const farbe = terminFarbe(t);
+          const zusatz = terminZusatz(t, t.datum);
+          return `
+          <div class="termin-item"${farbe ? ` style="box-shadow: inset 4px 0 0 ${farbe}; padding-left:0.7rem;"` : ""}>
             <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
-            <span class="termin-titel">${escapeHtml(t.titel)}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
-            <button class="task-snooze" onclick="terminBearbeitenStart('${t.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
-            <button class="task-delete" onclick="terminLoeschen('${t.id}')" aria-label="Löschen">${ic("x")}</button>
-          </div>`).join("");
+            <span class="termin-titel">${terminMarkeHtml(t)}${escapeHtml(t.titel)}${zusatz ? `<span class="termin-notiz">${t._serie ? ic("serie") + " " : ""}${escapeHtml(zusatz)}</span>` : ""}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
+            <button class="task-snooze" onclick="terminBearbeitenStart('${t.id}')" title="${t._serie ? "Serie bearbeiten" : "Bearbeiten"}" aria-label="${t._serie ? "Serie bearbeiten" : "Bearbeiten"}">${ic("stift")}</button>
+            <button class="task-delete" onclick="terminLoeschen('${t.id}')" aria-label="${t._serie ? "Serie löschen" : "Löschen"}">${ic("x")}</button>
+          </div>`; }).join("");
 
     // Das Formular dient nur noch zum Anlegen – Bearbeiten läuft seit
     // Session 35 über das Blatt (terminBearbeitenStart → eintragBearbeiten)
@@ -6035,6 +6262,8 @@
 
   // Löscht einen Termin und lädt die Daten neu
   window.terminLoeschen = async function(id) {
+    const t = termine.find((x) => String(x.id) === String(id));
+    if (t && t.wiederholung && !confirm(`„${t.titel}“ wiederholt sich ${TERMIN_WDH[t.wiederholung] || ""}. Die ganze Serie löschen?`)) return;
     await api("termin_loeschen", { id });
     await ladeDaten();
     renderKalender();
@@ -6217,10 +6446,11 @@
   function freiBusyBloecke(tagIso, wtIndex) {
     const bloecke = [];
 
-    termine.filter((t) => t.datum === tagIso && t.uhrzeit).forEach((t) => {
+    // Seit Session 42 inkl. Serien; ganztägige Termine (z. B. Geburtstage) blockieren nichts
+    termineVorkommen(termine, tagIso, tagIso).filter((t) => t.uhrzeit).forEach((t) => {
       const start = t.uhrzeit.slice(0,5);
       const ende = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0,5) : minutenZuZeit(zeitZuMinuten(start) + 30);
-      bloecke.push({ start, ende, titel: t.titel, typ: "Termin", id: t.id, erledigt: !!t.erledigt });
+      bloecke.push({ start, ende, titel: t.titel, typ: "Termin", id: t.id, erledigt: !!t.erledigt, serie: !!t._serie });
     });
 
     aufgaben.filter((a) => a.faellig_am === tagIso && a.uhrzeit).forEach((a) => {
@@ -6320,7 +6550,9 @@
           </div>`;
       }
       const istErledigt = e.art === "erledigt";
-      const checkboxHtml = e.typ === "Termin"
+      const checkboxHtml = e.typ === "Termin" && e.serie
+        ? `<span style="width:1.4rem; flex-shrink:0; color:var(--ink-dim);" title="Serie">${ic("serie")}</span>`
+        : e.typ === "Termin"
         ? `<button class="task-check ${istErledigt ? "done" : ""}" onclick="freiTerminUmschalten('${e.id}')" title="Erledigt">${istErledigt ? "✓" : ""}</button>`
         : e.typ === "Aufgabe"
         ? `<button class="task-check ${istErledigt ? "done" : ""}" onclick="freiAufgabeUmschalten('${e.id}')" title="Erledigt">${istErledigt ? "✓" : ""}</button>`
@@ -6331,7 +6563,7 @@
           <span class="frei-zeit">${e.start}–${e.ende}</span>
           <span class="frei-label">${escapeHtml(e.titel)}<span class="frei-typ">${e.typ}</span></span>
           ${e.typ === "Termin" ? `<button class="task-snooze" onclick="freiTerminBearbeitenStart('${e.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>` : ""}
-          ${e.typ === "Termin" ? `<button class="task-delete" onclick="freiTerminEntfernen('${e.id}')" title="Entfernen" aria-label="Entfernen">${ic("x")}</button>` : ""}
+          ${e.typ === "Termin" && !e.serie ? `<button class="task-delete" onclick="freiTerminEntfernen('${e.id}')" title="Entfernen" aria-label="Entfernen">${ic("x")}</button>` : ""}
           ${e.typ === "Aufgabe" ? `<button class="task-snooze" onclick="freiAufgabeBearbeitenStart('${e.id}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>` : ""}
           ${e.typ === "Aufgabe" ? `<button class="task-delete" onclick="freiAufgabeEntfernen('${e.id}')" title="Entfernen" aria-label="Entfernen">${ic("x")}</button>` : ""}
         </div>`;
@@ -10892,6 +11124,9 @@
       Beginn: t.uhrzeit ? t.uhrzeit.slice(0, 5) : "",
       Ende: t.ende_uhrzeit ? t.ende_uhrzeit.slice(0, 5) : "",
       Notiz: t.notiz || "",
+      Wiederholung: t.wiederholung ? TERMIN_WDH[t.wiederholung] : "",
+      "Wiederholen bis": t.wiederholung_bis || "",
+      Kategorie: (terminKat(t) || {}).name || "",
     }));
   }
   // Bereitet Notizen (mit Projektname) als Tabellenzeilen für den Export auf
@@ -11684,9 +11919,7 @@
       ? '<p class="empty-text">Noch keine Ziele für diesen Zeitraum.</p>'
       : zieleHier.map(zielKarteHtml).join("");
 
-    const termineImZeitraum = termine
-      .filter((t) => t.datum >= startIso && t.datum <= endIso)
-      .sort((a, b) => (a.datum + (a.uhrzeit || "99:99")).localeCompare(b.datum + (b.uhrzeit || "99:99")));
+    const termineImZeitraum = termineVorkommen(termine, startIso, endIso);
     const aufgabenImZeitraum = aufgaben
       .filter((a) => !a.erledigt && a.faellig_am && a.faellig_am >= startIso && a.faellig_am <= endIso)
       .map(enrich)
