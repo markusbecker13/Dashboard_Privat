@@ -121,6 +121,7 @@
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
     rezepte: "view-rezepte", ernaehrung: "view-ernaehrung", schluessel: "view-schluessel",
+    bibliothek: "view-bibliothek",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -133,13 +134,19 @@
     ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
-    ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"],
+    ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"], ["bibliothek", "Bibliothek"],
   ];
   // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
   const NUR_PRIVAT_REITER = ["ernaehrung"];
-  const REITER_OHNE_PRIVATE = ALLE_REITER.filter(([k]) => !NUR_PRIVAT_REITER.includes(k));
-  const BEREICH_TABS = { privat: ALLE_REITER, ogs: REITER_OHNE_PRIVATE, awo: REITER_OHNE_PRIVATE, business: REITER_OHNE_PRIVATE, ep: REITER_OHNE_PRIVATE };
+  // Reiter nur für EP (seit Session 50): Bibliothek der Ausbildungsunterlagen
+  const NUR_EP_REITER = ["bibliothek"];
+  const REITER_OHNE_PRIVATE = ALLE_REITER.filter(([k]) => !NUR_PRIVAT_REITER.includes(k) && !NUR_EP_REITER.includes(k));
+  const BEREICH_TABS = {
+    privat: ALLE_REITER.filter(([k]) => !NUR_EP_REITER.includes(k)),
+    ogs: REITER_OHNE_PRIVATE, awo: REITER_OHNE_PRIVATE, business: REITER_OHNE_PRIVATE,
+    ep: ALLE_REITER.filter(([k]) => !NUR_PRIVAT_REITER.includes(k)),
+  };
   const BEREICH_TITEL_VERWALTUNG = { privat: `${ic("haus")} Privat`, ogs: `${ic("schule")} OGS Rapunzel`, awo: `${ic("personen")} AWO OV Liblar`, business: `${ic("tasse")} Business`, ep: `${ic("sonnenaufgang")} Erlebnispädagogik` };
 
   // Vorbelegung, solange in tab_einstellungen noch kein expliziter Eintrag
@@ -153,12 +160,13 @@
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel"],
     business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen"],
     // Erlebnispädagogik (seit Session 49): Methodenkartei + Weiterbildung zogen aus Privat hierher
-    ep: ["heute", "aufgaben", "kalender", "notizen", "links", "methoden", "spiele", "verlauf", "anleitung"],
+    ep: ["heute", "aufgaben", "kalender", "notizen", "links", "bibliothek", "methoden", "spiele", "verlauf", "anleitung"],
   };
 
   // Prüft, ob ein Reiter im Bereich sichtbar ist (Nutzereinstellung, sonst Standardliste; manche nur privat)
   function reiterIstSichtbar(bereich, schluessel) {
     if (NUR_PRIVAT_REITER.includes(schluessel) && bereich !== "privat") return false;
+    if (NUR_EP_REITER.includes(schluessel) && bereich !== "ep") return false;
     const eintrag = tabEinstellungen.find((e) => e.bereich === bereich && e.tab_id === schluessel);
     if (eintrag) return eintrag.sichtbar !== false;
     return (STANDARD_SICHTBAR[bereich] || []).includes(schluessel);
@@ -171,14 +179,14 @@
   function hauptkategorien() {
     // In EP (seit Session 49) stehen Methoden/Weiterbildung, Spiele und
     // Einheiten in der eigenen Gruppe „EP“ statt unter „Sammeln“
-    const epTabs = aktiverBereich === "ep" ? ["methoden", "spiele", "einheiten"] : [];
+    const epTabs = aktiverBereich === "ep" ? ["bibliothek", "methoden", "spiele", "einheiten"] : [];
     const sammeln = ["notizen", "links", "reflexion", "spiele", "methoden", "einheiten", "einkauf", "rezepte", "training", "ernaehrung"]
       .filter((k) => !epTabs.includes(k));
     return [
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
       { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
       { schluessel: "sammeln", label: "Sammeln", tabs: sammeln },
-      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: [...epTabs, "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
+      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: [...new Set([...epTabs, "bibliothek"]), "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
       { schluessel: "verwalten", label: "Verwalten", tabs: ["export", "verlauf", "anleitung"] },
     ];
   }
@@ -523,6 +531,301 @@
       tabWechseln(ersterSichtbarerReiter());
     }
   };
+
+  // ==========================================================
+  // EP-Bibliothek (seit Session 50, Etappe 2 des EP-Ausbaus): Skripte der
+  // Ausbildung als PDF, dazu der erkannte Text je Seite für die Suche.
+  // Daten: ep_skripte, ep_skript_seiten (nur Bereich EP). Geladen wird
+  // erst beim Öffnen des Reiters (Seitentexte sind groß), nicht mit „liste“.
+  // PDF-Upload direkt in den Speicher (Upload-Adresse vom Server), weil
+  // Skripte oft größer als 5 MB sind. Text kommt als „Skript-Paket“
+  // (JSON, typ "ep_skript"), das Claude aus den Scans erzeugt.
+  // ==========================================================
+  const bib = {
+    geladen: false, laedt: false, fehlt: false, fehler: "",
+    skripte: [], seiten: [],
+    status: {},   // je Skript-ID: laufender Upload/Import-Text
+  };
+  const BIB_MAX_BYTES = 50 * 1024 * 1024;
+
+  // Lädt Skripte und Seitentexte (einmal je Sitzung bzw. nach Änderungen)
+  async function bibLaden() {
+    if (bib.laedt) return;
+    bib.laedt = true;
+    bib.fehler = "";
+    if (aktiverTab === "bibliothek") renderBibliothek();
+    try {
+      const r = await api("ep_bibliothek_laden");
+      bib.fehlt = !!r.fehlt;
+      bib.skripte = r.skripte || [];
+      bib.seiten = r.seiten || [];
+      bib.geladen = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") bib.fehler = e.message || "Fehler";
+    } finally {
+      bib.laedt = false;
+    }
+    if (aktiverTab === "bibliothek") renderBibliothek();
+    if (aktiverTab === "heute") renderHeute();
+  }
+
+  function bibSkript(id) { return bib.skripte.find((s) => String(s.id) === String(id)); }
+  function bibSeitenVon(id) { return bib.seiten.filter((x) => String(x.skript_id) === String(id)); }
+  function bibGroesse(bytes) {
+    const n = Number(bytes) || 0;
+    if (!n) return "";
+    return n >= 1048576 ? `${(n / 1048576).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+  }
+  function bibTitel(s) { return (s.nummer !== null && s.nummer !== undefined ? `${s.nummer} · ` : "") + (s.titel || "Ohne Titel"); }
+  function bibSortiert() {
+    return bib.skripte.slice().sort((a, b) => {
+      const na = a.nummer === null || a.nummer === undefined ? 9999 : Number(a.nummer);
+      const nb = b.nummer === null || b.nummer === undefined ? 9999 : Number(b.nummer);
+      return na - nb || String(a.titel).localeCompare(String(b.titel), "de");
+    });
+  }
+
+  // Ausschnitt um den ersten Treffer, Suchwörter hervorgehoben
+  function bibAusschnitt(text, woerter) {
+    const roh = String(text || "").replace(/\s+/g, " ").trim();
+    const norm = suchNorm(roh);
+    let pos = -1;
+    for (const w of woerter) { const p = norm.indexOf(w); if (p >= 0 && (pos < 0 || p < pos)) pos = p; }
+    const start = Math.max(0, pos - 70);
+    let aus = roh.slice(start, start + 220);
+    if (start > 0) aus = "… " + aus;
+    if (start + 220 < roh.length) aus += " …";
+    let html = escapeHtml(aus);
+    // Hervorheben (ohne Umlaut-Toleranz – reicht für die Anzeige)
+    for (const w of woerter) {
+      if (w.length < 2) continue;
+      const muster = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      html = html.replace(new RegExp(`(${muster})`, "gi"), "<mark>$1</mark>");
+    }
+    return html;
+  }
+
+  // Treffer der Suche: [{ skript, seite, html }] – jedes Wort muss auf der Seite vorkommen
+  function bibSuchen(q) {
+    const woerter = suchNorm(q).split(/\s+/).filter((w) => w.length >= 2);
+    if (!woerter.length) return [];
+    const treffer = [];
+    for (const x of bib.seiten) {
+      const norm = suchNorm(x.text);
+      if (woerter.every((w) => norm.includes(w))) {
+        const s = bibSkript(x.skript_id);
+        if (s) treffer.push({ skript: s, seite: x.seite, html: bibAusschnitt(x.text, woerter) });
+      }
+    }
+    // auch Titel, Thema, Notiz der Skripte
+    for (const s of bib.skripte) {
+      const meta = suchNorm([s.titel, s.thema, s.herausgeber, s.notiz].join(" "));
+      if (woerter.every((w) => meta.includes(w)) && !treffer.some((t) => t.skript.id === s.id && !t.seite)) {
+        treffer.unshift({ skript: s, seite: null, html: escapeHtml([s.thema, s.notiz].filter(Boolean).join(" · ") || "Treffer im Titel") });
+      }
+    }
+    return treffer;
+  }
+
+  // Karte eines Skripts
+  function bibKarteHtml(s) {
+    const seiten = bibSeitenVon(s.id);
+    const modul = s.modul_id && (wbModule || []).find((m) => String(m.id) === String(s.modul_id));
+    const meta = [s.herausgeber, s.auflage, s.seiten ? `${s.seiten} Seiten` : "", bibGroesse(s.datei_groesse)].filter(Boolean).map(escapeHtml).join(" · ");
+    const status = bib.status[s.id];
+    const id = escapeAttr(String(s.id));
+    return `
+      <div class="notiz-item spiel-karte bib-karte" id="bib-${id}">
+        <div class="spiel-karte-inhalt">
+          <div class="spiel-titel">${escapeHtml(bibTitel(s))}</div>
+          ${meta ? `<div class="notiz-meta">${meta}</div>` : ""}
+          ${s.thema ? `<div class="notiz-meta">Thema: ${escapeHtml(s.thema)}</div>` : ""}
+          ${modul ? `<div class="notiz-meta">${ic("kalender")} Modul: ${escapeHtml(modul.titel)}</div>` : ""}
+          ${s.notiz ? `<div class="notiz-meta" style="white-space:pre-line;">${escapeHtml(s.notiz)}</div>` : ""}
+          <div class="notiz-meta bib-stand">
+            ${s.datei_pfad ? `${ic("ok-kreis")} PDF${s.datei_name ? ` (${escapeHtml(s.datei_name)})` : ""}` : `${ic("warnung")} noch keine PDF`}
+            · ${seiten.length ? `${ic("ok-kreis")} Text für ${seiten.length} ${seiten.length === 1 ? "Seite" : "Seiten"} (durchsuchbar)` : `${ic("warnung")} noch kein Text`}
+          </div>
+          ${status ? `<div class="notiz-meta" role="status" aria-live="polite"><strong>${escapeHtml(status)}</strong></div>` : ""}
+          <div class="methode-aktionen">
+            ${s.datei_pfad ? `<button type="button" class="btn-primary" onclick="bibOeffnen('${id}')">${ic("export")}Öffnen</button>` : ""}
+            <label class="btn-secondary bib-datei-knopf">${ic("import")}${s.datei_pfad ? "PDF ersetzen" : "PDF hochladen"}
+              <input type="file" accept="application/pdf,.pdf" class="bib-unsichtbar" onchange="bibPdfGewaehlt('${id}', this)"></label>
+            <label class="btn-secondary bib-datei-knopf">${ic("import")}${seiten.length ? "Text erneuern" : "Text importieren"}
+              <input type="file" accept="application/json,.json" class="bib-unsichtbar" onchange="bibPaketGewaehlt(this, '${id}')"></label>
+          </div>
+        </div>
+        <div class="spiel-karte-knoepfe">
+          <button class="task-edit-btn" onclick="blattOeffnen('skript', '${id}')" aria-label="Skript bearbeiten" title="Bearbeiten">${ic("stift")}</button>
+        </div>
+      </div>`;
+  }
+
+  // Zeichnet den Reiter Bibliothek
+  function renderBibliothek() {
+    const el = document.getElementById("bibliothek-inhalt");
+    if (!el) return;
+    if (!bib.geladen && !bib.laedt && !bib.fehler) { bibLaden(); }
+    if (bib.fehlt) {
+      el.innerHTML = `<p class="empty-text">Für die Bibliothek bitte zuerst <code>ep_bibliothek_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+      return;
+    }
+    if (bib.fehler) {
+      el.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(bib.fehler)} <button class="link-btn" onclick="bibNeuLaden()">Nochmal versuchen</button></p>`;
+      return;
+    }
+    if (!bib.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
+    const q = (document.getElementById("bib-suche")?.value || "").trim();
+    const gesamtSeiten = bib.seiten.length;
+    const kopf = `<p class="notiz-meta spiel-stand">${bib.skripte.length} ${bib.skripte.length === 1 ? "Skript" : "Skripte"}${gesamtSeiten ? ` · ${gesamtSeiten} Seiten durchsuchbar` : ""}</p>`;
+    if (q.length >= 2) {
+      const treffer = bibSuchen(q);
+      const gezeigt = treffer.slice(0, 60);
+      el.innerHTML = kopf + (treffer.length
+        ? `<p class="notiz-meta">${treffer.length} ${treffer.length === 1 ? "Treffer" : "Treffer"}${treffer.length > gezeigt.length ? ` – die ersten ${gezeigt.length}` : ""}</p>
+          <div class="notiz-list">${gezeigt.map((t) => `
+            <button type="button" class="such-treffer bib-treffer" onclick="bibOeffnen('${escapeAttr(String(t.skript.id))}'${t.seite ? `, ${Number(t.seite)}` : ""})">
+              <span class="such-titel">${escapeHtml(bibTitel(t.skript))}${t.seite ? ` · S. ${Number(t.seite)}` : ""}</span>
+              <span class="such-auszug">${t.html}</span>
+            </button>`).join("")}</div>
+          <p class="notiz-meta">Antippen öffnet die PDF${gezeigt.some((t) => t.seite) ? " auf der Seite (sofern der PDF-Betrachter das unterstützt)" : ""}.</p>`
+        : `<p class="empty-text">Nichts gefunden zu „${escapeHtml(q)}“.${gesamtSeiten ? "" : " Gesucht wird im importierten Text – noch ist keiner da."}</p>`);
+      return;
+    }
+    el.innerHTML = kopf + (bib.skripte.length
+      ? `<div class="notiz-list">${bibSortiert().map(bibKarteHtml).join("")}</div>`
+      : `<p class="empty-text">Noch keine Skripte. Über „Neues Skript“ anlegen oder ein Skript-Paket (.json) importieren – dann die PDF dazu hochladen.</p>`);
+  }
+
+  window.bibNeuLaden = function() { bib.geladen = false; bib.fehler = ""; bibLaden(); };
+  window.bibSucheGetippt = function() { renderBibliothek(); };
+
+  // Öffnet die PDF, auf Wunsch an einer Seite (#page= verstehen die meisten Browser-Betrachter)
+  window.bibOeffnen = async function(id, seite) {
+    // Fenster sofort öffnen (sonst blockiert der Browser das Pop-up nach dem await)
+    const fenster = window.open("", "_blank");
+    try {
+      const r = await api("ep_skript_datei_url", { id });
+      const url = r.url + (seite ? `#page=${Number(seite)}` : "");
+      if (fenster) { fenster.opener = null; fenster.location.href = url; } else window.open(url, "_blank", "noopener");
+    } catch (e) {
+      if (fenster) fenster.close();
+      if (e.message !== "unauthorized") alert("Konnte nicht geöffnet werden: " + e.message);
+    }
+  };
+
+  function bibStatus(id, text) {
+    if (text) bib.status[id] = text; else delete bib.status[id];
+    if (aktiverTab === "bibliothek") renderBibliothek();
+  }
+
+  // Zählt die Seiten einer PDF grob (/Type /Page ohne s) – nur als Anzeige
+  async function bibPdfSeiten(datei) {
+    try {
+      if (datei.size > BIB_MAX_BYTES) return null;
+      const text = new TextDecoder("latin1").decode(await datei.arrayBuffer());
+      const n = (text.match(/\/Type\s*\/Page(?![s\w])/g) || []).length;
+      return n > 0 && n <= 2000 ? n : null;
+    } catch (_e) { return null; }
+  }
+
+  // PDF hochladen: Upload-Adresse holen → direkt in den Speicher → bestätigen
+  window.bibPdfGewaehlt = async function(id, input) {
+    const datei = input.files && input.files[0];
+    input.value = "";
+    if (!datei) return;
+    const s = bibSkript(id);
+    if (!s) return;
+    if (!/\.pdf$/i.test(datei.name) && datei.type !== "application/pdf") { alert("Bitte eine PDF-Datei wählen."); return; }
+    if (datei.size > BIB_MAX_BYTES) { alert(`Die PDF hat ${bibGroesse(datei.size)} – höchstens 50 MB gehen. Bitte vorher verkleinern.`); return; }
+    const kopf = new Uint8Array(await datei.slice(0, 5).arrayBuffer());
+    if (String.fromCharCode(...kopf) !== "%PDF-") { alert("Die Datei ist keine PDF."); return; }
+    if (s.datei_pfad && !confirm(`Die bisherige PDF von „${s.titel}“ wird ersetzt. Weiter?`)) return;
+    const name = /\.pdf$/i.test(datei.name) ? datei.name : datei.name + ".pdf";
+    try {
+      bibStatus(id, "Bereite Upload vor …");
+      const seiten = await bibPdfSeiten(datei);
+      const { url, pfad } = await api("ep_skript_upload_url", { id, datei_name: name, groesse: datei.size });
+      await new Promise((ok, fehler) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", url);
+        xhr.setRequestHeader("content-type", "application/pdf");
+        xhr.setRequestHeader("x-upsert", "true");
+        xhr.setRequestHeader("cache-control", "3600");
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) bibStatus(id, `Lade hoch … ${Math.round((ev.loaded / ev.total) * 100)} % von ${bibGroesse(datei.size)}`);
+        };
+        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? ok() : fehler(new Error(`Upload abgelehnt (${xhr.status})${xhr.responseText ? ": " + xhr.responseText.slice(0, 160) : ""}`)));
+        xhr.onerror = () => fehler(new Error("Keine Verbindung zum Speicher"));
+        xhr.send(datei);
+      });
+      bibStatus(id, "Prüfe die Datei …");
+      await api("ep_skript_datei_bestaetigen", { id, pfad, datei_name: name, seiten });
+      bibStatus(id, "");
+      hinweisZeigen("PDF gespeichert");
+      bib.geladen = false;
+      await bibLaden();
+    } catch (e) {
+      bibStatus(id, "");
+      if (e.message !== "unauthorized") alert("PDF nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
+
+  // Skript-Paket (JSON von Claude) einlesen und prüfen
+  async function bibPaketLesen(datei) {
+    let p;
+    try { p = JSON.parse(await datei.text()); } catch (_e) { throw new Error("Die Datei ist keine gültige JSON-Datei."); }
+    if (!p || p.typ !== "ep_skript" || !p.skript || !Array.isArray(p.seiten)) {
+      throw new Error("Das ist kein Skript-Paket (erwartet: typ „ep_skript“ mit skript und seiten).");
+    }
+    if (Number(p.version) > 1) throw new Error("Das Paket stammt aus einer neueren Version – bitte erst die App aktualisieren.");
+    return p;
+  }
+
+  // Paket importieren: mit id → Text dieses Skripts erneuern; ohne → Skript anlegen
+  // (bzw. gleichnamiges aktualisieren). Fragen im Paket folgen mit Etappe 3.
+  window.bibPaketGewaehlt = async function(input, id) {
+    const datei = input.files && input.files[0];
+    input.value = "";
+    if (!datei) return;
+    let p;
+    try { p = await bibPaketLesen(datei); } catch (e) { alert(e.message); return; }
+    const titel = String(p.skript.titel || "").trim();
+    let ziel = id ? bibSkript(id) : bib.skripte.find((s) => suchNorm(s.titel) === suchNorm(titel));
+    const anzahlFragen = Array.isArray(p.fragen) ? p.fragen.length : 0;
+    try {
+      if (ziel) {
+        if (id && titel && suchNorm(ziel.titel) !== suchNorm(titel)
+          && !confirm(`Das Paket gehört zu „${titel}“, gewählt ist „${ziel.titel}“. Text trotzdem hier übernehmen?`)) return;
+        const alt = bibSeitenVon(ziel.id).length;
+        if (alt && !confirm(`„${ziel.titel}“ hat schon Text für ${alt} Seiten. Durch ${p.seiten.length} Seiten aus dem Paket ersetzen?`)) return;
+      } else {
+        if (!titel) { alert("Im Paket fehlt der Titel."); return; }
+        if (!confirm(`Neues Skript „${titel}“ mit Text für ${p.seiten.length} Seiten anlegen?`)) return;
+        const r = await api("ep_skript_speichern", {
+          titel, nummer: p.skript.nummer ?? null, herausgeber: p.skript.herausgeber || null,
+          auflage: p.skript.auflage || null, thema: p.skript.thema || null,
+        });
+        ziel = { id: r.id, titel };
+      }
+      bibStatus(ziel.id, "Importiere Text …");
+      const r = await api("ep_skript_seiten_import", { id: ziel.id, seiten: p.seiten });
+      bibStatus(ziel.id, "");
+      hinweisZeigen(`Text für ${r.seiten} Seiten übernommen` + (anzahlFragen ? ` – ${anzahlFragen} Fragen folgen mit dem Lernen` : ""));
+      bib.geladen = false;
+      await bibLaden();
+    } catch (e) {
+      if (ziel) bibStatus(ziel.id, "");
+      if (e.message !== "unauthorized") alert("Import fehlgeschlagen: " + (e.message || "Fehler"));
+    }
+  };
+
+  // Kachel auf dem Start-Screen
+  function bibModulInfo() {
+    if (!bib.geladen) { if (!bib.laedt && !bib.fehler && !bib.fehlt) bibLaden(); return bib.fehlt ? "SQL fehlt" : ""; }
+    const n = bib.skripte.length;
+    return `${n} ${n === 1 ? "Skript" : "Skripte"}` + (bib.seiten.length ? ` · ${bib.seiten.length} Seiten` : "");
+  }
 
   // ==========================================================
   // Einheiten planen (seit Session 37, Etappe 4): Spiele aus der Kartei und
@@ -2815,6 +3118,36 @@
     },
   };
 
+  // Skript der EP-Bibliothek (seit Session 50)
+  BLATT_ARTEN.skript = {
+    titel: "Skript bearbeiten",
+    titelNeu: "Neues Skript",
+    finden: (id) => bibSkript(id),
+    laden: (s) => ({
+      titel: s.titel || "", nummer: s.nummer ?? "", herausgeber: s.herausgeber || "", auflage: s.auflage || "",
+      thema: s.thema || "", modul: s.modul_id || "", notiz: s.notiz || "",
+    }),
+    felder: [
+      { key: "titel", label: "Titel", typ: "text", pflicht: true, platzhalter: "z. B. Komplexe Bau- und Konstruktionsprojekte" },
+      { key: "nummer", label: "Nummer", typ: "zahl", min: 0, halb: true, platzhalter: "z. B. 3" },
+      { key: "auflage", label: "Auflage / Stand", typ: "text", halb: true, platzhalter: "z. B. Juli 2023" },
+      { key: "herausgeber", label: "Herausgeber / Träger", typ: "text", platzhalter: "z. B. Name des Ausbildungsträgers" },
+      { key: "thema", label: "Thema", typ: "text", platzhalter: "z. B. Floßbau, Wassersicherheit" },
+      { key: "modul", label: "Weiterbildungs-Modul", typ: "auswahl",
+        optionen: () => [["", "– ohne –"], ...(wbModule || []).map((m) => [String(m.id), m.titel])],
+        hinweis: "Optional – verknüpft das Skript mit einem Modul aus Methoden → Weiterbildung." },
+      { key: "notiz", label: "Notiz", typ: "text-lang", platzhalter: "optional" },
+    ],
+    speichern: (id, w) => api("ep_skript_speichern", {
+      id, titel: w.titel, nummer: w.nummer === "" ? null : Number(w.nummer), herausgeber: w.herausgeber,
+      auflage: w.auflage, thema: w.thema, modul_id: w.modul || null, notiz: w.notiz,
+    }),
+    loeschen: (id) => api("ep_skript_loeschen", { id }),
+    loeschFrage: (s) => `Skript „${s.titel || ""}“ löschen? Die PDF und der Text werden mit gelöscht.`,
+    gespeichert: "Skript gespeichert",
+    danach: () => { bib.geladen = false; bibLaden(); },
+  };
+
   let blatt = null; // { art, id, werte }
 
   // Öffnet das Bearbeiten-Blatt für einen Eintrag
@@ -5058,6 +5391,7 @@
     if (aktiv === "spiele") renderSpiele();
     if (aktiv === "einheiten") renderEinheiten();
     if (aktiv === "methoden") renderMethoden();
+    if (aktiv === "bibliothek") renderBibliothek();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
     if (aktiv === "schluessel") renderSchluessel();
@@ -5465,7 +5799,8 @@
     verleih: `<svg ${SVG_ATTR}><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>`,
     raumplanung: `<svg ${SVG_ATTR}><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
     schluessel: `<svg ${SVG_ATTR}><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>`,
-    // EP-Block (seit Session 49)
+    // EP-Block (seit Session 49/50)
+    bibliothek: `<svg ${SVG_ATTR}><path d="M4 19V5a2 2 0 012-2h4v18H6a2 2 0 01-2-2z"/><path d="M10 3h4v18h-4z"/><path d="M15 4l4-1 2 17-4 1z"/></svg>`,
     methoden: `<svg ${SVG_ATTR}><path d="M3 20l6-11 4 7 3-4 5 8z"/><circle cx="17" cy="6" r="2"/></svg>`,
     spiele: `<svg ${SVG_ATTR}><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="15" r="1.2"/><circle cx="15" cy="9" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg>`,
     einheiten: `<svg ${SVG_ATTR}><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>`,
@@ -5665,7 +6000,8 @@
       const ueber = offen.filter(ausgabeUeberfaellig).length;
       return `${offen.length} ausgegeben` + (ueber ? ` · ${warn(`${ueber} überfällig`)}` : "");
     }
-    // EP-Block (seit Session 49)
+    // EP-Block (seit Session 49/50)
+    if (tab === "bibliothek") return bibModulInfo();
     if (tab === "methoden") {
       const n = (methoden || []).length;
       const ziel = wbZielUe();
@@ -11628,6 +11964,16 @@
       luecken.push("Eigene Lebensmittel: " + e.message);
     }
 
+    // EP-Bibliothek (seit Session 50): Skripte und Seitentexte, nicht die PDFs
+    meldung("Lade Bibliothek …");
+    try {
+      const r = await api("ep_bibliothek_laden");
+      if (!r.fehlt) { liste.ep_skripte = r.skripte || []; liste.ep_skript_seiten = r.seiten || []; }
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Bibliothek: " + e.message);
+    }
+
     meldung("Lade Einstellungen …");
     let pushEinstellungen = null;
     try {
@@ -11775,9 +12121,11 @@
     { k: "ernaehrung.training_met", t: "training_met", name: "MET-Werte", gruppe: "Ernährung", pk: ["sportart_key"] },
     { k: "ernaehrung.eintraege", t: "ernaehrung_eintraege", name: "Tagebuch-Einträge", gruppe: "Ernährung", ern: true },
     { k: "tab_einstellungen", t: "tab_einstellungen", name: "Reiter-Einstellungen", gruppe: "Sonstiges" },
+    { k: "ep_skripte", t: "ep_skripte", name: "Bibliothek: Skripte (ohne PDFs)", gruppe: "EP" },
+    { k: "ep_skript_seiten", t: "ep_skript_seiten", name: "Bibliothek: Text je Seite", gruppe: "EP" },
     { k: "verlauf", t: "verlauf", name: "Verlauf (letzte 50 je Bereich)", gruppe: "Sonstiges", nurErg: true },
   ];
-  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "Sonstiges"];
+  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Sonstiges"];
 
   // Zustand der Karte (bleibt beim Neuzeichnen von Export erhalten)
   const wh = {
@@ -12116,6 +12464,7 @@
       // 3. Alles neu laden (Ernährung lädt beim nächsten Öffnen neu)
       ernGeladenFuer = null;
       ernProfilGeladen = false;
+      bib.geladen = false;
       meldung("Lade die App-Daten neu …");
       await ladeDaten();
       const probleme = ergebnis.filter((x) => x.warnung).length;
