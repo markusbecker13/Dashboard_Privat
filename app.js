@@ -16703,6 +16703,26 @@
       ${unvollstaendig ? `<p class="notiz-meta" style="margin:0.4rem 0 0;">* nur aus den Einträgen mit Wert (z. B. fehlen sie bei älteren Einträgen oder einzelnen Produkten) – die echte Menge liegt eher höher.</p>` : ""}`;
   }
 
+  // Werte einer Mahlzeit als Zeile unter ihrem Kopf (seit Session 48):
+  // Eiweiß, Fett, Kohlenhydrate, Ballaststoffe, Zucker, ges. Fettsäuren,
+  // Salz und der Anteil an den kcal des Tages. Felder ohne jeden Wert
+  // fallen weg; * = nur aus einem Teil der Einträge (wie in der Tagessumme).
+  function ernMahlzeitWerteHtml(s, tagKcal) {
+    if (!s.anzahl) return "";
+    const teile = [
+      `E ${ernZahl(s.eiweiss)} g`, `F ${ernZahl(s.fett)} g`, `KH ${ernZahl(s.kohlenhydrate)} g`,
+    ];
+    if (s.ballaststoffe > 0) teile.push(`Ballaststoffe ${ernZahl(s.ballaststoffe)} g`);
+    for (const [f, label, stellen] of ERN_ZUSATZ) {
+      const z = s.zusatz[f];
+      if (!z.mit) continue;
+      const stern = z.mit < s.anzahl ? `<sup class="ern-teilweise" title="nur aus ${z.mit} von ${s.anzahl} Einträgen">*</sup>` : "";
+      teile.push(`${label} ${ernZahl(z.summe, stellen)} g${stern}`);
+    }
+    if (tagKcal > 0) teile.push(`${Math.round((s.kcal / tagKcal) * 100)} % des Tages`);
+    return `<p class="notiz-meta ern-mahlzeit-werte" style="margin:0.15rem 0 0.45rem;">${teile.join(" · ")}</p>`;
+  }
+
   // Lädt die Ernährungseinträge, zuletzt verwendete Lebensmittel und Vortag für das gewählte Datum
   async function ernTagLaden() {
     const datum = ernAktDatum();
@@ -16788,6 +16808,7 @@
             ${titel}
             <button class="btn-secondary ern-plus" onclick="ernHinzuOeffnen('${schluessel}')">+ Hinzufügen</button>
           </div>
+          ${ernMahlzeitWerteHtml(summe, s.kcal)}
           ${eintraege.length
             ? `<div class="task-list${zu ? " hidden" : ""}" id="ern-mz-${schluessel}">${eintraege.map(ernEintragHtml).join("")}</div>`
             : ernKopierenHtml(schluessel)}
