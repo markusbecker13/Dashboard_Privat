@@ -852,7 +852,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <p><strong>Bereichsübergreifend:</strong> Der Frei-Tab berücksichtigt Termine aus allen Bereichen, damit OGS-, AWO- und Business-Termine echte Zeit blockieren. Frei/Planung/Finanzen/Reflexion/Einkauf/Rezepte/Ernährung/Export sind standardmäßig nur im Privat-Bereich eingeblendet, Links in Privat und Business.</p>
               <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS, AWO oder Business bleiben grundsätzlich rein lokal im Dashboard.</p>
               <p><strong>Business:</strong> startet mit Start, Aufgaben, Kalender, Notizen, Links, Ideen, Verlauf und Anleitung. Weitere Reiter (z.B. Finanzen, Projekte) lassen sich in der Reiter-Verwaltung einblenden – wie in den anderen Bereichen bereichsgetrennt.</p>
-              <p><strong>EP – Erlebnispädagogik</strong> (seit Session 49): Bereich für die Ausbildung zum Erlebnispädagogen, grüne Farbwelt mit eigenem Logo (Berge und Sonne). Startet mit Start, Aufgaben, Kalender, Notizen, Links, Verlauf und Anleitung, dazu in der Leiste unten der Block <strong>EP</strong> mit <strong>Methoden &amp; Weiterbildung</strong> (zog aus Privat hierher) und <strong>Spiele</strong>; auf dem Start-Screen je eine Kachel mit Stand (z. B. „42 Methoden · 48/120 UE“). <strong>Einheiten</strong> lassen sich per Reiter-Verwaltung dazuschalten – sie sind wie Aufgaben je Bereich getrennt, bisherige Einheiten bleiben in Privat bzw. OGS. Methoden, Weiterbildung und Spiele sind eine gemeinsame Kartei – in EP und anderswo dieselben Einträge. Für Termine gibt es die Kategorie „Ausbildung“ (grün). Geplant: Bibliothek für die Ausbildungsunterlagen und ein Fragenkatalog zum Lernen für die Prüfung.</p>
+              <p><strong>EP – Erlebnispädagogik</strong> (seit Session 49): Bereich für die Ausbildung zum Erlebnispädagogen, grüne Farbwelt mit eigenem Logo (Berge und Sonne). Startet mit Start, Aufgaben, Kalender, Notizen, Links, Verlauf und Anleitung, dazu in der Leiste unten der Block <strong>EP</strong> mit <strong>Methoden &amp; Weiterbildung</strong> (zog aus Privat hierher) und <strong>Spiele</strong>; auf dem Start-Screen je eine Kachel mit Stand (z. B. „42 Methoden · 48/120 UE“). <strong>Einheiten</strong> lassen sich per Reiter-Verwaltung dazuschalten – sie sind wie Aufgaben je Bereich getrennt, bisherige Einheiten bleiben in Privat bzw. OGS. Methoden, Weiterbildung und Spiele sind eine gemeinsame Kartei – in EP und anderswo dieselben Einträge. Für Termine gibt es die Kategorie „Ausbildung“ (grün). Seit Session 50 steht im Block EP zuerst die <strong>Bibliothek</strong> (siehe dort). Geplant: ein Fragenkatalog zum Lernen für die Prüfung.</p>
               <p><strong>Farbwelt je Bereich:</strong> Jeder Bereich hat eigene Farben – Privat Blautöne, OGS Rapunzel Gelb/Blau aus dem Rapunzel-Logo, AWO OV Liblar Rottöne, Business Marineblau/Orange aus dem Markenkit von zwischenkaffeeundchaos, EP Grüntöne. In Privat, OGS, AWO, Business und EP steht oben in der Kopfzeile das jeweilige Logo statt des Dashboard-Namens. Login, Willkommensseite und Verwaltung sind neutral gehalten. So ist auf einen Blick klar, in welchem Bereich du gerade bist. In AWO sind überfällige Einträge orange statt rot markiert, damit sie sich vom AWO-Rot abheben.</p>
               <p><strong>Hell und Dunkel:</strong> im ⋮-Menü unter „Darstellung“ – <em>Auto</em> (Standard, folgt der Einstellung von Handy bzw. PC), <em>Hell</em> oder <em>Dunkel</em>. Gilt pro Gerät. Im Dunkeln hat jeder Bereich eigene, aufgehellte Akzente (Privat Hellblau, OGS Himmelblau mit Rapunzel-Gelb, AWO Hellrot, Business Markenorange), auf farbigen Flächen steht dunkle Schrift. Die Logos oben stehen dann auf einer hellen Plakette. Druck und PDF bleiben immer hell.</p>
               <p><strong>Icons</strong> (seit Session 35): Bedienknöpfe zeigen schlichte Linien-Icons statt Zeichen – Stift zum Bearbeiten, X zum Löschen oder Schließen, Pfeile zum Blättern, drei Punkte fürs Menü, Zahnrad für Einstellungen, Plus vor „Neue …“, Kreispfeil zum Verschieben einer Erinnerung. Auch das ⋮-Menü und das Wetter (oben und im 5-Tage-Ausblick) haben eigene Icons. Sie nehmen die Farbe des Bereichs an und passen zu Hell und Dunkel. Seit dem zweiten Schritt haben auch die Reiter selbst Linien-Icons statt Emojis – z. B. Schlüssel und Key, ausgegeben/im Bestand, Drucken, Mail und PDF bei den Schlüsseln, Kamera, Lupe und Taschenlampe in Ernährung, Kochmodus und Einkaufswagen bei Rezepten, Zustand im Inventar, Pokal für Bestleistungen im Training. In Auswahllisten stehen nur Wörter, dort sind keine Icons möglich. Häkchen ✓, Sterne ★ und die kleinen Pfeile ▸ ▾ bleiben als Schriftzeichen.</p>
@@ -1174,6 +1174,22 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Liste:</strong> geplante Einheiten nach Datum (ohne Datum am Ende), „vorbei“ wenn das Datum verstrichen ist. Einheiten der nächsten Woche stehen auch im Wochenrückblick, und die Suche findet sie</li>
                 <li><strong>Aus der Kartei</strong> (seit Session 38): In Spiele und Methoden steht an jeder Karte „+ Zu Einheit hinzufügen“. Es öffnet die geplanten Einheiten (aktiver Bereich zuerst, andere Bereiche mit Namen, ✓ = schon im Ablauf) – ein Tipp hängt das Spiel mit seiner Dauer hinten an, „Einheit öffnen“ springt hin. „+ Neue Einheit mit diesem Spiel“ legt eine Einheit an, in der das Spiel gleich der erste Baustein ist</li>
                 <li><strong>Datenschutz:</strong> keine Namen von Kindern in Gruppe, Notiz oder Reflexion – Gruppe als „3b“ oder „8–12 J.“</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Bibliothek <span class="anleitung-nur">(nur EP, seit Session 50)</span></summary>
+            <div class="anleitung-text">
+              <p>Die Skripte und Unterlagen der Ausbildung an einer Stelle – als PDF und durchsuchbar bis auf die Seite.</p>
+              <ul>
+                <li><strong>Neues Skript:</strong> Titel (Pflicht), Nummer, Auflage, Herausgeber, Thema, optional das <strong>Weiterbildungs-Modul</strong> (aus Methoden → Weiterbildung) und eine Notiz. Die Liste ist nach Nummer sortiert. Stift am Skript = bearbeiten, unten im Blatt „Löschen“ (PDF und Text werden mit gelöscht)</li>
+                <li><strong>PDF hochladen</strong> am Skript: bis 50 MB je Datei, geht direkt in den privaten Speicher (mit Fortschritt in %). „PDF ersetzen“ tauscht die Datei, die alte wird entfernt. <strong>Öffnen</strong> zeigt die PDF in einem neuen Fenster (Link 10 Minuten gültig)</li>
+                <li><strong>Text:</strong> Eingescannte Skripte enthalten keinen Text. Claude erkennt ihn (OCR), verkleinert die PDF und liefert ein <strong>Skript-Paket</strong> (.json) mit dem Text je Seite – später auch mit den Fragen. Oben „Skript-Paket importieren“ legt das Skript an (bzw. erneuert den Text eines gleichnamigen); am Skript „Text importieren/erneuern“ übernimmt ein Paket genau für dieses Skript</li>
+                <li><strong>Suche:</strong> Feld unter den Knöpfen – findet Wörter auf allen Seiten aller Skripte (ab 2 Zeichen, jedes Wort muss auf der Seite stehen, Umlaute egal). Treffer zeigen Skript, Seite und einen Ausschnitt; antippen öffnet die PDF auf der Seite. Ob der Sprung zur Seite klappt, hängt vom PDF-Betrachter ab (am PC meist ja, am Handy nicht immer)</li>
+                <li><strong>Start-Screen in EP:</strong> Kachel „Bibliothek“ mit Anzahl Skripte und Seiten</li>
+                <li><strong>Backup:</strong> Skripte und Text sind im Komplett-Backup und lassen sich wiederherstellen; die PDFs selbst nicht (wie alle hochgeladenen Dateien)</li>
+                <li><strong>Urheberrecht:</strong> Die Skripte gehören dem Ausbildungsträger. Nur für das eigene Lernen ablegen, nicht weitergeben (Einschätzung, keine Rechtsprüfung)</li>
               </ul>
             </div>
           </details>
@@ -1626,6 +1642,20 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <button class="btn-secondary" onclick="reiterExport('raumplanung', 'word')">Word</button>
         </div>
 
+      </div>
+
+      <div id="view-bibliothek" class="hidden">
+        <h1>Bibliothek <button class="hilfe-icon" data-hilfe="Skripte und Unterlagen der Ausbildung (nur Bereich EP). Je Skript Titel, Nummer, Auflage, Thema und optional das Weiterbildungs-Modul; dazu die PDF und der erkannte Text je Seite. „Neues Skript“ legt ein Skript an, „PDF hochladen“ am Skript lädt die Datei (bis 50 MB) direkt in den privaten Speicher. Den Text bringt ein Skript-Paket (.json), das Claude aus den Scans erzeugt: „Skript-Paket importieren“ legt das Skript an bzw. erneuert den Text eines gleichnamigen. Die Suche findet Wörter auf allen Seiten – ein Treffer öffnet die PDF auf der Seite (sofern der PDF-Betrachter das kann). Stift = bearbeiten oder löschen.">?</button></h1>
+        <p class="hero-text">Skripte der Ausbildung als PDF – durchsuchbar bis auf die Seite.</p>
+        <div class="reiter-aktionen bib-aktionen">
+          <button type="button" class="btn-primary" onclick="blattNeu('skript')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neues Skript</button>
+          <label class="btn-secondary bib-datei-knopf"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-import"></use></svg>Skript-Paket importieren
+            <input type="file" accept="application/json,.json" class="bib-unsichtbar" onchange="bibPaketGewaehlt(this)"></label>
+        </div>
+        <div class="row">
+          <input type="search" id="bib-suche" placeholder="In allen Skripten suchen …" aria-label="In allen Skripten suchen" oninput="bibSucheGetippt()" autocomplete="off">
+        </div>
+        <div id="bibliothek-inhalt"></div>
       </div>
 
       <div id="view-schluessel" class="hidden">
