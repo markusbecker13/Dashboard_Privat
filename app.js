@@ -139,19 +139,21 @@
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
   const NUR_PRIVAT_REITER = ["ernaehrung"];
   const REITER_OHNE_PRIVATE = ALLE_REITER.filter(([k]) => !NUR_PRIVAT_REITER.includes(k));
-  const BEREICH_TABS = { privat: ALLE_REITER, ogs: REITER_OHNE_PRIVATE, awo: REITER_OHNE_PRIVATE, business: REITER_OHNE_PRIVATE };
-  const BEREICH_TITEL_VERWALTUNG = { privat: `${ic("haus")} Privat`, ogs: `${ic("schule")} OGS Rapunzel`, awo: `${ic("personen")} AWO OV Liblar`, business: `${ic("tasse")} Business` };
+  const BEREICH_TABS = { privat: ALLE_REITER, ogs: REITER_OHNE_PRIVATE, awo: REITER_OHNE_PRIVATE, business: REITER_OHNE_PRIVATE, ep: REITER_OHNE_PRIVATE };
+  const BEREICH_TITEL_VERWALTUNG = { privat: `${ic("haus")} Privat`, ogs: `${ic("schule")} OGS Rapunzel`, awo: `${ic("personen")} AWO OV Liblar`, business: `${ic("tasse")} Business`, ep: `${ic("sonnenaufgang")} Erlebnispädagogik` };
 
   // Vorbelegung, solange in tab_einstellungen noch kein expliziter Eintrag
   // existiert – entspricht dem bisherigen Standardverhalten, damit sich
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "methoden", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung"],
+      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel"],
     business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen"],
+    // Erlebnispädagogik (seit Session 49): Methodenkartei + Weiterbildung zogen aus Privat hierher
+    ep: ["heute", "aufgaben", "kalender", "notizen", "links", "methoden", "spiele", "verlauf", "anleitung"],
   };
 
   // Prüft, ob ein Reiter im Bereich sichtbar ist (Nutzereinstellung, sonst Standardliste; manche nur privat)
@@ -167,11 +169,16 @@
   // aktiven Bereichs.
 
   function hauptkategorien() {
+    // In EP (seit Session 49) stehen Methoden/Weiterbildung, Spiele und
+    // Einheiten in der eigenen Gruppe „EP“ statt unter „Sammeln“
+    const epTabs = aktiverBereich === "ep" ? ["methoden", "spiele", "einheiten"] : [];
+    const sammeln = ["notizen", "links", "reflexion", "spiele", "methoden", "einheiten", "einkauf", "rezepte", "training", "ernaehrung"]
+      .filter((k) => !epTabs.includes(k));
     return [
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
       { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
-      { schluessel: "sammeln", label: "Sammeln", tabs: ["notizen", "links", "reflexion", "spiele", "methoden", "einheiten", "einkauf", "rezepte", "training", "ernaehrung"] },
-      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: ["ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
+      { schluessel: "sammeln", label: "Sammeln", tabs: sammeln },
+      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: [...epTabs, "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
       { schluessel: "verwalten", label: "Verwalten", tabs: ["export", "verlauf", "anleitung"] },
     ];
   }
@@ -228,13 +235,14 @@
   // und ggf. das Bereichs-Logo in der Kopfzeile. Neues Logo = Datei
   // unter icons/ ablegen und hier eintragen.
   // ==========================================================
-  const BEREICH_FARBWELT = ["privat", "ogs", "awo", "business"];
-  const BEREICH_THEME_FARBE = { neutral: "#1b1b1b", privat: "#10233f", ogs: "#1e3a5c", awo: "#3b1215", business: "#1e3a5f" };
+  const BEREICH_FARBWELT = ["privat", "ogs", "awo", "business", "ep"];
+  const BEREICH_THEME_FARBE = { neutral: "#1b1b1b", privat: "#10233f", ogs: "#1e3a5c", awo: "#3b1215", business: "#1e3a5f", ep: "#13301f" };
   const BEREICH_LOGO = {
     privat: { src: "icons/privat.png", alt: "Privat" },
     ogs: { src: "icons/rapunzel.png", alt: "Rapunzel Kinderhaus e.V." },
     awo: { src: "icons/awo-liblar.png", alt: "AWO Ortsverein Liblar-Köttingen e.V." },
     business: { src: "icons/zwischenkaffeeundchaos-herz.png", alt: "zwischenkaffeeundchaos" },
+    ep: { src: "icons/ep.png", alt: "Erlebnispädagogik" },
   };
 
   // Setzt Farbwelt, Statusleisten-Farbe und Logo/Namen in der Kopfzeile passend zum Bereich
@@ -363,7 +371,7 @@
     arbeit: `<svg ${SVG_ATTR}><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>`,
     verwalten: `<svg ${SVG_ATTR}><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>`,
   };
-  const BEREICH_KNOPF_TEXT = { privat: "Privat", ogs: "OGS", awo: "AWO", business: "Business", verwaltung: "Verwaltung" };
+  const BEREICH_KNOPF_TEXT = { privat: "Privat", ogs: "OGS", awo: "AWO", business: "Business", ep: "EP", verwaltung: "Verwaltung" };
 
   // Liefert die Themengruppen, die im aktiven Bereich mindestens einen sichtbaren Reiter haben
   function sichtbareGruppen() {
@@ -394,17 +402,18 @@
   };
 
   // ==========================================================
-  // Bereichsumschalter oben links (seit Session 34): vier Punkte in den
+  // Bereichsumschalter oben links (seit Session 34): fünf Punkte (seit Session 49 mit EP) in den
   // Bereichsfarben, der aktive Bereich ist beschriftet. Ein Tipp wechselt
   // direkt den Bereich – ohne Umweg über die Willkommensseite. Die Farben
   // sind fest (nicht aus der Farbwelt), damit jeder Punkt in jedem Bereich
-  // gleich aussieht. Weiße Schrift auf allen vier Farben: Kontrast 5,1–5,9:1.
+  // gleich aussieht. Weiße Schrift auf allen Farben: Kontrast 5,1–6,5:1.
   // ==========================================================
   const BEREICH_UMSCHALTER = [
     { bereich: "privat", name: "Privat", lang: "Privat", farbe: "#2a5bd7", ring: "#2a5bd7" },
     { bereich: "ogs", name: "OGS", lang: "OGS Rapunzel", farbe: "#1872b8", ring: "#ffcc00" },
     { bereich: "awo", name: "AWO", lang: "AWO OV Liblar", farbe: "#c8102e", ring: "#c8102e" },
     { bereich: "business", name: "Business", lang: "Business (zwischenkaffeeundchaos)", farbe: "#c2410c", ring: "#c2410c" },
+    { bereich: "ep", name: "EP", lang: "Erlebnispädagogik", farbe: "#2d6a43", ring: "#2d6a43" },
   ];
 
   // Zeichnet den Bereichsumschalter in der Kopfzeile neu (aktiver Bereich mit Namen)
@@ -3436,6 +3445,7 @@
     ["ogs", "ogs|rapunzel|kinderhaus"],
     ["awo", "awo|ortsverein|liblar"],
     ["business", "business|zwischen\\s*kaffee\\s*und\\s*chaos"],
+    ["ep", "erlebnisp(?:ä|ae)dagogik"],
     ["privat", "privat"],
   ];
 
@@ -4391,7 +4401,7 @@
     // erst der aktuelle, sonst Privat, Business, OGS, AWO. Ist er
     // nirgends an, trotzdem Privat (Reiter öffnet sich, nur ohne Chip).
     if (aktiverBereich === "verwaltung" || !reiterIstSichtbar(aktiverBereich, "rezepte")) {
-      const ziel = ["privat", "business", "ogs", "awo"].find((b) => reiterIstSichtbar(b, "rezepte")) || "privat";
+      const ziel = ["privat", "business", "ogs", "awo", "ep"].find((b) => reiterIstSichtbar(b, "rezepte")) || "privat";
       window.bereichAuswaehlen(ziel);
     }
     tabWechseln("rezepte");
@@ -5007,7 +5017,7 @@
     return training.filter((t) => bereichVon(t) === aktiverBereich);
   }
 
-  const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar", business: "Business" };
+  const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar", business: "Business", ep: "EP" };
 
   // Aktualisiert Navigation sowie Titel und Untertitel des Ideen-Reiters für den aktiven Bereich
   function bereichAnwenden() {
@@ -5400,6 +5410,20 @@
       { text: "Ich kann freilich nicht sagen, ob es besser werden wird, wenn es anders wird; aber so viel kann ich sagen, es muß anders werden, wenn es gut werden soll.", autor: "Georg Christoph Lichtenberg", quelle: "Sudelbücher" },
       { text: "Die Neigung der Menschen, kleine Dinge für wichtig zu halten, hat sehr viel Großes hervorgebracht.", autor: "Georg Christoph Lichtenberg", quelle: "Sudelbücher" },
     ],
+    // Erlebnispädagogik (seit Session 49): Lernen durch Tun, Natur, Wagnis
+    ep: [
+      { text: "Was wir lernen müssen, um es zu tun, das lernen wir, indem wir es tun.", autor: "Aristoteles", quelle: "Nikomachische Ethik II,1 (eigene Übersetzung)" },
+      { text: "Grau, teurer Freund, ist alle Theorie, und grün des Lebens goldner Baum.", autor: "Johann Wolfgang von Goethe", quelle: "Faust I, Studierzimmer" },
+      { text: "Es ist nicht genug, zu wissen, man muß auch anwenden; es ist nicht genug, zu wollen, man muß auch tun.", autor: "Johann Wolfgang von Goethe", quelle: "Wilhelm Meisters Wanderjahre" },
+      { text: "Lang ist der Weg durch Lehren, kurz und wirksam durch Beispiele.", autor: "Seneca", quelle: "Briefe an Lucilius 6,5 (eigene Übersetzung)" },
+      { text: "Nicht weil es schwer ist, wagen wir es nicht, sondern weil wir es nicht wagen, ist es schwer.", autor: "Seneca", quelle: "Briefe an Lucilius 104,26 (eigene Übersetzung)" },
+      { text: "Unsere ersten Lehrer der Philosophie sind unsere Füße, unsere Hände, unsere Augen.", autor: "Jean-Jacques Rousseau", quelle: "Emile, Buch II (eigene Übersetzung)" },
+      { text: "Das Leben bildet.", autor: "Johann Heinrich Pestalozzi", quelle: "Schwanengesang (1826)" },
+      { text: "Alles fließe von selbst, Gewalt sei ferne den Dingen.", autor: "Johann Amos Comenius", quelle: "Orbis sensualium pictus, Leitspruch (eigene Übersetzung)" },
+      { text: "Wanderer, es gibt keinen Weg, der Weg entsteht beim Gehen.", autor: "Antonio Machado", quelle: "Proverbios y cantares XXIX (eigene Übersetzung)" },
+      { text: "Ich ging in die Wälder, weil ich bewusst leben wollte.", autor: "Henry David Thoreau", quelle: "Walden, Kapitel 2 (eigene Übersetzung)" },
+      { text: "Die Berge rufen, und ich muss gehen.", autor: "John Muir", quelle: "Brief an Sarah Muir, 1873 (eigene Übersetzung)" },
+    ],
   };
 
   // Wählt das Zitat des Tages für einen Bereich anhand des Kalendertags
@@ -5441,6 +5465,10 @@
     verleih: `<svg ${SVG_ATTR}><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>`,
     raumplanung: `<svg ${SVG_ATTR}><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
     schluessel: `<svg ${SVG_ATTR}><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>`,
+    // EP-Block (seit Session 49)
+    methoden: `<svg ${SVG_ATTR}><path d="M3 20l6-11 4 7 3-4 5 8z"/><circle cx="17" cy="6" r="2"/></svg>`,
+    spiele: `<svg ${SVG_ATTR}><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="15" r="1.2"/><circle cx="15" cy="9" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg>`,
+    einheiten: `<svg ${SVG_ATTR}><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>`,
   };
 
   // Minuten als kurzer Text: „40 Min.“, „2 Std.“, „2 Std. 15 Min.“
@@ -5601,7 +5629,7 @@
       </button>`;
   }
 
-  // Kurzer Stand je Modul des Bereichsblocks (Ideen, Inventar, Projekte, Verleih, Raumplanung, Schlüssel)
+  // Kurzer Stand je Modul des Bereichsblocks (Ideen, Inventar, Projekte, Verleih, Raumplanung, Schlüssel; EP: Methoden, Spiele, Einheiten)
   function heuteModulInfo(tab, heuteIso) {
     const warn = (t) => `<span class="heute-warn">${t}</span>`;
     if (tab === "ogsideen") {
@@ -5636,6 +5664,21 @@
       const offen = ausgabenAktuell().filter((a) => !a.zurueck_am);
       const ueber = offen.filter(ausgabeUeberfaellig).length;
       return `${offen.length} ausgegeben` + (ueber ? ` · ${warn(`${ueber} überfällig`)}` : "");
+    }
+    // EP-Block (seit Session 49)
+    if (tab === "methoden") {
+      const n = (methoden || []).length;
+      const ziel = wbZielUe();
+      const s = wbSummen();
+      return `${n} ${n === 1 ? "Methode" : "Methoden"}` + (ziel ? ` · ${wbZahl(s.besucht + s.bescheinigt)}/${wbZahl(ziel)} UE` : "");
+    }
+    if (tab === "spiele") {
+      const n = (spiele || []).length;
+      return `${n} ${n === 1 ? "Spiel" : "Spiele"}`;
+    }
+    if (tab === "einheiten") {
+      const n = einheitenAktuell().filter((e) => e.status !== "durchgefuehrt").length;
+      return n ? `${n} geplant` : "keine geplant";
     }
     return "";
   }
