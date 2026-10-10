@@ -1872,3 +1872,38 @@
 .zu-einheit-neu { margin-top: 0.8rem; min-height: 44px; display: inline-flex; align-items: center; gap: 0.35rem; }
 #zu-einheit-status .link-knopf { font-weight: 600; }
 #zu-einheit-status .ic { vertical-align: -0.18em; color: var(--ok-text); }
+
+  /* ==========================================================
+     Bereich EP – Erlebnispädagogik (seit Session 49): Grüntöne.
+     Kontraste (WCAG) hell: Weiß auf Akzent 6,5:1, Akzent auf --bg 5,7:1,
+     --ink-dim auf --bg 5,9:1. Dunkel: dunkle Schrift auf Akzent 10:1,
+     Akzent auf --panel 8,5:1, --ink-dim auf --panel 7:1.
+     ========================================================== */
+  :root[data-bereich="ep"] {
+    --bg: #eef3ee; --ink: #13301f; --ink-dim: #3f6450;
+    --accent: #2d6a43; --accent-2: #f2c94c; --border: #cfe0d2;
+    --akzent-flaeche: #b5d8bf; --nav-bg: #13301f; --nav-ink: #eaf3ec;
+    --reminder-bg: #dcefe1;
+  }
+  :root[data-schema="dunkel"][data-bereich="ep"] {
+    --bg: #121a16; --panel: #1b2620; --ink: #e5ede8; --ink-dim: #9db3a5;
+    --accent: #7fd09a; --accent-2: #f2c94c; --border: #2c3d33;
+    --akzent-flaeche: #2f4a39; --nav-bg: #23332a; --nav-ink: #e5ede8;
+    --reminder-bg: #20362a;
+  }
+  .bereich-karte--ep { background: #13301f; color: #eaf3ec; }
+
+  /* Fünf Bereiche im Umschalter (seit Session 49): auf schmalen Handys
+     enger, damit Umschalter, Logo, Lupe und ⋮ ab 360 px in eine Zeile passen */
+  @media (max-width: 420px) {
+    .content-topbar { gap: 0.3rem; }
+    .bu-knopf { min-width: 2rem; }
+    .bu-knopf.aktiv { padding: 0 0.6rem 0 0.5rem; gap: 0.35rem; }
+    .content-topbar .topbar-logo { min-width: 1.75rem; }
+  }
+  @media (max-width: 380px) {
+    .content-topbar { gap: 0.2rem; }
+    .bu-knopf { min-width: 1.75rem; }
+    .bu-knopf.aktiv { padding: 0 0.5rem 0 0.45rem; font-size: 0.8rem; }
+    .bereich-umschalter { padding: 0.15rem; }
+  }
