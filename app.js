@@ -4188,8 +4188,12 @@
     const uhrzeit = document.getElementById("aufgabe-uhrzeit").value || null;
     const ende_uhrzeit = document.getElementById("aufgabe-ende").value || null;
     const erinnere_alle_tage = document.getElementById("aufgabe-intervall").value || null;
+    // Notiz (seit Session 47 auch hier; Spalte seit Session 41)
+    const notizFeld = document.getElementById("aufgabe-notiz");
+    const notiz = notizFeld ? notizFeld.value.trim() : "";
 
-    await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am, uhrzeit, ende_uhrzeit, erinnere_alle_tage, bereich: aktiverBereich });
+    await api("aufgabe_hinzufuegen", { titel, projekt_id, faellig_am, uhrzeit, ende_uhrzeit, erinnere_alle_tage, bereich: aktiverBereich, ...(notiz ? { notiz } : {}) });
+    if (notizFeld) notizFeld.value = "";
     document.getElementById("neue-aufgabe").value = "";
     document.getElementById("aufgabe-faellig").value = "";
     document.getElementById("aufgabe-uhrzeit").value = "";
@@ -4707,6 +4711,7 @@
         <label class="push-schalter"><input type="checkbox" id="push-morgens"${e.morgens_an ? " checked" : ""}> Morgen-Übersicht um
           <input type="time" id="push-morgens-zeit" value="${escapeAttr(String(e.morgens_uhrzeit || "07:00").slice(0, 5))}" aria-label="Uhrzeit der Morgen-Übersicht"></label>
         <p class="notiz-meta push-erklaerung">Termine, fällige Aufgaben, Einheiten und Weiterbildung des Tages – an leeren Tagen kommt nichts.</p>
+        ${pushGeburtstagHtml(e, chips)}
         <label class="push-schalter"><input type="checkbox" id="push-termine"${e.termine_an ? " checked" : ""}> Vor Terminen und Aufgaben mit Uhrzeit</label>
         <div class="schnell-chips push-chips" role="group" aria-label="Vorlauf">${chips("vorlauf", PUSH_VORLAUF.map(([w, t]) => [String(w), t]), (w) => Number(w) === Number(e.vorlauf_min))}</div>
         <div class="schnell-label push-label">Bereiche</div>
@@ -4729,6 +4734,8 @@
       push.einst.morgens_an = document.getElementById("push-morgens").checked;
       push.einst.morgens_uhrzeit = document.getElementById("push-morgens-zeit").value || "07:00";
       push.einst.termine_an = document.getElementById("push-termine").checked;
+      const gebAn = document.getElementById("push-geburtstage");
+      if (gebAn) push.einst.geburtstage_an = gebAn.checked;
       const ruheAn = document.getElementById("push-ruhe-an");
       if (ruheAn) {
         push.einst.ruhe_an = ruheAn.checked;
@@ -4737,12 +4744,36 @@
       }
     };
     ["push-morgens", "push-morgens-zeit", "push-termine"].forEach((id) => document.getElementById(id).addEventListener("change", merk));
+    // Geburtstage: Erklärung hängt an Morgen-Übersicht und Schalter
+    ["push-geburtstage", "push-morgens", "push-morgens-zeit"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("change", () => { merk(); pushRendern(); });
+    });
     // Ruhezeit: Änderung sofort zeigen (Hinweise, Felder an/aus)
     ["push-ruhe-an", "push-ruhe-von", "push-ruhe-bis"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", () => { merk(); pushRendern(); });
     });
     vorlesenEinstBinden();
+  }
+
+  // ---- Geburtstage (seit Session 47) ----
+  const PUSH_GEB_VORLAUF = [[0, "Nur am Tag"], [1, "1 Tag vorher"], [3, "3 Tage"], [7, "1 Woche"], [14, "2 Wochen"]];
+  // Block „Geburtstage“ im Blatt Benachrichtigungen (ohne SQL: Hinweis)
+  function pushGeburtstagHtml(e, chips) {
+    if (!Object.prototype.hasOwnProperty.call(e, "geburtstage_an")) {
+      return `<p class="notiz-meta push-erklaerung push-geb-fehlt">Für Geburtstags-Erinnerungen bitte zuerst <code>geburtstag_erinnerung_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    const v = Number(e.geburtstage_vorlauf);
+    const vorlauf = PUSH_GEB_VORLAUF.some(([w]) => w === v) || v === 2 ? v : 3;
+    const zeit = String(e.morgens_uhrzeit || "07:00").slice(0, 5);
+    const wann = vorlauf === 0 ? "am Tag selbst" : `am Tag selbst und ${vorlauf === 1 ? "1 Tag" : vorlauf === 7 ? "1 Woche" : vorlauf === 14 ? "2 Wochen" : vorlauf + " Tage"} vorher`;
+    const wie = e.morgens_an ? "mit der Morgen-Übersicht" : `um ${zeit} als eigene Nachricht`;
+    return `<label class="push-schalter"><input type="checkbox" id="push-geburtstage"${e.geburtstage_an ? " checked" : ""}> Geburtstage</label>
+      ${e.geburtstage_an ? `<div class="schnell-chips push-chips" role="group" aria-label="Geburtstage vorher">${chips("gebvorlauf", PUSH_GEB_VORLAUF.map(([w, t]) => [String(w), t]), (w) => Number(w) === vorlauf)}</div>` : ""}
+      <p class="notiz-meta push-erklaerung">${e.geburtstage_an
+        ? `Kommt ${escapeHtml(wann)}, ${escapeHtml(wie)}. Zählt Termine der Kategorien mit der Art „Geburtstag“ (Kalender → Zahnrad).`
+        : "Aus – Geburtstage stehen dann nur als Termin in der Morgen-Übersicht."}</p>`;
   }
 
   // ---- Ruhezeit (seit Session 38) ----
@@ -4792,6 +4823,7 @@
     if (!e) return;
     if (name === "ruhe") e.ruhe_nachholen = wert === "nachholen";
     if (name === "vorlauf") e.vorlauf_min = Number(wert);
+    if (name === "gebvorlauf") e.geburtstage_vorlauf = Number(wert);
     if (name === "titel") e.ohne_titel = wert === "ohne";
     if (name === "bereich") {
       const b = new Set(Array.isArray(e.bereiche) ? e.bereiche : []);
@@ -4816,6 +4848,9 @@
         // Ruhezeit nur, wenn der Server sie kennt (SQL eingespielt)
         ...(mitRuhe ? { ruhe_an: !!e.ruhe_an, ruhe_von: String(e.ruhe_von || "22:00").slice(0, 5),
           ruhe_bis: String(e.ruhe_bis || "07:00").slice(0, 5), ruhe_nachholen: e.ruhe_nachholen !== false } : {}),
+        // Geburtstage (seit Session 47) nur, wenn der Server sie kennt
+        ...(Object.prototype.hasOwnProperty.call(e, "geburtstage_an")
+          ? { geburtstage_an: !!e.geburtstage_an, geburtstage_vorlauf: Number(e.geburtstage_vorlauf ?? 3) } : {}),
       });
       push.meldung = "Gespeichert.";
     } catch (err) {
