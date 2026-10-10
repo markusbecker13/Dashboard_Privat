@@ -1907,3 +1907,17 @@
     .bu-knopf.aktiv { padding: 0 0.5rem 0 0.45rem; font-size: 0.8rem; }
     .bereich-umschalter { padding: 0.15rem; }
   }
+
+  /* ==========================================================
+     EP-Bibliothek (seit Session 50)
+     ========================================================== */
+  .bib-aktionen { flex-wrap: wrap; }
+  .bib-aktionen .btn-primary, .bib-datei-knopf { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 44px; cursor: pointer; }
+  .bib-unsichtbar { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+  .bib-datei-knopf:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+  #bib-suche { flex: 1 1 100%; min-height: 44px; }
+  .bib-karte .methode-aktionen .btn-primary { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 40px; padding: 0.45rem 0.85rem; }
+  .bib-karte .methode-aktionen .btn-secondary { min-height: 40px; padding: 0.45rem 0.75rem; font-size: 0.82rem; gap: 0.3rem; }
+  .bib-stand { margin-top: 0.35rem; }
+  .bib-stand .ic { vertical-align: -0.18em; }
+  .bib-treffer { border: 1px solid var(--border); border-radius: var(--r-mittel); padding: 0.6rem 0.75rem; background: var(--panel); }
