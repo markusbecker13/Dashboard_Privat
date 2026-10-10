@@ -11445,7 +11445,8 @@
   // MET-Werte, eigene Lebensmittel), Unterschriften der Schlüssel-
   // protokolle und die Push-Einstellungen. Bewusst nicht enthalten:
   // Login-Sessions, Google-Zugang, Push-Schlüssel, BLS-Lebensmittel,
-  // hochgeladene Dateien (nur ihre Liste). Wiederherstellen kommt später.
+  // hochgeladene Dateien (nur ihre Liste). Wiederherstellen: siehe unten
+  // (seit Session 46).
   // ==========================================================
   const BACKUP_ZULETZT = "backup-zuletzt";
   const BACKUP_ERN_AB = "2020-01-01"; // frühestes Datum für Ernährungseinträge
@@ -11504,9 +11505,100 @@
     return ergebnis;
   }
 
-  // Sammelt alle Daten und lädt die JSON-Datei herunter
+  // Sammelt alle Daten und lädt die JSON-Datei herunter. Ohne Rückfrage
+  // (die stellt der Aufrufer). dateiZusatz z. B. "-vor-wiederherstellen".
+  // Gibt { datei, luecken, zeilen } zurück, wirft bei einem Fehler.
+  async function backupErstellen(meldung, dateiZusatz = "") {
+    const luecken = []; // was nicht gesichert werden konnte
+    meldung("Lade alle Tabellen …");
+    const liste = await api("liste");
+    delete liste.mail_eingerichtet; // nur ein Schalter, keine Daten
+
+    meldung("Lade Schlüsselprotokolle …");
+    try {
+      liste.schluessel_ausgaben = await backupAusgabenMitUnterschrift(liste.schluessel_ausgaben, meldung);
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Unterschriften der Schlüsselprotokolle: " + e.message);
+    }
+
+    meldung("Lade Ernährung …");
+    const ernaehrung = {};
+    try {
+      const p = await api("ernaehrung_profil");
+      Object.assign(ernaehrung, {
+        profil: p.profil || null, ziel_versionen: p.versionen ?? null,
+        schritte: p.schritte ?? null, training_met: p.met || [],
+      });
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Ernährungsprofil: " + e.message);
+    }
+    try {
+      const { eintraege, gewichte } = await backupErnaehrungEintraege();
+      ernaehrung.eintraege = eintraege;
+      ernaehrung.koerpergewicht = gewichte;
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Ernährungseinträge und Gewicht: " + e.message);
+    }
+    try {
+      const res = await api("lebensmittel_eigene");
+      ernaehrung.eigene_lebensmittel = res.lebensmittel || [];
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Eigene Lebensmittel: " + e.message);
+    }
+
+    meldung("Lade Einstellungen …");
+    let pushEinstellungen = null;
+    try {
+      const r = await api("push_status", { origin: location.origin, endpoint: null });
+      pushEinstellungen = r.fehlt ? null : (r.einstellungen || null);
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Push-Einstellungen: " + e.message);
+    }
+
+    // Anzahl je Tabelle für den schnellen Überblick
+    const anzahl = {};
+    Object.entries(liste).forEach(([k, v]) => { if (Array.isArray(v)) anzahl[k] = v.length; });
+    Object.entries(ernaehrung).forEach(([k, v]) => { if (Array.isArray(v)) anzahl["ernaehrung." + k] = v.length; });
+
+    const jetzt = new Date();
+    const backup = {
+      typ: "dashboard_backup",
+      // version 2 (seit Session 46): Ernährungseinträge zusätzlich mit
+      // lebensmittel_id und erstellt_am – sonst gleich wie version 1
+      version: 2,
+      erstellt_am: jetzt.toISOString(),
+      erstellt_lokal: `${heuteISO()} ${String(jetzt.getHours()).padStart(2, "0")}:${String(jetzt.getMinutes()).padStart(2, "0")}`,
+      hinweise: [
+        "Enthält Gesundheitsdaten (Ernährung) und Daten Dritter (Schlüssel, Vermietungen) – nur lokal oder verschlüsselt aufbewahren.",
+        "Nicht enthalten: Login-Sessions, Google-Zugang, Push-Schlüssel und angemeldete Geräte, BLS-Lebensmittel (jederzeit neu importierbar), gespeicherte Open-Food-Facts-Produkte (werden beim Scannen neu geholt).",
+        "Hochgeladene Dateien (Projekt- und Spieldateien, Rezeptfotos, Bilder im Training, Weiterbildungsnachweise) liegen nur im Supabase-Speicher; die Datei listet sie auf, enthält sie aber nicht.",
+        "Verlauf: nur die letzten 50 Einträge je Bereich (so viel liefert die App).",
+        "Ernährungseinträge in der Form des Ernährungs-Exports (ohne interne IDs).",
+        "Wiederherstellen: im Reiter Export, Karte „Wiederherstellen“.",
+      ],
+      luecken,
+      anzahl,
+      tabellen: liste,
+      ernaehrung,
+      push_einstellungen: pushEinstellungen,
+    };
+
+    meldung("Erstelle Datei …");
+    const datei = `dashboard-backup-${heuteISO()}${dateiZusatz}.json`;
+    downloadDatei(datei, JSON.stringify(backup, null, 1), "application/json");
+    try { localStorage.setItem(BACKUP_ZULETZT, heuteISO()); } catch (_e) { /* privater Modus */ }
+    const zeilen = Object.values(anzahl).reduce((s, n) => s + n, 0);
+    return { datei, luecken, zeilen };
+  }
+
+  // Knopf „Komplett-Backup herunterladen“ (Export-Karte und ⋮-Menü)
   window.komplettBackup = async function() {
-    if (backupLaeuft) return;
+    if (backupLaeuft || wh.laeuft) return;
     if (typeof kontoMenuSchliessen === "function") kontoMenuSchliessen();
     if (!confirm("Komplett-Backup herunterladen?\n\nDie Datei enthält alle deine Daten – auch Gesundheitsdaten (Ernährung) und Daten Dritter (Schlüssel, Vermietungen). Bitte nur lokal oder verschlüsselt ablegen.")) return;
     backupLaeuft = true;
@@ -11516,88 +11608,8 @@
       const el = document.getElementById("backup-status");
       if (el) el.textContent = t; else hinweisZeigen(t);
     };
-    const luecken = []; // was nicht gesichert werden konnte
     try {
-      meldung("Lade alle Tabellen …");
-      const liste = await api("liste");
-      delete liste.mail_eingerichtet; // nur ein Schalter, keine Daten
-
-      meldung("Lade Schlüsselprotokolle …");
-      try {
-        liste.schluessel_ausgaben = await backupAusgabenMitUnterschrift(liste.schluessel_ausgaben, meldung);
-      } catch (e) {
-        if (e.message === "unauthorized") throw e;
-        luecken.push("Unterschriften der Schlüsselprotokolle: " + e.message);
-      }
-
-      meldung("Lade Ernährung …");
-      const ernaehrung = {};
-      try {
-        const p = await api("ernaehrung_profil");
-        Object.assign(ernaehrung, {
-          profil: p.profil || null, ziel_versionen: p.versionen ?? null,
-          schritte: p.schritte ?? null, training_met: p.met || [],
-        });
-      } catch (e) {
-        if (e.message === "unauthorized") throw e;
-        luecken.push("Ernährungsprofil: " + e.message);
-      }
-      try {
-        const { eintraege, gewichte } = await backupErnaehrungEintraege();
-        ernaehrung.eintraege = eintraege;
-        ernaehrung.koerpergewicht = gewichte;
-      } catch (e) {
-        if (e.message === "unauthorized") throw e;
-        luecken.push("Ernährungseinträge und Gewicht: " + e.message);
-      }
-      try {
-        const res = await api("lebensmittel_eigene");
-        ernaehrung.eigene_lebensmittel = res.lebensmittel || [];
-      } catch (e) {
-        if (e.message === "unauthorized") throw e;
-        luecken.push("Eigene Lebensmittel: " + e.message);
-      }
-
-      meldung("Lade Einstellungen …");
-      let pushEinstellungen = null;
-      try {
-        const r = await api("push_status", { origin: location.origin, endpoint: null });
-        pushEinstellungen = r.fehlt ? null : (r.einstellungen || null);
-      } catch (e) {
-        if (e.message === "unauthorized") throw e;
-        luecken.push("Push-Einstellungen: " + e.message);
-      }
-
-      // Anzahl je Tabelle für den schnellen Überblick
-      const anzahl = {};
-      Object.entries(liste).forEach(([k, v]) => { if (Array.isArray(v)) anzahl[k] = v.length; });
-      Object.entries(ernaehrung).forEach(([k, v]) => { if (Array.isArray(v)) anzahl["ernaehrung." + k] = v.length; });
-
-      const jetzt = new Date();
-      const backup = {
-        typ: "dashboard_backup",
-        version: 1,
-        erstellt_am: jetzt.toISOString(),
-        erstellt_lokal: `${heuteISO()} ${String(jetzt.getHours()).padStart(2, "0")}:${String(jetzt.getMinutes()).padStart(2, "0")}`,
-        hinweise: [
-          "Enthält Gesundheitsdaten (Ernährung) und Daten Dritter (Schlüssel, Vermietungen) – nur lokal oder verschlüsselt aufbewahren.",
-          "Nicht enthalten: Login-Sessions, Google-Zugang, Push-Schlüssel und angemeldete Geräte, BLS-Lebensmittel (jederzeit neu importierbar), gespeicherte Open-Food-Facts-Produkte (werden beim Scannen neu geholt).",
-          "Hochgeladene Dateien (Projekt- und Spieldateien, Rezeptfotos, Bilder im Training, Weiterbildungsnachweise) liegen nur im Supabase-Speicher; die Datei listet sie auf, enthält sie aber nicht.",
-          "Verlauf: nur die letzten 50 Einträge je Bereich (so viel liefert die App).",
-          "Ernährungseinträge in der Form des Ernährungs-Exports (ohne interne IDs).",
-        ],
-        luecken,
-        anzahl,
-        tabellen: liste,
-        ernaehrung,
-        push_einstellungen: pushEinstellungen,
-      };
-
-      meldung("Erstelle Datei …");
-      const datei = `dashboard-backup-${heuteISO()}.json`;
-      downloadDatei(datei, JSON.stringify(backup, null, 1), "application/json");
-      try { localStorage.setItem(BACKUP_ZULETZT, heuteISO()); } catch (_e) { /* privater Modus */ }
-      const zeilen = Object.values(anzahl).reduce((s, n) => s + n, 0);
+      const { datei, luecken, zeilen } = await backupErstellen(meldung);
       const text = `Fertig: ${datei} mit ${zeilen.toLocaleString("de-DE")} Einträgen.` +
         (luecken.length ? ` Nicht gesichert: ${luecken.join("; ")}` : "");
       if (aktiverTab === "export") renderExport();
@@ -11615,9 +11627,436 @@
     }
   };
 
+  // ==========================================================
+  // Wiederherstellen aus dem Komplett-Backup (seit Session 46).
+  // Datei wählen → Vorschau je Tabelle (im Backup / jetzt) → Auswahl und
+  // Modus → automatisch frisches Backup des jetzigen Stands → Tabelle für
+  // Tabelle (Eltern vor Kindern) über backup_wh_* in index.ts.
+  //   Fehlendes ergänzen (Standard): legt nur an, was fehlt (gleiche ID).
+  //   Komplett ersetzen: gewählte Tabellen sehen danach aus wie im Backup;
+  //     was nicht im Backup steht, wird gelöscht (doppelte Rückfrage).
+  // Nicht wiederhergestellt: Push-Einstellungen, hochgeladene Dateien
+  // (nicht im Backup), Verlauf und Schritte nur ergänzen (Backup enthält
+  // nur einen Ausschnitt).
+  // ==========================================================
+  // k = Schlüssel in der Backup-Datei, t = Tabelle in der Datenbank,
+  // pk = Primärschlüssel, ref = Spalte, die auf eine Zeile derselben
+  // Tabelle zeigt (Eltern zuerst schreiben), aus = standardmäßig nicht
+  // angehakt, nurErg = nur ergänzen. Reihenfolge = Reihenfolge beim Schreiben.
+  const WH_TABELLEN = [
+    { k: "projekte", t: "projekte", name: "Projekte (für Aufgaben, Notizen, Links)", gruppe: "Planen" },
+    { k: "termin_kategorien", t: "termin_kategorien", name: "Termin-Kategorien", gruppe: "Planen" },
+    { k: "aufgaben", t: "aufgaben", name: "Aufgaben", gruppe: "Planen" },
+    { k: "termine", t: "termine", name: "Termine", gruppe: "Planen" },
+    { k: "ziele", t: "ziele", name: "Ziele (Planung)", gruppe: "Planen", ref: "uebergeordnetes_ziel_id" },
+    { k: "ziel_schritte", t: "ziel_schritte", name: "Ziel-Schritte", gruppe: "Planen" },
+    { k: "blockzeiten", t: "blockzeiten", name: "Blockzeiten", gruppe: "Planen" },
+    { k: "tagesrahmen", t: "tagesrahmen", name: "Zeitrahmen (Frei)", gruppe: "Planen" },
+    { k: "notizen", t: "notizen", name: "Notizen", gruppe: "Sammeln" },
+    { k: "links", t: "links", name: "Links", gruppe: "Sammeln" },
+    { k: "reflexionen", t: "reflexionen", name: "Reflexion", gruppe: "Sammeln" },
+    { k: "einkaufsliste", t: "einkaufsliste", name: "Einkaufsliste", gruppe: "Sammeln" },
+    { k: "fixkosten", t: "fixkosten", name: "Fixkosten", gruppe: "Finanzen" },
+    { k: "sonderausgaben", t: "sonderausgaben", name: "Sonderausgaben", gruppe: "Finanzen" },
+    { k: "buchungen", t: "buchungen", name: "Buchungen", gruppe: "Finanzen" },
+    { k: "finanz_einstellungen", t: "finanz_einstellungen", name: "Startkapital", gruppe: "Finanzen", pk: ["jahr", "bereich"] },
+    { k: "kategorie_regeln", t: "kategorie_regeln", name: "Kategorie-Regeln", gruppe: "Finanzen" },
+    { k: "sparziele", t: "sparziele", name: "Sparziele", gruppe: "Finanzen" },
+    { k: "weiterbildung_module", t: "weiterbildung_module", name: "Weiterbildung: Module", gruppe: "Spiele, Methoden, Einheiten" },
+    { k: "weiterbildung_dateien", t: "weiterbildung_dateien", name: "Weiterbildung: Liste der Nachweise", gruppe: "Spiele, Methoden, Einheiten", aus: true, datei: true },
+    { k: "weiterbildung_ziel", t: "weiterbildung_ziel", name: "Weiterbildung: UE-Ziel", gruppe: "Spiele, Methoden, Einheiten", objekt: true },
+    { k: "spiele", t: "spiele", name: "Spiele und Methoden", gruppe: "Spiele, Methoden, Einheiten" },
+    { k: "spiele_dateien", t: "spiele_dateien", name: "Spiele/Methoden: Liste der Dateien", gruppe: "Spiele, Methoden, Einheiten", aus: true, datei: true },
+    { k: "einheiten", t: "einheiten", name: "Einheiten", gruppe: "Spiele, Methoden, Einheiten" },
+    { k: "einheit_bausteine", t: "einheit_bausteine", name: "Einheiten: Ablauf", gruppe: "Spiele, Methoden, Einheiten" },
+    { k: "rezepte", t: "rezepte", name: "Rezepte", gruppe: "Sammeln" },
+    { k: "ogs_ideen", t: "ogs_ideen", name: "Ideen", gruppe: "Bereichsblock" },
+    { k: "ogs_inventar", t: "ogs_inventar", name: "Inventar", gruppe: "Bereichsblock" },
+    { k: "verleih", t: "verleih", name: "Verleih", gruppe: "Bereichsblock" },
+    { k: "ogs_projekte", t: "ogs_projekte", name: "Projekte (Bereichsblock)", gruppe: "Bereichsblock", ref: "hauptprojekt_id" },
+    { k: "ogs_projekt_dateien", t: "ogs_projekt_dateien", name: "Projekte: Liste der Dateien", gruppe: "Bereichsblock", aus: true, datei: true },
+    { k: "raeume", t: "raeume", name: "Räume", gruppe: "Bereichsblock" },
+    { k: "raum_vermietungen", t: "raum_vermietungen", name: "Vermietungen", gruppe: "Bereichsblock" },
+    { k: "raum_mail_empfaenger", t: "raum_mail_empfaenger", name: "Mail-Verteiler", gruppe: "Bereichsblock" },
+    { k: "schluessel_zugaenge", t: "schluessel_zugaenge", name: "Schlüssel: Zugänge", gruppe: "Bereichsblock" },
+    { k: "schluessel", t: "schluessel", name: "Schlüssel", gruppe: "Bereichsblock" },
+    { k: "schluessel_ausgaben", t: "schluessel_ausgaben", name: "Schlüssel: Ausgabeprotokolle", gruppe: "Bereichsblock" },
+    { k: "training_stammdaten", t: "training_stammdaten", name: "Sportarten und Übungen", gruppe: "Training" },
+    { k: "trainingsplaene", t: "trainingsplaene", name: "Trainingspläne", gruppe: "Training" },
+    { k: "trainingsplan_uebungen", t: "trainingsplan_uebungen", name: "Trainingspläne: Übungen", gruppe: "Training" },
+    { k: "training", t: "training", name: "Trainings", gruppe: "Training" },
+    { k: "training_uebungen", t: "training_uebungen", name: "Trainings: Übungen", gruppe: "Training" },
+    { k: "training_einstellungen", t: "training_einstellungen", name: "Wochenziele", gruppe: "Training", pk: ["bereich", "sportart"] },
+    { k: "intervall_timer", t: "intervall_timer", name: "Intervall-Timer", gruppe: "Training" },
+    { k: "training_ziel_events", t: "training_ziel_events", name: "Ziele (Events)", gruppe: "Training" },
+    { k: "ernaehrung.eigene_lebensmittel", t: "lebensmittel", name: "Eigene Lebensmittel", gruppe: "Ernährung" },
+    { k: "ernaehrung.profil", t: "ernaehrung_profil", name: "Profil", gruppe: "Ernährung", objekt: true },
+    { k: "ernaehrung.ziel_versionen", t: "ernaehrung_ziel_versionen", name: "Ziel-Stände", gruppe: "Ernährung", pk: ["gueltig_ab"] },
+    { k: "ernaehrung.koerpergewicht", t: "koerpergewicht", name: "Gewicht", gruppe: "Ernährung", pk: ["datum"] },
+    { k: "ernaehrung.schritte", t: "schritte", name: "Schritte", gruppe: "Ernährung", pk: ["datum"], nurErg: true },
+    { k: "ernaehrung.training_met", t: "training_met", name: "MET-Werte", gruppe: "Ernährung", pk: ["sportart_key"] },
+    { k: "ernaehrung.eintraege", t: "ernaehrung_eintraege", name: "Tagebuch-Einträge", gruppe: "Ernährung", ern: true },
+    { k: "tab_einstellungen", t: "tab_einstellungen", name: "Reiter-Einstellungen", gruppe: "Sonstiges" },
+    { k: "verlauf", t: "verlauf", name: "Verlauf (letzte 50 je Bereich)", gruppe: "Sonstiges", nurErg: true },
+  ];
+  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "Sonstiges"];
+
+  // Zustand der Karte (bleibt beim Neuzeichnen von Export erhalten)
+  const wh = {
+    backup: null,       // eingelesene Datei
+    dateiname: "",
+    jetzt: null,        // { tabelle: Anzahl } aktueller Stand
+    auswahl: new Set(), // gewählte k-Schlüssel
+    modus: "ergaenzen",
+    offen: new Set(),   // aufgeklappte Gruppen
+    laeuft: false,
+    status: "",
+    ergebnis: null,     // [{ name, text, warnung }]
+  };
+
+  // Zeilen einer Tabelle aus der Backup-Datei (null = nicht im Backup)
+  function whZeilenAus(backup, t) {
+    if (!backup) return null;
+    let v;
+    if (t.k.startsWith("ernaehrung.")) v = (backup.ernaehrung || {})[t.k.slice(11)];
+    else v = (backup.tabellen || {})[t.k];
+    if (t.objekt) return v && typeof v === "object" && !Array.isArray(v) ? [v] : (Array.isArray(v) ? v : null);
+    return Array.isArray(v) ? v : null;
+  }
+
+  // Primärschlüssel einer Zeile als Text (wie whSchluessel in index.ts)
+  function whSchluessel(z, pk) {
+    return pk.map((s) => String(z?.[s] ?? "")).join("|");
+  }
+
+  // Eltern vor Kindern, wenn eine Tabelle auf sich selbst zeigt (Ziele, Unterprojekte)
+  function whSortieren(zeilen, ref) {
+    if (!ref) return zeilen;
+    const ids = new Set(zeilen.map((z) => z.id));
+    const fertig = new Set();
+    const aus = [];
+    let rest = zeilen.slice();
+    for (let runde = 0; rest.length && runde < 50; runde++) {
+      const naechste = [];
+      for (const z of rest) {
+        const p = z[ref];
+        if (!p || !ids.has(p) || fertig.has(p)) { aus.push(z); fertig.add(z.id); } else naechste.push(z);
+      }
+      if (naechste.length === rest.length) break; // Kreis – Rest einfach anhängen
+      rest = naechste;
+    }
+    return aus.concat(rest.filter((z) => !fertig.has(z.id)));
+  }
+
+  // In Abschnitte teilen: höchstens 500 Zeilen und ca. 800 KB je Anfrage
+  // (Unterschriften der Schlüsselprotokolle sind bis zu 300 KB groß)
+  function whAbschnitte(zeilen) {
+    const aus = [];
+    let akt = [];
+    let groesse = 0;
+    for (const z of zeilen) {
+      const g = JSON.stringify(z).length;
+      if (akt.length && (akt.length >= 500 || groesse + g > 800000)) { aus.push(akt); akt = []; groesse = 0; }
+      akt.push(z);
+      groesse += g;
+    }
+    if (akt.length) aus.push(akt);
+    return aus;
+  }
+
+  // Ernährungseinträge in lückenlose Datumsbereiche teilen (je ca. 800
+  // Einträge, ganze Tage), 1900-01-01 bis 2999-12-31 – so findet „Ersetzen“
+  // auch Einträge an Tagen, die im Backup gar nicht vorkommen
+  function whErnBereiche(eintraege) {
+    const sortiert = eintraege.filter((e) => e && typeof e.datum === "string")
+      .slice().sort((a, b) => (a.datum < b.datum ? -1 : a.datum > b.datum ? 1 : 0));
+    const bereiche = [];
+    let von = "1900-01-01";
+    let akt = [];
+    for (let i = 0; i < sortiert.length; i++) {
+      akt.push(sortiert[i]);
+      const tagEnde = i === sortiert.length - 1 || sortiert[i + 1].datum !== sortiert[i].datum;
+      if (tagEnde && akt.length >= 800) {
+        bereiche.push({ von, bis: sortiert[i].datum, eintraege: akt });
+        von = addTage(sortiert[i].datum, 1);
+        akt = [];
+      }
+    }
+    bereiche.push({ von, bis: "2999-12-31", eintraege: akt });
+    return bereiche;
+  }
+
+  // Karte „Wiederherstellen“ im Reiter Export
+  function whKarteHtml() {
+    const b = wh.backup;
+    const aus = wh.laeuft ? " disabled" : "";
+    let html = `
+      <div class="sync-karte backup-karte" id="wh-karte" style="margin-bottom:1.2rem;">
+        <div class="sync-kopf">${ic("import")}<span>Wiederherstellen</span></div>
+        <p class="hero-text" style="margin:0.3rem 0 0.6rem;">Daten aus einer Backup-Datei zurückholen – alles oder nur einzelne Tabellen. Vorher lädt die App automatisch ein Backup des jetzigen Stands herunter.</p>`;
+    if (!b) {
+      html += `
+        <label class="btn-secondary" style="display:inline-flex;align-items:center;gap:0.4rem;cursor:pointer;">${ic("import")}Backup-Datei wählen …
+          <input type="file" accept=".json,application/json" style="display:none;" onchange="whDateiGewaehlt(this)">
+        </label>`;
+    } else {
+      const summe = WH_TABELLEN.reduce((s, t) => s + (whZeilenAus(b, t)?.length || 0), 0);
+      html += `
+        <p class="notiz-meta" style="margin:0 0 0.6rem;"><strong>${escapeHtml(wh.dateiname)}</strong> · erstellt ${escapeHtml(whBackupDatum(b))} · ${summe.toLocaleString("de-DE")} Einträge
+          ${wh.laeuft ? "" : ` · <a href="#" onclick="whZuruecksetzen();return false;">andere Datei</a>`}</p>`;
+      if (Array.isArray(b.luecken) && b.luecken.length) {
+        html += `<p class="notiz-meta" style="margin:0 0 0.6rem;">${ic("warnung")}Im Backup fehlt: ${escapeHtml(b.luecken.join("; "))}</p>`;
+      }
+      html += `
+        <fieldset style="border:0;padding:0;margin:0 0 0.6rem;"${aus}>
+          <legend class="notiz-meta" style="margin-bottom:0.3rem;">Was passiert mit Vorhandenem?</legend>
+          <label style="display:flex;gap:0.5rem;align-items:flex-start;margin-bottom:0.3rem;"><input type="radio" name="wh-modus" value="ergaenzen" ${wh.modus === "ergaenzen" ? "checked" : ""} onchange="whModus('ergaenzen')">
+            <span><strong>Fehlendes ergänzen</strong> – legt nur an, was es nicht mehr gibt. Vorhandenes bleibt, wie es ist.</span></label>
+          <label style="display:flex;gap:0.5rem;align-items:flex-start;"><input type="radio" name="wh-modus" value="ersetzen" ${wh.modus === "ersetzen" ? "checked" : ""} onchange="whModus('ersetzen')">
+            <span><strong>Komplett ersetzen</strong> – die gewählten Tabellen sehen danach aus wie im Backup. Was nicht im Backup steht, wird gelöscht.</span></label>
+        </fieldset>
+        <div class="notiz-meta" style="margin:0 0 0.4rem;">Tabellen: ${wh.auswahl.size} gewählt ·
+          <a href="#" onclick="whAlle(true);return false;">alle</a> · <a href="#" onclick="whAlle(false);return false;">keine</a></div>`;
+      for (const g of WH_GRUPPEN) {
+        const teile = WH_TABELLEN.filter((t) => t.gruppe === g && whZeilenAus(b, t));
+        if (!teile.length) continue;
+        const gewaehlt = teile.filter((t) => wh.auswahl.has(t.k)).length;
+        html += `
+        <details class="wh-gruppe" ${wh.offen.has(g) ? "open" : ""} ontoggle="whGruppeToggle('${g}', this.open)" style="margin-bottom:0.3rem;">
+          <summary style="cursor:pointer;padding:0.3rem 0;">${escapeHtml(g)} <span class="notiz-meta">(${gewaehlt} von ${teile.length})</span></summary>
+          <div style="padding:0.2rem 0 0.4rem 0.4rem;">`;
+        for (const t of teile) {
+          const n = whZeilenAus(b, t).length;
+          const jetzt = wh.jetzt && wh.jetzt[t.k] !== undefined ? wh.jetzt[t.k] : null;
+          const zusatz = [];
+          if (t.nurErg && wh.modus === "ersetzen") zusatz.push("nur ergänzen");
+          if (t.datei) zusatz.push("Dateien selbst sind nicht im Backup");
+          html += `
+            <label style="display:flex;gap:0.5rem;align-items:flex-start;padding:0.15rem 0;">
+              <input type="checkbox" ${wh.auswahl.has(t.k) ? "checked" : ""}${aus} onchange="whAuswahl('${t.k}', this.checked)">
+              <span>${escapeHtml(t.name)} <span class="notiz-meta">· im Backup ${n.toLocaleString("de-DE")}${jetzt !== null ? ` · jetzt ${jetzt.toLocaleString("de-DE")}` : ""}${zusatz.length ? ` · ${escapeHtml(zusatz.join(" · "))}` : ""}</span></span>
+            </label>`;
+        }
+        html += `</div></details>`;
+      }
+      const knopfKlasse = wh.modus === "ersetzen" ? "btn-danger" : "btn-primary";
+      html += `
+        <button type="button" class="${knopfKlasse}" style="margin-top:0.6rem;" onclick="whStarten()"${aus || (wh.auswahl.size ? "" : " disabled")}>${ic("import")}${wh.modus === "ersetzen" ? "Gewählte Tabellen ersetzen …" : "Fehlendes wiederherstellen …"}</button>`;
+    }
+    if (wh.status) html += `<p class="notiz-meta" role="status" aria-live="polite" style="margin:0.6rem 0 0;">${escapeHtml(wh.status)}</p>`;
+    if (wh.ergebnis) {
+      html += `<div style="margin-top:0.6rem;"><p class="notiz-meta" style="margin:0 0 0.3rem;"><strong>Ergebnis</strong></p><ul style="margin:0;padding-left:1.1rem;">`;
+      for (const r of wh.ergebnis) {
+        html += `<li class="notiz-meta" style="margin-bottom:0.2rem;">${r.warnung ? ic("warnung") : ""}<strong>${escapeHtml(r.name)}:</strong> ${escapeHtml(r.text)}</li>`;
+      }
+      html += `</ul></div>`;
+    }
+    html += `
+        <p class="notiz-meta" style="margin:0.6rem 0 0;">Hochgeladene Dateien (Fotos, PDFs, Nachweise) und Push-Einstellungen holt das Wiederherstellen nicht zurück – sie sind nicht im Backup.</p>
+      </div>`;
+    return html;
+  }
+
+  // Lesbares Erstelldatum des Backups
+  function whBackupDatum(b) {
+    if (typeof b.erstellt_lokal === "string" && /^\d{4}-\d{2}-\d{2}/.test(b.erstellt_lokal)) {
+      return datumDE(b.erstellt_lokal.slice(0, 10)) + (b.erstellt_lokal.length > 10 ? `, ${b.erstellt_lokal.slice(11, 16)} Uhr` : "");
+    }
+    return typeof b.erstellt_am === "string" ? b.erstellt_am.slice(0, 10) : "unbekannt";
+  }
+
+  // Nur die Karte neu zeichnen (nicht den ganzen Reiter)
+  function whRendern() {
+    const el = document.getElementById("wh-karte");
+    if (el) el.outerHTML = whKarteHtml();
+  }
+
+  // Datei gewählt: einlesen, prüfen, aktuellen Stand zum Vergleich holen
+  window.whDateiGewaehlt = async function(input) {
+    const datei = input.files && input.files[0];
+    if (!datei) return;
+    wh.ergebnis = null;
+    wh.status = "Lese Datei …";
+    whRendern();
+    let b;
+    try {
+      b = JSON.parse(await datei.text());
+    } catch (_e) {
+      wh.status = "Die Datei ist keine gültige JSON-Datei.";
+      whRendern();
+      return;
+    }
+    if (!b || b.typ !== "dashboard_backup" || typeof b.tabellen !== "object" || !b.tabellen) {
+      wh.status = "Das ist keine Backup-Datei dieses Dashboards (erwartet: dashboard-backup-….json).";
+      whRendern();
+      return;
+    }
+    wh.backup = b;
+    wh.dateiname = datei.name;
+    wh.auswahl = new Set(WH_TABELLEN.filter((t) => whZeilenAus(b, t) && !t.aus).map((t) => t.k));
+    wh.status = Number(b.version) > 2 ? "Hinweis: Die Datei stammt aus einer neueren App-Version – bitte erst die App aktualisieren." : "Lade aktuellen Stand zum Vergleich …";
+    whRendern();
+    try {
+      const liste = await api("liste");
+      wh.jetzt = {};
+      for (const t of WH_TABELLEN) {
+        if (t.k.startsWith("ernaehrung.")) continue;
+        const v = liste[t.k];
+        if (Array.isArray(v)) wh.jetzt[t.k] = v.length;
+        else if (t.objekt) wh.jetzt[t.k] = v && typeof v === "object" ? 1 : 0;
+      }
+      if (Number(b.version) <= 2) wh.status = "";
+    } catch (e) {
+      if (e.message === "unauthorized") return;
+      wh.jetzt = null;
+      wh.status = "Aktueller Stand konnte nicht geladen werden – Vergleich fehlt.";
+    }
+    whRendern();
+  };
+
+  // Andere Datei wählen
+  window.whZuruecksetzen = function() {
+    if (wh.laeuft) return;
+    Object.assign(wh, { backup: null, dateiname: "", jetzt: null, auswahl: new Set(), status: "", ergebnis: null });
+    whRendern();
+  };
+
+  // Modus umstellen
+  window.whModus = function(m) { wh.modus = m === "ersetzen" ? "ersetzen" : "ergaenzen"; whRendern(); };
+  // Eine Tabelle an- oder abwählen
+  window.whAuswahl = function(k, an) { if (an) wh.auswahl.add(k); else wh.auswahl.delete(k); whRendern(); };
+  // Alle bzw. keine Tabelle wählen
+  window.whAlle = function(an) {
+    wh.auswahl = new Set(an ? WH_TABELLEN.filter((t) => whZeilenAus(wh.backup, t)).map((t) => t.k) : []);
+    whRendern();
+  };
+  // Merkt, welche Gruppen aufgeklappt sind
+  window.whGruppeToggle = function(g, offen) { if (offen) wh.offen.add(g); else wh.offen.delete(g); };
+
+  // Ergebniszeile einer Tabelle als Text
+  function whErgebnisText(r, modus) {
+    const teile = [];
+    if (modus === "ersetzen") {
+      teile.push(`${r.geschrieben.toLocaleString("de-DE")} geschrieben`);
+      if (r.schon_da) teile.push(`${r.schon_da.toLocaleString("de-DE")} unverändert`);
+      teile.push(`${r.geloescht.toLocaleString("de-DE")} entfernt`);
+    } else {
+      teile.push(`${r.geschrieben.toLocaleString("de-DE")} neu`);
+      teile.push(`${r.schon_da.toLocaleString("de-DE")} schon da`);
+    }
+    const ueber = [];
+    if (r.doppelt) ueber.push(`${r.doppelt} doppelt`);
+    if (r.bezug) ueber.push(`${r.bezug} ohne Bezug`);
+    if (r.ungueltig) ueber.push(`${r.ungueltig} ungültig`);
+    if (r.fehler) ueber.push(`${r.fehler} mit Fehler`);
+    if (ueber.length) teile.push(`übersprungen: ${ueber.join(", ")}`);
+    if (r.spalten.size) teile.push(`nicht mehr vorhandene Felder ausgelassen: ${[...r.spalten].join(", ")}`);
+    if (r.beispiele.length) teile.push(`z. B. „${r.beispiele[0]}“`);
+    return teile.join(" · ");
+  }
+
+  // Ablauf: Rückfragen → Backup des jetzigen Stands → Tabelle für Tabelle
+  window.whStarten = async function() {
+    if (wh.laeuft || backupLaeuft || !wh.backup) return;
+    const gewaehlt = WH_TABELLEN.filter((t) => wh.auswahl.has(t.k) && whZeilenAus(wh.backup, t));
+    if (!gewaehlt.length) { hinweisZeigen("Bitte mindestens eine Tabelle wählen"); return; }
+    const modus = wh.modus;
+    const namen = gewaehlt.map((t) => t.name);
+    const liste = namen.length > 8 ? namen.slice(0, 8).join(", ") + ` und ${namen.length - 8} weitere` : namen.join(", ");
+    if (!confirm(`${modus === "ersetzen" ? "Komplett ersetzen" : "Fehlendes ergänzen"}: ${gewaehlt.length} ${gewaehlt.length === 1 ? "Tabelle" : "Tabellen"} aus dem Backup vom ${whBackupDatum(wh.backup)}.\n\n${liste}\n\nVorher lädt die App automatisch ein Backup des jetzigen Stands herunter. Weiter?`)) return;
+    if (modus === "ersetzen") {
+      const eingabe = prompt("Achtung: In den gewählten Tabellen wird alles gelöscht, was nicht im Backup steht – auch Einträge, die du nach dem Backup angelegt hast, und davon abhängige Einträge (z. B. Schritte eines gelöschten Ziels).\n\nZum Bestätigen ERSETZEN eintippen:");
+      if (eingabe === null) return;
+      if (eingabe.trim().toUpperCase() !== "ERSETZEN") { alert("Nicht bestätigt – es wurde nichts geändert."); return; }
+    }
+    wh.laeuft = true;
+    wh.ergebnis = null;
+    const meldung = (t) => { wh.status = t; whRendern(); };
+    try {
+      // 1. Sicherheits-Backup des jetzigen Stands
+      backupLaeuft = true;
+      let vorher;
+      try {
+        vorher = await backupErstellen((t) => meldung("Sicherung des jetzigen Stands: " + t), "-vor-wiederherstellen");
+      } finally {
+        backupLaeuft = false;
+      }
+      if (vorher.luecken.length && !confirm(`Die Sicherung des jetzigen Stands ist unvollständig:\n${vorher.luecken.join("\n")}\n\nTrotzdem wiederherstellen?`)) {
+        meldung(`Abgebrochen. Sicherung ${vorher.datei} wurde trotzdem heruntergeladen.`);
+        return;
+      }
+      // 2. Tabelle für Tabelle
+      const ergebnis = [];
+      for (let i = 0; i < gewaehlt.length; i++) {
+        const t = gewaehlt[i];
+        const tModus = t.nurErg ? "ergaenzen" : modus;
+        const r = { geschrieben: 0, schon_da: 0, geloescht: 0, doppelt: 0, bezug: 0, ungueltig: 0, fehler: 0, beispiele: [], spalten: new Set() };
+        const sammeln = (res) => {
+          r.geschrieben += res.geschrieben || 0;
+          r.schon_da += res.schon_da || 0;
+          r.geloescht += res.geloescht || 0;
+          for (const f of ["doppelt", "bezug", "ungueltig", "fehler"]) r[f] += res[f] || 0;
+          for (const b of res.beispiele || []) if (r.beispiele.length < 3) r.beispiele.push(b);
+          for (const s of res.spalten_entfernt || []) r.spalten.add(s);
+        };
+        const kopf = `${i + 1}/${gewaehlt.length} ${t.name}`;
+        try {
+          const zeilen = whZeilenAus(wh.backup, t);
+          if (t.ern) {
+            const bereiche = whErnBereiche(zeilen);
+            for (let j = 0; j < bereiche.length; j++) {
+              meldung(`${kopf} (${j + 1}/${bereiche.length}) …`);
+              const be = bereiche[j];
+              if (tModus === "ergaenzen" && !be.eintraege.length) continue;
+              sammeln(await api("backup_wh_ernaehrung", { modus: tModus, von: be.von, bis: be.bis, eintraege: be.eintraege }));
+            }
+          } else {
+            const pk = t.pk || ["id"];
+            const sortiert = whSortieren(zeilen, t.ref);
+            if (tModus === "ersetzen") {
+              meldung(`${kopf}: räume auf …`);
+              const vor = await api("backup_wh_vorbereiten", { tabelle: t.t, schluessel: sortiert.map((z) => whSchluessel(z, pk)) });
+              r.geloescht += vor.geloescht || 0;
+              for (const f of vor.fehler || []) { r.fehler++; if (r.beispiele.length < 3) r.beispiele.push(f); }
+            }
+            const abschnitte = whAbschnitte(sortiert);
+            for (let j = 0; j < abschnitte.length; j++) {
+              meldung(`${kopf}${abschnitte.length > 1 ? ` (${j + 1}/${abschnitte.length})` : ""} …`);
+              sammeln(await api("backup_wh_zeilen", { tabelle: t.t, modus: tModus, zeilen: abschnitte[j] }));
+            }
+          }
+          // „doppelt“ beim Ergänzen = gibt es schon unter anderer ID, kein Problem
+          const warnung = (tModus === "ersetzen" ? r.doppelt : 0) + r.bezug + r.ungueltig + r.fehler > 0;
+          ergebnis.push({ name: t.name + (t.nurErg && modus === "ersetzen" ? " (nur ergänzt)" : ""), text: whErgebnisText(r, tModus), warnung });
+        } catch (e) {
+          if (e.message === "unauthorized" || e.message === "rate-limited") throw e;
+          ergebnis.push({ name: t.name, text: "abgebrochen: " + (e.message || "Fehler") + (r.geschrieben ? ` (bis dahin ${r.geschrieben} geschrieben)` : ""), warnung: true });
+        }
+      }
+      wh.ergebnis = ergebnis;
+      try { await api("backup_wh_fertig", { modus, tabellen: gewaehlt.length }); } catch (_e) { /* nur Verlauf */ }
+      // 3. Alles neu laden (Ernährung lädt beim nächsten Öffnen neu)
+      ernGeladenFuer = null;
+      ernProfilGeladen = false;
+      meldung("Lade die App-Daten neu …");
+      await ladeDaten();
+      const probleme = ergebnis.filter((x) => x.warnung).length;
+      wh.status = `Fertig. Sicherung des vorherigen Stands: ${vorher.datei}.` + (probleme ? ` Bei ${probleme} ${probleme === 1 ? "Tabelle" : "Tabellen"} gab es Hinweise – siehe unten.` : "");
+      hinweisZeigen(probleme ? "Wiederhergestellt – mit Hinweisen, siehe Export" : "Wiederhergestellt");
+    } catch (e) {
+      if (e.message !== "unauthorized" && e.message !== "rate-limited") {
+        wh.status = "Wiederherstellen abgebrochen: " + (e.message || "Fehler");
+        alert(wh.status);
+      }
+    } finally {
+      wh.laeuft = false;
+      if (aktiverTab === "export") renderExport(); else whRendern();
+    }
+  };
+
   // Rendert die Exportliste mit Excel-/Word-Knöpfen für alles und je Kategorie
   function renderExport() {
-    let html = backupKarteHtml() + `
+    let html = backupKarteHtml() + whKarteHtml() + `
       <div class="export-row export-alle">
         <span class="export-name">Alles</span>
         <div class="export-buttons">
