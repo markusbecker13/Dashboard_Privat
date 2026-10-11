@@ -1994,3 +1994,69 @@
 }
 @media (prefers-reduced-motion: reduce) { .lern-balken span, .lern-antwort { transition: none; } }
 .lern-chips .schnell-chip { text-align: left; max-width: 100%; }
+
+/* ==========================================================
+   EP-Prüfungssimulation und Statistik (seit Session 53)
+   ========================================================== */
+.lern-ansicht { display: flex; gap: 0.25rem; padding: 0.25rem; margin: 0.25rem 0 0.75rem; background: var(--akzent-flaeche); border-radius: var(--r-pille); }
+.lern-ansicht-knopf { flex: 1 1 0; min-height: 40px; border: 0; border-radius: var(--r-pille); background: transparent; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.lern-ansicht-knopf.aktiv { background: var(--panel); box-shadow: 0 1px 3px var(--schatten); }
+.lern-ansicht-knopf:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.pruef-einst { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin: 0.6rem 0 0.2rem; }
+.pruef-einst-feld { display: flex; flex-direction: column; gap: 0.25rem; }
+.pruef-einst-feld input { min-height: 44px; width: 100%; box-sizing: border-box; font-size: var(--fs-mittel); }
+.pruef-kopf { font-weight: 600; }
+.pruef-uhr { display: inline-flex; align-items: center; gap: 0.3rem; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); padding: 0.2rem 0.6rem; border-radius: var(--r-pille); background: var(--akzent-flaeche); }
+.pruef-uhr.knapp { background: var(--overdue-bg); color: var(--overdue-text); }
+.lern-antwort.gewaehlt { border-color: var(--accent); background: var(--akzent-flaeche); }
+.lern-antwort.gewaehlt .lern-antwort-buchstabe { background: var(--accent); color: var(--on-accent); }
+.pruef-navi { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.9rem; }
+.pruef-navi > button { flex: 1 1 auto; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; }
+.pruef-navi > button:disabled { opacity: 0.45; cursor: not-allowed; }
+.pruef-navi .btn-secondary.aktiv { border-color: var(--today-border); background: var(--today-bg); color: var(--today-text); }
+.pruef-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); gap: 0.35rem; }
+.pruef-nr { min-height: 42px; border-radius: var(--r-klein); border: 2px solid var(--border); background: var(--panel); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums; }
+.pruef-nr.beantwortet { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pruef-nr.markiert { border-color: var(--today-text); box-shadow: inset 0 0 0 2px var(--today-border); }
+.pruef-nr.aktuell { outline: 3px solid var(--ink); outline-offset: 1px; }
+.pruef-nr:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.pruef-ende { margin: 0.5rem 0 1rem; }
+.pruef-ergebnis.ok { border-color: var(--ok-rand); }
+.pruef-ergebnis.nein { border-color: var(--overdue-border); }
+.pruef-ergebnis.ok .lern-frage { color: var(--ok-text); }
+.pruef-ergebnis.nein .lern-frage { color: var(--overdue-text); }
+.pruef-ergebnis .lern-frage .ic { vertical-align: -0.12em; }
+.pruef-skripte { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.6rem 0; }
+.pruef-skript-zeile { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1fr) auto; gap: 0.5rem; align-items: center; font-size: var(--fs-text); }
+.pruef-skript-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pruef-skript-balken, .stat-balken { position: relative; display: block; height: 8px; border-radius: var(--r-pille); background: var(--akzent-flaeche); overflow: hidden; }
+.pruef-skript-balken span { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+.pruef-skript-wert { font-variant-numeric: tabular-nums; color: var(--ink-dim); white-space: nowrap; }
+.pruef-liste-kopf { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+.pruef-liste-kopf .lern-h2 { margin: 0; }
+.pruef-auswertung.ok { border-left: 4px solid var(--ok-stark); }
+.pruef-auswertung.nein { border-left: 4px solid var(--overdue-text); }
+.pruef-auswertung .lern-liste-frage .ic { vertical-align: -0.18em; }
+.pruef-deine { color: var(--overdue-text); }
+.pruef-plakette { display: inline-block; font-size: var(--fs-klein); font-weight: 700; padding: 0.1rem 0.5rem; border-radius: var(--r-pille); margin-right: 0.25rem; vertical-align: 0.1em; }
+.pruef-plakette.ok { background: var(--ok-bg); color: var(--ok-text); }
+.pruef-plakette.nein { background: var(--overdue-bg); color: var(--overdue-text); }
+.stat-gross { font-family: var(--font-display); font-size: var(--fs-titel); font-weight: 700; margin: 0.1rem 0 0.3rem; line-height: 1.1; }
+.stat-gross .notiz-meta { font-family: var(--font-text); font-size: var(--fs-text); font-weight: 400; display: block; margin-top: 0.25rem; }
+.stat-balken { height: 10px; margin: 0.35rem 0; }
+.stat-balken .stat-gesehen, .stat-balken .stat-sicher { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; }
+.stat-balken .stat-gesehen { background: var(--ok-rand); }
+.stat-balken .stat-sicher { background: var(--ok-text); }
+.stat-skript .link-btn { margin-top: 0.15rem; }
+.stat-abschnitt .spiel-karte-knoepfe .btn-secondary { min-height: 40px; }
+.stat-tage { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 0.25rem; align-items: end; height: 110px; margin: 0.4rem 0; }
+.stat-tag { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 0.2rem; }
+.stat-tag-saeule { position: relative; display: flex; flex-direction: column; justify-content: flex-end; width: 100%; min-height: 2px; background: var(--akzent-flaeche); border-radius: var(--r-klein) var(--r-klein) 2px 2px; overflow: hidden; }
+.stat-tag-richtig { display: block; width: 100%; background: var(--accent); }
+.stat-tag-name { font-size: var(--fs-klein); color: var(--ink-dim); }
+@media (max-width: 420px) {
+  .pruef-einst { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
+  .pruef-einst-feld .schnell-label { font-size: 0.68rem; }
+  .pruef-skript-zeile { grid-template-columns: minmax(0, 1fr) auto; }
+  .pruef-skript-balken { grid-column: 1 / -1; grid-row: 2; }
+}
