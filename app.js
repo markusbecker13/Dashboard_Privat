@@ -654,7 +654,7 @@
             ${s.datei_pfad ? `<button type="button" class="btn-primary" onclick="bibOeffnen('${id}')">${ic("export")}Öffnen</button>` : ""}
             <label class="btn-secondary bib-datei-knopf">${ic("import")}${s.datei_pfad ? "PDF ersetzen" : "PDF hochladen"}
               <input type="file" accept="application/pdf,.pdf" class="bib-unsichtbar" onchange="bibPdfGewaehlt('${id}', this)"></label>
-            <label class="btn-secondary bib-datei-knopf">${ic("import")}${seiten.length ? "Text erneuern" : "Text importieren"}
+            <label class="btn-secondary bib-datei-knopf">${ic("import")}Paket (.json) importieren
               <input type="file" accept="application/json,.json" class="bib-unsichtbar" onchange="bibPaketGewaehlt(this, '${id}')"></label>
           </div>
         </div>
@@ -868,6 +868,9 @@
     fragen: [], stand: {}, tage: {},
     sitzung: null,      // { ids, pos, ordnung: {id: [Originalindex je Anzeigeplatz]}, antworten: {id: {gewaehlt, richtig}}, fertig }
     such: "", filter: "alle", verwaltenOffen: false,
+    // seit Session 53: Ansicht (ueben/pruefung/statistik), Prüfungsverlauf, laufende Prüfung, Ergebnis
+    ansicht: "ueben", pruefungen: [], pruefungFehlt: false, pruefung: null, pruefErgebnis: null,
+    pruefungGeprueft: false, pruefSpeichert: false, pruefRasterOffen: false,
   };
   const LERN_MODI = [
     ["faellig", "Fällige & neue"], ["zufall", "Zufällig gemischt"], ["falsch", "Zuletzt falsch"], ["neu", "Nur neue"],
@@ -903,6 +906,8 @@
       lern.fehlt = !!r.fehlt;
       lern.fragen = r.fragen || [];
       lern.stand = r.stand || {};
+      lern.pruefungen = r.pruefungen || [];
+      lern.pruefungFehlt = !!r.pruefung_fehlt;
       lern.tage = r.tage || {};
       lern.geladen = true;
     } catch (e) {
@@ -1189,7 +1194,7 @@
           <div class="schnell-chips lern-chips" role="group" aria-label="Filter">${LERN_FILTER.map(([k, t]) =>
             `<button type="button" class="schnell-chip${lern.filter === k ? " aktiv" : ""}" aria-pressed="${lern.filter === k}" onclick="lernFilterWaehlen('${k}')">${t}</button>`).join("")}</div>
           <div id="lern-verwalten-liste"></div>
-          <p class="notiz-meta">Fragen kommen mit dem Skript-Paket: in der Bibliothek „Skript-Paket importieren“ bzw. am Skript „Text erneuern“. Von dir geänderte Fragen überschreibt ein neues Paket nicht.</p>
+          <p class="notiz-meta">Fragen kommen mit dem Skript-Paket: in der Bibliothek „Skript-Paket importieren“ bzw. am Skript „Paket (.json) importieren“. Von dir geänderte Fragen überschreibt ein neues Paket nicht.</p>
         </div>
       </details>`;
   }
@@ -1332,16 +1337,28 @@
     }
     if (!lern.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
     if (!lern.fragen.length) {
-      el.innerHTML = `<p class="empty-text">Noch keine Fragen. Sie kommen mit dem Skript-Paket: in der Bibliothek „Skript-Paket importieren“ (bzw. am Skript „Text erneuern“) – oder unten eine eigene Frage anlegen.</p>` + lernVerwaltenHtml();
+      el.innerHTML = `<p class="empty-text">Noch keine Fragen. Sie kommen mit dem Skript-Paket: in der Bibliothek „Skript-Paket importieren“ (bzw. am Skript „Paket (.json) importieren“) – oder unten eine eigene Frage anlegen.</p>` + lernVerwaltenHtml();
       lernVerwaltenZeichnen();
       return;
     }
+    pruefWiederherstellen();
+    if (lern.pruefung) {
+      // Zeit abgelaufen, während die App zu war → gleich abgeben
+      if (lern.pruefung.ende && Date.now() >= lern.pruefung.ende) { window.pruefAbgeben(true); return; }
+      el.innerHTML = pruefFrageHtml();
+      pruefUhrStellen();
+      return;
+    }
+    pruefUhrStellen();
+    if (lern.pruefErgebnis) { el.innerHTML = pruefErgebnisHtml(); return; }
     const s = lern.sitzung;
     if (s) {
       el.innerHTML = s.fertig ? lernErgebnisHtml() : lernFrageHtml();
       return;
     }
-    el.innerHTML = lernStartHtml();
+    if (lern.ansicht === "pruefung") { el.innerHTML = lernAnsichtHtml() + pruefStartHtml(); return; }
+    if (lern.ansicht === "statistik") { el.innerHTML = lernAnsichtHtml() + lernStatistikHtml(); return; }
+    el.innerHTML = lernAnsichtHtml() + lernStartHtml();
     lernVerwaltenZeichnen();
   }
 
@@ -1349,9 +1366,532 @@
   function lernModulInfo() {
     if (!lern.geladen) { if (!lern.laedt && !lern.fehler && !lern.fehlt) lernLaden(); return lern.fehlt ? "SQL fehlt" : ""; }
     if (!lern.fragen.length) return "noch keine Fragen";
+    pruefWiederherstellen();
+    if (lern.pruefung) return "Prüfung läuft";
     const faellig = lern.fragen.filter(lernIstFaellig).length;
     const neu = lern.fragen.filter(lernIstNeu).length;
     return faellig || neu ? [faellig ? `${faellig} fällig` : "", neu ? `${neu} neu` : ""].filter(Boolean).join(" · ") : "alles wiederholt";
+  }
+
+  // ==========================================================
+  // EP-Prüfungssimulation und Statistik (seit Session 53, Etappe 4)
+  // Prüfung: feste Fragenzahl, Zeitlimit, Bestehensgrenze (Standard 40 /
+  // 60 Min. / 60 %, je Gerät änderbar). Antworten bleiben bis zur Abgabe
+  // änderbar, Lösungen gibt es erst danach. Eine laufende Prüfung liegt im
+  // Gerät (localStorage), damit Neuladen sie nicht verliert. Ausgewertet
+  // und gespeichert wird auf dem Server (ep_pruefungen); die Antworten
+  // zählen auch für Statistik und Lernkartei.
+  // ==========================================================
+  const PRUEF_STANDARD = { anzahl: 40, minuten: 60, grenze: 60 };
+  const PRUEF_SPEICHER = "lern-pruefung";
+
+  function pruefEinst() {
+    let e = {};
+    try { e = JSON.parse(localStorage.getItem("lern-pruefung-einstellungen") || "{}") || {}; } catch (_e) { e = {}; }
+    const zahl = (v, min, max, std) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n >= min && n <= max ? n : std; };
+    return {
+      anzahl: zahl(e.anzahl, 5, 200, PRUEF_STANDARD.anzahl),
+      minuten: zahl(e.minuten, 0, 600, PRUEF_STANDARD.minuten), // 0 = ohne Zeitlimit
+      grenze: zahl(e.grenze, 1, 100, PRUEF_STANDARD.grenze),
+      skripte: Array.isArray(e.skripte) ? e.skripte.map(String) : null,
+    };
+  }
+  function pruefEinstSetzen(teil) {
+    const e = Object.assign(pruefEinst(), teil);
+    try { localStorage.setItem("lern-pruefung-einstellungen", JSON.stringify(e)); } catch (_e) { /* nicht merkbar */ }
+  }
+  function pruefSichern() {
+    try {
+      if (lern.pruefung) localStorage.setItem(PRUEF_SPEICHER, JSON.stringify(lern.pruefung));
+      else localStorage.removeItem(PRUEF_SPEICHER);
+    } catch (_e) { /* ohne Sicherung weiter */ }
+  }
+  // Laufende Prüfung nach dem Neuladen wieder aufnehmen
+  function pruefWiederherstellen() {
+    if (lern.pruefung || lern.pruefungGeprueft) return;
+    lern.pruefungGeprueft = true;
+    try {
+      const p = JSON.parse(localStorage.getItem(PRUEF_SPEICHER) || "null");
+      if (p && Array.isArray(p.ids) && p.ids.length && p.ordnung && p.antworten) lern.pruefung = p;
+    } catch (_e) { /* kaputt → ignorieren */ }
+  }
+
+  window.lernAnsicht = function(a) {
+    lern.ansicht = a;
+    renderLernen();
+  };
+
+  window.pruefEinstAendern = function(feld, wert) {
+    if (feld === "skript" || feld === "alle") {
+      const alle = lernSkriptSchluessel();
+      let auswahl = feld === "alle" ? null : (pruefEinst().skripte || alle.slice());
+      if (auswahl) auswahl = auswahl.includes(wert) ? auswahl.filter((x) => x !== wert) : [...auswahl, wert];
+      pruefEinstSetzen({ skripte: !auswahl || auswahl.length === alle.length || !auswahl.length ? null : auswahl });
+      renderLernen();
+      return;
+    }
+    pruefEinstSetzen({ [feld]: wert });
+    renderLernen();
+  };
+  window.pruefStandard = function() {
+    pruefEinstSetzen({ ...PRUEF_STANDARD });
+    renderLernen();
+  };
+
+  window.pruefStarten = function() {
+    const e = pruefEinst();
+    const pool = lern.fragen.filter((f) => !e.skripte || e.skripte.includes(String(f.skript_id || "")));
+    if (!pool.length) { hinweisZeigen("Keine Fragen in der Auswahl"); return; }
+    // Gleichmäßig über die Skripte verteilen: je Skript mischen, dann reihum ziehen
+    const jeSkript = {};
+    lernMischen(pool).forEach((f) => { const k = String(f.skript_id || ""); (jeSkript[k] = jeSkript[k] || []).push(f.id); });
+    const toepfe = lernMischen(Object.values(jeSkript));
+    const ids = [];
+    while (ids.length < Math.min(e.anzahl, pool.length)) {
+      for (const t of toepfe) { if (t.length && ids.length < e.anzahl) ids.push(t.shift()); }
+    }
+    const ordnung = {};
+    ids.forEach((id) => { ordnung[id] = lernMischen([0, 1, 2, 3]); });
+    const jetzt = Date.now();
+    lern.pruefung = {
+      ids: lernMischen(ids), pos: 0, ordnung, antworten: {}, markiert: [],
+      start: jetzt, ende: e.minuten ? jetzt + e.minuten * 60000 : null,
+      minuten: e.minuten, grenze: e.grenze, skripte: e.skripte || lernSkriptSchluessel(),
+    };
+    lern.pruefErgebnis = null;
+    pruefSichern();
+    renderLernen();
+    lernFokus();
+  };
+
+  window.pruefWaehlen = function(platz) {
+    const p = lern.pruefung;
+    if (!p) return;
+    const id = p.ids[p.pos];
+    const orig = p.ordnung[id][platz];
+    if (p.antworten[id] === orig) delete p.antworten[id]; else p.antworten[id] = orig;
+    pruefSichern();
+    renderLernen();
+    const knopf = document.querySelector(`.lern-antwort[data-platz="${platz}"]`);
+    if (knopf) knopf.focus();
+  };
+  window.pruefGehe = function(pos) {
+    const p = lern.pruefung;
+    if (!p || pos < 0 || pos >= p.ids.length) return;
+    p.pos = pos;
+    pruefSichern();
+    renderLernen();
+    lernFokus();
+  };
+  window.pruefRasterUmschalten = function(offen) { lern.pruefRasterOffen = offen; };
+  window.pruefMarkieren = function() {
+    const p = lern.pruefung;
+    if (!p) return;
+    const id = p.ids[p.pos];
+    p.markiert = p.markiert.includes(id) ? p.markiert.filter((x) => x !== id) : [...p.markiert, id];
+    pruefSichern();
+    renderLernen();
+  };
+  window.pruefAbbrechen = function() {
+    if (!confirm("Prüfung abbrechen? Die bisherigen Antworten werden nicht gewertet.")) return;
+    lern.pruefung = null;
+    pruefSichern();
+    renderLernen();
+  };
+
+  // Abgeben (zeitAus = automatisch nach Ablauf der Zeit)
+  window.pruefAbgeben = async function(zeitAus) {
+    const p = lern.pruefung;
+    if (!p || lern.pruefSpeichert) return;
+    const offen = p.ids.filter((id) => p.antworten[id] === undefined).length;
+    if (!zeitAus && !confirm(offen ? `${offen} ${offen === 1 ? "Frage ist" : "Fragen sind"} noch offen und zählen als falsch. Trotzdem abgeben?` : "Prüfung abgeben?")) return;
+    const dauer = Math.round((Math.min(Date.now(), p.ende || Infinity) - p.start) / 1000);
+    // Sofort lokal auswerten, damit das Ergebnis auch ohne Netz da ist
+    const fragen = p.ids.map(lernFrage).filter(Boolean);
+    const richtig = fragen.filter((f) => p.antworten[f.id] === Number(f.richtig)).length;
+    const prozent = fragen.length ? Math.round((richtig / fragen.length) * 100) : 0;
+    lern.pruefErgebnis = {
+      ids: fragen.map((f) => f.id), ordnung: p.ordnung, antworten: { ...p.antworten }, anzahl: fragen.length,
+      richtig, prozent, grenze: p.grenze, bestanden: prozent >= p.grenze, dauer, minuten: p.minuten,
+      zeitAus: !!zeitAus, gespeichert: false, fehler: "", skripte: p.skripte, nurFalsche: false,
+    };
+    lern.pruefung = null;
+    pruefSichern();
+    if (zeitAus) hinweisZeigen("Die Zeit ist um – die Prüfung wurde abgegeben");
+    renderLernen();
+    lernFokus();
+    await pruefErgebnisSpeichern();
+  };
+
+  async function pruefErgebnisSpeichern() {
+    const e = lern.pruefErgebnis;
+    if (!e || e.gespeichert) return;
+    lern.pruefSpeichert = true;
+    e.fehler = "";
+    try {
+      const r = await api("ep_pruefung_speichern", {
+        antworten: e.ids.map((id) => ({ frage_id: id, gewaehlt: e.antworten[id] ?? null })),
+        grenze: e.grenze, zeit_min: e.minuten || null, dauer_sek: e.dauer, skripte: e.skripte, heute: heuteISO(),
+      });
+      e.gespeichert = true;
+      e.id = r.id;
+      lern.pruefSpeichert = false;
+      // Lernstand und Verlauf neu holen (Ergebnis bleibt stehen)
+      window.lernNeuLaden();
+    } catch (err) {
+      lern.pruefSpeichert = false;
+      if (err.message !== "unauthorized") e.fehler = err.message || "Fehler";
+      if (aktiverTab === "lernen") renderLernen();
+    }
+  }
+  window.pruefNochmalSpeichern = function() { pruefErgebnisSpeichern(); renderLernen(); };
+  window.pruefErgebnisSchliessen = function() { lern.pruefErgebnis = null; lern.ansicht = "pruefung"; renderLernen(); window.scrollTo({ top: 0 }); };
+  window.pruefNurFalsche = function(an) { if (lern.pruefErgebnis) { lern.pruefErgebnis.nurFalsche = an; renderLernen(); } };
+  window.pruefFalscheUeben = function() {
+    const e = lern.pruefErgebnis;
+    if (!e) return;
+    const ids = lernMischen(e.ids.filter((id) => { const f = lernFrage(id); return f && e.antworten[id] !== Number(f.richtig); }));
+    if (!ids.length) return;
+    lern.pruefErgebnis = null;
+    lern.ansicht = "ueben";
+    lernSitzungStarten(ids);
+  };
+  // Eine frühere Prüfung noch einmal ansehen
+  window.pruefAnsehen = function(id) {
+    const x = (lern.pruefungen || []).find((p) => String(p.id) === String(id));
+    if (!x) return;
+    const antworten = {};
+    const ids = [];
+    (x.antworten || []).forEach((a) => { if (lernFrage(a.f)) { ids.push(a.f); if (a.g !== null && a.g !== undefined) antworten[a.f] = a.g; } });
+    const ordnung = {};
+    ids.forEach((fid) => { ordnung[fid] = [0, 1, 2, 3]; });
+    lern.pruefErgebnis = {
+      ids, ordnung, antworten, anzahl: x.anzahl, richtig: x.richtig, prozent: x.prozent, grenze: x.grenze,
+      bestanden: x.bestanden, dauer: x.dauer_sek, minuten: x.zeit_min, gespeichert: true, alt: true,
+      datum: x.erstellt_am, fehler: "", nurFalsche: false, fehlend: (x.antworten || []).length - ids.length,
+    };
+    renderLernen();
+    lernFokus();
+  };
+  window.pruefLoeschen = async function(id) {
+    if (!confirm("Diese Prüfung aus dem Verlauf löschen? (Die Antworten bleiben im Lernstand.)")) return;
+    try {
+      await api("ep_pruefung_loeschen", { id });
+      lern.pruefungen = (lern.pruefungen || []).filter((p) => String(p.id) !== String(id));
+      renderLernen();
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht gelöscht: " + (e.message || "Fehler"));
+    }
+  };
+
+  function pruefZeitText(sek) {
+    sek = Math.max(0, Math.round(sek));
+    const h = Math.floor(sek / 3600), m = Math.floor((sek % 3600) / 60), s = sek % 60;
+    return (h ? `${h}:${String(m).padStart(2, "0")}` : `${m}`) + `:${String(s).padStart(2, "0")}`;
+  }
+  function pruefDauerText(sek) {
+    if (sek === null || sek === undefined) return "";
+    const m = Math.round(sek / 60);
+    return m >= 60 ? `${Math.floor(m / 60)} Std. ${m % 60} Min.` : `${Math.max(1, m)} Min.`;
+  }
+
+  // Uhr: jede Sekunde nur die Anzeige anfassen; bei 0 automatisch abgeben
+  let pruefUhr = null;
+  let pruefWarnungen = {};
+  function pruefUhrStellen() {
+    const p = lern.pruefung;
+    if (!p || !p.ende) { if (pruefUhr) { clearInterval(pruefUhr); pruefUhr = null; } return; }
+    if (pruefUhr) return;
+    pruefWarnungen = {};
+    pruefUhr = setInterval(() => {
+      const q = lern.pruefung;
+      if (!q || !q.ende) { clearInterval(pruefUhr); pruefUhr = null; return; }
+      const rest = (q.ende - Date.now()) / 1000;
+      const el = document.getElementById("pruef-uhr");
+      if (el) { el.textContent = pruefZeitText(rest); el.classList.toggle("knapp", rest <= 300); }
+      for (const grenze of [300, 60]) {
+        if (rest <= grenze && rest > 0 && !pruefWarnungen[grenze]) { pruefWarnungen[grenze] = true; hinweisZeigen(grenze === 300 ? "Noch 5 Minuten" : "Noch 1 Minute"); }
+      }
+      if (rest <= 0) { clearInterval(pruefUhr); pruefUhr = null; window.pruefAbgeben(true); }
+    }, 1000);
+  }
+
+  // Tastatur in der Prüfung: 1–4 / A–D wählen, ←/→ blättern
+  document.addEventListener("keydown", (ev) => {
+    if (aktiverTab !== "lernen" || !lern.pruefung) return;
+    if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.isComposing) return;
+    if (document.querySelector("dialog[open]")) return;
+    const t = ev.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+    const k = ev.key.toLowerCase();
+    const i = ["1", "2", "3", "4"].indexOf(k) >= 0 ? Number(k) - 1 : ["a", "b", "c", "d"].indexOf(k);
+    if (i >= 0) { ev.preventDefault(); window.pruefWaehlen(i); return; }
+    if (ev.key === "ArrowRight") { ev.preventDefault(); window.pruefGehe(lern.pruefung.pos + 1); }
+    if (ev.key === "ArrowLeft") { ev.preventDefault(); window.pruefGehe(lern.pruefung.pos - 1); }
+  });
+
+  // Umschalter Üben / Prüfung / Statistik
+  function lernAnsichtHtml() {
+    const a = lern.ansicht || "ueben";
+    return `<div class="lern-ansicht" role="tablist" aria-label="Ansicht">` + [["ueben", "Üben"], ["pruefung", "Prüfung"], ["statistik", "Statistik"]].map(([k, t]) =>
+      `<button type="button" role="tab" class="lern-ansicht-knopf${a === k ? " aktiv" : ""}" aria-selected="${a === k}" onclick="lernAnsicht('${k}')">${t}</button>`).join("") + `</div>`;
+  }
+
+  // Startkarte der Prüfungssimulation mit Einstellungen und Verlauf
+  function pruefStartHtml() {
+    if (lern.pruefungFehlt) {
+      return `<p class="empty-text">Für die Prüfungssimulation bitte zuerst <code>ep_pruefung_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    const e = pruefEinst();
+    const schluessel = lernSkriptSchluessel();
+    const pool = lern.fragen.filter((f) => !e.skripte || e.skripte.includes(String(f.skript_id || "")));
+    const anzahl = Math.min(e.anzahl, pool.length);
+    const istStandard = e.anzahl === PRUEF_STANDARD.anzahl && e.minuten === PRUEF_STANDARD.minuten && e.grenze === PRUEF_STANDARD.grenze;
+    const chips = `
+      <div class="schnell-chips lern-chips" role="group" aria-label="Skripte">
+        <button type="button" class="schnell-chip${!e.skripte ? " aktiv" : ""}" aria-pressed="${!e.skripte}" onclick="pruefEinstAendern('alle')">Alle Skripte</button>
+        ${schluessel.map((k) => {
+          const an = !!e.skripte && e.skripte.includes(k);
+          return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="pruefEinstAendern('skript', '${escapeAttr(k)}')" title="${escapeAttr(lernSkriptName(k, true))}">${escapeHtml(lernSkriptName(k))} <span class="lern-chip-zahl">${lernFragenVon(k).length}</span></button>`;
+        }).join("")}
+      </div>`;
+    const verlauf = lern.pruefungen || [];
+    const bestanden = verlauf.filter((p) => p.bestanden).length;
+    const letzte = verlauf.slice(0, 5).map((p) => p.prozent).reverse();
+    return `
+      <section class="lern-karte" aria-labelledby="pruef-titel">
+        <h2 id="pruef-titel" class="lern-h2">Prüfungssimulation</h2>
+        <p class="notiz-meta">Wie die schriftliche Prüfung: Fragen aus allen gewählten Skripten, Antworten bis zur Abgabe änderbar, Lösungen erst am Ende.</p>
+        <div class="pruef-einst">
+          <label class="pruef-einst-feld"><span class="schnell-label">Fragen</span>
+            <input type="number" inputmode="numeric" min="5" max="200" value="${e.anzahl}" onchange="pruefEinstAendern('anzahl', this.value)"></label>
+          <label class="pruef-einst-feld"><span class="schnell-label">Minuten</span>
+            <input type="number" inputmode="numeric" min="0" max="600" value="${e.minuten}" onchange="pruefEinstAendern('minuten', this.value)" aria-describedby="pruef-min-hinweis"></label>
+          <label class="pruef-einst-feld"><span class="schnell-label">Grenze %</span>
+            <input type="number" inputmode="numeric" min="1" max="100" value="${e.grenze}" onchange="pruefEinstAendern('grenze', this.value)" aria-label="Bestanden ab Prozent"></label>
+        </div>
+        <p class="blatt-hinweis" id="pruef-min-hinweis">0 Minuten = ohne Zeitlimit. ${istStandard ? "Startwerte, bis du die echten Werte kennst." : `<button type="button" class="link-btn" onclick="pruefStandard()">Startwerte (40 / 60 / 60 %)</button>`}</p>
+        <div class="lern-feld"><span class="schnell-label">Skripte</span>${chips}</div>
+        <button type="button" class="btn-primary lern-start" onclick="pruefStarten()"${anzahl ? "" : " disabled"}>${anzahl ? `${ic("stoppuhr")}Prüfung starten · ${anzahl} Fragen${e.minuten ? ` · ${e.minuten} Min.` : ""}` : "Keine Fragen in der Auswahl"}</button>
+        ${anzahl && anzahl < e.anzahl ? `<p class="notiz-meta">Die Auswahl hat nur ${pool.length} Fragen.</p>` : ""}
+      </section>
+      <section class="lern-karte" aria-labelledby="pruef-verlauf-titel">
+        <h2 id="pruef-verlauf-titel" class="lern-h2">Bisherige Prüfungen</h2>
+        ${verlauf.length ? `
+          <p class="notiz-meta">${verlauf.length} ${verlauf.length === 1 ? "Prüfung" : "Prüfungen"} · ${bestanden} bestanden${letzte.length > 1 ? ` · letzte: ${letzte.join(" → ")} %` : ""}</p>
+          <div class="notiz-list">${verlauf.slice(0, 20).map((p) => `
+            <div class="notiz-item pruef-verlauf-item">
+              <div class="notiz-inhalt">
+                <div class="lern-liste-frage"><span class="pruef-plakette ${p.bestanden ? "ok" : "nein"}">${p.bestanden ? "bestanden" : "nicht bestanden"}</span> ${p.prozent} % · ${p.richtig}/${p.anzahl}</div>
+                <div class="notiz-meta">${escapeHtml(formatDatumKurz(String(p.erstellt_am).slice(0, 10)))} · Grenze ${p.grenze} %${p.dauer_sek !== null && p.dauer_sek !== undefined ? ` · ${pruefDauerText(p.dauer_sek)}${p.zeit_min ? ` von ${p.zeit_min} Min.` : ""}` : ""}</div>
+              </div>
+              <div class="spiel-karte-knoepfe">
+                <button class="task-edit-btn" onclick="pruefAnsehen('${escapeAttr(String(p.id))}')" aria-label="Prüfung ansehen" title="Ansehen">${ic("lupe")}</button>
+                <button class="task-edit-btn" onclick="pruefLoeschen('${escapeAttr(String(p.id))}')" aria-label="Prüfung löschen" title="Löschen">${ic("x")}</button>
+              </div>
+            </div>`).join("")}</div>`
+          : `<p class="notiz-meta">Noch keine Prüfung abgelegt.</p>`}
+      </section>`;
+  }
+
+  // Eine Frage der laufenden Prüfung
+  function pruefFrageHtml() {
+    const p = lern.pruefung;
+    const id = p.ids[p.pos];
+    const f = lernFrage(id);
+    const beantwortet = p.ids.filter((x) => p.antworten[x] !== undefined).length;
+    const rest = p.ende ? (p.ende - Date.now()) / 1000 : null;
+    const uhr = p.ende
+      ? `<span class="pruef-uhr${rest <= 300 ? " knapp" : ""}" role="timer" aria-label="Restzeit">${ic("stoppuhr")}<span id="pruef-uhr">${pruefZeitText(rest)}</span></span>`
+      : `<span class="pruef-uhr">${ic("stoppuhr")}ohne Zeitlimit</span>`;
+    const markiert = p.markiert.includes(id);
+    const antworten = f ? p.ordnung[id].map((orig, platz) => {
+      const an = p.antworten[id] === orig;
+      return `<button type="button" class="lern-antwort${an ? " gewaehlt" : ""}" data-platz="${platz}" aria-pressed="${an}" onclick="pruefWaehlen(${platz})">
+          <span class="lern-antwort-buchstabe" aria-hidden="true">${LERN_BUCHSTABEN[platz]}</span>
+          <span class="lern-antwort-text">${escapeHtml((f.antworten || [])[orig] || "")}</span></button>`;
+    }).join("") : `<p class="empty-text">Diese Frage gibt es nicht mehr – sie zählt nicht.</p>`;
+    const raster = p.ids.map((x, i) => {
+      const kl = ["pruef-nr", p.antworten[x] !== undefined ? "beantwortet" : "", p.markiert.includes(x) ? "markiert" : "", i === p.pos ? "aktuell" : ""].filter(Boolean).join(" ");
+      const status = [p.antworten[x] !== undefined ? "beantwortet" : "offen", p.markiert.includes(x) ? "markiert" : ""].filter(Boolean).join(", ");
+      return `<button type="button" class="${kl}" onclick="pruefGehe(${i})" aria-label="Frage ${i + 1}, ${status}"${i === p.pos ? ' aria-current="true"' : ""}>${i + 1}</button>`;
+    }).join("");
+    return `
+      <div class="lern-fortschritt pruef-kopf">
+        <span>Frage ${p.pos + 1} von ${p.ids.length} · ${beantwortet} beantwortet</span>
+        ${uhr}
+      </div>
+      <div class="lern-balken" role="progressbar" aria-label="Beantwortet" aria-valuemin="0" aria-valuemax="${p.ids.length}" aria-valuenow="${beantwortet}"><span style="width:${Math.round((beantwortet / p.ids.length) * 100)}%"></span></div>
+      <section class="lern-karte lern-frage-karte">
+        <p class="notiz-meta">Prüfung · ${f ? escapeHtml(lernSkriptName(f.skript_id)) : ""}${markiert ? ` · ${ic("warnung")} markiert` : ""}</p>
+        <h2 class="lern-frage" id="lern-fokus" tabindex="-1">${f ? escapeHtml(f.frage) : "–"}</h2>
+        <div class="lern-antworten" role="group" aria-label="Antworten">${antworten}</div>
+        <p class="notiz-meta lern-tipp">Tasten 1–4 bzw. A–D wählen, ← → blättern. Nochmal antippen hebt die Auswahl auf.</p>
+        <div class="pruef-navi">
+          <button type="button" class="btn-secondary" onclick="pruefGehe(${p.pos - 1})"${p.pos ? "" : " disabled"}>${ic("zurueck")}Zurück</button>
+          <button type="button" class="btn-secondary${markiert ? " aktiv" : ""}" aria-pressed="${markiert}" onclick="pruefMarkieren()">${ic("warnung")}${markiert ? "Markiert" : "Markieren"}</button>
+          ${p.pos + 1 < p.ids.length
+            ? `<button type="button" class="btn-primary" onclick="pruefGehe(${p.pos + 1})">Weiter${ic("weiter")}</button>`
+            : `<button type="button" class="btn-primary" onclick="pruefAbgeben(false)">Abgeben</button>`}
+        </div>
+      </section>
+      <details class="anleitung-abschnitt pruef-uebersicht"${lern.pruefRasterOffen ? " open" : ""} ontoggle="pruefRasterUmschalten(this.open)">
+        <summary>Übersicht aller Fragen${p.markiert.length ? ` · ${p.markiert.length} markiert` : ""}</summary>
+        <div class="anleitung-text">
+          <div class="pruef-raster">${raster}</div>
+          <p class="notiz-meta">Gefüllt = beantwortet, Rahmen in Gelb = markiert.</p>
+        </div>
+      </details>
+      <div class="lern-knoepfe pruef-ende">
+        <button type="button" class="btn-primary" onclick="pruefAbgeben(false)">Prüfung abgeben</button>
+        <button type="button" class="btn-secondary" onclick="pruefAbbrechen()">Abbrechen</button>
+      </div>`;
+  }
+
+  // Ergebnis einer Prüfung (frisch abgegeben oder aus dem Verlauf)
+  function pruefErgebnisHtml() {
+    const e = lern.pruefErgebnis;
+    const fragen = e.ids.map(lernFrage).filter(Boolean);
+    const falsch = fragen.filter((f) => e.antworten[f.id] !== Number(f.richtig));
+    // je Skript
+    const jeSkript = {};
+    fragen.forEach((f) => {
+      const k = String(f.skript_id || "");
+      const x = jeSkript[k] || (jeSkript[k] = { n: 0, r: 0 });
+      x.n++; if (e.antworten[f.id] === Number(f.richtig)) x.r++;
+    });
+    const skriptZeilen = Object.entries(jeSkript).map(([k, x]) => {
+      const q = lernProzent(x.r, x.n);
+      return `<div class="pruef-skript-zeile"><span class="pruef-skript-name">${escapeHtml(lernSkriptName(k))}</span>
+        <span class="pruef-skript-balken" aria-hidden="true"><span style="width:${q}%"></span></span>
+        <span class="pruef-skript-wert">${x.r}/${x.n} · ${q} %</span></div>`;
+    }).join("");
+    const liste = (e.nurFalsche ? falsch : fragen).map((f) => {
+      const g = e.antworten[f.id];
+      const ok = g === Number(f.richtig);
+      return `
+        <div class="notiz-item lern-liste-item pruef-auswertung ${ok ? "ok" : "nein"}">
+          <div class="notiz-inhalt">
+            <div class="lern-liste-frage">${ok ? ic("ok-kreis") : ic("x-kreis")} ${escapeHtml(f.frage)}</div>
+            ${ok ? "" : `<div class="notiz-meta pruef-deine">Deine Antwort: ${g === undefined || g === null ? "keine" : escapeHtml((f.antworten || [])[g] || "")}</div>`}
+            <div class="notiz-meta">${ic("ok-kreis")} ${escapeHtml((f.antworten || [])[f.richtig] || "")}</div>
+            ${!ok && f.erklaerung ? `<div class="notiz-meta">${escapeHtml(f.erklaerung)}</div>` : ""}
+            <div class="notiz-meta">${escapeHtml([lernSkriptName(f.skript_id), f.seite ? `S. ${f.seite}` : "", f.abschnitt].filter(Boolean).join(" · "))}</div>
+          </div>
+        </div>`;
+    }).join("");
+    const zeit = e.dauer !== null && e.dauer !== undefined ? `${pruefDauerText(e.dauer)}${e.minuten ? ` von ${e.minuten} Min.` : ""}` : "";
+    return `
+      <section class="lern-karte lern-ergebnis pruef-ergebnis ${e.bestanden ? "ok" : "nein"}">
+        <p class="notiz-meta">${e.alt ? `Prüfung vom ${escapeHtml(formatDatumKurz(String(e.datum).slice(0, 10)))}` : "Prüfungssimulation"}${e.zeitAus ? " · Zeit abgelaufen" : ""}</p>
+        <h2 class="lern-frage" id="lern-fokus" tabindex="-1">${e.bestanden ? `${ic("ok-kreis")} Bestanden` : `${ic("x-kreis")} Nicht bestanden`} – ${e.prozent} %</h2>
+        <p class="notiz-meta">${e.richtig} von ${e.anzahl} richtig · Grenze ${e.grenze} %${zeit ? ` · ${zeit}` : ""}${e.fehlend ? ` · ${e.fehlend} Fragen gibt es nicht mehr` : ""}</p>
+        ${e.fehler ? `<p class="lern-hinweis" role="alert">${ic("warnung")} Nicht gespeichert: ${escapeHtml(e.fehler)} <button type="button" class="link-btn" onclick="pruefNochmalSpeichern()">Nochmal versuchen</button></p>` : ""}
+        ${!e.alt && !e.gespeichert && !e.fehler ? `<p class="notiz-meta" role="status">Speichere …</p>` : ""}
+        ${skriptZeilen ? `<div class="pruef-skripte">${skriptZeilen}</div>` : ""}
+        <div class="lern-knoepfe">
+          ${falsch.length ? `<button type="button" class="btn-primary" onclick="pruefFalscheUeben()">${ic("wiederholen")}Falsche üben (${falsch.length})</button>` : ""}
+          <button type="button" class="btn-secondary" onclick="pruefErgebnisSchliessen()">Zur Übersicht</button>
+        </div>
+      </section>
+      <div class="pruef-liste-kopf">
+        <h3 class="lern-h2">Auswertung</h3>
+        <div class="schnell-chips lern-chips" role="group" aria-label="Anzeigen">
+          <button type="button" class="schnell-chip${e.nurFalsche ? "" : " aktiv"}" aria-pressed="${!e.nurFalsche}" onclick="pruefNurFalsche(false)">Alle ${fragen.length}</button>
+          <button type="button" class="schnell-chip${e.nurFalsche ? " aktiv" : ""}" aria-pressed="${e.nurFalsche}" onclick="pruefNurFalsche(true)">Nur falsche ${falsch.length}</button>
+        </div>
+      </div>
+      <div class="notiz-list">${liste || `<p class="empty-text">Alles richtig – stark!</p>`}</div>`;
+  }
+
+  // Statistik: Stand je Skript, schwache Abschnitte, Antworten je Tag
+  function lernAbschnittSchluessel(f) {
+    const a = String(f.abschnitt || "").trim();
+    const nr = /^(\d+(?:\.\d+)*)/.exec(a);
+    return `${f.skript_id || ""}|${nr ? nr[1] : a || "ohne Abschnitt"}`;
+  }
+  window.lernAbschnittUeben = function(key) {
+    const ids = lernMischen(lern.fragen.filter((f) => lernAbschnittSchluessel(f) === key).map((f) => f.id));
+    if (!ids.length) return;
+    lern.ansicht = "ueben";
+    lernSitzungStarten(ids);
+  };
+  window.lernSkriptSchwaechenUeben = function(k) {
+    const ids = lernMischen(lern.fragen.filter((f) => String(f.skript_id || "") === k && (lernIstFalsch(f) || (Number(f.kasten) || 0) <= 1)).map((f) => f.id)).slice(0, 30);
+    if (!ids.length) { hinweisZeigen("Keine schwachen Fragen in diesem Skript"); return; }
+    lern.ansicht = "ueben";
+    lernSitzungStarten(ids);
+  };
+
+  function lernStatistikHtml() {
+    const alle = lern.fragen;
+    const sicher = alle.filter((f) => (Number(f.kasten) || 0) >= 3).length;
+    // je Skript
+    const zeilen = lernSkriptSchluessel().map((k) => {
+      const fr = lernFragenVon(k);
+      let n = 0, r = 0, gesehen = 0;
+      fr.forEach((f) => { const s = lernStandVon(f); if (s.n) { gesehen++; n += s.n; r += s.r; } });
+      const sk = fr.filter((f) => (Number(f.kasten) || 0) >= 3).length;
+      const anteilGesehen = lernProzent(gesehen, fr.length);
+      const anteilSicher = lernProzent(sk, fr.length);
+      return `
+        <div class="notiz-item stat-skript">
+          <div class="notiz-inhalt">
+            <div class="lern-liste-frage">${escapeHtml(lernSkriptName(k, true))}</div>
+            <div class="stat-balken" role="img" aria-label="${anteilSicher} % sicher gelernt, ${anteilGesehen} % schon beantwortet">
+              <span class="stat-gesehen" style="width:${anteilGesehen}%"></span><span class="stat-sicher" style="width:${anteilSicher}%"></span>
+            </div>
+            <div class="notiz-meta">${fr.length} Fragen · ${gesehen} beantwortet · ${sk} sicher (Kasten 3+)${n ? ` · ${lernProzent(r, n)} % richtig` : ""}</div>
+            ${gesehen ? `<button type="button" class="link-btn" onclick="lernSkriptSchwaechenUeben('${escapeAttr(k)}')">Schwächen üben</button>` : ""}
+          </div>
+        </div>`;
+    }).join("");
+    // schwache Abschnitte (mind. 3 Antworten)
+    const gruppen = {};
+    alle.forEach((f) => {
+      const key = lernAbschnittSchluessel(f);
+      const g = gruppen[key] || (gruppen[key] = { key, skript: f.skript_id, name: key.split("|")[1], titel: f.abschnitt || "", n: 0, r: 0, fragen: 0 });
+      const s = lernStandVon(f);
+      g.n += s.n; g.r += s.r; g.fragen++;
+      if (!g.titel || (f.abschnitt && f.abschnitt.length < g.titel.length)) g.titel = f.abschnitt || g.titel;
+    });
+    const schwach = Object.values(gruppen).filter((g) => g.n >= 3 && g.r < g.n).sort((a, b) => a.r / a.n - b.r / b.n || b.n - a.n).slice(0, 8);
+    const schwachHtml = schwach.length ? `<div class="notiz-list">${schwach.map((g) => `
+        <div class="notiz-item stat-abschnitt">
+          <div class="notiz-inhalt">
+            <div class="lern-liste-frage">${escapeHtml(g.titel || g.name)}</div>
+            <div class="notiz-meta">${escapeHtml(lernSkriptName(g.skript))} · ${lernProzent(g.r, g.n)} % richtig (${g.r}/${g.n} Antworten) · ${g.fragen} ${g.fragen === 1 ? "Frage" : "Fragen"}</div>
+          </div>
+          <div class="spiel-karte-knoepfe"><button type="button" class="btn-secondary" onclick="lernAbschnittUeben('${escapeAttr(g.key)}')">Üben</button></div>
+        </div>`).join("")}</div>`
+      : `<p class="notiz-meta">Noch zu wenige Antworten – ab 3 Antworten je Abschnitt erscheinen hier die schwächsten Themen.</p>`;
+    // Antworten je Tag (14 Tage)
+    const heute = heuteISO();
+    const tage = [];
+    for (let i = 13; i >= 0; i--) { const d = lernPlusTage(heute, -i); tage.push([d, lern.tage[d] || { n: 0, r: 0 }]); }
+    const max = Math.max(1, ...tage.map(([, t]) => t.n));
+    const summe = tage.reduce((a, [, t]) => ({ n: a.n + t.n, r: a.r + t.r }), { n: 0, r: 0 });
+    const aktiveTage = tage.filter(([, t]) => t.n).length;
+    const tageHtml = `
+      <div class="stat-tage" role="img" aria-label="Antworten der letzten 14 Tage: ${summe.n} an ${aktiveTage} Tagen, ${lernProzent(summe.r, summe.n)} % richtig">
+        ${tage.map(([d, t]) => `<div class="stat-tag" title="${escapeAttr(`${formatDatumKurz(d)}: ${t.n} Antworten, ${t.r} richtig`)}">
+          <span class="stat-tag-saeule" style="height:${Math.round((t.n / max) * 100)}%"><span class="stat-tag-richtig" style="height:${t.n ? Math.round((t.r / t.n) * 100) : 0}%"></span></span>
+          <span class="stat-tag-name">${new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "narrow" })}</span></div>`).join("")}
+      </div>
+      <p class="notiz-meta">${summe.n ? `${summe.n} Antworten an ${aktiveTage} von 14 Tagen · ${lernProzent(summe.r, summe.n)} % richtig. Dunkler Teil = richtig.` : "In den letzten 14 Tagen noch keine Antworten."}</p>`;
+    const pr = lern.pruefungen || [];
+    const prHtml = pr.length ? `<p class="notiz-meta">${pr.length} Prüfungen · ${pr.filter((p) => p.bestanden).length} bestanden · Schnitt ${Math.round(pr.reduce((a, p) => a + p.prozent, 0) / pr.length)} % · beste ${Math.max(...pr.map((p) => p.prozent))} %</p>` : "";
+    return `
+      <section class="lern-karte">
+        <h2 class="lern-h2">Gesamt</h2>
+        <p class="stat-gross">${lernProzent(sicher, alle.length)} % <span class="notiz-meta">sicher gelernt (${sicher} von ${alle.length} Fragen in Kasten 3 oder höher)</span></p>
+        ${prHtml}
+      </section>
+      <section class="lern-karte"><h2 class="lern-h2">Je Skript</h2>
+        <div class="notiz-list">${zeilen}</div>
+        <p class="notiz-meta">Balken: hell = schon beantwortet, dunkel = sicher gelernt.</p></section>
+      <section class="lern-karte"><h2 class="lern-h2">Schwächste Abschnitte</h2>${schwachHtml}</section>
+      <section class="lern-karte"><h2 class="lern-h2">Letzte 14 Tage</h2>${tageHtml}</section>`;
   }
 
 
@@ -12556,7 +13096,7 @@
     meldung("Lade Fragenkatalog …");
     try {
       const r = await api("ep_fragen_laden", { roh: true });
-      if (!r.fehlt) { liste.ep_fragen = r.fragen || []; liste.ep_fragen_versuche = r.versuche || []; }
+      if (!r.fehlt) { liste.ep_fragen = r.fragen || []; liste.ep_fragen_versuche = r.versuche || []; if (!r.pruefung_fehlt) liste.ep_pruefungen = r.pruefungen || []; }
     } catch (e) {
       if (e.message === "unauthorized") throw e;
       luecken.push("Fragenkatalog: " + e.message);
@@ -12713,6 +13253,7 @@
     { k: "ep_skript_seiten", t: "ep_skript_seiten", name: "Bibliothek: Text je Seite", gruppe: "EP" },
     { k: "ep_fragen", t: "ep_fragen", name: "Fragenkatalog: Fragen mit Lernkartei", gruppe: "EP" },
     { k: "ep_fragen_versuche", t: "ep_fragen_versuche", name: "Fragenkatalog: gegebene Antworten", gruppe: "EP" },
+    { k: "ep_pruefungen", t: "ep_pruefungen", name: "Prüfungssimulationen", gruppe: "EP" },
     { k: "verlauf", t: "verlauf", name: "Verlauf (letzte 50 je Bereich)", gruppe: "Sonstiges", nurErg: true },
   ];
   const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Sonstiges"];
