@@ -121,7 +121,7 @@
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
     rezepte: "view-rezepte", ernaehrung: "view-ernaehrung", schluessel: "view-schluessel",
-    bibliothek: "view-bibliothek",
+    bibliothek: "view-bibliothek", lernen: "view-lernen",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -134,13 +134,14 @@
     ["verlauf", "Verlauf"], ["anleitung", "Anleitung"], ["ogsideen", "Ideen"],
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
-    ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"], ["bibliothek", "Bibliothek"],
+    ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"], ["bibliothek", "Bibliothek"], ["lernen", "Lernen"],
   ];
   // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
   const NUR_PRIVAT_REITER = ["ernaehrung"];
-  // Reiter nur für EP (seit Session 50): Bibliothek der Ausbildungsunterlagen
-  const NUR_EP_REITER = ["bibliothek"];
+  // Reiter nur für EP (seit Session 50): Bibliothek der Ausbildungsunterlagen,
+  // seit Session 52 dazu Lernen (Fragenkatalog)
+  const NUR_EP_REITER = ["bibliothek", "lernen"];
   const REITER_OHNE_PRIVATE = ALLE_REITER.filter(([k]) => !NUR_PRIVAT_REITER.includes(k) && !NUR_EP_REITER.includes(k));
   const BEREICH_TABS = {
     privat: ALLE_REITER.filter(([k]) => !NUR_EP_REITER.includes(k)),
@@ -160,7 +161,7 @@
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel"],
     business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen"],
     // Erlebnispädagogik (seit Session 49): Methodenkartei + Weiterbildung zogen aus Privat hierher
-    ep: ["heute", "aufgaben", "kalender", "notizen", "links", "bibliothek", "methoden", "spiele", "verlauf", "anleitung"],
+    ep: ["heute", "aufgaben", "kalender", "notizen", "links", "bibliothek", "lernen", "methoden", "spiele", "verlauf", "anleitung"],
   };
 
   // Prüft, ob ein Reiter im Bereich sichtbar ist (Nutzereinstellung, sonst Standardliste; manche nur privat)
@@ -179,14 +180,14 @@
   function hauptkategorien() {
     // In EP (seit Session 49) stehen Methoden/Weiterbildung, Spiele und
     // Einheiten in der eigenen Gruppe „EP“ statt unter „Sammeln“
-    const epTabs = aktiverBereich === "ep" ? ["bibliothek", "methoden", "spiele", "einheiten"] : [];
+    const epTabs = aktiverBereich === "ep" ? ["bibliothek", "lernen", "methoden", "spiele", "einheiten"] : [];
     const sammeln = ["notizen", "links", "reflexion", "spiele", "methoden", "einheiten", "einkauf", "rezepte", "training", "ernaehrung"]
       .filter((k) => !epTabs.includes(k));
     return [
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
       { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
       { schluessel: "sammeln", label: "Sammeln", tabs: sammeln },
-      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: [...new Set([...epTabs, "bibliothek"]), "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
+      { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: [...new Set([...epTabs, "bibliothek", "lernen"]), "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
       { schluessel: "verwalten", label: "Verwalten", tabs: ["export", "verlauf", "anleitung"] },
     ];
   }
@@ -633,6 +634,7 @@
     const modul = s.modul_id && (wbModule || []).find((m) => String(m.id) === String(s.modul_id));
     const meta = [s.herausgeber, s.auflage, s.seiten ? `${s.seiten} Seiten` : "", bibGroesse(s.datei_groesse)].filter(Boolean).map(escapeHtml).join(" · ");
     const status = bib.status[s.id];
+    const fragenZahl = lern.geladen ? lernFragenVon(s.id).length : 0;
     const id = escapeAttr(String(s.id));
     return `
       <div class="notiz-item spiel-karte bib-karte" id="bib-${id}">
@@ -645,6 +647,7 @@
           <div class="notiz-meta bib-stand">
             ${s.datei_pfad ? `${ic("ok-kreis")} PDF${s.datei_name ? ` (${escapeHtml(s.datei_name)})` : ""}` : `${ic("warnung")} noch keine PDF`}
             · ${seiten.length ? `${ic("ok-kreis")} Text für ${seiten.length} ${seiten.length === 1 ? "Seite" : "Seiten"} (durchsuchbar)` : `${ic("warnung")} noch kein Text`}
+            ${fragenZahl ? `· ${ic("ok-kreis")} ${fragenZahl} ${fragenZahl === 1 ? "Frage" : "Fragen"}` : ""}
           </div>
           ${status ? `<div class="notiz-meta" role="status" aria-live="polite"><strong>${escapeHtml(status)}</strong></div>` : ""}
           <div class="methode-aktionen">
@@ -666,6 +669,7 @@
     const el = document.getElementById("bibliothek-inhalt");
     if (!el) return;
     if (!bib.geladen && !bib.laedt && !bib.fehler) { bibLaden(); }
+    if (!lern.geladen && !lern.laedt && !lern.fehler && !lern.fehlt) lernLaden();
     if (bib.fehlt) {
       el.innerHTML = `<p class="empty-text">Für die Bibliothek bitte zuerst <code>ep_bibliothek_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
       return;
@@ -783,7 +787,8 @@
   }
 
   // Paket importieren: mit id → Text dieses Skripts erneuern; ohne → Skript anlegen
-  // (bzw. gleichnamiges aktualisieren). Fragen im Paket folgen mit Etappe 3.
+  // (bzw. gleichnamiges aktualisieren). Seit Session 52 kommen die Fragen im
+  // Paket gleich mit in den Fragenkatalog (Reiter Lernen).
   window.bibPaketGewaehlt = async function(input, id) {
     const datei = input.files && input.files[0];
     input.value = "";
@@ -793,27 +798,51 @@
     const titel = String(p.skript.titel || "").trim();
     let ziel = id ? bibSkript(id) : bib.skripte.find((s) => suchNorm(s.titel) === suchNorm(titel));
     const anzahlFragen = Array.isArray(p.fragen) ? p.fragen.length : 0;
+    const fragenText = anzahlFragen ? ` und ${anzahlFragen} Fragen` : "";
+    let textUebernehmen = p.seiten.length > 0;
     try {
       if (ziel) {
         if (id && titel && suchNorm(ziel.titel) !== suchNorm(titel)
-          && !confirm(`Das Paket gehört zu „${titel}“, gewählt ist „${ziel.titel}“. Text trotzdem hier übernehmen?`)) return;
+          && !confirm(`Das Paket gehört zu „${titel}“, gewählt ist „${ziel.titel}“. Trotzdem hier übernehmen?`)) return;
         const alt = bibSeitenVon(ziel.id).length;
-        if (alt && !confirm(`„${ziel.titel}“ hat schon Text für ${alt} Seiten. Durch ${p.seiten.length} Seiten aus dem Paket ersetzen?`)) return;
+        if (alt && textUebernehmen) {
+          textUebernehmen = confirm(`„${ziel.titel}“ hat schon Text für ${alt} Seiten. Durch ${p.seiten.length} Seiten aus dem Paket ersetzen?`
+            + (anzahlFragen ? `\n\n„Abbrechen“ behält den Text und übernimmt nur die ${anzahlFragen} Fragen.` : ""));
+          if (!textUebernehmen && !anzahlFragen) return;
+        } else if (!textUebernehmen && !anzahlFragen) { alert("Das Paket enthält weder Text noch Fragen."); return; }
       } else {
         if (!titel) { alert("Im Paket fehlt der Titel."); return; }
-        if (!confirm(`Neues Skript „${titel}“ mit Text für ${p.seiten.length} Seiten anlegen?`)) return;
+        if (!confirm(`Neues Skript „${titel}“ mit Text für ${p.seiten.length} Seiten${fragenText} anlegen?`)) return;
         const r = await api("ep_skript_speichern", {
           titel, nummer: p.skript.nummer ?? null, herausgeber: p.skript.herausgeber || null,
           auflage: p.skript.auflage || null, thema: p.skript.thema || null,
         });
         ziel = { id: r.id, titel };
       }
-      bibStatus(ziel.id, "Importiere Text …");
-      const r = await api("ep_skript_seiten_import", { id: ziel.id, seiten: p.seiten });
+      const teile = [];
+      if (textUebernehmen) {
+        bibStatus(ziel.id, "Importiere Text …");
+        const r = await api("ep_skript_seiten_import", { id: ziel.id, seiten: p.seiten });
+        teile.push(`Text für ${r.seiten} Seiten`);
+      }
+      if (anzahlFragen) {
+        bibStatus(ziel.id, `Übernehme ${anzahlFragen} Fragen …`);
+        try {
+          const r = await api("ep_fragen_import", { skript_id: ziel.id, fragen: p.fragen });
+          const det = [r.neu ? `${r.neu} neu` : "", r.aktualisiert ? `${r.aktualisiert} aktualisiert` : "",
+            r.behalten ? `${r.behalten} von dir geänderte behalten` : "", r.entfernt ? `${r.entfernt} entfernt` : ""].filter(Boolean).join(", ");
+          teile.push(`Fragen (${det || "unverändert"})`);
+        } catch (e) {
+          if (e.message === "unauthorized") throw e;
+          alert((teile.length ? teile.join(" und ") + " übernommen – die Fragen aber nicht: " : "Fragen nicht übernommen: ") + (e.message || "Fehler"));
+        }
+        lern.geladen = false;
+      }
       bibStatus(ziel.id, "");
-      hinweisZeigen(`Text für ${r.seiten} Seiten übernommen` + (anzahlFragen ? ` – ${anzahlFragen} Fragen folgen mit dem Lernen` : ""));
+      if (teile.length) hinweisZeigen(teile.join(" und ") + " übernommen");
       bib.geladen = false;
       await bibLaden();
+      if (anzahlFragen) lernLaden();
     } catch (e) {
       if (ziel) bibStatus(ziel.id, "");
       if (e.message !== "unauthorized") alert("Import fehlgeschlagen: " + (e.message || "Fehler"));
@@ -826,6 +855,506 @@
     const n = bib.skripte.length;
     return `${n} ${n === 1 ? "Skript" : "Skripte"}` + (bib.seiten.length ? ` · ${bib.seiten.length} Seiten` : "");
   }
+  // ==========================================================
+  // EP-Fragenkatalog und Lernen (seit Session 52, Etappe 3 des EP-Ausbaus)
+  // Single-Choice-Fragen aus den Skript-Paketen (und eigene), gelernt mit
+  // gemischten Antworten, Erklärung und Seitenangabe. Lernkartei nach
+  // Leitner: richtig → ein Kasten weiter (1/3/7/14/30 Tage), falsch →
+  // zurück in Kasten 1 und sofort wieder fällig. Daten: ep_fragen,
+  // ep_fragen_versuche (nur Bereich EP); geladen erst bei Bedarf.
+  // ==========================================================
+  const lern = {
+    geladen: false, laedt: false, fehlt: false, fehler: "",
+    fragen: [], stand: {}, tage: {},
+    sitzung: null,      // { ids, pos, ordnung: {id: [Originalindex je Anzeigeplatz]}, antworten: {id: {gewaehlt, richtig}}, fertig }
+    such: "", filter: "alle", verwaltenOffen: false,
+  };
+  const LERN_MODI = [
+    ["faellig", "Fällige & neue"], ["zufall", "Zufällig gemischt"], ["falsch", "Zuletzt falsch"], ["neu", "Nur neue"],
+  ];
+  const LERN_ANZAHL = [[10, "10"], [20, "20"], [30, "30"], [0, "Alle"]];
+  const LERN_STUFEN = [[0, "Alle Stufen"], [1, "leicht"], [2, "mittel"], [3, "schwer"]];
+  const LERN_KASTEN_TAGE = [0, 1, 3, 7, 14, 30];
+  const LERN_BUCHSTABEN = ["A", "B", "C", "D"];
+
+  // Einstellungen der Startseite (nur dieses Gerät)
+  function lernEinst() {
+    let e = {};
+    try { e = JSON.parse(localStorage.getItem("lern-einstellungen") || "{}") || {}; } catch (_e) { e = {}; }
+    return {
+      modus: LERN_MODI.some(([k]) => k === e.modus) ? e.modus : "faellig",
+      anzahl: LERN_ANZAHL.some(([k]) => k === e.anzahl) ? e.anzahl : 20,
+      stufe: LERN_STUFEN.some(([k]) => k === e.stufe) ? e.stufe : 0,
+      skripte: Array.isArray(e.skripte) ? e.skripte.map(String) : null, // null = alle
+    };
+  }
+  function lernEinstSetzen(teil) {
+    const e = Object.assign(lernEinst(), teil);
+    try { localStorage.setItem("lern-einstellungen", JSON.stringify(e)); } catch (_e) { /* privat-Modus: dann eben nicht merken */ }
+  }
+
+  async function lernLaden() {
+    if (lern.laedt) return;
+    lern.laedt = true;
+    lern.fehler = "";
+    if (aktiverTab === "lernen") renderLernen();
+    try {
+      const r = await api("ep_fragen_laden");
+      lern.fehlt = !!r.fehlt;
+      lern.fragen = r.fragen || [];
+      lern.stand = r.stand || {};
+      lern.tage = r.tage || {};
+      lern.geladen = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") lern.fehler = e.message || "Fehler";
+    } finally {
+      lern.laedt = false;
+    }
+    if (aktiverTab === "lernen") renderLernen();
+    if (aktiverTab === "bibliothek") renderBibliothek();
+    if (aktiverTab === "heute") renderHeute();
+  }
+  window.lernNeuLaden = function() { lern.geladen = false; lern.fehler = ""; lernLaden(); };
+
+  function lernFrage(id) { return lern.fragen.find((f) => String(f.id) === String(id)); }
+  function lernStandVon(f) { return lern.stand[f.id] || { n: 0, r: 0, zuletzt: "", letzt_richtig: false }; }
+  function lernIstNeu(f) { return !lernStandVon(f).n && !f.kasten; }
+  function lernIstFaellig(f) { return !!f.faellig_am && f.faellig_am <= heuteISO(); }
+  function lernIstFalsch(f) { const s = lernStandVon(f); return s.n > 0 && !s.letzt_richtig; }
+  function lernFragenVon(skriptId) { return lern.fragen.filter((f) => String(f.skript_id || "") === String(skriptId || "")); }
+  function lernMischen(liste) {
+    const a = liste.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  // Kurzer Skriptname für Chips und Meta-Zeilen
+  function lernSkriptName(skriptId, lang) {
+    if (!skriptId) return "Ohne Skript";
+    const s = bibSkript(skriptId);
+    if (!s) return "Skript";
+    const t = bibTitel(s);
+    if (lang) return t;
+    const kurz = t.split(/\s[–—-]\s|:\s/)[0];
+    return kurz.length > 42 ? kurz.slice(0, 40) + "…" : kurz;
+  }
+  // Alle Skript-Schlüssel, zu denen es Fragen gibt ("" = ohne Skript)
+  function lernSkriptSchluessel() {
+    const ids = [...new Set(lern.fragen.map((f) => String(f.skript_id || "")))];
+    const ordnung = bibSortiert().map((s) => String(s.id));
+    return ids.sort((a, b) => (a === "" ? 1 : b === "" ? -1 : ordnung.indexOf(a) - ordnung.indexOf(b)));
+  }
+
+  // Fragen, die zur Auswahl (Skripte, Stufe) passen
+  function lernPool(e) {
+    return lern.fragen.filter((f) => (!e.skripte || e.skripte.includes(String(f.skript_id || "")))
+      && (!e.stufe || Number(f.schwierigkeit) === e.stufe));
+  }
+  // Fragen für eine Runde nach Modus
+  function lernKandidaten(e) {
+    const pool = lernPool(e);
+    let liste;
+    if (e.modus === "faellig") {
+      const faellig = pool.filter(lernIstFaellig).sort((a, b) => String(a.faellig_am).localeCompare(String(b.faellig_am)) || a.kasten - b.kasten);
+      liste = [...faellig, ...lernMischen(pool.filter(lernIstNeu))];
+    } else if (e.modus === "falsch") liste = lernMischen(pool.filter(lernIstFalsch));
+    else if (e.modus === "neu") liste = lernMischen(pool.filter(lernIstNeu));
+    else liste = lernMischen(pool);
+    return e.anzahl ? liste.slice(0, e.anzahl) : liste;
+  }
+
+  function lernSitzungStarten(ids) {
+    const ordnung = {};
+    ids.forEach((id) => { ordnung[id] = lernMischen([0, 1, 2, 3]); });
+    lern.sitzung = { ids, pos: 0, ordnung, antworten: {}, fertig: false };
+    renderLernen();
+    lernFokus();
+  }
+  window.lernStarten = function() {
+    const ids = lernKandidaten(lernEinst()).map((f) => f.id);
+    if (!ids.length) { hinweisZeigen("Keine passenden Fragen"); return; }
+    lernSitzungStarten(ids);
+  };
+  window.lernFalscheWiederholen = function() {
+    const s = lern.sitzung;
+    if (!s) return;
+    const ids = lernMischen(s.ids.filter((id) => s.antworten[id] && !s.antworten[id].richtig));
+    if (ids.length) lernSitzungStarten(ids);
+  };
+  window.lernBeenden = function() {
+    const s = lern.sitzung;
+    if (s && !s.fertig && Object.keys(s.antworten).length) { s.fertig = true; renderLernen(); lernFokus(); return; }
+    lern.sitzung = null;
+    renderLernen();
+  };
+  window.lernZurUebersicht = function() { lern.sitzung = null; renderLernen(); window.scrollTo({ top: 0 }); };
+
+  // Antwort an Anzeigeplatz i (0–3)
+  window.lernAntworten = function(i) {
+    const s = lern.sitzung;
+    if (!s || s.fertig) return;
+    const id = s.ids[s.pos];
+    const f = lernFrage(id);
+    if (!f || s.antworten[id]) return;
+    const gewaehlt = s.ordnung[id][i];
+    const richtig = gewaehlt === Number(f.richtig);
+    s.antworten[id] = { gewaehlt, richtig };
+    // Lernstand sofort lokal nachführen (wie der Server)
+    const st = lern.stand[id] || (lern.stand[id] = { n: 0, r: 0, zuletzt: "", letzt_richtig: false });
+    st.n++; if (richtig) st.r++;
+    st.zuletzt = new Date().toISOString(); st.letzt_richtig = richtig;
+    const heute = heuteISO();
+    f.kasten = richtig ? Math.min(5, (Number(f.kasten) || 0) + 1) : 1;
+    f.faellig_am = richtig ? lernPlusTage(heute, LERN_KASTEN_TAGE[f.kasten]) : heute;
+    const tag = lern.tage[heute] || (lern.tage[heute] = { n: 0, r: 0 });
+    tag.n++; if (richtig) tag.r++;
+    renderLernen();
+    const weiter = document.getElementById("lern-weiter");
+    if (weiter) weiter.focus();
+    api("ep_antwort_speichern", { frage_id: id, gewaehlt, heute }).then((r) => {
+      if (r && r.faellig_am) { f.kasten = r.kasten; f.faellig_am = r.faellig_am; }
+    }).catch((e) => {
+      if (e.message !== "unauthorized") hinweisZeigen("Antwort nicht gespeichert: " + (e.message || "Fehler"));
+    });
+  };
+  function lernPlusTage(iso, tage) {
+    const [j, m, t] = iso.split("-").map(Number);
+    const d = new Date(Date.UTC(j, m - 1, t + tage));
+    return d.toISOString().slice(0, 10);
+  }
+  // Frage wurde zwischendurch gelöscht: überspringen
+  window.lernWeiterOhne = function() {
+    const s = lern.sitzung;
+    if (!s) return;
+    s.ids.splice(s.pos, 1);
+    if (s.pos >= s.ids.length) s.fertig = true;
+    if (!s.ids.length) lern.sitzung = null;
+    renderLernen();
+  };
+  window.lernWeiter = function() {
+    const s = lern.sitzung;
+    if (!s || !s.antworten[s.ids[s.pos]]) return;
+    if (s.pos + 1 >= s.ids.length) s.fertig = true; else s.pos++;
+    renderLernen();
+    lernFokus();
+  };
+  // Fokus auf die Frage bzw. das Ergebnis (Bildschirmleser, Tastatur)
+  function lernFokus() {
+    const el = document.getElementById("lern-fokus");
+    if (el) { el.focus({ preventScroll: true }); el.scrollIntoView({ block: "start", behavior: "smooth" }); }
+  }
+
+  // Tastatur: 1–4 bzw. A–D antworten, Enter/→ weiter
+  document.addEventListener("keydown", (ev) => {
+    if (aktiverTab !== "lernen" || !lern.sitzung || lern.sitzung.fertig) return;
+    if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.isComposing) return;
+    if (document.querySelector("dialog[open]")) return;
+    const t = ev.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+    const s = lern.sitzung;
+    const beantwortet = !!s.antworten[s.ids[s.pos]];
+    const k = ev.key.toLowerCase();
+    const i = ["1", "2", "3", "4"].indexOf(k) >= 0 ? Number(k) - 1 : ["a", "b", "c", "d"].indexOf(k);
+    if (!beantwortet && i >= 0) { ev.preventDefault(); window.lernAntworten(i); return; }
+    if (beantwortet && (ev.key === "ArrowRight" || (ev.key === "Enter" && t && t.tagName !== "BUTTON"))) { ev.preventDefault(); window.lernWeiter(); }
+  });
+
+  // Frage melden („stimmt nicht“, „unklar“) bzw. Meldung entfernen
+  window.lernMelden = async function(id) {
+    const f = lernFrage(id);
+    if (!f) return;
+    let meldung;
+    if (f.gemeldet) {
+      if (!confirm(`Diese Frage ist gemeldet:\n„${f.meldung || ""}“\n\nMeldung entfernen (Frage ist in Ordnung)?`)) return;
+      meldung = null;
+    } else {
+      meldung = prompt("Was stimmt an der Frage nicht? (z. B. „Antwort C ist laut Skript auch richtig“)", "");
+      if (meldung === null) return;
+      meldung = meldung.trim() || "Bitte prüfen";
+    }
+    try {
+      await api("ep_frage_melden", { id, meldung });
+      f.gemeldet = !!meldung; f.meldung = meldung;
+      hinweisZeigen(meldung ? "Frage gemeldet – sie steht unter „Fragen verwalten“ → Gemeldete" : "Meldung entfernt");
+      renderLernen();
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
+
+  window.lernEinstWaehlen = function(feld, wert) {
+    if (feld === "skript") {
+      const alle = lernSkriptSchluessel();
+      let auswahl = lernEinst().skripte || alle.slice();
+      auswahl = auswahl.includes(wert) ? auswahl.filter((x) => x !== wert) : [...auswahl, wert];
+      lernEinstSetzen({ skripte: auswahl.length === alle.length || !auswahl.length ? null : auswahl });
+    } else if (feld === "alle") {
+      lernEinstSetzen({ skripte: null });
+    } else {
+      lernEinstSetzen({ [feld]: feld === "modus" ? wert : Number(wert) });
+    }
+    renderLernen();
+  };
+
+  window.lernZuruecksetzen = async function() {
+    const n = Object.keys(lern.stand).length;
+    if (!confirm(`Lernstand aller Fragen zurücksetzen?\n\nDabei werden alle gegebenen Antworten${n ? ` (zu ${n} Fragen)` : ""} gelöscht und alle Fragen gelten wieder als neu. Die Fragen selbst bleiben.`)) return;
+    try {
+      await api("ep_lernstand_zuruecksetzen", {});
+      lern.sitzung = null;
+      hinweisZeigen("Lernstand zurückgesetzt");
+      window.lernNeuLaden();
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht zurückgesetzt: " + (e.message || "Fehler"));
+    }
+  };
+  window.lernVerwaltenUmschalten = function(offen) { lern.verwaltenOffen = offen; };
+  window.lernSucheGetippt = function(wert) { lern.such = wert; lernVerwaltenZeichnen(); };
+  window.lernFilterWaehlen = function(wert) { lern.filter = wert; renderLernen(); };
+
+  function lernChips(feld, optionen, aktiv, label) {
+    return `<div class="schnell-chips lern-chips" role="group" aria-label="${escapeAttr(label)}">` + optionen.map(([wert, text]) => {
+      const an = aktiv(wert);
+      return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lernEinstWaehlen('${feld}', '${escapeAttr(String(wert))}')">${text}</button>`;
+    }).join("") + `</div>`;
+  }
+
+  function lernProzent(r, n) { return n ? Math.round((r / n) * 100) : 0; }
+
+  // Startseite: Überblick, Auswahl, Start, Verwaltung
+  function lernStartHtml() {
+    const e = lernEinst();
+    const alle = lern.fragen;
+    const heute = heuteISO();
+    const beantwortet = alle.filter((f) => lernStandVon(f).n > 0);
+    let n = 0, r = 0;
+    beantwortet.forEach((f) => { const s = lernStandVon(f); n += s.n; r += s.r; });
+    const tagHeute = lern.tage[heute] || { n: 0, r: 0 };
+    let w7n = 0, w7r = 0;
+    Object.entries(lern.tage).forEach(([tag, t]) => { if (tag >= lernPlusTage(heute, -6)) { w7n += t.n; w7r += t.r; } });
+    const faellig = alle.filter(lernIstFaellig).length;
+    const neu = alle.filter(lernIstNeu).length;
+    const kaesten = [0, 1, 2, 3, 4, 5].map((k) => alle.filter((f) => (Number(f.kasten) || 0) === k).length);
+    const ueberblick = `
+      <div class="lern-ueberblick" aria-label="Lernstand">
+        <div class="lern-zahl"><span class="lern-zahl-wert">${alle.length}</span><span class="lern-zahl-text">Fragen</span></div>
+        <div class="lern-zahl"><span class="lern-zahl-wert">${faellig}</span><span class="lern-zahl-text">fällig</span></div>
+        <div class="lern-zahl"><span class="lern-zahl-wert">${neu}</span><span class="lern-zahl-text">neu</span></div>
+        <div class="lern-zahl"><span class="lern-zahl-wert">${tagHeute.n}</span><span class="lern-zahl-text">heute beantwortet</span></div>
+      </div>
+      <p class="notiz-meta">${beantwortet.length ? `${beantwortet.length} von ${alle.length} Fragen schon beantwortet · insgesamt ${lernProzent(r, n)} % richtig${w7n ? ` · letzte 7 Tage ${lernProzent(w7r, w7n)} % (${w7n} Antworten)` : ""}` : "Noch keine Frage beantwortet – los geht’s mit „Start“."}</p>
+      <div class="lern-kaesten" role="img" aria-label="Lernkartei: ${kaesten.map((k, i) => `${i ? `Kasten ${i}` : "neu"} ${k}`).join(", ")}">
+        ${kaesten.map((k, i) => `<div class="lern-kasten"><span class="lern-kasten-balken" style="--anteil:${alle.length ? Math.round((k / alle.length) * 100) : 0}%"></span><span class="lern-kasten-zahl">${k}</span><span class="lern-kasten-name">${i ? `K${i}` : "neu"}</span></div>`).join("")}
+      </div>`;
+
+    const schluessel = lernSkriptSchluessel();
+    const skriptChips = `
+      <div class="schnell-chips lern-chips" role="group" aria-label="Skripte">
+        <button type="button" class="schnell-chip${!e.skripte ? " aktiv" : ""}" aria-pressed="${!e.skripte}" onclick="lernEinstWaehlen('alle')">Alle Skripte</button>
+        ${schluessel.map((k) => {
+          const an = !!e.skripte && e.skripte.includes(k);
+          const zahl = lernFragenVon(k).length;
+          return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lernEinstWaehlen('skript', '${escapeAttr(k)}')" title="${escapeAttr(lernSkriptName(k, true))}">${escapeHtml(lernSkriptName(k))} <span class="lern-chip-zahl">${zahl}</span></button>`;
+        }).join("")}
+      </div>`;
+    const passend = lernKandidaten(e).length;
+    const modusText = { faellig: "Erst die fälligen Wiederholungen, dann neue Fragen.", zufall: "Alle Fragen der Auswahl in zufälliger Reihenfolge.", falsch: "Fragen, deren letzte Antwort falsch war.", neu: "Nur Fragen, die du noch nie beantwortet hast." }[e.modus];
+    const start = `
+      <section class="lern-karte" aria-labelledby="lern-start-titel">
+        <h2 id="lern-start-titel" class="lern-h2">Neue Runde</h2>
+        <div class="lern-feld"><span class="schnell-label">Skripte</span>${skriptChips}</div>
+        <div class="lern-feld"><span class="schnell-label">Fragen</span>${lernChips("modus", LERN_MODI, (w) => w === e.modus, "Welche Fragen")}<span class="blatt-hinweis">${modusText}</span></div>
+        <div class="lern-feld lern-feld-reihe">
+          <div><span class="schnell-label">Anzahl</span>${lernChips("anzahl", LERN_ANZAHL, (w) => w === e.anzahl, "Anzahl")}</div>
+          <div><span class="schnell-label">Schwierigkeit</span>${lernChips("stufe", LERN_STUFEN, (w) => w === e.stufe, "Schwierigkeit")}</div>
+        </div>
+        <button type="button" class="btn-primary lern-start" onclick="lernStarten()"${passend ? "" : " disabled"}>${passend ? `${ic("weiter")}Start · ${passend} ${passend === 1 ? "Frage" : "Fragen"}` : "Keine passenden Fragen"}</button>
+        ${!passend && e.modus === "faellig" && lernPool(e).length ? `<p class="notiz-meta">Gerade ist nichts fällig – alles wiederholt. Für mehr Übung „Zufällig gemischt“ wählen.</p>` : ""}
+      </section>`;
+    return ueberblick + start + lernVerwaltenHtml();
+  }
+
+  // Liste zum Durchsuchen, Prüfen und Bearbeiten der Fragen
+  const LERN_FILTER = [["alle", "Alle"], ["gemeldet", "Gemeldete"], ["falsch", "Zuletzt falsch"], ["eigen", "Eigene"], ["bearbeitet", "Bearbeitete"]];
+  function lernVerwaltenHtml() {
+    const gemeldet = lern.fragen.filter((f) => f.gemeldet).length;
+    return `
+      <details class="anleitung-abschnitt lern-verwalten"${lern.verwaltenOffen ? " open" : ""} ontoggle="lernVerwaltenUmschalten(this.open)">
+        <summary>Fragen verwalten${gemeldet ? ` · ${gemeldet} gemeldet` : ""}</summary>
+        <div class="anleitung-text">
+          <div class="reiter-aktionen bib-aktionen">
+            <button type="button" class="btn-secondary" onclick="blattNeu('frage', {})">${ic("plus")}Eigene Frage</button>
+            <button type="button" class="btn-secondary" onclick="lernZuruecksetzen()">${ic("wiederholen")}Lernstand zurücksetzen</button>
+          </div>
+          <div class="row"><input type="search" id="lern-suche" value="${escapeAttr(lern.such)}" placeholder="In Fragen und Antworten suchen …" aria-label="In Fragen und Antworten suchen" oninput="lernSucheGetippt(this.value)" autocomplete="off"></div>
+          <div class="schnell-chips lern-chips" role="group" aria-label="Filter">${LERN_FILTER.map(([k, t]) =>
+            `<button type="button" class="schnell-chip${lern.filter === k ? " aktiv" : ""}" aria-pressed="${lern.filter === k}" onclick="lernFilterWaehlen('${k}')">${t}</button>`).join("")}</div>
+          <div id="lern-verwalten-liste"></div>
+          <p class="notiz-meta">Fragen kommen mit dem Skript-Paket: in der Bibliothek „Skript-Paket importieren“ bzw. am Skript „Text erneuern“. Von dir geänderte Fragen überschreibt ein neues Paket nicht.</p>
+        </div>
+      </details>`;
+  }
+  function lernVerwaltenZeichnen() {
+    const el = document.getElementById("lern-verwalten-liste");
+    if (!el) return;
+    const woerter = suchNorm(lern.such).split(/\s+/).filter((w) => w.length >= 2);
+    let liste = lern.fragen.filter((f) => {
+      if (lern.filter === "gemeldet" && !f.gemeldet) return false;
+      if (lern.filter === "falsch" && !lernIstFalsch(f)) return false;
+      if (lern.filter === "eigen" && f.quelle !== "eigen") return false;
+      if (lern.filter === "bearbeitet" && !f.bearbeitet) return false;
+      if (!woerter.length) return true;
+      const text = suchNorm([f.frage, ...(f.antworten || []), f.erklaerung, f.abschnitt, f.meldung].join(" "));
+      return woerter.every((w) => text.includes(w));
+    });
+    const gesamt = liste.length;
+    if (!woerter.length && lern.filter === "alle") {
+      el.innerHTML = `<p class="notiz-meta">${gesamt} Fragen – zum Anzeigen suchen oder einen Filter wählen.</p>`;
+      return;
+    }
+    liste = liste.slice(0, 50);
+    el.innerHTML = gesamt ? `<p class="notiz-meta">${gesamt} ${gesamt === 1 ? "Frage" : "Fragen"}${gesamt > liste.length ? ` – die ersten ${liste.length}` : ""}</p>
+      <div class="notiz-list">${liste.map((f) => {
+        const s = lernStandVon(f);
+        const meta = [lernSkriptName(f.skript_id), f.seite ? `S. ${f.seite}` : "", ["", "leicht", "mittel", "schwer"][f.schwierigkeit] || "",
+          f.quelle === "eigen" ? "eigene" : f.bearbeitet ? "bearbeitet" : "", s.n ? `${s.r}/${s.n} richtig` : "neu", f.kasten ? `Kasten ${f.kasten}` : ""].filter(Boolean).map(escapeHtml).join(" · ");
+        return `
+          <div class="notiz-item lern-liste-item">
+            <div class="notiz-inhalt">
+              <div class="lern-liste-frage">${escapeHtml(f.frage)}</div>
+              <div class="notiz-meta">${ic("ok-kreis")} ${escapeHtml(LERN_BUCHSTABEN[f.richtig] ? (f.antworten || [])[f.richtig] : "")}</div>
+              <div class="notiz-meta">${meta}</div>
+              ${f.gemeldet ? `<div class="notiz-meta lern-gemeldet">${ic("warnung")} gemeldet: ${escapeHtml(f.meldung || "")}</div>` : ""}
+            </div>
+            <div class="spiel-karte-knoepfe">
+              <button class="task-edit-btn" onclick="lernMelden('${escapeAttr(String(f.id))}')" aria-label="${f.gemeldet ? "Meldung ansehen oder entfernen" : "Frage melden"}" title="${f.gemeldet ? "Meldung" : "Melden"}">${ic("warnung")}</button>
+              <button class="task-edit-btn" onclick="blattOeffnen('frage', '${escapeAttr(String(f.id))}')" aria-label="Frage bearbeiten" title="Bearbeiten">${ic("stift")}</button>
+            </div>
+          </div>`;
+      }).join("")}</div>` : `<p class="empty-text">Keine passenden Fragen.</p>`;
+  }
+
+  // Eine Frage der laufenden Runde
+  function lernFrageHtml() {
+    const s = lern.sitzung;
+    const id = s.ids[s.pos];
+    const f = lernFrage(id);
+    if (!f) return `<p class="empty-text">Diese Frage gibt es nicht mehr. <button class="link-btn" onclick="lernWeiterOhne()">Weiter</button></p>`;
+    const a = s.antworten[id];
+    const richtigeZahl = Object.values(s.antworten).filter((x) => x.richtig).length;
+    const falscheZahl = Object.values(s.antworten).length - richtigeZahl;
+    const stufe = Number(f.schwierigkeit) || 2;
+    const antworten = s.ordnung[id].map((orig, platz) => {
+      let klasse = "lern-antwort";
+      let zusatz = "";
+      if (a) {
+        if (orig === Number(f.richtig)) { klasse += " richtig"; zusatz = `<span class="lern-antwort-marke">${ic("ok-kreis")}<span class="lern-sr"> richtige Antwort</span></span>`; }
+        else if (orig === a.gewaehlt) { klasse += " falsch"; zusatz = `<span class="lern-antwort-marke">${ic("x-kreis")}<span class="lern-sr"> deine Antwort</span></span>`; }
+        else klasse += " still";
+      }
+      return `<button type="button" class="${klasse}" onclick="lernAntworten(${platz})"${a ? " disabled" : ""}>
+          <span class="lern-antwort-buchstabe" aria-hidden="true">${LERN_BUCHSTABEN[platz]}</span>
+          <span class="lern-antwort-text">${escapeHtml((f.antworten || [])[orig] || "")}</span>${zusatz}</button>`;
+    }).join("");
+    const seiteText = f.seite && f.skript_id ? (bib.seiten.find((x) => String(x.skript_id) === String(f.skript_id) && Number(x.seite) === Number(f.seite)) || {}).text : "";
+    const skript = f.skript_id ? bibSkript(f.skript_id) : null;
+    const quelle = [lernSkriptName(f.skript_id, true), f.seite ? `S. ${f.seite}` : "", f.abschnitt].filter(Boolean).map(escapeHtml).join(" · ");
+    const aufloesung = a ? `
+      <div class="lern-aufloesung ${a.richtig ? "richtig" : "falsch"}" role="status">
+        <p class="lern-urteil">${a.richtig ? `${ic("ok-kreis")} Richtig!` : `${ic("x-kreis")} Leider falsch – richtig ist ${LERN_BUCHSTABEN[s.ordnung[id].indexOf(Number(f.richtig))]}.`}</p>
+        ${f.erklaerung ? `<p class="lern-erklaerung">${escapeHtml(f.erklaerung)}</p>` : ""}
+        ${f.hinweis ? `<p class="lern-hinweis">${ic("warnung")} ${escapeHtml(f.hinweis)}</p>` : ""}
+        ${quelle ? `<p class="notiz-meta lern-quelle">Quelle: ${quelle}</p>` : ""}
+        <div class="lern-knoepfe">
+          ${skript && skript.datei_pfad && f.seite ? `<button type="button" class="btn-secondary" onclick="bibOeffnen('${escapeAttr(String(f.skript_id))}', ${Number(f.seite)})">${ic("export")}PDF S. ${Number(f.seite)}</button>` : ""}
+          <button type="button" class="btn-secondary" onclick="lernMelden('${escapeAttr(String(f.id))}')">${ic("warnung")}${f.gemeldet ? "Gemeldet" : "Melden"}</button>
+          <button type="button" class="btn-secondary" onclick="blattOeffnen('frage', '${escapeAttr(String(f.id))}')">${ic("stift")}Bearbeiten</button>
+        </div>
+        ${seiteText ? `<details class="lern-seitentext"><summary>Text von Seite ${Number(f.seite)} lesen</summary><div class="lern-seitentext-inhalt">${escapeHtml(seiteText)}</div></details>` : ""}
+      </div>
+      <button type="button" class="btn-primary lern-weiter" id="lern-weiter" onclick="lernWeiter()">${s.pos + 1 >= s.ids.length ? "Ergebnis ansehen" : "Weiter"}${ic("weiter")}</button>` : "";
+    return `
+      <div class="lern-fortschritt">
+        <span>Frage ${s.pos + 1} von ${s.ids.length}</span>
+        <span>${ic("ok-kreis")} ${richtigeZahl} · ${ic("x-kreis")} ${falscheZahl}</span>
+        <button type="button" class="link-btn" onclick="lernBeenden()">Beenden</button>
+      </div>
+      <div class="lern-balken" role="progressbar" aria-label="Fortschritt der Runde" aria-valuemin="0" aria-valuemax="${s.ids.length}" aria-valuenow="${Object.keys(s.antworten).length}"><span style="width:${Math.round((Object.keys(s.antworten).length / s.ids.length) * 100)}%"></span></div>
+      <section class="lern-karte lern-frage-karte">
+        <p class="notiz-meta">${escapeHtml(lernSkriptName(f.skript_id))} · <span class="lern-stufe" aria-label="Schwierigkeit ${["", "leicht", "mittel", "schwer"][stufe]}">${"●".repeat(stufe)}${"○".repeat(3 - stufe)}</span>${f.gemeldet ? ` · ${ic("warnung")} gemeldet` : ""}</p>
+        <h2 class="lern-frage" id="lern-fokus" tabindex="-1">${escapeHtml(f.frage)}</h2>
+        <div class="lern-antworten" role="group" aria-label="Antworten">${antworten}</div>
+        ${a ? "" : `<p class="notiz-meta lern-tipp">Tipp: Tasten 1–4 bzw. A–D wählen, Enter geht weiter.</p>`}
+        ${aufloesung}
+      </section>`;
+  }
+
+  function lernErgebnisHtml() {
+    const s = lern.sitzung;
+    const beantwortet = s.ids.filter((id) => s.antworten[id]);
+    const richtig = beantwortet.filter((id) => s.antworten[id].richtig).length;
+    const falsche = beantwortet.filter((id) => !s.antworten[id].richtig).map(lernFrage).filter(Boolean);
+    const quote = lernProzent(richtig, beantwortet.length);
+    const lob = quote >= 90 ? "Stark – fast alles sitzt." : quote >= 70 ? "Gut! Die falschen kommen bald wieder dran." : quote >= 50 ? "Solide Basis – die Wiederholung macht den Rest." : "Dranbleiben – genau dafür ist die Wiederholung da.";
+    return `
+      <section class="lern-karte lern-ergebnis">
+        <h2 class="lern-frage" id="lern-fokus" tabindex="-1">${richtig} von ${beantwortet.length} richtig (${quote} %)</h2>
+        <p class="notiz-meta">${lob}${beantwortet.length < s.ids.length ? ` · ${s.ids.length - beantwortet.length} Fragen übersprungen` : ""}</p>
+        <div class="lern-knoepfe">
+          ${falsche.length ? `<button type="button" class="btn-primary" onclick="lernFalscheWiederholen()">${ic("wiederholen")}Falsche nochmal (${falsche.length})</button>` : ""}
+          <button type="button" class="btn-secondary" onclick="lernStarten()">${ic("weiter")}Neue Runde</button>
+          <button type="button" class="btn-secondary" onclick="lernZurUebersicht()">Zur Übersicht</button>
+        </div>
+      </section>
+      ${falsche.length ? `<h3 class="lern-h2">Zum Nachlesen</h3><div class="notiz-list">${falsche.map((f) => `
+        <div class="notiz-item lern-liste-item">
+          <div class="notiz-inhalt">
+            <div class="lern-liste-frage">${escapeHtml(f.frage)}</div>
+            <div class="notiz-meta">${ic("ok-kreis")} ${escapeHtml((f.antworten || [])[f.richtig] || "")}</div>
+            ${f.erklaerung ? `<div class="notiz-meta">${escapeHtml(f.erklaerung)}</div>` : ""}
+            <div class="notiz-meta">${escapeHtml([lernSkriptName(f.skript_id), f.seite ? `S. ${f.seite}` : ""].filter(Boolean).join(" · "))}</div>
+          </div>
+        </div>`).join("")}</div>` : ""}`;
+  }
+
+  // Zeichnet den Reiter Lernen
+  function renderLernen() {
+    const el = document.getElementById("lernen-inhalt");
+    if (!el) return;
+    if (!lern.geladen && !lern.laedt && !lern.fehler) lernLaden();
+    if (!bib.geladen && !bib.laedt && !bib.fehler && !bib.fehlt) bibLaden();
+    if (lern.fehlt) {
+      el.innerHTML = `<p class="empty-text">Für den Fragenkatalog bitte zuerst <code>ep_fragen_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+      return;
+    }
+    if (lern.fehler) {
+      el.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(lern.fehler)} <button class="link-btn" onclick="lernNeuLaden()">Nochmal versuchen</button></p>`;
+      return;
+    }
+    if (!lern.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
+    if (!lern.fragen.length) {
+      el.innerHTML = `<p class="empty-text">Noch keine Fragen. Sie kommen mit dem Skript-Paket: in der Bibliothek „Skript-Paket importieren“ (bzw. am Skript „Text erneuern“) – oder unten eine eigene Frage anlegen.</p>` + lernVerwaltenHtml();
+      lernVerwaltenZeichnen();
+      return;
+    }
+    const s = lern.sitzung;
+    if (s) {
+      el.innerHTML = s.fertig ? lernErgebnisHtml() : lernFrageHtml();
+      return;
+    }
+    el.innerHTML = lernStartHtml();
+    lernVerwaltenZeichnen();
+  }
+
+  // Kachel auf dem Start-Screen
+  function lernModulInfo() {
+    if (!lern.geladen) { if (!lern.laedt && !lern.fehler && !lern.fehlt) lernLaden(); return lern.fehlt ? "SQL fehlt" : ""; }
+    if (!lern.fragen.length) return "noch keine Fragen";
+    const faellig = lern.fragen.filter(lernIstFaellig).length;
+    const neu = lern.fragen.filter(lernIstNeu).length;
+    return faellig || neu ? [faellig ? `${faellig} fällig` : "", neu ? `${neu} neu` : ""].filter(Boolean).join(" · ") : "alles wiederholt";
+  }
+
+
 
   // ==========================================================
   // Einheiten planen (seit Session 37, Etappe 4): Spiele aus der Kartei und
@@ -3143,9 +3672,56 @@
       auflage: w.auflage, thema: w.thema, modul_id: w.modul || null, notiz: w.notiz,
     }),
     loeschen: (id) => api("ep_skript_loeschen", { id }),
-    loeschFrage: (s) => `Skript „${s.titel || ""}“ löschen? Die PDF und der Text werden mit gelöscht.`,
+    loeschFrage: (s) => `Skript „${s.titel || ""}“ löschen? Die PDF, der Text und die Fragen (mit Lernstand) werden mit gelöscht.`,
     gespeichert: "Skript gespeichert",
-    danach: () => { bib.geladen = false; bibLaden(); },
+    danach: () => { bib.geladen = false; bibLaden(); lern.geladen = false; },
+  };
+
+  // Bearbeiten-Blatt für eine Frage (eigene oder aus dem Paket)
+  BLATT_ARTEN.frage = {
+    titel: "Frage bearbeiten",
+    titelNeu: "Eigene Frage",
+    finden: (id) => lernFrage(id),
+    laden: (f) => {
+      const a = Array.isArray(f.antworten) ? f.antworten : [];
+      return {
+        herkunft: f.id ? (f.quelle === "eigen" ? "Eigene Frage." : f.bearbeitet ? "Aus dem Skript-Paket, von dir geändert – ein neuer Import überschreibt sie nicht." : "Aus dem Skript-Paket. Nach dem Speichern überschreibt ein neuer Import diese Frage nicht mehr.") : "",
+        skript: f.skript_id || (lernEinst().skripte && lernEinst().skripte.length === 1 ? lernEinst().skripte[0] : ""),
+        frage: f.frage || "", a: a[0] || "", b: a[1] || "", c: a[2] || "", d: a[3] || "",
+        richtig: String(f.richtig ?? 0), erklaerung: f.erklaerung || "", seite: f.seite ?? "",
+        abschnitt: f.abschnitt || "", schwierigkeit: String(f.schwierigkeit || 2), hinweis: f.hinweis || "",
+      };
+    },
+    felder: [
+      { key: "herkunft", label: "Herkunft", typ: "info", wenn: (w) => !!w.herkunft },
+      { key: "skript", label: "Skript", typ: "auswahl", optionen: () => [["", "– ohne Skript –"], ...bibSortiert().map((s) => [String(s.id), bibTitel(s)])] },
+      { key: "frage", label: "Frage", typ: "text-lang", zeilen: 2, pflicht: true, platzhalter: "z. B. Welches Holz empfiehlt das Skript für den Floßbau?" },
+      { key: "a", label: "Antwort A", typ: "text", pflicht: true },
+      { key: "b", label: "Antwort B", typ: "text", pflicht: true },
+      { key: "c", label: "Antwort C", typ: "text", pflicht: true },
+      { key: "d", label: "Antwort D", typ: "text", pflicht: true },
+      { key: "richtig", label: "Richtig ist", typ: "chips", optionen: [["0", "A"], ["1", "B"], ["2", "C"], ["3", "D"]] },
+      { key: "erklaerung", label: "Erklärung", typ: "text-lang", zeilen: 3, platzhalter: "Warum ist die Antwort richtig? (erscheint nach dem Antworten)" },
+      { key: "seite", label: "Seite", typ: "zahl", min: 1, halb: true, platzhalter: "z. B. 5" },
+      { key: "schwierigkeit", label: "Schwierigkeit", typ: "auswahl", halb: true, optionen: [["1", "leicht"], ["2", "mittel"], ["3", "schwer"]] },
+      { key: "abschnitt", label: "Abschnitt", typ: "text", platzhalter: "z. B. 3.3.2 Material" },
+      { key: "hinweis", label: "Hinweis", typ: "text-lang", zeilen: 2, platzhalter: "optional, z. B. Abweichung zum aktuellen Stand" },
+    ],
+    pruefen: (w) => {
+      const a = [w.a, w.b, w.c, w.d].map((x) => String(x).trim().toLowerCase());
+      if (new Set(a).size !== 4) return "Die vier Antworten müssen sich unterscheiden.";
+      if (w.seite !== "" && (!Number.isFinite(Number(w.seite)) || Number(w.seite) < 1)) return "Seite bitte als Zahl ab 1.";
+      return "";
+    },
+    speichern: (id, w) => api("ep_frage_speichern", {
+      id, skript_id: w.skript || null, frage: w.frage, antworten: [w.a, w.b, w.c, w.d], richtig: Number(w.richtig),
+      erklaerung: w.erklaerung, seite: w.seite === "" ? null : Number(w.seite), abschnitt: w.abschnitt,
+      schwierigkeit: Number(w.schwierigkeit), hinweis: w.hinweis,
+    }),
+    loeschen: (id) => api("ep_frage_loeschen", { id }),
+    loeschFrage: (f) => `Frage „${String(f.frage || "").slice(0, 80)}“ löschen? Ihr Lernstand geht mit verloren.`,
+    gespeichert: "Frage gespeichert",
+    danach: () => { lernNeuLaden(); },
   };
 
   let blatt = null; // { art, id, werte }
@@ -5392,6 +5968,7 @@
     if (aktiv === "einheiten") renderEinheiten();
     if (aktiv === "methoden") renderMethoden();
     if (aktiv === "bibliothek") renderBibliothek();
+    if (aktiv === "lernen") renderLernen();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
     if (aktiv === "schluessel") renderSchluessel();
@@ -5801,6 +6378,7 @@
     schluessel: `<svg ${SVG_ATTR}><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>`,
     // EP-Block (seit Session 49/50)
     bibliothek: `<svg ${SVG_ATTR}><path d="M4 19V5a2 2 0 012-2h4v18H6a2 2 0 01-2-2z"/><path d="M10 3h4v18h-4z"/><path d="M15 4l4-1 2 17-4 1z"/></svg>`,
+    lernen: `<svg ${SVG_ATTR}><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 10l2 2 4-4M7 15h10"/></svg>`,
     methoden: `<svg ${SVG_ATTR}><path d="M3 20l6-11 4 7 3-4 5 8z"/><circle cx="17" cy="6" r="2"/></svg>`,
     spiele: `<svg ${SVG_ATTR}><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="15" r="1.2"/><circle cx="15" cy="9" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg>`,
     einheiten: `<svg ${SVG_ATTR}><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>`,
@@ -6002,6 +6580,7 @@
     }
     // EP-Block (seit Session 49/50)
     if (tab === "bibliothek") return bibModulInfo();
+    if (tab === "lernen") return lernModulInfo();
     if (tab === "methoden") {
       const n = (methoden || []).length;
       const ziel = wbZielUe();
@@ -11973,6 +12552,15 @@
       if (e.message === "unauthorized") throw e;
       luecken.push("Bibliothek: " + e.message);
     }
+    // Fragenkatalog (seit Session 52): Fragen mit Lernkartei und alle gegebenen Antworten
+    meldung("Lade Fragenkatalog …");
+    try {
+      const r = await api("ep_fragen_laden", { roh: true });
+      if (!r.fehlt) { liste.ep_fragen = r.fragen || []; liste.ep_fragen_versuche = r.versuche || []; }
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Fragenkatalog: " + e.message);
+    }
 
     meldung("Lade Einstellungen …");
     let pushEinstellungen = null;
@@ -12123,6 +12711,8 @@
     { k: "tab_einstellungen", t: "tab_einstellungen", name: "Reiter-Einstellungen", gruppe: "Sonstiges" },
     { k: "ep_skripte", t: "ep_skripte", name: "Bibliothek: Skripte (ohne PDFs)", gruppe: "EP" },
     { k: "ep_skript_seiten", t: "ep_skript_seiten", name: "Bibliothek: Text je Seite", gruppe: "EP" },
+    { k: "ep_fragen", t: "ep_fragen", name: "Fragenkatalog: Fragen mit Lernkartei", gruppe: "EP" },
+    { k: "ep_fragen_versuche", t: "ep_fragen_versuche", name: "Fragenkatalog: gegebene Antworten", gruppe: "EP" },
     { k: "verlauf", t: "verlauf", name: "Verlauf (letzte 50 je Bereich)", gruppe: "Sonstiges", nurErg: true },
   ];
   const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Sonstiges"];
