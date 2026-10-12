@@ -1034,6 +1034,12 @@
     background: var(--overdue-bg); color: var(--overdue-text); border: 1px solid var(--overdue-border);
     border-radius: var(--r-mittel); padding: 0.6rem 0.8rem; font-size: 0.88rem;
   }
+  /* Bedarf aus dem Gewichtstrend (seit Session 57) */
+  .ern-trend { margin-top: 0.4rem; }
+  .ern-trend .schnell-chips { margin: 0.4rem 0; }
+  .ern-trend .ern-rechnung-tabelle { margin: 0.4rem 0 0.6rem; }
+  .ern-trend .ern-rechnung-tabelle td:last-child { white-space: normal; min-width: 6.5rem; }
+  .ern-trend-vorschlag { font-size: 0.92rem; margin: 0.5rem 0; }
   .ern-gewicht-aktuell { margin: 0.2rem 0 0.6rem; }
   .ern-gewicht-svg { width: 100%; height: auto; display: block; margin-bottom: 0.6rem; }
   .ern-gewicht-liste { display: flex; flex-direction: column; }
