@@ -19973,6 +19973,7 @@
     document.getElementById("ern-p-gueltig").value = heuteISO();
     document.getElementById("ern-p-gueltig-feld").classList.toggle("hidden", !ernProfil || ernZielVersionen === null);
     ernZielVerlaufRendern();
+    ernTrendRendern();
     document.getElementById("ern-p-geschlecht").value = p ? p.geschlecht : "";
     document.getElementById("ern-p-geburt").value = p ? p.geburtsdatum : "";
     document.getElementById("ern-p-groesse").value = p ? Number(p.groesse_cm) : "";
@@ -20011,7 +20012,7 @@
       })()}.</p>
       <p class="notiz-meta">An Trainingstagen kommen ${p.training_anrechnung === 0 ? "keine Trainingskalorien dazu (nur Anzeige)" : `${p.training_anrechnung === 100 ? "die" : p.training_anrechnung + " % der"} Trainingskalorien dazu – die Makroziele wachsen mit (Fett anteilig, der Rest als Kohlenhydrate)`}.</p>
       ${r.unterGrundumsatz ? `<p class="ern-warnung">Das Ziel liegt unter deinem Grundumsatz. Auf Dauer ist das nicht zu empfehlen – wähle lieber ein langsameres Tempo oder sprich es mit ärztlicher oder ernährungsfachlicher Begleitung ab.</p>` : ""}
-      <p class="notiz-meta">Das ist eine Schätzung: Formeln liegen bei Einzelnen oft um rund 10 % daneben. Genauer wird es, wenn du ein paar Wochen isst, trackst und wiegst – dein Gewichtstrend zeigt dann, wo dein echter Bedarf liegt.</p>`;
+      <p class="notiz-meta">Das ist eine Schätzung: Formeln liegen bei Einzelnen oft um rund 10 % daneben. Genauer wird es, wenn du ein paar Wochen isst, trackst und wiegst – dein Gewichtstrend zeigt dann, wo dein echter Bedarf liegt (unten „Bedarf aus deinen Daten prüfen“).</p>`;
   }
   ["ern-p-geschlecht", "ern-p-geburt", "ern-p-groesse", "ern-p-pal", "ern-p-ziel", "ern-p-eiweiss", "ern-p-fett", "ern-p-anrechnung", "ern-p-sockel"].forEach((id) => {
     document.getElementById(id).addEventListener("input", ernProfilRechnungZeigen);
@@ -20094,6 +20095,195 @@
       if (e.message !== "unauthorized") status.textContent = e.message;
     }
   };
+
+  // ---- Bedarf aus dem Gewichtstrend (Ernährung Etappe 6, Session 57) ----
+  // Verbrauch aus den eigenen Daten: Ø gegessen − Gewichtstrend × Energie je kg.
+  // Vergleich mit der Formel im selben Zeitraum (Grundumsatz × Aktivität +
+  // angerechnete Trainings und Schritte). Nur ein Vorschlag: „Übernehmen“
+  // speichert einen neuen Ziel-Stand ab heute mit angepasster Aktivität (PAL),
+  // alles andere bleibt. Kein eigenes Backend – nutzt ernaehrung_export und
+  // ernaehrung_profil_speichern.
+  const ERN_KCAL_JE_KG = 7700;          // Faustregel Körpergewebe (Schätzung, je nach Quelle ca. 7.000–7.700)
+  const ERN_TREND_WOCHEN = [2, 3, 4, 6, 8];
+  const ERN_PAL_STUFEN = [1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0];
+  const ernTrend = { laedt: false, fehler: "", ergebnis: null, status: "" };
+
+  function ernTrendWochen() {
+    let w = 4;
+    try { w = Number(localStorage.getItem("ern-trend-wochen")) || 4; } catch (_e) { /* ohne Speicher: Standard */ }
+    return ERN_TREND_WOCHEN.includes(w) ? w : 4;
+  }
+  window.ernTrendWochenWaehlen = function(w) {
+    try { localStorage.setItem("ern-trend-wochen", String(w)); } catch (_e) { /* egal */ }
+    ernTrend.ergebnis = null; ernTrend.fehler = ""; ernTrend.status = "";
+    ernTrendRendern();
+  };
+
+  // Lineare Regression Gewicht über Tage → kg pro Tag
+  function ernTrendSteigung(punkte) {
+    const n = punkte.length;
+    const mx = punkte.reduce((a, p) => a + p.x, 0) / n;
+    const my = punkte.reduce((a, p) => a + p.y, 0) / n;
+    let zaehler = 0, nenner = 0;
+    for (const p of punkte) { zaehler += (p.x - mx) * (p.y - my); nenner += (p.x - mx) ** 2; }
+    return nenner ? zaehler / nenner : 0;
+  }
+
+  // Reine Rechnung (testbar): eintraege aus ernaehrung_export, Zeitraum von–bis
+  function ernTrendRechnen(von, bis, eintraege) {
+    const tage = tageSeitIso(von, bis) + 1;
+    const jeTag = new Map();
+    for (const e of eintraege) {
+      if (e.datum < von || e.datum > bis) continue;
+      if (!jeTag.has(e.datum)) jeTag.set(e.datum, { kcal: 0, mahlzeiten: new Set() });
+      const t = jeTag.get(e.datum);
+      t.kcal += Number(e.kcal) || 0;
+      t.mahlzeiten.add(e.mahlzeit);
+    }
+    // „Vollständig“ = Einträge in mindestens zwei Mahlzeiten (Tage mit nur
+    // einem Eintrag sind meist Lücken). Nur diese Tage zählen für Ø und Formel.
+    const voll = [...jeTag.entries()].filter(([, t]) => t.kcal > 0 && t.mahlzeiten.size >= 2).map(([d, t]) => ({ datum: d, kcal: t.kcal })).sort((a, b) => a.datum.localeCompare(b.datum));
+    const mitEintrag = jeTag.size;
+    const wiegungen = ernGewichte.filter((g) => g.datum >= von && g.datum <= addTage(bis, 1));
+    const r = { von, bis, tage, mitEintrag, vollTage: voll.length, wiegungen: wiegungen.length, gruende: [] };
+    if (voll.length) r.gegessen = voll.reduce((a, t) => a + t.kcal, 0) / voll.length;
+    if (wiegungen.length >= 2) {
+      r.spanne = tageSeitIso(wiegungen[0].datum, wiegungen[wiegungen.length - 1].datum);
+      r.kgProTag = ernTrendSteigung(wiegungen.map((g) => ({ x: tageSeitIso(von, g.datum), y: Number(g.gewicht_kg) })));
+      r.kgProWoche = r.kgProTag * 7;
+      r.erstes = Number(wiegungen[0].gewicht_kg);
+      r.letztes = Number(wiegungen[wiegungen.length - 1].gewicht_kg);
+    }
+    // Formel an denselben Tagen
+    const formel = voll.map((t) => ernZiele(t.datum)).filter(Boolean);
+    if (formel.length) {
+      r.formel = formel.reduce((a, z) => a + z.bedarf + z.trainingZuschlag + z.schritteZuschlag, 0) / formel.length;
+      r.extras = formel.reduce((a, z) => a + z.trainingZuschlag + z.schritteZuschlag, 0) / formel.length;
+      r.grundumsatz = formel.reduce((a, z) => a + z.grundumsatz, 0) / formel.length;
+    }
+    // Mindestens nötig für einen Vorschlag
+    const minTage = Math.max(10, Math.ceil(tage * 0.5));
+    if (voll.length < minTage) r.gruende.push(`zu wenig vollständige Tage (${voll.length}, nötig ${minTage})`);
+    if (wiegungen.length < 4) r.gruende.push(`zu wenig Wiegungen (${wiegungen.length}, nötig 4)`);
+    else if (r.spanne < 10) r.gruende.push("Wiegungen liegen zu dicht beieinander (mind. 10 Tage Abstand zwischen erster und letzter)");
+    if (!formel.length) r.gruende.push("Profil oder Gewicht fehlt für die Formel");
+    if (r.gruende.length) return r;
+    r.verbrauch = r.gegessen - r.kgProTag * ERN_KCAL_JE_KG;
+    r.abweichung = r.verbrauch - r.formel;
+    r.abweichungProzent = r.abweichung / r.formel * 100;
+    if (r.verbrauch < r.grundumsatz * 1.1 || r.verbrauch > r.grundumsatz * 2.6) {
+      r.unplausibel = true;
+      r.gruende.push("Ergebnis unplausibel – vermutlich fehlen Einträge (z. B. Snacks, Getränke) oder das Gewicht schwankt stark");
+      return r;
+    }
+    r.palRoh = (r.verbrauch - r.extras) / r.grundumsatz;
+    const palGerundet = Math.round(r.palRoh * 10) / 10;
+    r.palNeu = Math.min(2.0, Math.max(1.4, palGerundet));
+    r.palBegrenzt = r.palNeu !== palGerundet;
+    const heute = ernProfilFuer(heuteISO());
+    r.palHeute = heute ? Number(heute.pal) : null;
+    // Güte: gut = mind. 4 Wochen, 80 % vollständig, im Schnitt 2 Wiegungen pro Woche
+    r.guete = tage >= 28 && voll.length >= tage * 0.8 && wiegungen.length >= tage / 3.5 ? "gut" : "mittel";
+    return r;
+  }
+
+  window.ernTrendBerechnen = async function() {
+    if (ernTrend.laedt) return;
+    const wochen = ernTrendWochen();
+    const bis = addTage(heuteISO(), -1);          // heute ist meist noch nicht fertig
+    const von = addTage(bis, -(wochen * 7 - 1));
+    ernTrend.laedt = true; ernTrend.fehler = ""; ernTrend.status = "";
+    ernTrendRendern();
+    try {
+      const res = await api("ernaehrung_export", { von, bis });
+      ernTrend.ergebnis = ernTrendRechnen(von, bis, res.eintraege || []);
+    } catch (e) {
+      if (e.message !== "unauthorized") ernTrend.fehler = e.message || "Fehler";
+    } finally {
+      ernTrend.laedt = false;
+      ernTrendRendern();
+    }
+  };
+
+  // Vorschlag übernehmen: neuer Ziel-Stand ab heute, nur die Aktivität ändert sich
+  window.ernTrendUebernehmen = async function() {
+    const r = ernTrend.ergebnis;
+    const p = ernProfilFuer(heuteISO());
+    if (!r || !r.palNeu || !p) return;
+    const geplant = (ernZielVersionen || []).filter((v) => v.gueltig_ab > heuteISO());
+    if (!confirm(`Aktivität ${ernZahl(r.palHeute)} → ${ernZahl(r.palNeu)} ab heute übernehmen?\n\nZiel, Eiweiß, Fett, Anrechnung und Schritte-Sockel bleiben. Frühere Tage behalten ihren Stand.${geplant.length ? `\n\nHinweis: Ein geplanter Stand ab ${datumDe(geplant[0].gueltig_ab)} bleibt unverändert und gilt ab dann mit seiner eigenen Aktivität.` : ""}`)) return;
+    try {
+      const res = await api("ernaehrung_profil_speichern", {
+        geschlecht: p.geschlecht, geburtsdatum: p.geburtsdatum, groesse_cm: p.groesse_cm,
+        pal: r.palNeu, ziel: p.ziel, ziel_kcal_diff: Number(p.ziel_kcal_diff),
+        eiweiss_g_pro_kg: Number(p.eiweiss_g_pro_kg), fett_prozent: Number(p.fett_prozent),
+        training_anrechnung: p.training_anrechnung === undefined || p.training_anrechnung === null ? 100 : Number(p.training_anrechnung),
+        schritte_sockel: ernSockelVon(p),
+        gueltig_ab: heuteISO(),
+      });
+      ernProfil = res.profil;
+      if (Array.isArray(res.versionen)) ernZielVersionen = res.versionen;
+      r.palHeute = r.palNeu;
+      ernTrend.status = `✓ Aktivität ${ernZahl(r.palNeu)} gilt ab heute`;
+      ernProfilFormFuellen();
+      renderErnaehrung();
+      if (aktiverTab === "heute") renderHeute();
+    } catch (e) {
+      if (e.message !== "unauthorized") { ernTrend.status = "Nicht gespeichert: " + (e.message || "Fehler"); ernTrendRendern(); }
+    }
+  };
+
+  function ernTrendErgebnisHtml(r) {
+    const kcal = (v) => `${ernZahl(Math.round(v), 0)} kcal`;
+    const basis = `
+      <table class="ern-rechnung-tabelle">
+        <tr><td>Zeitraum</td><td>${datumDe(r.von)} – ${datumDe(r.bis)}</td></tr>
+        <tr><td>Vollständige Tage (Einträge in mind. 2 Mahlzeiten)</td><td>${r.vollTage} von ${r.tage}${r.mitEintrag > r.vollTage ? ` <span class="notiz-meta">(+${r.mitEintrag - r.vollTage} lückenhaft)</span>` : ""}</td></tr>
+        <tr><td>Wiegungen</td><td>${r.wiegungen}</td></tr>
+        ${r.gegessen !== undefined ? `<tr><td>Ø gegessen an vollständigen Tagen</td><td>${kcal(r.gegessen)}</td></tr>` : ""}
+        ${r.kgProWoche !== undefined ? `<tr><td>Gewichtstrend (${ernZahl(r.erstes)} → ${ernZahl(r.letztes)} kg)</td><td>${r.kgProWoche >= 0 ? "+" : "−"}${ernZahl(Math.abs(r.kgProWoche), 2)} kg/Woche</td></tr>` : ""}
+        ${r.verbrauch !== undefined ? `
+        <tr><td>= Verbrauch aus deinen Daten</td><td><strong>≈ ${kcal(r.verbrauch)}</strong></td></tr>
+        <tr><td>Formel im selben Zeitraum (inkl. angerechnetem Training/Schritten)</td><td>≈ ${kcal(r.formel)}</td></tr>
+        <tr><td>Abweichung</td><td>${r.abweichung >= 0 ? "+" : "−"}${kcal(Math.abs(r.abweichung))} (${r.abweichung >= 0 ? "+" : "−"}${ernZahl(Math.abs(r.abweichungProzent), 0)} %)</td></tr>` : ""}
+      </table>`;
+    if (r.gruende.length) {
+      return basis + `<p class="ern-warnung">Noch kein Vorschlag: ${r.gruende.map(escapeHtml).join("; ")}.</p>
+        <p class="notiz-meta">Für einen belastbaren Wert: möglichst jeden Tag alles eintragen und 2–3 Mal pro Woche wiegen (morgens, nüchtern, gleiche Waage). Oder einen längeren Zeitraum wählen.</p>`;
+    }
+    const gueteText = r.guete === "gut"
+      ? `<span class="badge">belastbar</span>`
+      : `<span class="badge">grob</span> <span class="notiz-meta">– für „belastbar“: mind. 4 Wochen, 80 % vollständige Tage, im Schnitt 2 Wiegungen pro Woche</span>`;
+    let vorschlag;
+    if (r.palHeute !== null && r.palNeu === r.palHeute) {
+      vorschlag = `<p class="ern-trend-vorschlag">${ic("ok-kreis")} Deine Aktivität ${ernZahl(r.palHeute)} passt zu deinen Daten (rechnerisch ${ernZahl(r.palRoh, 2)}) – keine Änderung nötig.</p>`;
+    } else {
+      const gum = (ernZiele(heuteISO()) || {}).grundumsatz || r.grundumsatz;
+      const effekt = (r.palNeu - (r.palHeute || r.palNeu)) * gum;
+      vorschlag = `
+        <p class="ern-trend-vorschlag">Vorschlag: <strong>Aktivität ${ernZahl(r.palNeu)}</strong> statt ${ernZahl(r.palHeute)} (rechnerisch ${ernZahl(r.palRoh, 2)}${r.palBegrenzt ? ", auf die erlaubte Spanne 1,4–2,0 begrenzt" : ""}) – dein Tagesziel ändert sich damit um etwa ${effekt >= 0 ? "+" : "−"}${kcal(Math.abs(effekt))}.</p>
+        <div class="row"><button type="button" class="btn-primary" onclick="ernTrendUebernehmen()">Aktivität ${ernZahl(r.palNeu)} ab heute übernehmen</button></div>`;
+    }
+    return basis + `<p>Aussagekraft: ${gueteText}</p>` + vorschlag;
+  }
+
+  function ernTrendRendern() {
+    const el = document.getElementById("ern-trend");
+    if (!el) return;
+    if (!ernProfil) { el.innerHTML = ""; return; }
+    const w = ernTrendWochen();
+    const chips = ERN_TREND_WOCHEN.map((x) =>
+      `<button type="button" class="schnell-chip${x === w ? " aktiv" : ""}" aria-pressed="${x === w}" onclick="ernTrendWochenWaehlen(${x})">${x} Wochen</button>`).join("");
+    el.innerHTML = `
+      <p class="ern-liste-titel" style="margin-top:0.8rem;">Bedarf aus deinen Daten prüfen</p>
+      <p class="notiz-meta">Vergleicht, was du gegessen hast, mit deinem Gewichtstrend und schätzt daraus deinen tatsächlichen Verbrauch. Passt die Formel nicht, schlägt die App eine andere Aktivität vor – du entscheidest, ob du sie übernimmst. Gerechnet wird bis gestern.</p>
+      <div class="schnell-chips" role="group" aria-label="Zeitraum">${chips}</div>
+      <div class="row"><button type="button" class="btn-secondary" onclick="ernTrendBerechnen()"${ernTrend.laedt ? " disabled" : ""}>${ic("statistik")}${ernTrend.laedt ? "Rechne …" : "Berechnen"}</button></div>
+      ${ernTrend.fehler ? `<p class="ern-warnung">Konnte nicht rechnen: ${escapeHtml(ernTrend.fehler)}</p>` : ""}
+      ${ernTrend.ergebnis ? ernTrendErgebnisHtml(ernTrend.ergebnis) : ""}
+      ${ernTrend.status ? `<p class="notiz-meta" role="status">${escapeHtml(ernTrend.status)}</p>` : ""}
+      ${ernTrend.ergebnis ? `<p class="notiz-meta">Schätzung: ${ernZahl(ERN_KCAL_JE_KG, 0)} kcal je kg Körpergewicht (Faustregel). Wasser, Salz und Verdauung lassen das Gewicht von Tag zu Tag um 1–2 kg schwanken – deshalb zählt der Trend über alle Wiegungen, nicht einzelne Werte. Nach Ernährungsumstellungen sind die ersten 1–2 Wochen oft verzerrt.</p>` : ""}`;
+  }
 
   // ---- Gewicht ----
   document.getElementById("btn-ern-gewicht").addEventListener("click", async (ev) => {
