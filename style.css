@@ -2060,3 +2060,36 @@
   .pruef-skript-zeile { grid-template-columns: minmax(0, 1fr) auto; }
   .pruef-skript-balken { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* ==========================================================
+   EP-Karteikarten (seit Session 54)
+   ========================================================== */
+.karteikarte { min-height: 11rem; display: flex; flex-direction: column; }
+.karteikarte:not(.offen) { cursor: pointer; border-width: 2px; border-style: dashed; }
+.karteikarte:not(.offen):hover { border-color: var(--accent); }
+.karte-vorne-hinweis { margin: auto 0 0; font-size: var(--fs-klein); color: var(--ink-dim); text-align: center; }
+.karte-vorne-hinweis .ic { vertical-align: -0.18em; }
+.karte-rueck { border-top: 2px solid var(--border); padding-top: 0.75rem; margin-top: 0.2rem; }
+.karte-rueck .schnell-label { display: block; margin: 0 0 0.25rem; }
+.karte-antwort {
+  font-family: var(--font-display); font-size: var(--fs-gross); font-weight: 700; line-height: 1.3;
+  margin: 0 0 0.6rem; padding: 0.6rem 0.75rem; border-radius: var(--r-mittel);
+  background: var(--ok-bg); color: var(--ok-text); border: 1px solid var(--ok-rand); outline: none;
+}
+.karte-antwort:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.karte-falsche-liste { list-style: none; margin: 0.4rem 0 0.2rem; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.karte-falsche-liste li { font-size: var(--fs-text); color: var(--ink-dim); line-height: 1.4; }
+.karte-falsche-liste .ic { vertical-align: -0.18em; color: var(--overdue-text); }
+.karte-frage-urteil { margin: 0.2rem 0 0.4rem; font-weight: 700; text-align: center; }
+.karte-urteil { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.karte-urteil-knopf {
+  min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  border-radius: var(--r-pille); border: 2px solid; font: inherit; font-weight: 700; font-size: var(--fs-mittel); cursor: pointer;
+}
+.karte-urteil-knopf.nein { background: var(--overdue-bg); color: var(--overdue-text); border-color: var(--overdue-border); }
+.karte-urteil-knopf.ja { background: var(--ok-bg); color: var(--ok-text); border-color: var(--ok-rand); }
+.karte-urteil-knopf:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+/* Vier Ansichten im Umschalter: auf schmalen Handys etwas kleinere Schrift */
+@media (max-width: 400px) {
+  .lern-ansicht-knopf { font-size: 0.82rem; padding: 0 0.2rem; }
+}
