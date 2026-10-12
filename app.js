@@ -1096,6 +1096,100 @@
     }
   };
 
+  // ---- Gemeldete Fragen an Claude geben (seit Session 56) ----
+  // Datei bzw. Text enthält je Frage alles, was zum Berichtigen im Skript-Paket
+  // nötig ist: Skript, Original-Fragetext (Paket-Schlüssel), Antworten, Lösung,
+  // Erklärung, Seite, Abschnitt und die Meldung. Keine Lernkartei-Daten.
+  function lernGemeldete() {
+    return lern.fragen.filter((f) => f.gemeldet).sort((a, b) =>
+      lernSkriptName(a.skript_id, true).localeCompare(lernSkriptName(b.skript_id, true), "de") || (Number(a.seite) || 0) - (Number(b.seite) || 0));
+  }
+  function lernMeldungDaten(f) {
+    const s = f.skript_id ? bibSkript(f.skript_id) : null;
+    const d = {
+      skript: lernSkriptName(f.skript_id, true),
+      skript_nummer: s && s.nummer ? s.nummer : undefined,
+      auflage: s && s.auflage ? s.auflage : undefined,
+      herkunft: f.quelle === "eigen" ? "eigene Frage" : f.bearbeitet ? "aus Paket, in der App bearbeitet" : "aus Paket",
+      // nur bei bearbeiteten Paket-Fragen: ursprünglicher Fragetext (vereinfacht: klein, Leerraum zusammengefasst)
+      paket_schluessel: f.quelle !== "eigen" && f.bearbeitet && f.paket_schluessel ? f.paket_schluessel : undefined,
+      frage: f.frage,
+      antworten: f.antworten || [],
+      richtig: f.richtig,
+      richtig_buchstabe: LERN_BUCHSTABEN[f.richtig] || "",
+      erklaerung: f.erklaerung || "",
+      hinweis: f.hinweis || undefined,
+      seite: f.seite || undefined,
+      abschnitt: f.abschnitt || undefined,
+      schwierigkeit: f.schwierigkeit || undefined,
+      meldung: f.meldung || "Bitte prüfen",
+    };
+    Object.keys(d).forEach((k) => d[k] === undefined && delete d[k]);
+    return d;
+  }
+  const LERN_MELDUNG_AUFTRAG = "Bitte prüfe diese gemeldeten Fragen anhand des Skripts und liefere je betroffenem Skript ein berichtigtes Skript-Paket (.json). Fragetexte von Paket-Fragen nicht ändern (sie sind der Schlüssel für den Lernstand). Fragen mit Herkunft „in der App bearbeitet“ oder „eigene Frage“ werden von einem Paket nicht überschrieben – dazu bitte die Korrektur als Text nennen.";
+
+  window.lernMeldungenExport = function() {
+    const liste = lernGemeldete();
+    if (!liste.length) { hinweisZeigen("Keine gemeldeten Fragen"); return; }
+    const daten = {
+      typ: "ep_meldungen", version: 1, erstellt: heuteISO(),
+      auftrag: LERN_MELDUNG_AUFTRAG,
+      anzahl: liste.length,
+      fragen: liste.map(lernMeldungDaten),
+    };
+    downloadDatei(`ep-gemeldete-fragen-${heuteISO()}.json`, JSON.stringify(daten, null, 2), "application/json");
+    hinweisZeigen(`${liste.length} gemeldete ${liste.length === 1 ? "Frage" : "Fragen"} exportiert`);
+  };
+
+  function lernMeldungenText() {
+    const liste = lernGemeldete();
+    const teile = liste.map((f, i) => {
+      const d = lernMeldungDaten(f);
+      return [
+        `${i + 1}) ${d.skript}${d.seite ? `, S. ${d.seite}` : ""}${d.abschnitt ? ` – ${d.abschnitt}` : ""} (${d.herkunft})`,
+        d.paket_schluessel ? `Ursprünglich im Paket (vereinfacht): ${d.paket_schluessel}` : "",
+        `Frage: ${d.frage}`,
+        ...d.antworten.map((a, j) => `${LERN_BUCHSTABEN[j]}) ${a}${j === d.richtig ? "  ← richtig" : ""}`),
+        d.erklaerung ? `Erklärung: ${d.erklaerung}` : "",
+        d.hinweis ? `Hinweis: ${d.hinweis}` : "",
+        `Meldung: ${d.meldung}`,
+      ].filter(Boolean).join("\n");
+    });
+    return `Gemeldete EP-Fragen (${liste.length}) – Stand ${heuteISO()}\n${LERN_MELDUNG_AUFTRAG}\n\n${teile.join("\n\n")}\n`;
+  }
+  window.lernMeldungenKopieren = async function() {
+    if (!lernGemeldete().length) { hinweisZeigen("Keine gemeldeten Fragen"); return; }
+    const text = lernMeldungenText();
+    try {
+      await navigator.clipboard.writeText(text);
+      hinweisZeigen("Kopiert – jetzt im Chat mit Claude einfügen");
+    } catch (_e) {
+      // Zwischenablage nicht erlaubt (z. B. ohne HTTPS-Rechte) → als Textdatei
+      downloadDatei(`ep-gemeldete-fragen-${heuteISO()}.txt`, text, "text/plain;charset=utf-8");
+      hinweisZeigen("Kopieren ging nicht – als Textdatei heruntergeladen");
+    }
+  };
+
+  // Nach dem Import des berichtigten Pakets: alle Meldungen auf einmal entfernen
+  window.lernMeldungenEntfernen = async function() {
+    const liste = lernGemeldete();
+    if (!liste.length) return;
+    if (!confirm(`Alle ${liste.length} Meldungen entfernen?\n\nDas ist für danach gedacht: wenn das berichtigte Paket importiert ist bzw. du die Fragen geprüft hast. Die Fragen selbst und dein Lernstand bleiben.`)) return;
+    let ok = 0, fehler = "";
+    for (const f of liste) {
+      try {
+        await api("ep_frage_melden", { id: f.id, meldung: null });
+        f.gemeldet = false; f.meldung = null; ok++;
+      } catch (e) {
+        if (e.message === "unauthorized") return;
+        fehler = e.message || "Fehler";
+      }
+    }
+    hinweisZeigen(fehler ? `${ok} entfernt, ${liste.length - ok} nicht (${fehler})` : `${ok} ${ok === 1 ? "Meldung" : "Meldungen"} entfernt`);
+    renderLernen();
+  };
+
   window.lernEinstWaehlen = function(feld, wert) {
     if (feld === "skript") {
       const alle = lernSkriptSchluessel();
@@ -1200,6 +1294,14 @@
             <button type="button" class="btn-secondary" onclick="blattNeu('frage', {})">${ic("plus")}Eigene Frage</button>
             <button type="button" class="btn-secondary" onclick="lernZuruecksetzen()">${ic("wiederholen")}Lernstand zurücksetzen</button>
           </div>
+          ${gemeldet ? `<div class="lern-export">
+            <p class="notiz-meta">${ic("warnung")} ${gemeldet} ${gemeldet === 1 ? "Frage ist" : "Fragen sind"} gemeldet. Zum Korrigieren an Claude schicken – du bekommst ein berichtigtes Skript-Paket zurück.</p>
+            <div class="reiter-aktionen bib-aktionen">
+              <button type="button" class="btn-secondary" onclick="lernMeldungenExport()">${ic("export")}Gemeldete exportieren (.json)</button>
+              <button type="button" class="btn-secondary" onclick="lernMeldungenKopieren()">${ic("kopieren")}Als Text kopieren</button>
+              <button type="button" class="btn-secondary" onclick="lernMeldungenEntfernen()">${ic("ok-kreis")}Alle Meldungen entfernen</button>
+            </div>
+          </div>` : ""}
           <div class="row"><input type="search" id="lern-suche" value="${escapeAttr(lern.such)}" placeholder="In Fragen und Antworten suchen …" aria-label="In Fragen und Antworten suchen" oninput="lernSucheGetippt(this.value)" autocomplete="off"></div>
           <div class="schnell-chips lern-chips" role="group" aria-label="Filter">${LERN_FILTER.map(([k, t]) =>
             `<button type="button" class="schnell-chip${lern.filter === k ? " aktiv" : ""}" aria-pressed="${lern.filter === k}" onclick="lernFilterWaehlen('${k}')">${t}</button>`).join("")}</div>
