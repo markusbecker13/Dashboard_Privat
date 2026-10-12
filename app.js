@@ -868,9 +868,10 @@
     fragen: [], stand: {}, tage: {},
     sitzung: null,      // { ids, pos, ordnung: {id: [Originalindex je Anzeigeplatz]}, antworten: {id: {gewaehlt, richtig}}, fertig }
     such: "", filter: "alle", verwaltenOffen: false,
-    // seit Session 53: Ansicht (ueben/pruefung/statistik), Prüfungsverlauf, laufende Prüfung, Ergebnis
+    // seit Session 53: Ansicht (ueben/pruefung/statistik, seit Session 54 auch karten), Prüfungsverlauf, laufende Prüfung, Ergebnis
     ansicht: "ueben", pruefungen: [], pruefungFehlt: false, pruefung: null, pruefErgebnis: null,
     pruefungGeprueft: false, pruefSpeichert: false, pruefRasterOffen: false,
+    karten: null,       // seit Session 54: laufende Kartenrunde { ids, pos, offen, urteile: {id: true/false}, fertig }
   };
   const LERN_MODI = [
     ["faellig", "Fällige & neue"], ["zufall", "Zufällig gemischt"], ["falsch", "Zuletzt falsch"], ["neu", "Nur neue"],
@@ -971,6 +972,7 @@
     const ordnung = {};
     ids.forEach((id) => { ordnung[id] = lernMischen([0, 1, 2, 3]); });
     lern.sitzung = { ids, pos: 0, ordnung, antworten: {}, fertig: false };
+    lern.karten = null; // eine laufende Kartenrunde endet
     renderLernen();
     lernFokus();
   }
@@ -1003,7 +1005,17 @@
     const gewaehlt = s.ordnung[id][i];
     const richtig = gewaehlt === Number(f.richtig);
     s.antworten[id] = { gewaehlt, richtig };
-    // Lernstand sofort lokal nachführen (wie der Server)
+    lernVerbuchen(f, gewaehlt);
+    renderLernen();
+    const weiter = document.getElementById("lern-weiter");
+    if (weiter) weiter.focus();
+  };
+  // Eine Antwort für Lernstand und Lernkartei verbuchen: sofort lokal
+  // nachführen (wie der Server rechnet) und im Hintergrund speichern.
+  // Genutzt von Üben und seit Session 54 von den Karteikarten.
+  function lernVerbuchen(f, gewaehlt) {
+    const id = f.id;
+    const richtig = gewaehlt === Number(f.richtig);
     const st = lern.stand[id] || (lern.stand[id] = { n: 0, r: 0, zuletzt: "", letzt_richtig: false });
     st.n++; if (richtig) st.r++;
     st.zuletzt = new Date().toISOString(); st.letzt_richtig = richtig;
@@ -1012,15 +1024,13 @@
     f.faellig_am = richtig ? lernPlusTage(heute, LERN_KASTEN_TAGE[f.kasten]) : heute;
     const tag = lern.tage[heute] || (lern.tage[heute] = { n: 0, r: 0 });
     tag.n++; if (richtig) tag.r++;
-    renderLernen();
-    const weiter = document.getElementById("lern-weiter");
-    if (weiter) weiter.focus();
     api("ep_antwort_speichern", { frage_id: id, gewaehlt, heute }).then((r) => {
       if (r && r.faellig_am) { f.kasten = r.kasten; f.faellig_am = r.faellig_am; }
     }).catch((e) => {
       if (e.message !== "unauthorized") hinweisZeigen("Antwort nicht gespeichert: " + (e.message || "Fehler"));
     });
-  };
+    return richtig;
+  }
   function lernPlusTage(iso, tage) {
     const [j, m, t] = iso.split("-").map(Number);
     const d = new Date(Date.UTC(j, m - 1, t + tage));
@@ -1356,6 +1366,8 @@
       el.innerHTML = s.fertig ? lernErgebnisHtml() : lernFrageHtml();
       return;
     }
+    if (lern.karten) { el.innerHTML = lern.karten.fertig ? kartenErgebnisHtml() : kartenKarteHtml(); return; }
+    if (lern.ansicht === "karten") { el.innerHTML = lernAnsichtHtml() + kartenStartHtml(); return; }
     if (lern.ansicht === "pruefung") { el.innerHTML = lernAnsichtHtml() + pruefStartHtml(); return; }
     if (lern.ansicht === "statistik") { el.innerHTML = lernAnsichtHtml() + lernStatistikHtml(); return; }
     el.innerHTML = lernAnsichtHtml() + lernStartHtml();
@@ -1459,6 +1471,7 @@
       minuten: e.minuten, grenze: e.grenze, skripte: e.skripte || lernSkriptSchluessel(),
     };
     lern.pruefErgebnis = null;
+    lern.karten = null;
     pruefSichern();
     renderLernen();
     lernFokus();
@@ -1630,10 +1643,10 @@
     if (ev.key === "ArrowLeft") { ev.preventDefault(); window.pruefGehe(lern.pruefung.pos - 1); }
   });
 
-  // Umschalter Üben / Prüfung / Statistik
+  // Umschalter Üben / Karten (seit Session 54) / Prüfung / Statistik
   function lernAnsichtHtml() {
     const a = lern.ansicht || "ueben";
-    return `<div class="lern-ansicht" role="tablist" aria-label="Ansicht">` + [["ueben", "Üben"], ["pruefung", "Prüfung"], ["statistik", "Statistik"]].map(([k, t]) =>
+    return `<div class="lern-ansicht" role="tablist" aria-label="Ansicht">` + [["ueben", "Üben"], ["karten", "Karten"], ["pruefung", "Prüfung"], ["statistik", "Statistik"]].map(([k, t]) =>
       `<button type="button" role="tab" class="lern-ansicht-knopf${a === k ? " aktiv" : ""}" aria-selected="${a === k}" onclick="lernAnsicht('${k}')">${t}</button>`).join("") + `</div>`;
   }
 
@@ -1893,6 +1906,254 @@
       <section class="lern-karte"><h2 class="lern-h2">Schwächste Abschnitte</h2>${schwachHtml}</section>
       <section class="lern-karte"><h2 class="lern-h2">Letzte 14 Tage</h2>${tageHtml}</section>`;
   }
+
+  // ==========================================================
+  // EP-Karteikarten (seit Session 54, Etappe 5 des EP-Ausbaus)
+  // Vorne die Frage, hinten die richtige Antwort mit Erklärung. Die
+  // Selbsteinschätzung „Gewusst“ / „Nicht gewusst“ zählt wie eine
+  // richtige bzw. falsche Antwort (Lernkartei, Statistik) – gespeichert
+  // über ep_antwort_speichern mit der richtigen bzw. einer falschen
+  // Antwort, also ohne eigenes Backend. Auswahl je Gerät in
+  // localStorage „lern-karten-einstellungen“.
+  // ==========================================================
+  const KARTEN_RUECKSEITE = [["nein", "Nur richtige Antwort"], ["ja", "Auch die falschen"]];
+
+  // Einstellungen der Karten-Startseite (wie beim Üben, plus Rückseite)
+  function kartenEinst() {
+    let e = {};
+    try { e = JSON.parse(localStorage.getItem("lern-karten-einstellungen") || "{}") || {}; } catch (_e) { e = {}; }
+    return {
+      modus: LERN_MODI.some(([k]) => k === e.modus) ? e.modus : "faellig",
+      anzahl: LERN_ANZAHL.some(([k]) => k === e.anzahl) ? e.anzahl : 20,
+      stufe: LERN_STUFEN.some(([k]) => k === e.stufe) ? e.stufe : 0,
+      skripte: Array.isArray(e.skripte) ? e.skripte.map(String) : null, // null = alle
+      falsche: e.falsche === "ja" ? "ja" : "nein",
+    };
+  }
+  function kartenEinstSetzen(teil) {
+    const e = Object.assign(kartenEinst(), teil);
+    try { localStorage.setItem("lern-karten-einstellungen", JSON.stringify(e)); } catch (_e) { /* privat-Modus: nicht merken */ }
+  }
+
+  window.kartenEinstWaehlen = function(feld, wert) {
+    if (feld === "skript") {
+      const alle = lernSkriptSchluessel();
+      let auswahl = kartenEinst().skripte || alle.slice();
+      auswahl = auswahl.includes(wert) ? auswahl.filter((x) => x !== wert) : [...auswahl, wert];
+      kartenEinstSetzen({ skripte: auswahl.length === alle.length || !auswahl.length ? null : auswahl });
+    } else if (feld === "alle") {
+      kartenEinstSetzen({ skripte: null });
+    } else if (feld === "modus" || feld === "falsche") {
+      kartenEinstSetzen({ [feld]: wert });
+    } else {
+      kartenEinstSetzen({ [feld]: Number(wert) });
+    }
+    renderLernen();
+  };
+
+  function kartenChips(feld, optionen, aktiv, label) {
+    return `<div class="schnell-chips lern-chips" role="group" aria-label="${escapeAttr(label)}">` + optionen.map(([wert, text]) => {
+      const an = aktiv(wert);
+      return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="kartenEinstWaehlen('${feld}', '${escapeAttr(String(wert))}')">${text}</button>`;
+    }).join("") + `</div>`;
+  }
+
+  // Startkarte der Ansicht „Karten“
+  function kartenStartHtml() {
+    const e = kartenEinst();
+    const schluessel = lernSkriptSchluessel();
+    const skriptChips = `
+      <div class="schnell-chips lern-chips" role="group" aria-label="Skripte">
+        <button type="button" class="schnell-chip${!e.skripte ? " aktiv" : ""}" aria-pressed="${!e.skripte}" onclick="kartenEinstWaehlen('alle')">Alle Skripte</button>
+        ${schluessel.map((k) => {
+          const an = !!e.skripte && e.skripte.includes(k);
+          return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="kartenEinstWaehlen('skript', '${escapeAttr(k)}')" title="${escapeAttr(lernSkriptName(k, true))}">${escapeHtml(lernSkriptName(k))} <span class="lern-chip-zahl">${lernFragenVon(k).length}</span></button>`;
+        }).join("")}
+      </div>`;
+    const passend = lernKandidaten(e).length;
+    const modusText = { faellig: "Erst die fälligen Wiederholungen, dann neue Fragen.", zufall: "Alle Fragen der Auswahl in zufälliger Reihenfolge.", falsch: "Fragen, deren letzte Antwort falsch war.", neu: "Nur Fragen, die du noch nie beantwortet hast." }[e.modus];
+    return `
+      <section class="lern-karte" aria-labelledby="karten-start-titel">
+        <h2 id="karten-start-titel" class="lern-h2">Karteikarten</h2>
+        <p class="notiz-meta">Frage lesen, Antwort im Kopf überlegen, Karte umdrehen – dann ehrlich einschätzen. „Gewusst“ zählt wie richtig beantwortet, „Nicht gewusst“ wie falsch (Lernkartei und Statistik).</p>
+        <div class="lern-feld"><span class="schnell-label">Skripte</span>${skriptChips}</div>
+        <div class="lern-feld"><span class="schnell-label">Karten</span>${kartenChips("modus", LERN_MODI, (w) => w === e.modus, "Welche Karten")}<span class="blatt-hinweis">${modusText}</span></div>
+        <div class="lern-feld lern-feld-reihe">
+          <div><span class="schnell-label">Anzahl</span>${kartenChips("anzahl", LERN_ANZAHL, (w) => w === e.anzahl, "Anzahl")}</div>
+          <div><span class="schnell-label">Schwierigkeit</span>${kartenChips("stufe", LERN_STUFEN, (w) => w === e.stufe, "Schwierigkeit")}</div>
+        </div>
+        <div class="lern-feld"><span class="schnell-label">Rückseite</span>${kartenChips("falsche", KARTEN_RUECKSEITE, (w) => w === e.falsche, "Rückseite")}<span class="blatt-hinweis">„Auch die falschen“ zeigt hinten zusätzlich die drei falschen Antwortmöglichkeiten.</span></div>
+        <button type="button" class="btn-primary lern-start" onclick="kartenStarten()"${passend ? "" : " disabled"}>${passend ? `${ic("weiter")}Karten starten · ${passend} ${passend === 1 ? "Karte" : "Karten"}` : "Keine passenden Karten"}</button>
+        ${!passend && e.modus === "faellig" && lernPool(e).length ? `<p class="notiz-meta">Gerade ist nichts fällig – alles wiederholt. Für mehr Übung „Zufällig gemischt“ wählen.</p>` : ""}
+      </section>`;
+  }
+
+  function kartenRundeStarten(ids) {
+    lern.sitzung = null;
+    lern.karten = { ids, pos: 0, offen: false, urteile: {}, fertig: false };
+    renderLernen();
+    lernFokus();
+  }
+  window.kartenStarten = function() {
+    const ids = lernKandidaten(kartenEinst()).map((f) => f.id);
+    if (!ids.length) { hinweisZeigen("Keine passenden Karten"); return; }
+    kartenRundeStarten(ids);
+  };
+  window.kartenNichtGewussteNochmal = function() {
+    const k = lern.karten;
+    if (!k) return;
+    const ids = lernMischen(k.ids.filter((id) => k.urteile[id] === false));
+    if (ids.length) kartenRundeStarten(ids);
+  };
+  window.kartenUmdrehen = function() {
+    const k = lern.karten;
+    if (!k || k.fertig || k.offen) return;
+    k.offen = true;
+    renderLernen();
+    const ziel = document.getElementById("karte-antwort");
+    if (ziel) { ziel.focus({ preventScroll: true }); ziel.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  };
+  // Selbsteinschätzung: zählt wie eine richtige bzw. falsche Antwort
+  window.kartenUrteil = function(gewusst) {
+    const k = lern.karten;
+    if (!k || k.fertig || !k.offen) return;
+    const id = k.ids[k.pos];
+    const f = lernFrage(id);
+    if (f && k.urteile[id] === undefined) {
+      const r = Number(f.richtig);
+      lernVerbuchen(f, gewusst ? r : (r + 1) % 4);
+      k.urteile[id] = !!gewusst;
+    }
+    if (k.pos + 1 >= k.ids.length) k.fertig = true; else { k.pos++; k.offen = false; }
+    renderLernen();
+    lernFokus();
+  };
+  // Karte wurde zwischendurch gelöscht: überspringen
+  window.kartenWeiterOhne = function() {
+    const k = lern.karten;
+    if (!k) return;
+    k.ids.splice(k.pos, 1);
+    k.offen = false;
+    if (k.pos >= k.ids.length) k.fertig = true;
+    if (!k.ids.length) lern.karten = null;
+    renderLernen();
+  };
+  window.kartenBeenden = function() {
+    const k = lern.karten;
+    if (k && !k.fertig && Object.keys(k.urteile).length) { k.fertig = true; renderLernen(); lernFokus(); return; }
+    lern.karten = null;
+    renderLernen();
+  };
+  window.kartenZurUebersicht = function() { lern.karten = null; lern.ansicht = "karten"; renderLernen(); window.scrollTo({ top: 0 }); };
+
+  // Eine Karte (Vorder- bzw. Rückseite)
+  function kartenKarteHtml() {
+    const k = lern.karten;
+    const id = k.ids[k.pos];
+    const f = lernFrage(id);
+    if (!f) return `<p class="empty-text">Diese Karte gibt es nicht mehr. <button class="link-btn" onclick="kartenWeiterOhne()">Weiter</button></p>`;
+    const urteile = Object.values(k.urteile);
+    const gewusst = urteile.filter(Boolean).length;
+    const nicht = urteile.length - gewusst;
+    const stufe = Number(f.schwierigkeit) || 2;
+    const antworten = Array.isArray(f.antworten) ? f.antworten : [];
+    const richtigIdx = Number(f.richtig);
+    const falsche = antworten.map((a, i) => [a, i]).filter(([, i]) => i !== richtigIdx);
+    const seiteText = f.seite && f.skript_id ? (bib.seiten.find((x) => String(x.skript_id) === String(f.skript_id) && Number(x.seite) === Number(f.seite)) || {}).text : "";
+    const skript = f.skript_id ? bibSkript(f.skript_id) : null;
+    const quelle = [lernSkriptName(f.skript_id, true), f.seite ? `S. ${f.seite}` : "", f.abschnitt].filter(Boolean).map(escapeHtml).join(" · ");
+    const fid = escapeAttr(String(f.id));
+    const rueckseite = k.offen ? `
+        <div class="karte-rueck">
+          <p class="schnell-label">Antwort</p>
+          <p class="karte-antwort" id="karte-antwort" tabindex="-1">${escapeHtml(antworten[richtigIdx] || "")}</p>
+          ${f.erklaerung ? `<p class="lern-erklaerung">${escapeHtml(f.erklaerung)}</p>` : ""}
+          ${f.hinweis ? `<p class="lern-hinweis">${ic("warnung")} ${escapeHtml(f.hinweis)}</p>` : ""}
+          ${falsche.length ? `<details class="lern-seitentext karte-falsche"${kartenEinst().falsche === "ja" ? " open" : ""}><summary>Die falschen Antwortmöglichkeiten</summary>
+            <ul class="karte-falsche-liste">${falsche.map(([a]) => `<li>${ic("x-kreis")} ${escapeHtml(a)}</li>`).join("")}</ul></details>` : ""}
+          ${quelle ? `<p class="notiz-meta lern-quelle">Quelle: ${quelle}</p>` : ""}
+          <div class="lern-knoepfe">
+            ${skript && skript.datei_pfad && f.seite ? `<button type="button" class="btn-secondary" onclick="bibOeffnen('${escapeAttr(String(f.skript_id))}', ${Number(f.seite)})">${ic("export")}PDF S. ${Number(f.seite)}</button>` : ""}
+            <button type="button" class="btn-secondary" onclick="lernMelden('${fid}')">${ic("warnung")}${f.gemeldet ? "Gemeldet" : "Melden"}</button>
+            <button type="button" class="btn-secondary" onclick="blattOeffnen('frage', '${fid}')">${ic("stift")}Bearbeiten</button>
+          </div>
+          ${seiteText ? `<details class="lern-seitentext"><summary>Text von Seite ${Number(f.seite)} lesen</summary><div class="lern-seitentext-inhalt">${escapeHtml(seiteText)}</div></details>` : ""}
+        </div>` : "";
+    const unten = k.offen ? `
+      <p class="karte-frage-urteil">Gewusst?</p>
+      <div class="karte-urteil" role="group" aria-label="Selbsteinschätzung">
+        <button type="button" class="karte-urteil-knopf nein" onclick="kartenUrteil(false)">${ic("x-kreis")}Nicht gewusst</button>
+        <button type="button" class="karte-urteil-knopf ja" onclick="kartenUrteil(true)">${ic("ok-kreis")}Gewusst</button>
+      </div>
+      <p class="notiz-meta lern-tipp">Tastatur: ← oder 1 = nicht gewusst, → oder 2 = gewusst.</p>` : `
+      <button type="button" class="btn-primary lern-weiter" id="karte-umdrehen" onclick="kartenUmdrehen()">${ic("wiederholen")}Umdrehen</button>
+      <p class="notiz-meta lern-tipp">Tipp: Karte antippen, Leertaste oder Enter dreht um.</p>`;
+    return `
+      <div class="lern-fortschritt">
+        <span>Karte ${k.pos + 1} von ${k.ids.length}</span>
+        <span>${ic("ok-kreis")} ${gewusst} · ${ic("x-kreis")} ${nicht}</span>
+        <button type="button" class="link-btn" onclick="kartenBeenden()">Beenden</button>
+      </div>
+      <div class="lern-balken" role="progressbar" aria-label="Fortschritt der Runde" aria-valuemin="0" aria-valuemax="${k.ids.length}" aria-valuenow="${urteile.length}"><span style="width:${Math.round((urteile.length / k.ids.length) * 100)}%"></span></div>
+      <section class="lern-karte karteikarte${k.offen ? " offen" : ""}"${k.offen ? "" : ` onclick="kartenUmdrehen()"`}>
+        <p class="notiz-meta">${escapeHtml(lernSkriptName(f.skript_id))} · <span class="lern-stufe" aria-label="Schwierigkeit ${["", "leicht", "mittel", "schwer"][stufe]}">${"●".repeat(stufe)}${"○".repeat(3 - stufe)}</span>${f.gemeldet ? ` · ${ic("warnung")} gemeldet` : ""}</p>
+        <h2 class="lern-frage" id="lern-fokus" tabindex="-1">${escapeHtml(f.frage)}</h2>
+        ${k.offen ? "" : `<p class="karte-vorne-hinweis" aria-hidden="true">${ic("wiederholen")} antippen zum Umdrehen</p>`}
+        ${rueckseite}
+      </section>
+      ${unten}`;
+  }
+
+  // Ergebnis einer Kartenrunde
+  function kartenErgebnisHtml() {
+    const k = lern.karten;
+    const bewertet = k.ids.filter((id) => k.urteile[id] !== undefined);
+    const gewusst = bewertet.filter((id) => k.urteile[id]).length;
+    const nicht = bewertet.filter((id) => !k.urteile[id]).map(lernFrage).filter(Boolean);
+    const quote = lernProzent(gewusst, bewertet.length);
+    const lob = quote >= 90 ? "Stark – fast alles sitzt." : quote >= 70 ? "Gut! Die nicht gewussten kommen bald wieder dran." : quote >= 50 ? "Solide Basis – die Wiederholung macht den Rest." : "Dranbleiben – genau dafür ist die Wiederholung da.";
+    return `
+      <section class="lern-karte lern-ergebnis">
+        <h2 class="lern-frage" id="lern-fokus" tabindex="-1">${gewusst} von ${bewertet.length} gewusst (${quote} %)</h2>
+        <p class="notiz-meta">${lob}${bewertet.length < k.ids.length ? ` · ${k.ids.length - bewertet.length} Karten übersprungen` : ""}</p>
+        <div class="lern-knoepfe">
+          ${nicht.length ? `<button type="button" class="btn-primary" onclick="kartenNichtGewussteNochmal()">${ic("wiederholen")}Nicht gewusste nochmal (${nicht.length})</button>` : ""}
+          <button type="button" class="btn-secondary" onclick="kartenStarten()">${ic("weiter")}Neue Runde</button>
+          <button type="button" class="btn-secondary" onclick="kartenZurUebersicht()">Zur Übersicht</button>
+        </div>
+      </section>
+      ${nicht.length ? `<h3 class="lern-h2">Zum Nachlesen</h3><div class="notiz-list">${nicht.map((f) => `
+        <div class="notiz-item lern-liste-item">
+          <div class="notiz-inhalt">
+            <div class="lern-liste-frage">${escapeHtml(f.frage)}</div>
+            <div class="notiz-meta">${ic("ok-kreis")} ${escapeHtml((f.antworten || [])[f.richtig] || "")}</div>
+            ${f.erklaerung ? `<div class="notiz-meta">${escapeHtml(f.erklaerung)}</div>` : ""}
+            <div class="notiz-meta">${escapeHtml([lernSkriptName(f.skript_id), f.seite ? `S. ${f.seite}` : ""].filter(Boolean).join(" · "))}</div>
+          </div>
+        </div>`).join("")}</div>` : ""}`;
+  }
+
+  // Tastatur bei Karten: Leertaste/Enter umdrehen, ←/1 nicht gewusst, →/2 gewusst
+  document.addEventListener("keydown", (ev) => {
+    const k = lern.karten;
+    if (aktiverTab !== "lernen" || !k || k.fertig || lern.sitzung || lern.pruefung || lern.pruefErgebnis) return;
+    if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.isComposing) return;
+    if (document.querySelector("dialog[open]")) return;
+    const t = ev.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+    if (!k.offen) {
+      if (ev.key === " " || ev.key === "Enter") {
+        // Enter/Leertaste auf einem anderen Knopf (z. B. „Beenden“) bleibt bei diesem
+        if (t && t.tagName === "BUTTON" && t.id !== "karte-umdrehen") return;
+        ev.preventDefault();
+        window.kartenUmdrehen();
+      }
+      return;
+    }
+    if (t && t.tagName === "SUMMARY") return;
+    if (ev.key === "ArrowLeft" || ev.key === "1") { ev.preventDefault(); window.kartenUrteil(false); }
+    else if (ev.key === "ArrowRight" || ev.key === "2") { ev.preventDefault(); window.kartenUrteil(true); }
+  });
 
 
 
