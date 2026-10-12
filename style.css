@@ -1986,6 +1986,10 @@
 .lern-liste-item .notiz-meta .ic { vertical-align: -0.18em; }
 .lern-gemeldet { color: var(--overdue-text); }
 .lern-verwalten .row { margin: 0.5rem 0; }
+/* Gemeldete Fragen exportieren (seit Session 56) */
+.lern-export { margin: 0.25rem 0 0.75rem; padding: 0.6rem 0.75rem; border: 1px solid var(--overdue-border); border-radius: 12px; background: var(--overdue-bg); }
+.lern-export > .notiz-meta { color: var(--overdue-text); margin: 0 0 0.4rem; }
+.lern-export .bib-aktionen { margin: 0; }
 .lern-verwalten #lern-suche { flex: 1 1 100%; min-height: 44px; }
 @media (max-width: 420px) {
   .lern-ueberblick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
