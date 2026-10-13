@@ -9133,6 +9133,7 @@
           <input type="time" id="termin-uhrzeit" style="width:8rem;" title="Beginn (optional)">
           <input type="time" id="termin-ende" style="width:8rem;" title="Ende (optional)">
           <input type="text" id="termin-notiz" placeholder="Notiz (optional)">
+          ${terminFormSerieHtml()}
           <button class="btn-primary" id="btn-termin-hinzufuegen">Eintragen</button>
         </div>
       </div>`;
@@ -9141,12 +9142,69 @@
       festerTag: () => calAusgewaehlterTag,
     });
 
+    terminFormSerieEinrichten();
     document.getElementById("btn-termin-hinzufuegen").addEventListener("click", terminHinzufuegen);
     document.getElementById("termin-titel").addEventListener("keydown", (e) => {
       if (e.key === "Enter") terminHinzufuegen();
     });
   }
 
+
+  // ---- Kategorie und Wiederholung im Tagesformular (seit Session 62) ----
+  // Gleiche Werte wie im „+“-Blatt (Session 42). Ohne SQL (terminKategorien
+  // === null) bleiben die Felder weg.
+  function terminFormSerieHtml() {
+    if (terminKategorien === null) return "";
+    const kats = terminKategorien.filter((k) => bereichVon(k) === aktiverBereich);
+    const katFeld = kats.length ? `
+          <label class="termin-form-feld">Kategorie
+            <select id="termin-kat">
+              <option value="">Keine</option>
+              ${kats.map((k) => `<option value="${escapeAttr(String(k.id))}">${escapeHtml(k.name)}</option>`).join("")}
+            </select>
+          </label>` : "";
+    return `${katFeld}
+          <label class="termin-form-feld">Wiederholen
+            <select id="termin-wdh">
+              <option value="">Nie</option>
+              <option value="woechentlich">Wöchentlich</option>
+              <option value="monatlich">Monatlich</option>
+              <option value="jaehrlich">Jährlich</option>
+            </select>
+          </label>
+          <label class="termin-form-feld hidden" id="termin-wdh-bis-zeile">bis (optional)
+            <input type="date" id="termin-wdh-bis">
+          </label>
+          <p class="notiz-meta termin-form-hinweis hidden" id="termin-kat-hinweis">Geburtstag: mit Geburtsjahr eintragen (z. B. „Anna 12.05.1986“), dann steht das Alter dabei.</p>`;
+  }
+  function terminFormSerieEinrichten() {
+    const wdh = document.getElementById("termin-wdh");
+    if (!wdh) return;
+    const kat = document.getElementById("termin-kat");
+    const anzeigen = () => {
+      document.getElementById("termin-wdh-bis-zeile").classList.toggle("hidden", !wdh.value);
+      const k = kat && (terminKategorien || []).find((x) => String(x.id) === kat.value);
+      document.getElementById("termin-kat-hinweis").classList.toggle("hidden", !(k && k.geburtstag));
+    };
+    wdh.addEventListener("change", anzeigen);
+    if (kat) kat.addEventListener("change", () => {
+      // Kategorie Geburtstag und noch keine Wiederholung → jährlich (wie im „+“-Blatt)
+      const k = (terminKategorien || []).find((x) => String(x.id) === kat.value);
+      if (k && k.geburtstag && !wdh.value) wdh.value = "jaehrlich";
+      anzeigen();
+    });
+  }
+  // Felder fürs Speichern; null = Eingabe passt nicht (Meldung schon gezeigt)
+  function terminFormSerieWerte(datum) {
+    const wdh = document.getElementById("termin-wdh");
+    if (!wdh) return {};
+    const kat = document.getElementById("termin-kat");
+    const w = wdh.value || null;
+    const bis = w ? (document.getElementById("termin-wdh-bis").value || null) : null;
+    if (bis && bis < datum) { alert("„bis“ liegt vor dem ersten Termin."); return null; }
+    const katId = kat && kat.value && (terminKategorien || []).some((k) => String(k.id) === kat.value && bereichVon(k) === aktiverBereich) ? kat.value : null;
+    return { wiederholung: w, wiederholung_bis: bis, kategorie_id: katId };
+  }
 
   // Bearbeiten eines Termins: seit Session 35 im Blatt (eintragBearbeiten)
   window.terminBearbeitenStart = function(id) {
@@ -9163,8 +9221,16 @@
     const uhrzeit = document.getElementById("termin-uhrzeit").value || null;
     const ende_uhrzeit = document.getElementById("termin-ende").value || null;
     const notiz = document.getElementById("termin-notiz").value.trim() || null;
+    // Kategorie und Wiederholung (seit Session 62)
+    const serie = terminFormSerieWerte(datum);
+    if (serie === null) return;
 
-    await api("termin_hinzufuegen", { titel, datum, uhrzeit, ende_uhrzeit, notiz, bereich: aktiverBereich });
+    try {
+      await api("termin_hinzufuegen", { titel, datum, uhrzeit, ende_uhrzeit, notiz, bereich: aktiverBereich, ...serie });
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+      return;
+    }
     // Anderer Tag erkannt: dorthin springen, damit der neue Termin sichtbar ist
     if (datum !== calAusgewaehlterTag) {
       calAusgewaehlterTag = datum;
