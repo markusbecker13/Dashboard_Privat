@@ -2177,3 +2177,8 @@
 .termin-erledigt .termin-titel, .termin-erledigt .termin-zeit { color: var(--ink-dim); }
 .termin-weg .termin-notiz .ic, .termin-item .termin-notiz .ic { vertical-align: -0.15em; }
 .termin-check-platz { width: 1.4rem; flex-shrink: 0; }
+
+/* Kalender-Tagesformular: Kategorie und Wiederholung (seit Session 62) */
+.termin-form-feld { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; color: var(--ink-dim); flex: 1 1 8rem; min-width: 0; }
+.termin-form-feld select, .termin-form-feld input { width: 100%; }
+.termin-form-hinweis { flex-basis: 100%; margin: 0; }
