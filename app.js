@@ -4878,6 +4878,20 @@
     </div>`;
   }
 
+  window.stdZuletztUmschalten = function(offen) { std.zuletztOffen = offen; };
+  // Die zuletzt erfassten Einträge (unabhängig von Filter und Zeitraum) – seit Session 59b
+  function stdZuletztHtml() {
+    const liste = std.eintraege.slice().sort((a, b) => String(b.erstellt_am || "").localeCompare(String(a.erstellt_am || ""))).slice(0, 5);
+    if (!liste.length) return "";
+    return `<details class="anleitung-abschnitt std-block std-zuletzt"${std.zuletztOffen !== false ? " open" : ""} ontoggle="stdZuletztUmschalten(this.open)">
+      <summary>Zuletzt erfasst</summary>
+      <div class="anleitung-text"><div class="notiz-list">${liste.map((e) => {
+        const wt = new Date(e.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
+        return `<div class="std-zuletzt-zeile"><span class="notiz-meta">${wt} ${datumDe(e.datum).slice(0, 6)}</span>${stdEintragZeileHtml(e)}</div>`;
+      }).join("")}</div></div>
+    </details>`;
+  }
+
   function stdSaldoKartenHtml(kats) {
     const heute = heuteISO();
     const mo = stdMontag(heute);
@@ -4997,6 +5011,7 @@
         <button type="button" class="btn-secondary" onclick="blattNeu('stdabwesenheit', {})">${ic("kalender")}Abwesenheit</button>
       </div>
       ${stdLaufendHtml(aktiv)}
+      ${stdZuletztHtml()}
       ${stdSaldoKartenHtml(aktiv)}
       <div class="schnell-chips std-ansicht" role="group" aria-label="Ansicht">${ansichten}</div>
       <div class="std-nav">
@@ -5101,7 +5116,7 @@
     try {
       const r = await api("stunden_stopp", {});
       std.laufend = null; stdTickerStellen();
-      if (r.kurz) hinweisZeigen("Unter einer Minute – nichts gespeichert");
+      if (r.kurz) alert("Die Zeit war kürzer als eine Minute (bzw. nur Pause) – es wurde kein Eintrag gespeichert.");
       else {
         const e = r.eintrag || {};
         hinweisZeigen(`Gespeichert: ${String(e.von || "").slice(0, 5)}–${String(e.bis || "").slice(0, 5)} · ${stdHm(r.dauer_min || 0)} h`);
