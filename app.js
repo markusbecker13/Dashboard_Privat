@@ -5549,7 +5549,8 @@
     blatt = { art, id, werte };
     document.getElementById("blatt-titel").textContent = titel;
     // „Löschen“ nur bei vorhandenen Einträgen
-    document.getElementById("blatt-loeschen").classList.toggle("hidden", id === null || !BLATT_ARTEN[art].loeschen);
+    document.getElementById("blatt-loeschen").classList.toggle("hidden", id === null || !BLATT_ARTEN[art].loeschen ||
+      (BLATT_ARTEN[art].kannLoeschen ? !BLATT_ARTEN[art].kannLoeschen(werte) : false));
     document.getElementById("blatt-loeschen").textContent = BLATT_ARTEN[art].loeschText || "Löschen";
     blattMeldung("", false);
     blattRendern();
@@ -5694,7 +5695,7 @@
       return;
     }
     window.blattSchliessen();
-    hinweisZeigen("Gelöscht");
+    hinweisZeigen(cfg.geloescht || "Gelöscht");
     await ladeDaten();
     if (cfg.danach) cfg.danach();
   };
@@ -8211,15 +8212,19 @@
   // Sammelt alles, was heute im aktiven Bereich ansteht (ohne Überfälliges), nach Uhrzeit sortiert
   function heuteEintraegeSammeln(heuteIso, offenEnriched) {
     const liste = [];
-    // Seit Session 42 inkl. wiederholter Termine (Serie: nicht abhakbar, nicht wischbar)
+    // Seit Session 42 inkl. wiederholter Termine; seit Session 61 sind auch
+    // Vorkommen einer Serie abhakbar und wischbar (tag = ursprünglicher Tag)
     const heuteTermine = termineAmTag(heuteIso);
-    const zusatz = (t) => { const z = terminZusatz(t, heuteIso); return z ? ` · ${z}` : ""; };
+    const zusatz = (t) => {
+      const z = terminZusatz(t, heuteIso);
+      return (t._verschoben ? ` · verschoben vom ${formatDatumKurz(t._verschoben)}` : "") + (z ? ` · ${z}` : "");
+    };
     heuteTermine
       .filter((t) => !t.uhrzeit)
       .sort((a, b) => a.titel.localeCompare(b.titel))
       .forEach((t) => liste.push({
         id: t.id, typ: "termin", zeit: "ganzt.", titel: t.titel, meta: "Termin · ganztägig" + zusatz(t),
-        tab: "kalender", sort: -1, erledigt: !!t.erledigt, serie: !!t._serie, marke: terminMarkeHtml(t),
+        tab: "kalender", sort: -1, erledigt: !!t.erledigt, serie: !!t._serie, tag: t._serie ? t._tag : null, marke: terminMarkeHtml(t),
       }));
     heuteTermine
       .filter((t) => t.uhrzeit)
@@ -8229,7 +8234,7 @@
         liste.push({
           id: t.id, typ: "termin", zeit: start, start, ende: endeEcht || minutenZuZeit(zeitZuMinuten(start) + 30), endeEcht,
           titel: t.titel, meta: "Termin" + (endeEcht ? ` bis ${endeEcht}` : "") + zusatz(t), tab: "kalender",
-          sort: zeitZuMinuten(start), erledigt: !!t.erledigt, serie: !!t._serie, marke: terminMarkeHtml(t),
+          sort: zeitZuMinuten(start), erledigt: !!t.erledigt, serie: !!t._serie, tag: t._serie ? t._tag : null, marke: terminMarkeHtml(t),
         });
       });
     offenEnriched
@@ -8467,31 +8472,16 @@
     const klassen = ["heute-zeile"];
     if (laeuftJetzt) klassen.push("jetzt");
     if (e.erledigt) klassen.push("erledigt");
-    // Termin aus einer Serie (seit Session 42): kein Abhaken, kein Wischen –
-    // das würde die ganze Serie treffen. Antippen öffnet die Serie.
-    if (e.serie) {
-      return `
-      <div class="${klassen.join(" ")}">
-        <div class="heute-zeile-vorne">
-        <span class="zl-check" aria-hidden="true" style="border-color:transparent; display:inline-flex; align-items:center; justify-content:center; color:var(--ink-dim);">${ic("serie")}</span>
-        <span class="heute-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
-        <button class="heute-zeile-inhalt" onclick="eintragBearbeiten('${e.typ}','${e.id}')" title="Serie bearbeiten">
-          <span class="heute-zeile-titel">${e.marke || ""}${escapeHtml(e.titel)}</span>
-          <span class="heute-zeile-meta">${escapeHtml(e.meta)}</span>
-        </button>
-        </div>
-      </div>`;
-    }
     const links = heuteWischLinks(e);
     klassen.push("wisch-zeile");
     return `
-      <div class="${klassen.join(" ")}" data-wisch-typ="${e.typ}" data-wisch-id="${e.id}" data-wisch-links="${links}">
+      <div class="${klassen.join(" ")}" data-wisch-typ="${e.typ}" data-wisch-id="${e.id}" data-wisch-links="${links}"${e.tag ? ` data-wisch-tag="${e.tag}"` : ""}>
         ${wischHinterHtml(e.erledigt ? "wiederholen" : "ok-kreis", e.erledigt ? "Wieder offen" : "Erledigt", links)}
         <div class="heute-zeile-vorne wisch-vorne">
-        <button class="zl-check ${e.erledigt ? "done" : ""}" onclick="zeitleisteUmschalten('${e.typ}','${e.id}', this)"
+        <button class="zl-check ${e.erledigt ? "done" : ""}" onclick="zeitleisteUmschalten('${e.typ}','${e.id}', this${e.tag ? `, '${e.tag}'` : ""})"
           title="${e.erledigt ? "Wieder offen" : "Erledigt"}" aria-label="${escapeAttr(e.titel)} ${e.erledigt ? "wieder öffnen" : "als erledigt markieren"}"></button>
         <span class="heute-zeit">${laeuftJetzt ? "Jetzt" : escapeHtml(e.zeit)}</span>
-        <button class="heute-zeile-inhalt" onclick="eintragBearbeiten('${e.typ}','${e.id}')" title="${e.typ === "termin" ? "Termin bearbeiten" : "Aufgabe bearbeiten"}">
+        <button class="heute-zeile-inhalt" onclick="eintragBearbeiten('${e.typ}','${e.id}')" title="${e.serie ? "Serie bearbeiten" : e.typ === "termin" ? "Termin bearbeiten" : "Aufgabe bearbeiten"}">
           <span class="heute-zeile-titel">${e.marke || ""}${escapeHtml(e.titel)}</span>
           <span class="heute-zeile-meta">${escapeHtml(e.meta)}</span>
         </button>
@@ -8513,7 +8503,27 @@
   let wischKlickSperre = 0;  // Zeitpunkt, bis zu dem Klicks nach einem Wisch verschluckt werden
 
   // Führt die Aktion eines Wischs aus; liefert den Hinweistext und ggf. eine Rückgängig-Funktion
-  async function wischAusfuehren(typ, id, richtung, art) {
+  async function wischAusfuehren(typ, id, richtung, art, tag = null) {
+    // Vorkommen einer Serie (seit Session 61): rechts = nur dieses abhaken,
+    // links = nur dieses einen Tag später (gleiche Uhrzeit)
+    if (typ === "termin" && tag) {
+      const t = termine.find((x) => String(x.id) === String(id));
+      if (!t) throw new Error("Termin nicht gefunden");
+      if (richtung === "rechts") {
+        const warErledigt = terminErledigtAm(t, tag);
+        await terminUmschaltenApi(id, tag);
+        return { text: warErledigt ? "Wieder offen" : "Erledigt", zurueck: async () => { await terminUmschaltenApi(id, tag); await ladeDaten(); } };
+      }
+      const vorher = terminVerschiebungen(t)[tag] || null;
+      const zeit = (z) => (z ? String(z).slice(0, 5) : null);
+      const jetzt = vorher || { datum: tag, uhrzeit: zeit(t.uhrzeit), ende_uhrzeit: zeit(t.ende_uhrzeit) };
+      const ziel = addTage(jetzt.datum, 1);
+      await api("termin_verschieben", { id, tag, datum: ziel, uhrzeit: jetzt.uhrzeit, ende_uhrzeit: jetzt.ende_uhrzeit });
+      return { text: `Nur dieser Termin: auf ${formatDatumKurz(ziel)} verschoben`, zurueck: async () => {
+        await api("termin_verschieben", vorher ? { id, tag, ...vorher } : { id, tag, modus: "weg" });
+        await ladeDaten();
+      } };
+    }
     if (typ === "einkauf") {
       const e = einkaufsliste.find((x) => String(x.id) === String(id));
       if (!e) throw new Error("Eintrag nicht gefunden");
@@ -8627,7 +8637,7 @@
       }
       wischSetzen(w.zeile, richtung === "rechts" ? w.breite : -w.breite, true);
       try {
-        const erg = await wischAusfuehren(w.zeile.dataset.wischTyp, w.zeile.dataset.wischId, richtung, art);
+        const erg = await wischAusfuehren(w.zeile.dataset.wischTyp, w.zeile.dataset.wischId, richtung, art, w.zeile.dataset.wischTag || null);
         try { localStorage.setItem("heute-wisch-tipp", "gesehen"); } catch (_e) { /* egal */ }
         await ladeDaten();
         hinweisZeigen(erg.text, erg.zurueck);
@@ -8773,8 +8783,9 @@
   // Tage rechnet termineVorkommen() aus – gleiche Regeln wie terminAmTag in
   // index.ts: monatlich am 31. → letzter Tag kürzerer Monate, jährlich am
   // 29.2. → in Nicht-Schaltjahren am 28.2. Vorkommen sind Kopien mit datum =
-  // Tag des Vorkommens, _serie = true, _start = erster Termin; sie lassen
-  // sich nicht einzeln abhaken, verschieben oder löschen (Stift = ganze Serie).
+  // Tag des Vorkommens, _serie = true, _start = erster Termin. Seit Session 61
+  // lassen sie sich einzeln abhaken und verschieben (termin_umschalten mit tag,
+  // termin_verschieben); Stift und Löschen gelten weiter für die ganze Serie.
   // ==========================================================
   // Farben für Streifen und Punkte – alle mit mind. 3:1 gegen helle und
   // dunkle Flächen aller Bereiche (WCAG 1.4.11), nie als Schriftfarbe
@@ -8823,9 +8834,33 @@
   }
   // Alle Termine (Einzel- und Vorkommen von Serien) zwischen von und bis, sortiert
   // mitAusfall (seit Session 60): ausgefallene Tage als _ausfall mitliefern
-  // (nur Kalender); sonst fehlen sie – Start, Frei, Push, Export sehen sie nicht
+  // (nur Kalender); sonst fehlen sie – Start, Frei, Push, Export sehen sie nicht.
+  // Seit Session 61: _tag = ursprünglicher Tag des Vorkommens (Schlüssel für
+  // Abhaken, Ausfall, Verschieben); erledigt je Vorkommen (erledigt_tage);
+  // verschobene Vorkommen stehen am neuen Tag mit neuer Uhrzeit (_verschoben =
+  // ursprünglicher Tag); mit mitAusfall steht am alten Tag zusätzlich ein
+  // Platzhalter _weg (nur Kalender-Tagespanel).
   function terminAusfallAm(t, iso) {
     return Array.isArray(t.ausfall_tage) && t.ausfall_tage.some((a) => String(a).slice(0, 10) === iso);
+  }
+  function terminErledigtAm(t, iso) {
+    return Array.isArray(t.erledigt_tage) && t.erledigt_tage.some((a) => String(a).slice(0, 10) === iso);
+  }
+  // { ursprünglicher Tag: { datum, uhrzeit, ende_uhrzeit } }
+  function terminVerschiebungen(t) {
+    const v = t && t.verschiebungen;
+    if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+    const aus = {};
+    for (const [tag, z] of Object.entries(v)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(tag) || !z || !/^\d{4}-\d{2}-\d{2}$/.test(String(z.datum || ""))) continue;
+      aus[tag] = { datum: String(z.datum), uhrzeit: z.uhrzeit ? String(z.uhrzeit).slice(0, 5) : null, ende_uhrzeit: z.ende_uhrzeit ? String(z.ende_uhrzeit).slice(0, 5) : null };
+    }
+    return aus;
+  }
+  // Gehört der Tag zur Serie (Start, Ende, Rhythmus)?
+  function terminSerienTagGueltig(t, iso) {
+    if (!t.datum || iso < t.datum || (t.wiederholung_bis && iso > t.wiederholung_bis)) return false;
+    return terminSerienTage(t, iso, iso).length === 1;
   }
   function termineVorkommen(liste, von, bis, mitAusfall = false) {
     const ergebnis = [];
@@ -8834,13 +8869,29 @@
         if (t.datum >= von && t.datum <= bis) ergebnis.push(t);
         continue;
       }
-      if (!t.datum || t.datum > bis) continue;
+      if (!t.datum) continue;
+      const basis = { ...t, _serie: true, _start: t.datum };
+      const versch = terminVerschiebungen(t);
+      // Hierher verschobene Vorkommen (auch von Tagen außerhalb von–bis)
+      for (const [tag, v] of Object.entries(versch)) {
+        if (v.datum < von || v.datum > bis || !terminSerienTagGueltig(t, tag) || terminAusfallAm(t, tag)) continue;
+        ergebnis.push({ ...basis, datum: v.datum, uhrzeit: v.uhrzeit, ende_uhrzeit: v.ende_uhrzeit,
+          erledigt: terminErledigtAm(t, tag), _tag: tag, _verschoben: tag });
+      }
+      if (t.datum > bis) continue;
       const ende = t.wiederholung_bis && t.wiederholung_bis < bis ? t.wiederholung_bis : bis;
       const ab = von > t.datum ? von : t.datum;
       for (const iso of terminSerienTage(t, ab, ende)) {
         const ausfall = terminAusfallAm(t, iso);
-        if (ausfall && !mitAusfall) continue;
-        ergebnis.push({ ...t, datum: iso, erledigt: false, _serie: true, _start: t.datum, ...(ausfall ? { _ausfall: true } : {}) });
+        if (ausfall) {
+          if (mitAusfall) ergebnis.push({ ...basis, datum: iso, erledigt: false, _tag: iso, _ausfall: true });
+          continue;
+        }
+        if (versch[iso]) {
+          if (mitAusfall) ergebnis.push({ ...basis, datum: iso, erledigt: false, _tag: iso, _weg: versch[iso] });
+          continue;
+        }
+        ergebnis.push({ ...basis, datum: iso, erledigt: terminErledigtAm(t, iso), _tag: iso });
       }
     }
     return ergebnis.sort((a, b) => (a.datum + (a.uhrzeit || "99:99")).localeCompare(b.datum + (b.uhrzeit || "99:99")));
@@ -9037,20 +9088,37 @@
       : liste.map((t) => {
           const farbe = terminFarbe(t);
           const zusatz = terminZusatz(t, t.datum);
+          const zeit = t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : "";
+          const streifen = farbe ? ` style="box-shadow: inset 4px 0 0 ${farbe}; padding-left:0.7rem;"` : "";
           // Ausgefallenes Vorkommen einer Serie (seit Session 60): durchgestrichen, „wieder aktivieren“
           if (t._ausfall) return `
-          <div class="termin-item termin-ausfall"${farbe ? ` style="box-shadow: inset 4px 0 0 ${farbe}; padding-left:0.7rem;"` : ""}>
-            <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
+          <div class="termin-item termin-ausfall"${streifen}>
+            <span class="termin-check-platz" aria-hidden="true"></span>
+            <span class="termin-zeit">${zeit}</span>
             <span class="termin-titel"><s>${escapeHtml(t.titel)}</s><span class="termin-notiz">${ic("serie")} fällt aus</span></span>
-            <button class="link-btn" onclick="terminAusfallWeg('${t.id}','${t.datum}')">Wieder aktivieren</button>
+            <button class="link-btn" onclick="terminAusfallWeg('${t.id}','${t._tag}')">Wieder aktivieren</button>
           </div>`;
+          // Von hier weg verschoben (seit Session 61): ausgegraut, „Zurück“ holt es an diesen Tag
+          if (t._weg) return `
+          <div class="termin-item termin-ausfall termin-weg"${streifen}>
+            <span class="termin-check-platz" aria-hidden="true"></span>
+            <span class="termin-zeit">${zeit}</span>
+            <span class="termin-titel"><s>${escapeHtml(t.titel)}</s><span class="termin-notiz">${ic("verschieben")} verschoben auf ${escapeHtml(terminTagText(t._weg.datum))}${t._weg.uhrzeit ? " · " + t._weg.uhrzeit + " Uhr" : ""}</span></span>
+            <button class="link-btn" onclick="terminVerschiebungWeg('${t.id}','${t._tag}')">Zurückholen</button>
+          </div>`;
+          const tagArg = t._serie ? `'${t._tag}'` : "null";
           return `
-          <div class="termin-item"${farbe ? ` style="box-shadow: inset 4px 0 0 ${farbe}; padding-left:0.7rem;"` : ""}>
-            <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
-            <span class="termin-titel">${terminMarkeHtml(t)}${escapeHtml(t.titel)}${zusatz ? `<span class="termin-notiz">${t._serie ? ic("serie") + " " : ""}${escapeHtml(zusatz)}</span>` : ""}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
-            ${t._serie ? `<button class="task-snooze" onclick="terminAusfallOeffnen('${t.id}','${t.datum}')" title="Fällt aus …" aria-label="Termin am ${formatDatumKurz(t.datum)} ausfallen lassen">${ic("x-kreis")}</button>` : ""}
+          <div class="termin-item${t.erledigt ? " termin-erledigt" : ""}"${streifen}>
+            <button class="task-check termin-check ${t.erledigt ? "done" : ""}" onclick="terminAbhaken('${t.id}', ${tagArg}, this)"
+              title="${t.erledigt ? "Wieder offen" : "Erledigt"}" aria-label="${escapeAttr(t.titel)} ${t.erledigt ? "wieder öffnen" : "abhaken"}" aria-pressed="${t.erledigt}">${t.erledigt ? "✓" : ""}</button>
+            <span class="termin-zeit">${zeit}</span>
+            <span class="termin-titel">${terminMarkeHtml(t)}${escapeHtml(t.titel)}${t._verschoben ? `<span class="termin-notiz">${ic("verschieben")} verschoben vom ${escapeHtml(terminTagText(t._verschoben))}</span>` : ""}${zusatz ? `<span class="termin-notiz">${t._serie ? ic("serie") + " " : ""}${escapeHtml(zusatz)}</span>` : ""}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
+            <span class="termin-aktionen">
+            ${t._serie ? `<button class="task-snooze" onclick="terminVerschiebenOeffnen('${t.id}','${t._tag}')" title="Nur diesen Termin verschieben" aria-label="Termin vom ${formatDatumKurz(t._tag)} verschieben">${ic("verschieben")}</button>` : ""}
+            ${t._serie && !t._verschoben ? `<button class="task-snooze" onclick="terminAusfallOeffnen('${t.id}','${t._tag}')" title="Fällt aus …" aria-label="Termin am ${formatDatumKurz(t._tag)} ausfallen lassen">${ic("x-kreis")}</button>` : ""}
             <button class="task-snooze" onclick="terminBearbeitenStart('${t.id}')" title="${t._serie ? "Serie bearbeiten" : "Bearbeiten"}" aria-label="${t._serie ? "Serie bearbeiten" : "Bearbeiten"}">${ic("stift")}</button>
             <button class="task-delete" onclick="terminLoeschen('${t.id}')" aria-label="${t._serie ? "Serie löschen" : "Löschen"}">${ic("x")}</button>
+            </span>
           </div>`; }).join("");
 
     // Das Formular dient nur noch zum Anlegen – Bearbeiten läuft seit
@@ -9177,6 +9245,91 @@
       return api("termin_ausfall", { id, tage, modus: "hinzu" }).then((r) => ({ ...r, anzahl: tage.length }));
     },
     gespeichert: (r) => (r && r.anzahl > 1 ? `${r.anzahl} Termine fallen aus` : "Termin fällt aus"),
+    danach: () => { if (aktiverTab === "kalender") renderKalender(); },
+  };
+
+  // ---- Einzelne Vorkommen abhaken und verschieben (seit Session 61) ----
+  // Abhaken: Einzeltermin wie bisher (erledigt), Serie nur dieses Vorkommen
+  // (erledigt_tage, Schlüssel = ursprünglicher Tag). Verschieben: nur Serien,
+  // neuer Tag und/oder neue Uhrzeit (verschiebungen); die Serie bleibt.
+  // „Mi, 15.10.“
+  function terminTagText(iso) {
+    const wt = new Date(iso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
+    return `${wt}, ${formatDatumKurz(iso)}`;
+  }
+  // Wechselt erledigt/offen; tag = ursprünglicher Tag bei Serien (sonst null)
+  function terminUmschaltenApi(id, tag) {
+    return api("termin_umschalten", tag ? { id, tag } : { id });
+  }
+  window.terminAbhaken = async function(id, tag, knopf) {
+    if (knopf) {
+      if (knopf.disabled) return;
+      knopf.disabled = true;
+      knopf.classList.toggle("done");
+    }
+    try {
+      await terminUmschaltenApi(id, tag);
+      await ladeDaten();
+      if (aktiverTab === "kalender") renderKalender();
+    } catch (e) {
+      if (knopf) { knopf.disabled = false; knopf.classList.toggle("done"); }
+      if (e.message !== "unauthorized") alert("Nicht geändert: " + (e.message || "Fehler"));
+    }
+  };
+  window.terminVerschiebungWeg = async function(id, tag) {
+    try {
+      await api("termin_verschieben", { id, tag, modus: "weg" });
+      hinweisZeigen("Termin wieder am " + formatDatumKurz(tag));
+      await ladeDaten();
+      if (aktiverTab === "kalender") renderKalender();
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht geändert: " + (e.message || "Fehler"));
+    }
+  };
+  let terminVerschiebenTag = null;
+  window.terminVerschiebenOeffnen = function(id, tag) {
+    terminVerschiebenTag = tag;
+    blattOeffnen("terminverschieben", id);
+  };
+  BLATT_ARTEN.terminverschieben = {
+    titel: "Nur diesen Termin verschieben",
+    finden: (id) => termine.find((x) => String(x.id) === String(id) && x.wiederholung),
+    laden: (t) => {
+      const tag = terminVerschiebenTag || heuteISO();
+      const v = terminVerschiebungen(t)[tag];
+      const zeit = (z) => (z ? String(z).slice(0, 5) : "");
+      return {
+        id: t.id, tag, verschoben: !!v,
+        info: `${t.titel} · ${TERMIN_WDH[t.wiederholung] || ""} · eigentlich ${terminTagText(tag)}${t.uhrzeit ? ", " + zeit(t.uhrzeit) + (t.ende_uhrzeit ? "–" + zeit(t.ende_uhrzeit) : "") + " Uhr" : ""}`,
+        datum: v ? v.datum : tag,
+        uhrzeit: v ? (v.uhrzeit || "") : zeit(t.uhrzeit),
+        ende: v ? (v.ende_uhrzeit || "") : zeit(t.ende_uhrzeit),
+      };
+    },
+    felder: [
+      { key: "info", label: "Serie", typ: "info" },
+      { key: "datum", label: "Neuer Tag", typ: "datum", pflicht: true },
+      { key: "uhrzeit", label: "Beginn", typ: "zeit", halb: true, hinweis: "leer = ganztägig" },
+      { key: "ende", label: "Ende", typ: "zeit", halb: true },
+      { key: "hinweis", label: "", typ: "html", html: () => `<p class="blatt-hinweis">Nur dieser eine Termin wandert. Die Serie und alle anderen Termine bleiben, wie sie sind. Ändert sich an der Serie alles, über ${ic("stift")} bearbeiten.</p>` },
+    ],
+    pruefen: (w) => {
+      if (!w.datum) return "Bitte einen Tag wählen.";
+      if (w.ende && !w.uhrzeit) return "Ohne Beginn gibt es kein Ende – bitte Beginn eintragen oder Ende leeren.";
+      if (w.uhrzeit && w.ende && w.ende <= w.uhrzeit) return "Das Ende liegt vor dem Beginn.";
+      return "";
+    },
+    speichern: (id, w) => api("termin_verschieben", { id, tag: w.tag, datum: w.datum, uhrzeit: w.uhrzeit || null, ende_uhrzeit: w.ende || null })
+      .then((r) => ({ ...r, tag: w.tag })),
+    gespeichert: (r, w) => (r && r.verschiebungen && r.verschiebungen[w.tag]
+      ? `Termin auf ${terminTagText(w.datum)}${w.uhrzeit ? ", " + w.uhrzeit + " Uhr" : ""} verschoben` : "Termin bleibt an seinem Tag"),
+    // „Löschen“ = Verschiebung zurücknehmen, nur wenn verschoben
+    kannLoeschen: (w) => w.verschoben,
+    loeschText: "Zurück an den eigenen Tag",
+    loeschen: (id) => api("termin_verschieben", { id, tag: terminVerschiebenTag, modus: "weg" }),
+    loeschFrage: () => `Termin wieder auf ${terminTagText(terminVerschiebenTag)} legen?`,
+    geloescht: "Termin wieder an seinem Tag",
+    // Am alten Tag steht danach „verschoben auf …“ – kein Sprung nötig
     danach: () => { if (aktiverTab === "kalender") renderKalender(); },
   };
 
@@ -9369,7 +9522,7 @@
     termineVorkommen(termine, tagIso, tagIso).filter((t) => t.uhrzeit).forEach((t) => {
       const start = t.uhrzeit.slice(0,5);
       const ende = t.ende_uhrzeit ? t.ende_uhrzeit.slice(0,5) : minutenZuZeit(zeitZuMinuten(start) + 30);
-      bloecke.push({ start, ende, titel: t.titel, typ: "Termin", id: t.id, erledigt: !!t.erledigt, serie: !!t._serie });
+      bloecke.push({ start, ende, titel: t.titel, typ: "Termin", id: t.id, erledigt: !!t.erledigt, serie: !!t._serie, tag: t._serie ? t._tag : null });
     });
 
     aufgaben.filter((a) => a.faellig_am === tagIso && a.uhrzeit).forEach((a) => {
@@ -9469,10 +9622,8 @@
           </div>`;
       }
       const istErledigt = e.art === "erledigt";
-      const checkboxHtml = e.typ === "Termin" && e.serie
-        ? `<span style="width:1.4rem; flex-shrink:0; color:var(--ink-dim);" title="Serie">${ic("serie")}</span>`
-        : e.typ === "Termin"
-        ? `<button class="task-check ${istErledigt ? "done" : ""}" onclick="freiTerminUmschalten('${e.id}')" title="Erledigt">${istErledigt ? "✓" : ""}</button>`
+      const checkboxHtml = e.typ === "Termin"
+        ? `<button class="task-check ${istErledigt ? "done" : ""}" onclick="freiTerminUmschalten('${e.id}'${e.tag ? `,'${e.tag}'` : ""})" title="Erledigt">${istErledigt ? "✓" : ""}</button>`
         : e.typ === "Aufgabe"
         ? `<button class="task-check ${istErledigt ? "done" : ""}" onclick="freiAufgabeUmschalten('${e.id}')" title="Erledigt">${istErledigt ? "✓" : ""}</button>`
         : `<span style="width:1.4rem; flex-shrink:0;"></span>`;
@@ -9493,14 +9644,15 @@
   // Backend-Aktionen wie Aufgaben bzw. Kalender – erledigte Aufgaben
   // verschwinden danach aus der Zeitleiste (unter Aufgaben → Erledigt),
   // Termine bleiben durchgestrichen stehen und lassen sich zurücknehmen.
-  window.zeitleisteUmschalten = async function(typ, id, knopf) {
+  window.zeitleisteUmschalten = async function(typ, id, knopf, tag = null) {
     if (knopf) {
       if (knopf.disabled) return;
       knopf.disabled = true;
       knopf.classList.toggle("done");
     }
     try {
-      await api(typ === "termin" ? "termin_umschalten" : "aufgabe_umschalten", { id });
+      if (typ === "termin") await terminUmschaltenApi(id, tag);
+      else await api("aufgabe_umschalten", { id });
       await ladeDaten();
     } catch (fehler) {
       if (knopf) {
@@ -9512,8 +9664,8 @@
   };
 
   // Schaltet einen Termin in der Frei-Ansicht erledigt/offen und zeichnet neu
-  window.freiTerminUmschalten = async function(id) {
-    await api("termin_umschalten", { id });
+  window.freiTerminUmschalten = async function(id, tag = null) {
+    await terminUmschaltenApi(id, tag);
     await ladeDaten();
     renderFrei();
   };
