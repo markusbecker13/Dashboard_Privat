@@ -3911,6 +3911,7 @@
   // Speichern und Löschen. Ersetzt die früheren Inline-Formulare.
   // ==========================================================
   window.eintragBearbeiten = function(typ, id) {
+    if (istTempId(id)) return;
     const dlg = document.getElementById("schnell-dialog");
     const liste = typ === "termin" ? termine : aufgaben;
     const e = liste.find((x) => String(x.id) === String(id));
@@ -5529,6 +5530,7 @@
 
   // Öffnet das Bearbeiten-Blatt für einen Eintrag
   window.blattOeffnen = function(art, id) {
+    if (istTempId(id)) return; // gerade erst angelegt, noch nicht gespeichert (Session 64)
     const cfg = BLATT_ARTEN[art];
     const dlg = document.getElementById("blatt-dialog");
     const eintrag = cfg && cfg.finden(id);
@@ -6659,8 +6661,11 @@
   }
 
   // Lädt alle Daten per api("liste") in die globalen Listen und rendert alle Ansichten neu
-  async function ladeDaten() {
+  async function ladeDaten(optionen = {}) {
     const data = await api("liste");
+    // Hintergrund-Laden (seit Session 64): Speichert gerade eine Sofort-Änderung,
+    // wären die Daten schon veraltet – verwerfen und gleich danach neu laden
+    if (optionen.hintergrund && speichertGerade > 0) { hgNochmal = true; return; }
     projekte = data.projekte || [];
     aufgaben = data.aufgaben || [];
     termine = data.termine || [];
@@ -6716,27 +6721,149 @@
     mailEingerichtet = data.mail_eingerichtet === true;
     bereichAnwenden();
     renderReiterVerwaltung();
-    render();
-    renderKalender();
-    renderHeute();
     ladeWetter();
-    renderNotizen();
-    renderLinks();
-    renderReflexionen();
-    renderExport();
-    renderEinkauf();
-    renderVerlauf();
-    renderPlanung();
-    renderBlockzeiten();
-    renderOgsIdeen();
-    renderInventar();
-    renderVerleih();
-    renderProjekte();
-    renderSpiele();
-    renderRezepte();
-    renderRaumplanung();
-    renderSchluessel();
+    // Seit Session 64: erst den sichtbaren Reiter zeichnen, die übrigen kurz
+    // danach in kleinen Häppchen (blockiert die Bedienung nicht). Wechselt
+    // man vorher den Reiter, zeichnet tabWechseln ihn sofort.
+    allesZeichnen();
   }
+
+  // ---- Zeichnen nach dem Laden (seit Session 64) ----
+  // Welche Zeichen-Funktionen zu welchem Reiter gehören. Reihenfolge = wie
+  // früher in ladeDaten; Heute und Kalender zuerst, weil sie am häufigsten offen sind.
+  const ZEICHNEN_JE_REITER = [
+    ["heute", () => renderHeute()],
+    ["kalender", () => renderKalender()],
+    ["aufgaben", () => render()],
+    ["notizen", () => renderNotizen()],
+    ["links", () => renderLinks()],
+    ["reflexion", () => renderReflexionen()],
+    ["export", () => renderExport()],
+    ["einkauf", () => renderEinkauf()],
+    ["verlauf", () => renderVerlauf()],
+    ["planung", () => renderPlanung()],
+    ["frei", () => renderBlockzeiten()],
+    ["ogsideen", () => renderOgsIdeen()],
+    ["ogsinventar", () => renderInventar()],
+    ["verleih", () => renderVerleih()],
+    ["ogsprojekte", () => renderProjekte()],
+    ["spiele", () => renderSpiele()],
+    ["rezepte", () => renderRezepte()],
+    ["raumplanung", () => renderRaumplanung()],
+    ["schluessel", () => renderSchluessel()],
+  ];
+  let zeichnenOffen = new Set();   // Reiter, die noch neu gezeichnet werden müssen
+  let zeichnenTimer = null;
+  function zeichneReiter(tab) {
+    if (!zeichnenOffen.has(tab)) return;
+    zeichnenOffen.delete(tab);
+    for (const [t, fn] of ZEICHNEN_JE_REITER) {
+      if (t !== tab) continue;
+      try { fn(); } catch (e) { console.error("[Zeichnen]", tab, e); }
+    }
+  }
+  function allesZeichnen() {
+    zeichnenOffen = new Set(ZEICHNEN_JE_REITER.map(([t]) => t));
+    // Sichtbarer Reiter sofort, die übrigen danach
+    zeichneReiter(aktiverTab);
+    restSpaeterZeichnen();
+  }
+  // Übrige Reiter in Häppchen von höchstens ~12 ms, dazwischen bleibt die App bedienbar
+  function restSpaeterZeichnen() {
+    clearTimeout(zeichnenTimer);
+    const weiter = () => {
+      const start = performance.now();
+      while (zeichnenOffen.size && performance.now() - start < 12) {
+        zeichneReiter(zeichnenOffen.values().next().value);
+      }
+      if (zeichnenOffen.size) zeichnenTimer = setTimeout(weiter, 0);
+    };
+    zeichnenTimer = setTimeout(weiter, 0);
+  }
+  // Nur den sichtbaren Reiter neu zeichnen (nach einer Sofort-Änderung)
+  function aktivNeuZeichnen() {
+    zeichnenOffen.add(aktiverTab);
+    zeichneReiter(aktiverTab);
+    if (aktiverTab === "frei") renderFrei();
+    // Die übrigen Reiter kurz danach (z. B. Heute ↔ Aufgaben teilen Daten)
+    for (const [t] of ZEICHNEN_JE_REITER) if (t !== aktiverTab) zeichnenOffen.add(t);
+    restSpaeterZeichnen();
+  }
+
+  // Neu laden im Hintergrund (seit Session 64): mehrere Aufrufe kurz
+  // hintereinander werden zusammengefasst; läuft schon ein Laden, folgt
+  // genau eines danach (damit die letzte Änderung sicher drin ist).
+  let hgLaedt = null, hgNochmal = false, speichertGerade = 0;
+  function hintergrundLaden() {
+    if (hgLaedt) { hgNochmal = true; return hgLaedt; }
+    hgLaedt = (async () => {
+      try {
+        do {
+          hgNochmal = false;
+          try { await ladeDaten({ hintergrund: true }); } catch (e) { if (e.message !== "unauthorized") console.error("[Neu laden]", e); }
+        } while (hgNochmal);
+      } finally { hgLaedt = null; }
+    })();
+    return hgLaedt;
+  }
+
+  // Sofort-Änderung (seit Session 64): lokal ändern und anzeigen, dann
+  // speichern; danach im Hintergrund neu laden. Schlägt das Speichern fehl,
+  // wird die lokale Änderung zurückgenommen.
+  // aendern() ändert die Daten im Speicher und liefert eine Rückgängig-Funktion.
+  async function sofort(aendern, speichern, fehlerText = "Nicht gespeichert") {
+    let zurueck = null;
+    try { zurueck = aendern(); } catch (e) { console.error("[Sofort]", e); }
+    aktivNeuZeichnen();
+    speichertGerade++;
+    try {
+      const r = await speichern();
+      speichertGerade--;
+      hintergrundLaden();
+      return r === undefined ? true : r;
+    } catch (e) {
+      speichertGerade--;
+      if (typeof zurueck === "function") { try { zurueck(); } catch (_e) { /* egal */ } }
+      aktivNeuZeichnen();
+      if (e.message !== "unauthorized") alert(fehlerText + ": " + (e.message || "Fehler"));
+      hintergrundLaden();
+      return false;
+    }
+  }
+  // Aufgabe lokal erledigt/offen schalten; liefert Rückgängig
+  function aufgabeLokalUmschalten(id) {
+    const a = aufgaben.find((x) => String(x.id) === String(id));
+    if (!a) return null;
+    const vorher = { erledigt: a.erledigt, erledigt_am: a.erledigt_am };
+    a.erledigt = !a.erledigt;
+    a.erledigt_am = a.erledigt ? new Date().toISOString() : null;
+    return () => Object.assign(a, vorher);
+  }
+  // Termin lokal erledigt/offen schalten (Serie: nur das Vorkommen am Tag tag)
+  function terminLokalUmschalten(id, tag) {
+    const t = termine.find((x) => String(x.id) === String(id));
+    if (!t) return null;
+    if (t.wiederholung && tag) {
+      const vorher = Array.isArray(t.erledigt_tage) ? [...t.erledigt_tage] : [];
+      const liste = vorher.map((x) => String(x).slice(0, 10));
+      t.erledigt_tage = liste.includes(tag) ? liste.filter((x) => x !== tag) : [...liste, tag];
+      return () => { t.erledigt_tage = vorher; };
+    }
+    const vorher = t.erledigt;
+    t.erledigt = !t.erledigt;
+    return () => { t.erledigt = vorher; };
+  }
+  // Eintrag lokal aus einer Liste entfernen; liefert Rückgängig
+  function lokalEntfernen(liste, id) {
+    const i = liste.findIndex((x) => String(x.id) === String(id));
+    if (i < 0) return null;
+    const [weg] = liste.splice(i, 1);
+    return () => { liste.splice(Math.min(i, liste.length), 0, weg); };
+  }
+
+  // Vorläufige ID für sofort angezeigte neue Einträge (bis zum Neuladen)
+  function tempId() { return "tmp-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7); }
+  function istTempId(id) { return String(id).startsWith("tmp-"); }
 
   // Erzeugt das HTML für ein Badge mit CSS-Klasse und escaptem Text
   function badgeHtml(cls, text) {
@@ -7001,15 +7128,16 @@
   };
 
   // Schaltet eine Aufgabe erledigt/offen und lädt die Daten neu
+  // Seit Session 64 sofort sichtbar, gespeichert wird im Hintergrund
   async function umschalten(id) {
-    await api("aufgabe_umschalten", { id });
-    await ladeDaten();
+    if (istTempId(id)) return;
+    await sofort(() => aufgabeLokalUmschalten(id), () => api("aufgabe_umschalten", { id }));
   }
 
   // Löscht eine Aufgabe und lädt die Daten neu
   async function loeschen(id) {
-    await api("aufgabe_loeschen", { id });
-    await ladeDaten();
+    if (istTempId(id)) return;
+    await sofort(() => lokalEntfernen(aufgaben, id), () => api("aufgabe_loeschen", { id }), "Nicht gelöscht");
   }
 
   // Verschiebt die fällige Erinnerung einer Aufgabe und lädt die Daten neu
@@ -7962,6 +8090,8 @@
   // Tabs / Inhalt anzeigen
   // ==========================================================
   function tabWechseln(aktiv) {
+    // Nach dem Laden noch nicht gezeichnet (seit Session 64)? Jetzt nachholen
+    try { zeichneReiter(aktiv); } catch (_e) { /* vor dem ersten Laden */ }
     for (const key in VIEW_ELEMENTE) {
       document.getElementById(VIEW_ELEMENTE[key]).classList.toggle("hidden", key !== aktiv);
     }
@@ -8843,8 +8973,9 @@
       try {
         const erg = await wischAusfuehren(w.zeile.dataset.wischTyp, w.zeile.dataset.wischId, richtung, art, w.zeile.dataset.wischTag || null);
         try { localStorage.setItem("heute-wisch-tipp", "gesehen"); } catch (_e) { /* egal */ }
-        await ladeDaten();
+        // Seit Session 64: Hinweis sofort, Neuladen im Hintergrund
         hinweisZeigen(erg.text, erg.zurueck);
+        hintergrundLaden();
       } catch (fehler) {
         wischSetzen(w.zeile, 0, true);
         alert("Konnte nicht gespeichert werden: " + (fehler.message || "Fehler"));
@@ -9537,14 +9668,8 @@
       knopf.disabled = true;
       knopf.classList.toggle("done");
     }
-    try {
-      await terminUmschaltenApi(id, tag);
-      await ladeDaten();
-      if (aktiverTab === "kalender") renderKalender();
-    } catch (e) {
-      if (knopf) { knopf.disabled = false; knopf.classList.toggle("done"); }
-      if (e.message !== "unauthorized") alert("Nicht geändert: " + (e.message || "Fehler"));
-    }
+    // Seit Session 64 sofort, Speichern im Hintergrund
+    await sofort(() => terminLokalUmschalten(id, tag), () => terminUmschaltenApi(id, tag), "Nicht geändert");
   };
   window.terminVerschiebungWeg = async function(id, tag) {
     try {
@@ -9920,31 +10045,21 @@
       knopf.disabled = true;
       knopf.classList.toggle("done");
     }
-    try {
-      if (typ === "termin") await terminUmschaltenApi(id, tag);
-      else await api("aufgabe_umschalten", { id });
-      await ladeDaten();
-    } catch (fehler) {
-      if (knopf) {
-        knopf.disabled = false;
-        knopf.classList.toggle("done");
-        }
-      alert("Konnte nicht gespeichert werden. Bitte nochmal versuchen.");
-    }
+    // Seit Session 64: sofort umgeschaltet, Speichern im Hintergrund
+    await sofort(
+      () => (typ === "termin" ? terminLokalUmschalten(id, tag) : aufgabeLokalUmschalten(id)),
+      () => (typ === "termin" ? terminUmschaltenApi(id, tag) : api("aufgabe_umschalten", { id })),
+      "Konnte nicht gespeichert werden");
   };
 
   // Schaltet einen Termin in der Frei-Ansicht erledigt/offen und zeichnet neu
   window.freiTerminUmschalten = async function(id, tag = null) {
-    await terminUmschaltenApi(id, tag);
-    await ladeDaten();
-    renderFrei();
+    await sofort(() => terminLokalUmschalten(id, tag), () => terminUmschaltenApi(id, tag));
   };
 
   // Schaltet eine Aufgabe in der Frei-Ansicht erledigt/offen und zeichnet neu
   window.freiAufgabeUmschalten = async function(id) {
-    await api("aufgabe_umschalten", { id });
-    await ladeDaten();
-    renderFrei();
+    await sofort(() => aufgabeLokalUmschalten(id), () => api("aufgabe_umschalten", { id }));
   };
 
   // Löscht einen Termin aus der Frei-Ansicht und schließt ggf. dessen Formular
@@ -10074,18 +10189,24 @@
 
   // Legt eine neue Notiz im aktiven Bereich an, optional mit Projekt
   async function notizHinzufuegen() {
-    const text = document.getElementById("neue-notiz").value.trim();
+    const feld = document.getElementById("neue-notiz");
+    const text = feld.value.trim();
     if (!text) return;
     const projekt_id = document.getElementById("notiz-projekt").value || null;
-    await api("notiz_hinzufuegen", { text, projekt_id, bereich: aktiverBereich });
-    document.getElementById("neue-notiz").value = "";
-    await ladeDaten();
+    feld.value = "";
+    const bereich = aktiverBereich;
+    const ok = await sofort(() => {
+      const neu = { id: tempId(), text, projekt_id, bereich, erstellt_am: new Date().toISOString() };
+      notizen.unshift(neu);
+      return () => lokalEntfernen(notizen, neu.id);
+    }, () => api("notiz_hinzufuegen", { text, projekt_id, bereich }));
+    if (!ok && !feld.value) feld.value = text;
   }
 
   // Löscht eine Notiz und lädt die Daten neu
   window.notizLoeschen = async function(id) {
-    await api("notiz_loeschen", { id });
-    await ladeDaten();
+    if (istTempId(id)) return;
+    await sofort(() => lokalEntfernen(notizen, id), () => api("notiz_loeschen", { id }), "Nicht gelöscht");
   };
 
   // ==========================================================
@@ -15483,23 +15604,35 @@
 
   // Fügt einen Artikel zur Einkaufsliste des aktiven Bereichs hinzu
   async function einkaufHinzufuegen() {
-    const text = document.getElementById("neuer-einkauf").value.trim();
+    const feld = document.getElementById("neuer-einkauf");
+    const text = feld.value.trim();
     if (!text) return;
-    await api("einkauf_hinzufuegen", { text, bereich: aktiverBereich });
-    document.getElementById("neuer-einkauf").value = "";
-    await ladeDaten();
+    feld.value = "";
+    const bereich = aktiverBereich;
+    const ok = await sofort(() => {
+      const neu = { id: tempId(), text, erledigt: false, bereich, erstellt_am: new Date().toISOString() };
+      einkaufsliste.unshift(neu);
+      return () => lokalEntfernen(einkaufsliste, neu.id);
+    }, () => api("einkauf_hinzufuegen", { text, bereich }));
+    if (!ok && !feld.value) feld.value = text;
+    feld.focus();
   }
 
   // Hakt einen Einkaufsartikel ab bzw. wieder auf
   window.einkaufUmschalten = async function(id) {
-    await api("einkauf_umschalten", { id });
-    await ladeDaten();
+    if (istTempId(id)) return;
+    await sofort(() => {
+      const e = einkaufsliste.find((x) => String(x.id) === String(id));
+      if (!e) return null;
+      e.erledigt = !e.erledigt;
+      return () => { e.erledigt = !e.erledigt; };
+    }, () => api("einkauf_umschalten", { id }));
   };
 
   // Löscht einen Einkaufsartikel
   window.einkaufLoeschen = async function(id) {
-    await api("einkauf_loeschen", { id });
-    await ladeDaten();
+    if (istTempId(id)) return;
+    await sofort(() => lokalEntfernen(einkaufsliste, id), () => api("einkauf_loeschen", { id }), "Nicht gelöscht");
   };
 
   // ==========================================================
