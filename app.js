@@ -5552,6 +5552,9 @@
     document.getElementById("blatt-loeschen").classList.toggle("hidden", id === null || !BLATT_ARTEN[art].loeschen ||
       (BLATT_ARTEN[art].kannLoeschen ? !BLATT_ARTEN[art].kannLoeschen(werte) : false));
     document.getElementById("blatt-loeschen").textContent = BLATT_ARTEN[art].loeschText || "Löschen";
+    // Beschriftung des Speichern-Knopfs (seit Session 63, z. B. „Auf NFC-Tag schreiben“)
+    const st = BLATT_ARTEN[art].speichernText;
+    document.getElementById("blatt-speichern").textContent = typeof st === "function" ? st(werte) : (st || "Speichern");
     blattMeldung("", false);
     blattRendern();
     if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
@@ -6534,7 +6537,9 @@
     const rueck = aktiverBereich === "verwaltung" ? "" : `<button class="link-btn" onclick="wochenrueckblickOeffnen()">${ic("statistik")}<span>Wochenrückblick</span></button>`;
     // Komplett-Backup (seit Session 39) immer erreichbar, auch ohne Reiter Export
     const backup = aktiverBereich === "verwaltung" ? "" : `<button class="link-btn" onclick="komplettBackup()">${ic("export")}<span>Komplett-Backup</span></button>`;
-    el.innerHTML = rueck + backup + eintraege.map(([tab, label, icon]) =>
+    // NFC-Tags einrichten (seit Session 63)
+    const nfc = aktiverBereich === "verwaltung" ? "" : `<button class="link-btn" onclick="nfcBlattOeffnen()">${ic("nfc")}<span>NFC-Tags</span></button>`;
+    el.innerHTML = rueck + backup + nfc + eintraege.map(([tab, label, icon]) =>
       `<button class="link-btn${tab === aktiverTab ? " aktiv" : ""}" onclick="tabWechseln('${tab}')">${ic(icon)}<span>${label}</span></button>`).join("");
     el.classList.toggle("hidden", !rueck && !backup && eintraege.length === 0);
   }
@@ -6608,9 +6613,10 @@
       token = daten.token;
       localStorage.setItem("aufgaben-token", token);
       await ladeDaten();
-      if (geteiltAnstehend()) {
+      if (geteiltAnstehend() || nfcAnstehend()) {
         appDirektOeffnen();
         geteiltenInhaltVerarbeiten();
+        await nfcVerarbeiten();
       } else {
         // Seit Session 34: ohne Umweg über die Willkommensseite
         appImLetztenBereichOeffnen();
@@ -7144,6 +7150,203 @@
     document.getElementById("btn-rezept-import-laden").click();
   }
 
+  // ==========================================================
+  // NFC-Tags (seit Session 63): Ein Tag enthält einen Link auf die App mit
+  // ?nfc=… – beim Öffnen wird der Auftrag geparkt (sessionStorage, Adresse
+  // sofort bereinigt, damit Neuladen nichts doppelt auslöst) und nach dem
+  // Laden der Daten ausgeführt:
+  //   ?nfc=oeffnen&bereich=ogs&tab=stunden   Bereich (+ Reiter) öffnen
+  //   ?nfc=neu&bereich=privat&art=einkauf    „+“-Blatt mit Art öffnen
+  //   ?nfc=stunden&kat=<id>                  Stunden Start/Stopp umschalten
+  // Die Links erzeugt bzw. schreibt das Blatt „NFC-Tags“ (⋮-Menü).
+  // ==========================================================
+  const NFC_SCHLUESSEL = "nfc-auftrag";
+  const NFC_ARTEN = ["oeffnen", "neu", "stunden"];
+  (function nfcParken() {
+    const p = new URLSearchParams(location.search);
+    if (!p.has("nfc")) return;
+    const auftrag = { zeit: Date.now() };
+    ["nfc", "bereich", "tab", "art", "kat"].forEach((k) => { if (p.get(k)) auftrag[k] = String(p.get(k)).slice(0, 80); });
+    try { sessionStorage.setItem(NFC_SCHLUESSEL, JSON.stringify(auftrag)); } catch (e) { /* ohne Speicher: dann eben nicht */ }
+    history.replaceState({}, "", location.pathname);
+  })();
+  function nfcAnstehend() {
+    try { return sessionStorage.getItem(NFC_SCHLUESSEL) !== null; } catch (e) { return false; }
+  }
+  async function nfcVerarbeiten() {
+    let a = null;
+    try {
+      a = JSON.parse(sessionStorage.getItem(NFC_SCHLUESSEL) || "null");
+      sessionStorage.removeItem(NFC_SCHLUESSEL);
+    } catch (e) { return; }
+    // Älter als 10 Minuten (z. B. Login dazwischen vergessen): nicht mehr ausführen
+    if (!a || !NFC_ARTEN.includes(a.nfc) || Date.now() - Number(a.zeit || 0) > 10 * 60000) return;
+    const bereich = BEREICH_FARBWELT.includes(a.bereich) ? a.bereich : null;
+    if (a.nfc === "oeffnen") {
+      if (bereich && bereich !== aktiverBereich) window.bereichAuswaehlen(bereich);
+      if (a.tab && VIEW_ELEMENTE[a.tab]) tabWechseln(a.tab);
+      return;
+    }
+    if (a.nfc === "neu") {
+      if (bereich && bereich !== aktiverBereich) window.bereichAuswaehlen(bereich);
+      window.schnellOeffnen();
+      if (a.art && schnellArtenFuer(schnell.bereich).some((x) => x.art === a.art) && schnell.art !== a.art) window.schnellSetzen("art", a.art);
+      return;
+    }
+    await nfcStunden(a.kat);
+  }
+
+  // Stunden per Tag: nichts läuft → starten; diese Kategorie läuft → stoppen;
+  // andere läuft → nach Rückfrage wechseln. Immer mit „Rückgängig“.
+  async function nfcStunden(katId) {
+    await stdFrischLaden();
+    if (std.fehlt || std.laufendFehlt) { alert("Für Stunden Start/Stopp fehlt noch das SQL (stunden_setup.sql / stunden_laufend_setup.sql)."); return; }
+    if (std.fehler) { alert("Stunden konnten nicht geladen werden: " + std.fehler); return; }
+    const k = stdKat(katId);
+    if (!k) { alert("Die Stunden-Kategorie dieses NFC-Tags gibt es nicht mehr. Bitte den Tag neu beschreiben (⋮-Menü → NFC-Tags)."); return; }
+    if (k.archiviert) { alert(`„${k.name}“ ist archiviert – mit diesem Tag lässt sich nichts mehr starten.`); return; }
+    const ziel = BEREICH_FARBWELT.includes(k.bereich) ? k.bereich : null;
+    if (ziel && ziel !== aktiverBereich) window.bereichAuswaehlen(ziel);
+    tabWechseln("stunden");
+    const l = std.laufend;
+    try {
+      if (l && String(l.kategorie_id) === String(k.id)) {
+        if (stdLaufendMin(l) < 2 && !confirm(`„${k.name}“ läuft erst seit ${stdLaufendMin(l)} Min. – jetzt schon stoppen?`)) return;
+        const vorher = { ...l };
+        const r = await api("stunden_stopp", {});
+        std.laufend = null; stdTickerStellen();
+        stdNeuLaden();
+        if (r.kurz) { hinweisZeigen("Kürzer als eine Minute – nichts gespeichert"); return; }
+        const e = r.eintrag || {};
+        hinweisZeigen(`Gestoppt: ${k.name} ${String(e.von || "").slice(0, 5)}–${String(e.bis || "").slice(0, 5)} · ${stdHm(r.dauer_min || 0)} h`, async () => {
+          // Eintrag weg, Zeit läuft wieder ab der alten Startzeit (Pausen von vorher zählen dann nicht mehr)
+          if (e.id) await api("stunden_eintrag_loeschen", { id: e.id });
+          await api("stunden_start", { kategorie_id: vorher.kategorie_id, notiz: vorher.notiz || null });
+          await api("stunden_laufend_aendern", { start_uhr: stdUhrLokal(vorher.start), start_datum: datumLokalISO(new Date(vorher.start)) });
+          stdNeuLaden();
+        });
+        return;
+      }
+      if (l) {
+        const andere = stdKat(l.kategorie_id) || {};
+        if (!confirm(`Gerade läuft „${andere.name || "?"}“ seit ${stdUhrLokal(l.start)}.\n\nStoppen (wird gespeichert) und „${k.name}“ starten?`)) return;
+        const r0 = await api("stunden_stopp", {});
+        if (r0.kurz) hinweisZeigen("Vorherige Zeit war kürzer als eine Minute – nichts gespeichert");
+      }
+      const r = await api("stunden_start", { kategorie_id: k.id });
+      try { localStorage.setItem("std-letzte-kat", String(k.id)); } catch (_e) { /* egal */ }
+      stdLaufendSetzen(r.laufend, r.jetzt);
+      hinweisZeigen(`Gestartet: ${k.name}`, async () => {
+        await api("stunden_laufend_verwerfen", {});
+        stdNeuLaden();
+      });
+    } catch (e) {
+      if (e.message !== "unauthorized") { alert("NFC-Tag: " + (e.message || "Fehler")); stdNeuLaden(); }
+    }
+  }
+
+  // ---- Blatt „NFC-Tags“: Link bauen, kopieren oder direkt auf den Tag schreiben ----
+  function nfcLink(w) {
+    const p = new URLSearchParams();
+    p.set("nfc", w.art);
+    if (w.art === "stunden") { if (!w.kat) return ""; p.set("kat", w.kat); }
+    else {
+      p.set("bereich", w.bereich);
+      if (w.art === "oeffnen" && w.tab) p.set("tab", w.tab);
+      if (w.art === "neu") p.set("art", w.neuArt);
+    }
+    return location.origin + location.pathname + "?" + p.toString();
+  }
+  function nfcReiterOptionen(bereich) {
+    return (BEREICH_TABS[bereich] || []).filter(([k]) => reiterIstSichtbar(bereich, k) && VIEW_ELEMENTE[k]);
+  }
+  function nfcVorschauHtml(w) {
+    const link = nfcLink(w);
+    const kannSchreiben = "NDEFReader" in window;
+    return `<p class="nfc-link" id="nfc-link">${link ? escapeHtml(link) : "Bitte zuerst eine Kategorie anlegen."}</p>
+      <button type="button" class="btn-secondary" onclick="nfcLinkKopieren()"${link ? "" : " disabled"}>${ic("kopieren")}Link kopieren</button>
+      <p class="blatt-hinweis">${kannSchreiben
+        ? "„Auf NFC-Tag schreiben“ und dann den Tag an die Rückseite des Handys halten. Der Tag muss beschreibbar sein (z. B. NTAG213/215); ein vorhandener Inhalt wird überschrieben."
+        : "Dieses Gerät kann keine NFC-Tags schreiben (das geht nur mit Chrome auf Android). Link kopieren und mit einer NFC-App als „URL“ auf den Tag schreiben – oder das Blatt auf dem Handy öffnen."}</p>`;
+  }
+  window.nfcLinkKopieren = async function() {
+    if (!blatt || blatt.art !== "nfc") return;
+    const link = nfcLink(blatt.werte);
+    try { await navigator.clipboard.writeText(link); hinweisZeigen("Link kopiert"); }
+    catch (_e) { prompt("Link zum Kopieren:", link); }
+  };
+  // Stunden frisch laden – läuft schon ein Laden (z. B. Kachel auf Start),
+  // erst dessen Ende abwarten (max. 10 s), dann neu laden
+  async function stdFrischLaden() {
+    for (let i = 0; i < 100 && std.laedt; i++) await new Promise((r) => setTimeout(r, 100));
+    std.geladen = false;
+    await stdLaden();
+  }
+  window.nfcBlattOeffnen = async function() {
+    if (typeof kontoMenuSchliessen === "function") kontoMenuSchliessen();
+    if (!std.geladen) await stdFrischLaden();
+    blattNeu("nfc", {});
+  };
+  BLATT_ARTEN.nfc = {
+    titel: "NFC-Tag einrichten",
+    finden: () => null,
+    laden: () => {
+      const bereich = BEREICH_FARBWELT.includes(aktiverBereich) ? aktiverBereich : "privat";
+      const kats = std.geladen ? stdKatOptionen("") : [];
+      return { art: "oeffnen", bereich, tab: "heute", neuArt: "aufgabe", kat: kats.length ? kats[0][0] : "" };
+    },
+    felder: [
+      { key: "art", label: "Was soll der Tag tun?", typ: "chips", optionen: [["oeffnen", "Öffnen"], ["stunden", "Stunden Start/Stopp"], ["neu", "„+“-Blatt"]] },
+      { key: "bereich", label: "Bereich", typ: "chips", optionen: STD_BEREICHE, wenn: (w) => w.art !== "stunden" },
+      { key: "tab", label: "Reiter", typ: "auswahl", wenn: (w) => w.art === "oeffnen",
+        optionen: (w) => nfcReiterOptionen(w.bereich).map(([k, t]) => [k, t]),
+        hinweis: "Nur Reiter, die im Bereich eingeblendet sind." },
+      { key: "neuArt", label: "Art im „+“-Blatt", typ: "auswahl", wenn: (w) => w.art === "neu",
+        optionen: (w) => schnellArtenFuer(w.bereich).map((a) => [a.art, a.label]) },
+      { key: "kat", label: "Stunden-Kategorie", typ: "auswahl", wenn: (w) => w.art === "stunden" && std.geladen && stdKatOptionen("").length > 0,
+        optionen: () => stdKatOptionen(""),
+        hinweis: "Antippen startet die Zeit, nochmal antippen stoppt und speichert sie. Läuft eine andere Kategorie, fragt die App vorher." },
+      { key: "vorschau", label: "Link", typ: "html", html: (w) => nfcVorschauHtml(w) },
+    ],
+    // Auswahl passt nicht mehr zum Bereich (z. B. Reiter ausgeblendet) → ersten nehmen
+    beimRendern: (w) => {
+      const reiter = nfcReiterOptionen(w.bereich);
+      if (w.art === "oeffnen" && reiter.length && !reiter.some(([k]) => k === w.tab)) w.tab = reiter[0][0];
+      const arten = schnellArtenFuer(w.bereich);
+      if (w.art === "neu" && !arten.some((a) => a.art === w.neuArt)) w.neuArt = arten[0].art;
+      const el = document.getElementById("nfc-link");
+      if (el) el.textContent = nfcLink(w) || "Bitte zuerst eine Kategorie anlegen.";
+    },
+    beimTippen: (w) => {
+      const el = document.getElementById("nfc-link");
+      if (el) el.textContent = nfcLink(w) || "Bitte zuerst eine Kategorie anlegen.";
+    },
+    speichernText: () => ("NDEFReader" in window ? "Auf NFC-Tag schreiben" : "Link kopieren"),
+    pruefen: (w) => (nfcLink(w) ? "" : "Für Stunden bitte zuerst im Reiter Stunden eine Kategorie anlegen."),
+    speichern: async (id, w) => {
+      const link = nfcLink(w);
+      if (!("NDEFReader" in window)) {
+        await navigator.clipboard.writeText(link);
+        return { art: "kopiert" };
+      }
+      blattMeldung("Jetzt den NFC-Tag an die Rückseite des Handys halten …", false);
+      const abbruch = new AbortController();
+      const uhr = setTimeout(() => abbruch.abort(), 30000);
+      try {
+        await new NDEFReader().write({ records: [{ recordType: "url", data: link }] }, { signal: abbruch.signal });
+      } catch (e) {
+        if (e.name === "AbortError") throw new Error("Kein Tag erkannt (30 Sekunden) – nochmal versuchen.");
+        if (e.name === "NotAllowedError") throw new Error("NFC ist für die App nicht erlaubt – in Chrome bei der Seite NFC erlauben und NFC am Handy einschalten.");
+        if (e.name === "NotSupportedError") throw new Error("Dieser Tag lässt sich nicht beschreiben (schreibgeschützt oder falscher Typ).");
+        throw new Error(e.message || "Schreiben fehlgeschlagen");
+      } finally {
+        clearTimeout(uhr);
+      }
+      return { art: "nfc" };
+    },
+    gespeichert: (r) => (r && r.art === "nfc" ? "NFC-Tag beschrieben" : "Link kopiert"),
+  };
+
   // Beim Start: automatisch anmelden, falls Token schon gespeichert
   (async function init() {
     if (token) {
@@ -7157,7 +7360,7 @@
         const googleCode = urlParams.get("code");
         const gewuenschterTab = urlParams.get("tab");
 
-        if (googleCode || gewuenschterTab || geteiltAnstehend()) {
+        if (googleCode || gewuenschterTab || geteiltAnstehend() || nfcAnstehend()) {
           appDirektOeffnen();
         } else {
           // Seit Session 34: direkt im zuletzt genutzten Bereich starten
@@ -7181,6 +7384,7 @@
           tabWechseln(gewuenschterTab);
         }
         geteiltenInhaltVerarbeiten();
+        await nfcVerarbeiten();
         return;
       } catch (e) {
         // Passwort ungültig geworden -> Login zeigen
