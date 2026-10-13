@@ -2161,3 +2161,10 @@
 .std-zuletzt .std-zuletzt-zeile:first-child { border-top: 0; }
 .std-zuletzt .std-zuletzt-zeile > .notiz-meta { display: block; padding-top: 0.35rem; }
 .std-zuletzt .std-eintrag { border-top: 0; }
+
+/* Serientermine: Ausfälle (seit Session 60) */
+.termin-ausfall { opacity: 0.75; }
+.termin-ausfall .termin-titel s { text-decoration-thickness: 2px; }
+.termin-ausfall-liste { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.termin-ausfall-chip { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.15rem 0.2rem 0.15rem 0.6rem; border: 1px solid var(--border); border-radius: 999px; font-size: 0.85rem; }
+.termin-ausfall-chip button { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; background: none; border: 0; color: inherit; cursor: pointer; border-radius: 50%; }
