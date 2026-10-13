@@ -3695,9 +3695,10 @@
     { art: "notiz", label: "Notiz", tab: "notizen", platzhalter: "Notiz …" },
     { art: "einkauf", label: "Einkauf", tab: "einkauf", platzhalter: "Was fehlt?" },
     { art: "idee", label: "Idee", tab: "ogsideen", platzhalter: "Welche Idee?" },
+    { art: "stunden", label: "Stunden", tab: "stunden", platzhalter: "z. B. „OGS 11:30–15:45 30 Min. Pause“" },
   ];
   // Welche Art ist beim Öffnen vorgewählt? Passend zum gerade offenen Reiter
-  const SCHNELL_ART_VON_TAB = { kalender: "termin", frei: "termin", notizen: "notiz", einkauf: "einkauf", ogsideen: "idee" };
+  const SCHNELL_ART_VON_TAB = { kalender: "termin", frei: "termin", notizen: "notiz", einkauf: "einkauf", ogsideen: "idee", stunden: "stunden" };
   const SCHNELL_PLUS_ICON = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
   let schnell = { art: "aufgabe", bereich: "privat", wann: "ohne", details: false };
   // Reiter mit eigenem Formular, das die Schnellerfassung nicht abdeckt (seit Etappe 5)
@@ -4641,6 +4642,8 @@
     geladen: false, laedt: false, fehlt: false, fehler: "",
     kategorien: [], soll: [], eintraege: [], abw: [],
     ansicht: "woche", bezug: null,
+    // seit Session 59: laufende Zeit (Start/Stopp), Zeitversatz Server − Gerät in ms
+    laufend: null, laufendFehlt: false, versatz: 0,
   };
   const STD_BEREICHE = [["privat", "Privat"], ["ogs", "OGS"], ["awo", "AWO"], ["business", "Business"], ["ep", "EP"]];
   const STD_FARBEN = [
@@ -4661,13 +4664,20 @@
       std.soll = r.soll || [];
       std.eintraege = r.eintraege || [];
       std.abw = r.abwesenheiten || [];
+      std.laufend = r.laufend || null;
+      std.laufendFehlt = !!r.laufend_fehlt;
+      if (r.jetzt) std.versatz = Date.parse(r.jetzt) - Date.now();
       std.geladen = true;
+      stdTickerStellen();
     } catch (e) {
       if (e.message !== "unauthorized") std.fehler = e.message || "Fehler";
     } finally {
       std.laedt = false;
     }
     if (aktiverTab === "stunden") renderStunden();
+    if (aktiverTab === "heute") renderHeute();
+    const sd = document.getElementById("schnell-dialog");
+    if (sd && sd.open && schnell.art === "stunden") schnellRendern();
   }
   window.stdNeuLaden = function() { std.geladen = false; std.fehler = ""; stdLaden(); };
 
@@ -4986,6 +4996,7 @@
         <button type="button" class="btn-primary" onclick="stdNeuerEintrag()"${aktiv.length ? "" : " disabled"}>${ic("plus")}Eintrag</button>
         <button type="button" class="btn-secondary" onclick="blattNeu('stdabwesenheit', {})">${ic("kalender")}Abwesenheit</button>
       </div>
+      ${stdLaufendHtml(aktiv)}
       ${stdSaldoKartenHtml(aktiv)}
       <div class="schnell-chips std-ansicht" role="group" aria-label="Ansicht">${ansichten}</div>
       <div class="std-nav">
@@ -4994,9 +5005,344 @@
         <button type="button" class="btn-secondary ern-pfeil" onclick="stdBlaettern(1)" aria-label="Weiter">${ic("weiter")}</button>
       </div>
       ${inhalt}
+      <div class="reiter-aktionen bib-aktionen std-export">
+        <button type="button" class="btn-secondary" onclick="stdExportExcel()">${ic("export")}Excel (${escapeHtml(std.ansicht === "woche" ? "Woche" : std.ansicht === "monat" ? "Monat" : "Jahr")})</button>
+        <button type="button" class="btn-secondary" onclick="stdDrucken()">${ic("drucken")}Drucken / PDF</button>
+      </div>
       ${stdAbwesenheitenHtml(kats)}
       ${stdKategorienHtml()}`;
   }
+
+
+  // ---- Start/Stopp (seit Session 59) ----
+  function stdJetzt() { return Date.now() + (std.versatz || 0); }
+  // Netto-Minuten der laufenden Zeit (ohne Pausen)
+  function stdLaufendMin(l) {
+    if (!l) return 0;
+    const jetzt = stdJetzt();
+    const brutto = (jetzt - Date.parse(l.start)) / 60000;
+    const pause = Number(l.pause_min || 0) + (l.pause_seit ? (jetzt - Date.parse(l.pause_seit)) / 60000 : 0);
+    return Math.max(0, Math.floor(brutto - pause));
+  }
+  function stdUhrLokal(iso) { return new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }); }
+  let stdTicker = null;
+  function stdTickerStellen() {
+    if (std.laufend && !stdTicker) {
+      stdTicker = setInterval(() => {
+        if (!std.laufend) { clearInterval(stdTicker); stdTicker = null; return; }
+        const t = stdHm(stdLaufendMin(std.laufend));
+        document.querySelectorAll(".std-lauf-zeit").forEach((el) => { el.textContent = t; });
+      }, 20000);
+    } else if (!std.laufend && stdTicker) { clearInterval(stdTicker); stdTicker = null; }
+  }
+  function stdLaufendSetzen(l, jetzt) {
+    std.laufend = l || null;
+    if (jetzt) std.versatz = Date.parse(jetzt) - Date.now();
+    stdTickerStellen();
+    if (aktiverTab === "stunden") renderStunden();
+    if (aktiverTab === "heute") renderHeute();
+  }
+
+  function stdLaufendHtml(aktiv) {
+    if (std.laufendFehlt) return `<p class="notiz-meta">Für Start/Stopp bitte <code>stunden_laufend_setup.sql</code> ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    const l = std.laufend;
+    if (l) {
+      const k = stdKat(l.kategorie_id) || {};
+      const startTag = datumLokalISO(new Date(l.start));
+      const pauseMin = Number(l.pause_min || 0);
+      return `<div class="std-lauf" style="border-left-color:${escapeAttr(stdFarbe(k))}">
+        <div class="std-lauf-kopf">
+          <span class="std-lauf-punkt${l.pause_seit ? " pause" : ""}" aria-hidden="true"></span>
+          <span><strong>${l.pause_seit ? "Pause" : "Läuft"}</strong> · ${escapeHtml(k.name || "?")} · seit ${stdUhrLokal(l.start)}${startTag !== heuteISO() ? ` (${datumDe(startTag).slice(0, 6)})` : ""}</span>
+        </div>
+        <div class="std-lauf-zeile">
+          <span class="std-lauf-zeit-gross"><span class="std-lauf-zeit">${stdHm(stdLaufendMin(l))}</span> h</span>
+          <span class="notiz-meta">${l.pause_seit ? `in Pause seit ${stdUhrLokal(l.pause_seit)}` : pauseMin ? `Pause bisher ${pauseMin} Min.` : "ohne Pause"}${l.notiz ? ` · ${escapeHtml(l.notiz)}` : ""}</span>
+        </div>
+        <div class="reiter-aktionen bib-aktionen">
+          <button type="button" class="btn-primary" onclick="stdStopp()">${ic("stoppuhr")}Stopp</button>
+          <button type="button" class="btn-secondary" onclick="stdPause()">${ic(l.pause_seit ? "play" : "pause")}${l.pause_seit ? "Weiter" : "Pause"}</button>
+          <button type="button" class="btn-secondary" onclick="blattOeffnen('stdlaufend', 1)">${ic("stift")}Ändern</button>
+        </div>
+      </div>`;
+    }
+    if (!aktiv.length) return "";
+    let letzte = "";
+    try { letzte = localStorage.getItem("std-letzte-kat") || ""; } catch (_e) { /* egal */ }
+    const opt = stdKatOptionen("");
+    const wahl = opt.some(([id]) => id === letzte) ? letzte : String(aktiv[0].id);
+    return `<div class="std-start">
+      <select id="std-start-kat" aria-label="Kategorie für Start">${opt.map(([id, t]) => `<option value="${escapeAttr(id)}"${id === wahl ? " selected" : ""}>${escapeHtml(t)}</option>`).join("")}</select>
+      <button type="button" class="btn-secondary" onclick="stdStart()">${ic("play")}Start</button>
+    </div>`;
+  }
+
+  window.stdStart = async function(katId) {
+    const id = katId || (document.getElementById("std-start-kat") || {}).value;
+    if (!id) return;
+    try {
+      const r = await api("stunden_start", { kategorie_id: id });
+      try { localStorage.setItem("std-letzte-kat", id); } catch (_e) { /* egal */ }
+      hinweisZeigen(`Läuft: ${(stdKat(id) || {}).name || ""}`);
+      stdLaufendSetzen(r.laufend, r.jetzt);
+    } catch (e) {
+      if (e.message !== "unauthorized") { alert("Nicht gestartet: " + (e.message || "Fehler")); stdNeuLaden(); }
+    }
+  };
+  window.stdPause = async function() {
+    try {
+      const r = await api("stunden_pause", {});
+      stdLaufendSetzen(r.laufend, r.jetzt);
+    } catch (e) {
+      if (e.message !== "unauthorized") { alert(e.message || "Fehler"); stdNeuLaden(); }
+    }
+  };
+  window.stdStopp = async function() {
+    try {
+      const r = await api("stunden_stopp", {});
+      std.laufend = null; stdTickerStellen();
+      if (r.kurz) hinweisZeigen("Unter einer Minute – nichts gespeichert");
+      else {
+        const e = r.eintrag || {};
+        hinweisZeigen(`Gespeichert: ${String(e.von || "").slice(0, 5)}–${String(e.bis || "").slice(0, 5)} · ${stdHm(r.dauer_min || 0)} h`);
+      }
+      stdNeuLaden();
+    } catch (e) {
+      if (e.message !== "unauthorized") { alert("Nicht gestoppt: " + (e.message || "Fehler")); stdNeuLaden(); }
+    }
+  };
+
+  BLATT_ARTEN.stdlaufend = {
+    titel: "Laufende Zeit ändern",
+    finden: () => std.laufend,
+    laden: (l) => ({
+      kategorie: String(l.kategorie_id || ""), start: l.start ? stdUhrLokal(l.start) : "",
+      starttag: l.start ? datumLokalISO(new Date(l.start)) : heuteISO(), notiz: l.notiz || "",
+    }),
+    felder: [
+      { key: "kategorie", label: "Kategorie", typ: "auswahl", optionen: (w) => stdKatOptionen(w.kategorie) },
+      { key: "start", label: "Gestartet um", typ: "zeit", pflicht: true, halb: true, hinweis: "Vergessen zu starten? Hier die echte Startzeit eintragen." },
+      { key: "starttag", label: "am", typ: "datum", pflicht: true, halb: true },
+      { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional" },
+    ],
+    speichern: (id, w) => api("stunden_laufend_aendern", { kategorie_id: w.kategorie, start_uhr: w.start, start_datum: w.starttag, notiz: w.notiz }),
+    loeschen: () => api("stunden_laufend_verwerfen", {}),
+    loeschFrage: () => "Laufende Zeit verwerfen? Es wird nichts gespeichert.",
+    loeschText: "Verwerfen",
+    gespeichert: "Laufende Zeit geändert",
+    danach: () => { stdNeuLaden(); },
+  };
+
+  // ---- Kachel auf Start (seit Session 59) ----
+  function stdStartKachelHtml() {
+    if (!reiterIstSichtbar(aktiverBereich, "stunden")) return "";
+    if (!std.geladen) {
+      if (!std.laedt && !std.fehler && !std.fehlt) stdLaden();
+      return "";
+    }
+    if (std.laufend) {
+      const k = stdKat(std.laufend.kategorie_id) || {};
+      return kennzahlHtml(`<span class="std-lauf-zeit">${stdHm(stdLaufendMin(std.laufend))}</span>`, `${std.laufend.pause_seit ? "Pause" : "läuft"} · ${k.name || "Stunden"}`, "tabWechseln('stunden')");
+    }
+    const aktiv = std.kategorien.filter((k) => !k.archiviert);
+    if (!aktiv.length) return "";
+    const eigene = aktiv.filter((k) => k.bereich === aktiverBereich);
+    const kats = eigene.length ? eigene : aktiv;
+    for (const k of kats) {
+      const s = stdSaldo(k);
+      if (s) return kennzahlHtml(stdHm(s.saldo, true), `Saldo ${k.name}`, "tabWechseln('stunden')");
+    }
+    const mo = stdMontag(heuteISO());
+    const woche = kats.reduce((a, k) => a + stdSumme(k.id, mo, addTage(mo, 6)).ist, 0);
+    return kennzahlHtml(stdHm(woche), "Std. diese Woche", "tabWechseln('stunden')");
+  }
+
+  // ---- Schnellerfassung im „+“-Blatt (seit Session 59) ----
+  // „OGS 11:30–15:45 30 Min. Pause gestern Elternabend“ → Kategorie, Tag,
+  // von–bis, Pause, Rest = Notiz. Nicht alles erkannt → Blatt zum Ergänzen.
+  function stdSchnellLesen(text) {
+    let t = String(text || "");
+    let pause = null;
+    const pm = t.match(/(?:(\d{1,3})\s*(?:min\.?|minuten)\s*pause|pause\s*(?:von\s*)?(\d{1,3})\s*(?:min\.?|minuten)?)/i);
+    if (pm) { pause = Number(pm[1] || pm[2]); t = t.replace(pm[0], " "); }
+    // Zeitspanne „9-13“, „19–21:30“, „8.15 bis 12 Uhr“ (die allgemeine Erkennung braucht dafür „Uhr“)
+    let spanneVon = "", spanneBis = "";
+    const sm = t.match(/(?<![\d.:])(?:von\s+)?([01]?\d|2[0-3])(?:[:.]([0-5]\d))?\s*(?:-|–|bis)\s*([01]?\d|2[0-3])(?:[:.]([0-5]\d))?(?![\d.])(?:\s*uhr)?/i);
+    if (sm) {
+      const hm = (h, m) => `${String(Number(h)).padStart(2, "0")}:${m || "00"}`;
+      spanneVon = hm(sm[1], sm[2]); spanneBis = hm(sm[3], sm[4]);
+      t = t.replace(sm[0], " ");
+    }
+    // Stunden liegen meist in der Vergangenheit: gestern/vorgestern und
+    // Wochentage („Montag“) meinen den letzten solchen Tag (die allgemeine
+    // Erkennung denkt an Termine in der Zukunft)
+    const heute = heuteISO();
+    let tag = null;
+    const gm = t.match(/(?:^|\s)(vorgestern|gestern)(?=\s|$|[,.;])/i);
+    if (gm) { tag = addTage(heute, gm[1].toLowerCase() === "gestern" ? -1 : -2); t = t.replace(gm[0], " "); }
+    const WT = ["montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag"];
+    const wm = !tag && t.match(/(?:^|\s)(?:am\s+|letzten\s+|letzte[nm]?\s+)?(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)(?=\s|$|[,.;])/i);
+    if (wm) {
+      const ziel = WT.indexOf(wm[1].toLowerCase()) + 1;
+      const diff = (stdWochentag(heute) - ziel + 7) % 7;
+      tag = addTage(heute, -diff);
+      t = t.replace(wm[0], " ");
+    }
+    const e = typeof textDatumErkennen === "function" ? textDatumErkennen(t) : null;
+    let rest = e ? e.rest : t;
+    let datum = tag || (e && e.datum ? e.datum : heute);
+    // „12.10.“ ohne Jahr, das schon vorbei ist, schiebt die allgemeine Erkennung ins nächste Jahr – hier zurück
+    if (!tag && datum > heute && /\b\d{1,2}\.\s?\d{1,2}\.(?!\s?\d)/.test(t)) datum = `${Number(datum.slice(0, 4)) - 1}${datum.slice(4)}`;
+    const von = spanneVon || (e && e.uhrzeit ? e.uhrzeit : "");
+    const bis = spanneBis || (e && e.ende ? e.ende : "");
+    // Kategorie: längster Name, der im Text vorkommt; sonst erstes Wort als Anfang eines Namens
+    const norm = (x) => String(x || "").toLowerCase();
+    const kats = std.kategorien.filter((k) => !k.archiviert);
+    let kat = null;
+    for (const k of kats) if (norm(rest).includes(norm(k.name)) && (!kat || k.name.length > kat.name.length)) kat = k;
+    if (kat) rest = rest.replace(new RegExp(kat.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), " ");
+    else {
+      const wort = norm(rest.trim().split(/\s+/)[0]);
+      if (wort.length >= 2) kat = kats.find((k) => norm(k.name).startsWith(wort) || norm(k.name).split(/\s+/).some((w) => w.startsWith(wort))) || null;
+      if (kat) rest = rest.trim().replace(/^\S+/, " ");
+    }
+    const notiz = rest.replace(/\s+/g, " ").replace(/^[\s,;:–-]+|[\s,;:–-]+$/g, "").trim();
+    return { kat, datum, von, bis, pause, notiz };
+  }
+  function stdSchnellVorschauHtml() {
+    if (!std.geladen) return std.fehlt ? "Stunden sind noch nicht eingerichtet (SQL fehlt)." : "Lade Kategorien …";
+    if (!std.kategorien.some((k) => !k.archiviert)) return "Noch keine Kategorie – bitte erst im Reiter Stunden anlegen.";
+    const r = stdSchnellLesen(document.getElementById("schnell-text").value);
+    const teile = [
+      r.kat ? `<strong>${escapeHtml(r.kat.name)}</strong>` : `<span class="std-minus">Kategorie?</span>`,
+      r.datum === heuteISO() ? "heute" : datumDe(r.datum),
+      r.von && r.bis ? `${r.von}–${r.bis}` : `<span class="std-minus">von–bis?</span>`,
+      r.pause ? `Pause ${r.pause} Min.` : "",
+      r.von && r.bis ? `= ${stdHm(Math.max(0, stdSpanne(r.von, r.bis) - (r.pause || 0)))} h` : "",
+      r.notiz ? `Notiz: „${escapeHtml(r.notiz)}“` : "",
+    ].filter(Boolean).join(" · ");
+    const start = r.kat && !r.von && !std.laufend && !std.laufendFehlt
+      ? ` <button type="button" class="link-btn" onclick="stdSchnellStart()">${ic("play")}Stattdessen jetzt starten</button>` : "";
+    return `${ic("stoppuhr")}<span class="schnell-erkannt-text"><span>${teile}</span><span class="notiz-meta">Kategorien: ${escapeHtml(std.kategorien.filter((k) => !k.archiviert).map((k) => k.name).join(", "))}</span></span>${start}`;
+  }
+  window.stdSchnellStart = function() {
+    const r = stdSchnellLesen(document.getElementById("schnell-text").value);
+    if (!r.kat) return;
+    window.schnellSchliessen();
+    window.stdStart(String(r.kat.id));
+  };
+  async function stdSchnellSpeichern() {
+    if (!std.geladen) { schnellMeldung("Stunden werden noch geladen …", true); return; }
+    const r = stdSchnellLesen(document.getElementById("schnell-text").value);
+    const vorlage = { kategorie_id: r.kat ? r.kat.id : "", datum: r.datum, von: r.von, bis: r.bis, pause_min: r.pause || 0, notiz: r.notiz };
+    const sp = r.von && r.bis ? stdSpanne(r.von, r.bis) : 0;
+    if (!r.kat || !sp || (r.pause || 0) >= sp) {
+      // Unvollständig: im Blatt ergänzen
+      window.schnellSchliessen();
+      blattNeu("stunde", vorlage);
+      return;
+    }
+    schnellMeldung("Speichere …", false);
+    try {
+      await api("stunden_eintrag_speichern", { kategorie_id: r.kat.id, datum: r.datum, von: r.von, bis: r.bis, pause_min: r.pause || 0, notiz: r.notiz });
+      try { localStorage.setItem("std-letzte-kat", String(r.kat.id)); } catch (_e) { /* egal */ }
+      window.schnellSchliessen();
+      hinweisZeigen(`Stunden gespeichert: ${r.kat.name} ${r.von}–${r.bis} (${stdHm(sp - (r.pause || 0))} h)`);
+      stdNeuLaden();
+    } catch (e) {
+      if (e.message !== "unauthorized") schnellMeldung("Nicht gespeichert: " + (e.message || "Fehler"), true);
+    }
+  }
+
+  // ---- Export: Excel und Druck für den angezeigten Zeitraum (seit Session 59) ----
+  function stdExportDaten() {
+    const z = stdZeitraum();
+    const kats = stdKategorienSichtbar(true);
+    const ids = new Set(kats.map((k) => String(k.id)));
+    const heute = heuteISO();
+    const bisSoll = z.bis > heute ? (heute < z.von ? null : heute) : z.bis;
+    const bereichName = (b) => (STD_BEREICHE.find(([x]) => x === b) || [0, b])[1];
+    const uebersicht = kats.map((k) => {
+      const s = stdSumme(k.id, z.von, z.bis);
+      const sollBis = bisSoll ? stdSumme(k.id, z.von, bisSoll).soll : 0;
+      const sal = stdSaldo(k);
+      return { k, ist: s.ist, soll: s.mitSoll ? sollBis : null, diff: s.mitSoll && bisSoll ? s.ist - sollBis : null, saldo: sal ? sal.saldo : null, bereich: bereichName(k.bereich) };
+    }).filter((x) => x.ist || x.soll);
+    const eintraege = std.eintraege.filter((e) => ids.has(String(e.kategorie_id)) && e.datum >= z.von && e.datum <= z.bis)
+      .sort((a, b) => (a.datum + a.von).localeCompare(b.datum + b.von));
+    const abw = std.abw.filter((a) => a.bis >= z.von && a.von <= z.bis && (!a.kategorie_id || ids.has(String(a.kategorie_id))));
+    const filter = stdFilter();
+    return { z, uebersicht, eintraege, abw, bisSoll, bereichName, filterText: filter === "alle" ? "alle Bereiche" : bereichName(filter) };
+  }
+  const stdStd = (min) => Math.round(min / 60 * 100) / 100;
+
+  window.stdExportExcel = function() {
+    if (typeof XLSX === "undefined") { alert("Export-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen."); return; }
+    const d = stdExportDaten();
+    const wb = XLSX.utils.book_new();
+    const blatt = (zeilen, name, breiten) => {
+      const ws = XLSX.utils.json_to_sheet(zeilen.length ? zeilen : [{ Hinweis: "Keine Einträge im Zeitraum" }]);
+      if (zeilen.length && breiten) ws["!cols"] = breiten.map((w) => ({ wch: w }));
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+    blatt(d.uebersicht.map((x) => ({
+      Kategorie: x.k.name, Bereich: x.bereich, Art: x.k.bezahlt ? "bezahlt" : "Ehrenamt/unbezahlt",
+      "Ist (h:mm)": stdHm(x.ist), "Ist (Std.)": stdStd(x.ist),
+      "Soll (h:mm)": x.soll === null ? "" : stdHm(x.soll), "Soll (Std.)": x.soll === null ? "" : stdStd(x.soll),
+      "± (h:mm)": x.diff === null ? "" : stdHm(x.diff, true), "± (Std.)": x.diff === null ? "" : stdStd(x.diff),
+      "Saldo gesamt heute (h:mm)": x.saldo === null ? "" : stdHm(x.saldo, true),
+    })), "Übersicht", [24, 10, 18, 10, 9, 11, 10, 10, 9, 22]);
+    blatt(d.eintraege.map((e) => {
+      const k = stdKat(e.kategorie_id) || {};
+      return {
+        Datum: e.datum, Wochentag: new Date(e.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", ""),
+        Kategorie: k.name || "", Bereich: d.bereichName(k.bereich), Von: String(e.von).slice(0, 5), Bis: String(e.bis).slice(0, 5),
+        "Pause (Min.)": Number(e.pause_min) || 0, "Dauer (h:mm)": stdHm(stdDauer(e)), "Dauer (Std.)": stdStd(stdDauer(e)), Notiz: e.notiz || "",
+      };
+    }), "Einträge", [11, 9, 24, 10, 7, 7, 11, 11, 11, 40]);
+    blatt(d.abw.map((a) => ({
+      Von: a.von, Bis: a.bis, Art: (STD_ARTEN.find(([x]) => x === a.art) || [0, a.art])[1],
+      "Gilt für": a.kategorie_id ? (stdKat(a.kategorie_id) || {}).name || "" : "alle mit Soll", Notiz: a.notiz || "",
+    })), "Abwesenheiten", [11, 11, 22, 24, 40]);
+    blatt([
+      { Punkt: "Zeitraum", Wert: `${datumDe(d.z.von)} – ${datumDe(d.z.bis)}` },
+      { Punkt: "Bereiche", Wert: d.filterText },
+      { Punkt: "Erstellt", Wert: new Date().toLocaleString("de-DE") },
+      { Punkt: "Soll", Wert: d.bisSoll && d.bisSoll !== d.z.bis ? `Soll und ± bis ${datumDe(d.bisSoll)} (laufender Zeitraum)` : "Soll und ± für den ganzen Zeitraum" },
+      { Punkt: "Feiertage", Wert: "Gesetzliche Feiertage NRW senken das Soll; Abwesenheiten (Urlaub, krank, frei) ebenso." },
+      { Punkt: "Hinweis", Wert: "Eigene Aufzeichnung, kein amtlicher Nachweis." },
+    ], "Info", [12, 80]);
+    XLSX.writeFile(wb, `stunden_${d.z.von}_bis_${d.z.bis}.xlsx`);
+  };
+
+  window.stdDrucken = function() {
+    const d = stdExportDaten();
+    const zelle = "padding:4px 6px; border-bottom:1px solid #ccc; text-align:left;";
+    const rechts = zelle + " text-align:right;";
+    const uebersicht = d.uebersicht.length ? `<table style="border-collapse:collapse; width:100%; font-size:10pt; margin:6px 0 14px;">
+      <tr><th style="${zelle}">Kategorie</th><th style="${zelle}">Bereich</th><th style="${rechts}">Ist</th><th style="${rechts}">Soll</th><th style="${rechts}">±</th><th style="${rechts}">Saldo heute</th></tr>
+      ${d.uebersicht.map((x) => `<tr><td style="${zelle}">${escapeHtml(x.k.name)}</td><td style="${zelle}">${escapeHtml(x.bereich)}</td>
+        <td style="${rechts}">${stdHm(x.ist)}</td><td style="${rechts}">${x.soll === null ? "–" : stdHm(x.soll)}</td>
+        <td style="${rechts}">${x.diff === null ? "–" : stdHm(x.diff, true)}</td><td style="${rechts}">${x.saldo === null ? "–" : stdHm(x.saldo, true)}</td></tr>`).join("")}
+      </table>` : `<p>Keine Stunden im Zeitraum.</p>`;
+    const eintraege = d.eintraege.length ? `<table style="border-collapse:collapse; width:100%; font-size:9.5pt;">
+      <tr><th style="${zelle}">Datum</th><th style="${zelle}">Kategorie</th><th style="${zelle}">Zeit</th><th style="${rechts}">Pause</th><th style="${rechts}">Dauer</th><th style="${zelle}">Notiz</th></tr>
+      ${d.eintraege.map((e) => {
+        const k = stdKat(e.kategorie_id) || {};
+        const wt = new Date(e.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
+        return `<tr><td style="${zelle}">${wt} ${datumDe(e.datum)}</td><td style="${zelle}">${escapeHtml(k.name || "")}</td>
+          <td style="${zelle}">${String(e.von).slice(0, 5)}–${String(e.bis).slice(0, 5)}</td><td style="${rechts}">${Number(e.pause_min) ? e.pause_min + " Min." : ""}</td>
+          <td style="${rechts}">${stdHm(stdDauer(e))}</td><td style="${zelle}">${escapeHtml(e.notiz || "")}</td></tr>`;
+      }).join("")}</table>` : "";
+    const abw = d.abw.length ? `<h3 style="font-size:11pt; margin:14px 0 4px;">Abwesenheiten</h3><p style="font-size:9.5pt; margin:0;">${d.abw.map((a) =>
+      `${escapeHtml((STD_ARTEN.find(([x]) => x === a.art) || [0, a.art])[1])} ${datumDe(a.von)}${a.bis !== a.von ? "–" + datumDe(a.bis) : ""}${a.kategorie_id ? " (" + escapeHtml((stdKat(a.kategorie_id) || {}).name || "") + ")" : ""}`).join(" · ")}</p>` : "";
+    htmlDrucken(`<div style="font-family:system-ui, sans-serif; color:#111;">
+      <h1 style="font-size:16pt; margin:0 0 2px;">Stunden · ${escapeHtml(stdZeitraumText(d.z))}</h1>
+      <p style="font-size:9.5pt; color:#444; margin:0 0 8px;">${datumDe(d.z.von)} – ${datumDe(d.z.bis)} · ${escapeHtml(d.filterText)}${d.bisSoll && d.bisSoll !== d.z.bis ? ` · Soll und ± bis ${datumDe(d.bisSoll)}` : ""}</p>
+      ${uebersicht}${eintraege}${abw}
+      <p style="font-size:8.5pt; color:#555; margin-top:14px;">Eigene Aufzeichnung. Feiertage NRW und Abwesenheiten senken das Soll. Erstellt ${new Date().toLocaleString("de-DE")}.</p>
+    </div>`);
+  };
 
   // ---- Bearbeiten-Blätter ----
   function stdKatOptionen(aktuelleId) {
@@ -5189,6 +5535,7 @@
     document.getElementById("blatt-titel").textContent = titel;
     // „Löschen“ nur bei vorhandenen Einträgen
     document.getElementById("blatt-loeschen").classList.toggle("hidden", id === null);
+    document.getElementById("blatt-loeschen").textContent = BLATT_ARTEN[art].loeschText || "Löschen";
     blattMeldung("", false);
     blattRendern();
     if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
@@ -5567,7 +5914,7 @@
     }
 
     // Details je Art
-    const hatDetails = schnell.art !== "einkauf";
+    const hatDetails = schnell.art !== "einkauf" && schnell.art !== "stunden";
     const detailsKnopf = document.getElementById("schnell-details-knopf");
     detailsKnopf.classList.toggle("hidden", !hatDetails);
     detailsKnopf.setAttribute("aria-expanded", String(schnell.details && hatDetails));
@@ -5605,6 +5952,17 @@
     select.innerHTML = `<option value="">Kein Projekt</option>` +
       liste.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join("");
     if (liste.some((p) => String(p.id) === bisher)) select.value = bisher;
+
+    // Stunden (seit Session 59): kein Bereich nötig, eigene Vorschau statt Datumserkennung
+    const istStunden = schnell.art === "stunden";
+    document.getElementById("schnell-bereich-label").classList.toggle("hidden", istStunden);
+    document.getElementById("schnell-bereiche").classList.toggle("hidden", istStunden);
+    if (istStunden) {
+      if (!std.geladen && !std.laedt && !std.fehler && !std.fehlt) stdLaden();
+      const el = document.getElementById("schnell-erkannt");
+      el.innerHTML = stdSchnellVorschauHtml();
+      el.classList.remove("hidden");
+    }
   }
 
   // Zeigt eine Meldung im Blatt (Fehler rot)
@@ -5627,6 +5985,7 @@
   window.schnellSpeichern = async function() {
     const eingabe = document.getElementById("schnell-text").value.trim();
     if (!eingabe) { schnellMeldung("Bitte erst etwas eintragen.", true); document.getElementById("schnell-text").focus(); return; }
+    if (schnell.art === "stunden") { await stdSchnellSpeichern(); return; }
     // Erkanntes Datum/Uhrzeit aus dem Titel nehmen („Zahnarzt morgen 15 Uhr“ → „Zahnarzt“)
     const erkannt = schnell.erkannt;
     let text = erkannt && erkannt.rest ? erkannt.rest : eingabe;
@@ -8355,6 +8714,8 @@
     const k = [];
     const kcal = ernStartKachelHtml();
     if (kcal) k.push(kcal);
+    const stunden = stdStartKachelHtml();
+    if (stunden) k.push(stunden);
     if (reiterIstSichtbar(aktiverBereich, "einkauf")) k.push(kennzahlHtml(einkaufOffen.length, "Einkauf offen", "tabWechseln('einkauf')"));
     if (aktiverBereich === "privat" && reiterIstSichtbar("privat", "planung")) {
       k.push(kennzahlHtml(aktuelleZiele.length, aktuelleZiele.length === 1 ? "aktives Ziel" : "aktive Ziele", "tabWechseln('planung')"));
