@@ -997,7 +997,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Stunden <span class="anleitung-nur">(seit Session 58; Standard: Privat, OGS, AWO, Business – gemeinsame Daten)</span></summary>
+            <summary>Stunden <span class="anleitung-nur">(seit Session 58/59; Standard: Privat, OGS, AWO, Business – gemeinsame Daten)</span></summary>
             <div class="anleitung-text">
               <p>Arbeits- und Ehrenamtsstunden an einer Stelle – bezahlte Arbeit mit Soll und Plus-/Minusstunden, Ehrenamt nur mit Ist-Stunden. Die Daten sind in allen Bereichen dieselben; jede Kategorie gehört zu einem Bereich, oben filterst du danach („Alle“ oder ein Bereich, je Gerät gemerkt).</p>
               <ul>
@@ -1007,6 +1007,10 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Woche · Monat · Jahr:</strong> Woche zeigt jeden Tag mit Einträgen, Feiertag und Abwesenheit; Monat die Tage mit Einträgen; Jahr die Monate (antippen öffnet den Monat). Darunter je Kategorie Ist, Soll und ± – bei laufenden Zeiträumen gegen das Soll bis heute. ‹ › blättert, der Zeitraum in der Mitte springt zu heute</li>
                 <li><strong>Feiertage</strong> (gesetzlich in NRW: Neujahr, Karfreitag, Ostermontag, 1. Mai, Christi Himmelfahrt, Pfingstmontag, Fronleichnam, 3. Oktober, Allerheiligen, 1. und 2. Weihnachtstag) rechnet die App selbst – dort entfällt das Soll</li>
                 <li><strong>Abwesenheiten:</strong> Urlaub, krank, frei (z. B. Schließtag, freigegebener Brückentag) oder sonstiges von–bis, für eine Kategorie oder alle mit Soll. An Arbeitstagen im Zeitraum entfällt das Soll (zählt wie gearbeitet). Freizeitausgleich für Überstunden also <em>nicht</em> als Abwesenheit eintragen, sonst bleiben die Plusstunden stehen – einfach nicht arbeiten, das Soll baut sie ab</li>
+                <li><strong>Start/Stopp</strong> (seit Session 59): oben Kategorie wählen, „Start“. Die laufende Zeit ist auf allen Geräten dieselbe; „Pause“/„Weiter“ zählt Pausen mit, „Stopp“ macht daraus einen Eintrag (Tag des Starts, von–bis auf die Minute). „Ändern“: Kategorie, Notiz oder die echte Startzeit, falls du vergessen hast zu starten; dort auch „Verwerfen“. Läuft die Zeit über 24 Stunden, bitte Startzeit korrigieren oder verwerfen</li>
+                <li><strong>Im „+“-Blatt</strong> die Art „Stunden“: z. B. „OGS 11:30–15:45 30 Min. Pause“, „AWO gestern 19–21:30 Sitzung“ oder „OGS Montag 8 bis 12 Uhr“. Darunter steht, was erkannt wurde (Kategorie = Name oder dessen Anfang, Tag, von–bis, Pause, Rest = Notiz). „gestern“, „vorgestern“ und Wochentage meinen den letzten solchen Tag. Ist alles da, speichert „Speichern“ direkt, sonst öffnet sich das Blatt zum Ergänzen. Nur eine Kategorie ohne Zeit: „Stattdessen jetzt starten“</li>
+                <li><strong>Kachel auf Start:</strong> läuft eine Zeit, steht sie dort; sonst der Saldo der ersten Kategorie mit Soll (aus dem aktiven Bereich, falls vorhanden) oder die Stunden dieser Woche</li>
+                <li><strong>Excel</strong> und <strong>Drucken / PDF</strong> unter der Auswertung: für den angezeigten Zeitraum (Woche, Monat oder Jahr) und den gewählten Bereichsfilter – Übersicht (Ist, Soll, ±, Saldo), alle Einträge, Abwesenheiten</li>
                 <li>Nur für dich gedacht, kein Nachweis gegenüber Dritten. Halbe Feiertage (24./31.12.) kennt die App nicht – bei Bedarf als Abwesenheit eintragen</li>
               </ul>
             </div>
@@ -1707,7 +1711,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-stunden" class="hidden">
-        <h1>Stunden <button class="hilfe-icon" data-hilfe="Arbeits- und Ehrenamtsstunden je Kategorie (z. B. OGS, AWO Vorstand, Business) – gemeinsam für alle Bereiche, oben nach Bereich filtern. „+ Eintrag“: Kategorie, Datum, von–bis (über Mitternacht geht), Pause in Minuten. Kategorien mit Soll (Stunden pro Woche, verteilt auf die gewählten Arbeitstage, mit „gilt ab“) zeigen Plus-/Minusstunden: oben der Saldo seit Beginn, unten Ist/Soll/± für Woche, Monat oder Jahr. Feiertage in NRW zieht die App selbst ab, Urlaub, krank und frei trägst du unter „Abwesenheit“ ein – sie senken das Soll. Ehrenamt ohne Soll zählt nur Ist-Stunden. Eintrag antippen = bearbeiten; ‹ › blättern, Datum antippen springt zu heute.">?</button></h1>
+        <h1>Stunden <button class="hilfe-icon" data-hilfe="Arbeits- und Ehrenamtsstunden je Kategorie (z. B. OGS, AWO Vorstand, Business) – gemeinsam für alle Bereiche, oben nach Bereich filtern. „+ Eintrag“: Kategorie, Datum, von–bis (über Mitternacht geht), Pause in Minuten. Kategorien mit Soll (Stunden pro Woche, verteilt auf die gewählten Arbeitstage, mit „gilt ab“) zeigen Plus-/Minusstunden: oben der Saldo seit Beginn, unten Ist/Soll/± für Woche, Monat oder Jahr. Feiertage in NRW zieht die App selbst ab, Urlaub, krank und frei trägst du unter „Abwesenheit“ ein – sie senken das Soll. Ehrenamt ohne Soll zählt nur Ist-Stunden. Eintrag antippen = bearbeiten; ‹ › blättern, Datum antippen springt zu heute. „Start“ misst die Zeit live (Pause, Stopp → Eintrag), im „+“-Blatt geht „Stunden“ als Text (z. B. „OGS 11:30–15:45“); unten Excel und Drucken für den angezeigten Zeitraum.">?</button></h1>
         <p class="hero-text">Arbeits- und Ehrenamtsstunden – mit Soll, Plus- und Minusstunden.</p>
         <div id="stunden-inhalt"></div>
       </div>
