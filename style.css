@@ -2168,3 +2168,12 @@
 .termin-ausfall-liste { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .termin-ausfall-chip { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.15rem 0.2rem 0.15rem 0.6rem; border: 1px solid var(--border); border-radius: 999px; font-size: 0.85rem; }
 .termin-ausfall-chip button { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; background: none; border: 0; color: inherit; cursor: pointer; border-radius: 50%; }
+
+/* Serientermine: einzelne Vorkommen abhaken und verschieben (seit Session 61) */
+.cal-day-panel .termin-item { flex-wrap: wrap; align-items: center; }
+.cal-day-panel .termin-titel { flex: 1 1 6rem; min-width: 0; }
+.termin-aktionen { display: flex; align-items: center; gap: 0.35rem; margin-left: auto; }
+.termin-check { align-self: center; }
+.termin-erledigt .termin-titel, .termin-erledigt .termin-zeit { color: var(--ink-dim); }
+.termin-weg .termin-notiz .ic, .termin-item .termin-notiz .ic { vertical-align: -0.15em; }
+.termin-check-platz { width: 1.4rem; flex-shrink: 0; }
