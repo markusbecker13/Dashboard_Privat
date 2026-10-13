@@ -121,7 +121,7 @@
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
     rezepte: "view-rezepte", ernaehrung: "view-ernaehrung", schluessel: "view-schluessel",
-    bibliothek: "view-bibliothek", lernen: "view-lernen",
+    bibliothek: "view-bibliothek", lernen: "view-lernen", stunden: "view-stunden",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -135,6 +135,7 @@
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
     ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"], ["bibliothek", "Bibliothek"], ["lernen", "Lernen"],
+    ["stunden", "Stunden"],
   ];
   // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
@@ -155,11 +156,11 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung"],
+      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
-      "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten"],
-    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel"],
-    business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen"],
+      "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten", "stunden"],
+    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel", "stunden"],
+    business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen", "stunden"],
     // Erlebnispädagogik (seit Session 49): Methodenkartei + Weiterbildung zogen aus Privat hierher
     ep: ["heute", "aufgaben", "kalender", "notizen", "links", "bibliothek", "lernen", "methoden", "spiele", "verlauf", "anleitung"],
   };
@@ -185,7 +186,7 @@
       .filter((k) => !epTabs.includes(k));
     return [
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
-      { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen"] },
+      { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen", "stunden"] },
       { schluessel: "sammeln", label: "Sammeln", tabs: sammeln },
       { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: [...new Set([...epTabs, "bibliothek", "lernen"]), "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
       { schluessel: "verwalten", label: "Verwalten", tabs: ["export", "verlauf", "anleitung"] },
@@ -4627,6 +4628,542 @@
     danach: () => { lernNeuLaden(); },
   };
 
+  // ==========================================================
+  // Stunden (seit Session 58, Etappe 1): Arbeits- und Ehrenamtsstunden
+  // je Kategorie mit von–bis und Pause, Soll in Wochenstunden je Kategorie
+  // (mit „gilt ab“), Plus-/Minusstunden. Feiertage NRW und eingetragene
+  // Abwesenheiten (Urlaub, krank, frei) senken das Soll. Daten global (alle
+  // Bereiche), jede Kategorie gehört zu einem Bereich (Filter, Farbe).
+  // Tabellen: stunden_kategorien, stunden_soll, stunden_eintraege,
+  // stunden_abwesenheiten – geladen erst beim Öffnen des Reiters.
+  // ==========================================================
+  const std = {
+    geladen: false, laedt: false, fehlt: false, fehler: "",
+    kategorien: [], soll: [], eintraege: [], abw: [],
+    ansicht: "woche", bezug: null,
+  };
+  const STD_BEREICHE = [["privat", "Privat"], ["ogs", "OGS"], ["awo", "AWO"], ["business", "Business"], ["ep", "EP"]];
+  const STD_FARBEN = [
+    ["#2f6fdf", "Blau"], ["#1f9d6b", "Grün"], ["#e07a1f", "Orange"], ["#c0392b", "Rot"],
+    ["#8e44ad", "Lila"], ["#16a2b8", "Türkis"], ["#b8860b", "Ocker"], ["#6c757d", "Grau"],
+  ];
+  const STD_ARTEN = [["urlaub", "Urlaub"], ["krank", "Krank"], ["frei", "Frei (z. B. Schließtag)"], ["sonstiges", "Sonstiges"]];
+  const STD_TAGE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+  async function stdLaden() {
+    if (std.laedt) return;
+    std.laedt = true; std.fehler = "";
+    if (aktiverTab === "stunden") renderStunden();
+    try {
+      const r = await api("stunden_laden");
+      std.fehlt = !!r.fehlt;
+      std.kategorien = r.kategorien || [];
+      std.soll = r.soll || [];
+      std.eintraege = r.eintraege || [];
+      std.abw = r.abwesenheiten || [];
+      std.geladen = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") std.fehler = e.message || "Fehler";
+    } finally {
+      std.laedt = false;
+    }
+    if (aktiverTab === "stunden") renderStunden();
+  }
+  window.stdNeuLaden = function() { std.geladen = false; std.fehler = ""; stdLaden(); };
+
+  // ---- Rechnen ----
+  function stdUhrMin(t) { const s = String(t || "").slice(0, 5); return Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5)); }
+  function stdSpanne(von, bis) { return (stdUhrMin(bis) - stdUhrMin(von) + 1440) % 1440; }
+  function stdDauer(e) { return Math.max(0, stdSpanne(e.von, e.bis) - (Number(e.pause_min) || 0)); }
+  // Minuten als „7:30“; mit vorzeichen „+1:15“ / „−0:45“
+  function stdHm(min, vorzeichen) {
+    const m = Math.round(Math.abs(min));
+    const t = `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+    if (!vorzeichen) return (min < 0 ? "−" : "") + t;
+    return (min > 0 ? "+" : min < 0 ? "−" : "±") + t;
+  }
+  function stdWochentag(iso) { const d = new Date(iso + "T12:00:00").getDay(); return d === 0 ? 7 : d; }
+  function stdMontag(iso) { return addTage(iso, 1 - stdWochentag(iso)); }
+  function stdKat(id) { return std.kategorien.find((k) => String(k.id) === String(id)); }
+  function stdFarbe(k) {
+    if (k && k.farbe) return k.farbe;
+    const i = Math.max(0, std.kategorien.indexOf(k));
+    return STD_FARBEN[i % STD_FARBEN.length][0];
+  }
+
+  // Feiertage NRW (gesetzlich): fest + abhängig von Ostern (Gauß/Meeus)
+  const stdFeiertagCache = {};
+  function stdFeiertage(jahr) {
+    if (stdFeiertagCache[jahr]) return stdFeiertagCache[jahr];
+    const a = jahr % 19, b = Math.floor(jahr / 100), c = jahr % 100, d = Math.floor(b / 4), e = b % 4;
+    const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const monat = Math.floor((h + l - 7 * m + 114) / 31), tag = ((h + l - 7 * m + 114) % 31) + 1;
+    const ostern = `${jahr}-${String(monat).padStart(2, "0")}-${String(tag).padStart(2, "0")}`;
+    const liste = {
+      [`${jahr}-01-01`]: "Neujahr", [addTage(ostern, -2)]: "Karfreitag", [addTage(ostern, 1)]: "Ostermontag",
+      [`${jahr}-05-01`]: "Tag der Arbeit", [addTage(ostern, 39)]: "Christi Himmelfahrt", [addTage(ostern, 50)]: "Pfingstmontag",
+      [addTage(ostern, 60)]: "Fronleichnam", [`${jahr}-10-03`]: "Tag der Deutschen Einheit", [`${jahr}-11-01`]: "Allerheiligen",
+      [`${jahr}-12-25`]: "1. Weihnachtstag", [`${jahr}-12-26`]: "2. Weihnachtstag",
+    };
+    stdFeiertagCache[jahr] = liste;
+    return liste;
+  }
+  function stdFeiertag(iso) { return stdFeiertage(Number(iso.slice(0, 4)))[iso] || ""; }
+
+  // Soll-Stand einer Kategorie an einem Tag (größtes gueltig_ab <= Tag), sonst null
+  function stdSollStand(katId, iso) {
+    let treffer = null;
+    for (const s of std.soll) if (String(s.kategorie_id) === String(katId) && s.gueltig_ab <= iso) treffer = s;
+    return treffer;
+  }
+  function stdSollStaende(katId) { return std.soll.filter((s) => String(s.kategorie_id) === String(katId)); }
+  function stdSollBeginn(katId) { const s = stdSollStaende(katId); return s.length ? s[0].gueltig_ab : null; }
+  function stdAbwesenheit(katId, iso) {
+    return std.abw.find((a) => a.von <= iso && a.bis >= iso && (!a.kategorie_id || String(a.kategorie_id) === String(katId))) || null;
+  }
+  // Soll eines Tages in Minuten mit Grund, falls es entfällt
+  function stdTagSoll(katId, iso) {
+    const s = stdSollStand(katId, iso);
+    if (!s || !Number(s.minuten_woche)) return { min: 0 };
+    const tage = (s.tage || []).map(Number);
+    if (!tage.includes(stdWochentag(iso))) return { min: 0 };
+    const fei = stdFeiertag(iso);
+    if (fei) return { min: 0, grund: fei, regulaer: Number(s.minuten_woche) / tage.length };
+    const ab = stdAbwesenheit(katId, iso);
+    if (ab) return { min: 0, grund: (STD_ARTEN.find(([k]) => k === ab.art) || [0, ab.art])[1], regulaer: Number(s.minuten_woche) / tage.length };
+    return { min: Number(s.minuten_woche) / tage.length };
+  }
+  // Ist und Soll einer Kategorie von–bis (Soll erst ab dem ersten Soll-Stand)
+  function stdSumme(katId, von, bis) {
+    let ist = 0, soll = 0;
+    for (const e of std.eintraege) if (String(e.kategorie_id) === String(katId) && e.datum >= von && e.datum <= bis) ist += stdDauer(e);
+    const beginn = stdSollBeginn(katId);
+    if (beginn) {
+      for (let d = von < beginn ? beginn : von; d <= bis; d = addTage(d, 1)) soll += stdTagSoll(katId, d).min;
+    }
+    return { ist, soll, mitSoll: !!beginn && beginn <= bis };
+  }
+  // Saldo seit dem ersten Soll-Stand bis heute (inkl. heute) + Startsaldo
+  function stdSaldo(k) {
+    const beginn = stdSollBeginn(k.id);
+    if (!beginn) return null;
+    const heute = heuteISO();
+    const s = stdSumme(k.id, beginn, heute);
+    return { beginn, saldo: (Number(k.startsaldo_min) || 0) + s.ist - s.soll, ist: s.ist, soll: s.soll };
+  }
+
+  // ---- Filter (nur dieses Gerät) ----
+  function stdFilter() {
+    let f = "";
+    try { f = localStorage.getItem("std-filter") || ""; } catch (_e) { /* egal */ }
+    const vorhanden = new Set(std.kategorien.map((k) => k.bereich));
+    if (f === "alle" || vorhanden.has(f)) return f;
+    return vorhanden.has(aktiverBereich) && vorhanden.size > 1 ? aktiverBereich : "alle";
+  }
+  window.stdFilterWaehlen = function(f) {
+    try { localStorage.setItem("std-filter", f); } catch (_e) { /* egal */ }
+    renderStunden();
+  };
+  function stdKategorienSichtbar(auchArchiv) {
+    const f = stdFilter();
+    return std.kategorien.filter((k) => (f === "alle" || k.bereich === f) && (auchArchiv || !k.archiviert));
+  }
+
+  window.stdAnsicht = function(a) { std.ansicht = a; renderStunden(); };
+  window.stdBlaettern = function(richtung) {
+    const b = std.bezug || heuteISO();
+    if (richtung === 0) std.bezug = heuteISO();
+    else if (std.ansicht === "woche") std.bezug = addTage(b, 7 * richtung);
+    else if (std.ansicht === "monat") {
+      const [j, m] = b.split("-").map(Number);
+      const d = new Date(j, m - 1 + richtung, 1);
+      std.bezug = datumLokalISO(d);
+    } else std.bezug = `${Number(b.slice(0, 4)) + richtung}-01-01`;
+    renderStunden();
+  };
+  window.stdMonatOeffnen = function(iso) { std.ansicht = "monat"; std.bezug = iso; renderStunden(); };
+  window.stdNeuerEintrag = function(datum) { blattNeu("stunde", { datum: datum || heuteISO() }); };
+
+  // Zeitraum der aktuellen Ansicht
+  function stdZeitraum() {
+    const b = std.bezug || heuteISO();
+    if (std.ansicht === "woche") { const von = stdMontag(b); return { von, bis: addTage(von, 6) }; }
+    if (std.ansicht === "monat") {
+      const [j, m] = b.split("-").map(Number);
+      const von = `${j}-${String(m).padStart(2, "0")}-01`;
+      return { von, bis: addTage(datumLokalISO(new Date(j, m, 1)), -1) };
+    }
+    const j = b.slice(0, 4);
+    return { von: `${j}-01-01`, bis: `${j}-12-31` };
+  }
+  function stdZeitraumText(z) {
+    if (std.ansicht === "woche") {
+      const kw = typeof ernKw === "function" ? ernKw(z.von) : "";
+      return `${kw ? `KW ${kw} · ` : ""}${datumDe(z.von).slice(0, 6)} – ${datumDe(z.bis)}`;
+    }
+    if (std.ansicht === "monat") return new Date(z.von + "T12:00:00").toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+    return z.von.slice(0, 4);
+  }
+
+  // Tabelle Kategorie | Ist | Soll | ± für einen Zeitraum
+  function stdTabelleHtml(kats, von, bis) {
+    const heute = heuteISO();
+    const laufend = bis > heute && von <= heute;
+    const ganz = [];
+    const zeilen = kats.map((k) => {
+      const s = stdSumme(k.id, von, bis);
+      // Soll nur bis heute vergleichen, sonst steht jede laufende Woche im Minus
+      const sBis = bis > heute ? stdSumme(k.id, von, heute < von ? addTage(von, -1) : heute) : s;
+      if (!s.ist && !s.soll) return "";
+      const diff = s.mitSoll && von <= heute ? s.ist - sBis.soll : null;
+      if (laufend && s.mitSoll && s.soll !== sBis.soll) ganz.push(`${escapeHtml(k.name)} ${stdHm(s.soll)} h`);
+      return `<tr>
+        <td><span class="std-punkt" style="background:${escapeAttr(stdFarbe(k))}"></span>${escapeHtml(k.name)}</td>
+        <td>${stdHm(s.ist)}</td>
+        <td>${s.mitSoll ? stdHm(laufend ? sBis.soll : s.soll) : "–"}</td>
+        <td class="${diff === null ? "" : diff < 0 ? "std-minus" : "std-plus"}">${diff === null ? "–" : stdHm(diff, true)}</td>
+      </tr>`;
+    }).join("");
+    if (!zeilen) return `<p class="notiz-meta">In diesem Zeitraum keine Stunden und kein Soll.</p>`;
+    const gesamt = kats.reduce((a, k) => a + stdSumme(k.id, von, bis).ist, 0);
+    return `<table class="std-tabelle">
+      <thead><tr><th>Kategorie</th><th>Ist</th><th>Soll</th><th>±</th></tr></thead>
+      <tbody>${zeilen}</tbody>
+      <tfoot><tr><td>Gesamt</td><td>${stdHm(gesamt)}</td><td></td><td></td></tr></tfoot>
+    </table>
+    ${laufend ? `<p class="notiz-meta">Soll und ± bis heute.${ganz.length ? ` Soll im ganzen Zeitraum: ${ganz.join(" · ")}.` : ""}</p>` : ""}`;
+  }
+
+  function stdEintragZeileHtml(e) {
+    const k = stdKat(e.kategorie_id) || {};
+    const zeit = `${String(e.von).slice(0, 5)}–${String(e.bis).slice(0, 5)}${stdUhrMin(e.bis) <= stdUhrMin(e.von) ? " (+1)" : ""}`;
+    return `<button type="button" class="std-eintrag" onclick="blattOeffnen('stunde','${escapeAttr(String(e.id))}')">
+      <span class="std-punkt" style="background:${escapeAttr(stdFarbe(k))}"></span>
+      <span class="std-eintrag-text"><strong>${zeit}</strong> · ${escapeHtml(k.name || "?")}${Number(e.pause_min) ? ` · Pause ${Number(e.pause_min)} Min.` : ""}${e.notiz ? `<span class="notiz-meta"> ${escapeHtml(e.notiz)}</span>` : ""}</span>
+      <span class="std-eintrag-dauer">${stdHm(stdDauer(e))}</span>
+    </button>`;
+  }
+
+  // Ein Tag mit Einträgen, Feiertag/Abwesenheit und „+“
+  function stdTagHtml(iso, kats, mitLeer) {
+    const ids = new Set(kats.map((k) => String(k.id)));
+    const eintraege = std.eintraege.filter((e) => e.datum === iso && ids.has(String(e.kategorie_id)));
+    const fei = stdFeiertag(iso);
+    const abw = std.abw.filter((a) => a.von <= iso && a.bis >= iso && (!a.kategorie_id || ids.has(String(a.kategorie_id))));
+    if (!mitLeer && !eintraege.length && !abw.length) return "";
+    const summe = eintraege.reduce((a, e) => a + stdDauer(e), 0);
+    const marken = [
+      fei ? `<span class="badge std-badge-fei">${escapeHtml(fei)}</span>` : "",
+      ...abw.map((a) => `<button type="button" class="badge std-badge-abw" onclick="blattOeffnen('stdabwesenheit','${escapeAttr(String(a.id))}')">${escapeHtml((STD_ARTEN.find(([k]) => k === a.art) || [0, a.art])[1])}${a.kategorie_id ? ` · ${escapeHtml((stdKat(a.kategorie_id) || {}).name || "")}` : ""}</button>`),
+    ].join(" ");
+    const wt = new Date(iso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
+    return `<div class="std-tag${iso === heuteISO() ? " heute" : ""}">
+      <div class="std-tag-kopf">
+        <span class="std-tag-datum">${wt} ${datumDe(iso).slice(0, 6)}</span> ${marken}
+        <span class="std-tag-summe">${summe ? stdHm(summe) + " h" : ""}</span>
+        <button type="button" class="task-edit-btn" onclick="stdNeuerEintrag('${iso}')" aria-label="Eintrag am ${datumDe(iso)}" title="Eintrag an diesem Tag">${ic("plus")}</button>
+      </div>
+      ${eintraege.map(stdEintragZeileHtml).join("")}
+    </div>`;
+  }
+
+  function stdSaldoKartenHtml(kats) {
+    const heute = heuteISO();
+    const mo = stdMontag(heute);
+    const karten = kats.map((k) => {
+      const s = stdSaldo(k);
+      if (!s) return "";
+      const woche = stdSumme(k.id, mo, addTage(mo, 6));
+      const wocheBisHeute = stdSumme(k.id, mo, heute);
+      return `<div class="std-saldo-karte" style="border-left-color:${escapeAttr(stdFarbe(k))}">
+        <span class="std-saldo-name">${escapeHtml(k.name)}</span>
+        <span class="std-saldo-wert ${s.saldo < 0 ? "std-minus" : "std-plus"}">${stdHm(s.saldo, true)} h</span>
+        <span class="notiz-meta">Saldo seit ${datumDe(s.beginn)}${Number(k.startsaldo_min) ? ` (inkl. Übertrag ${stdHm(Number(k.startsaldo_min), true)})` : ""}</span>
+        <span class="notiz-meta">Diese Woche ${stdHm(woche.ist)} von ${stdHm(woche.soll)} h${wocheBisHeute.soll ? ` · bis heute ${stdHm(woche.ist - wocheBisHeute.soll, true)}` : ""}</span>
+      </div>`;
+    }).join("");
+    return karten ? `<div class="std-saldo-liste">${karten}</div>` : "";
+  }
+
+  function stdWocheHtml(kats, z) {
+    let tage = "";
+    for (let d = z.von; d <= z.bis; d = addTage(d, 1)) tage += stdTagHtml(d, kats, true);
+    return `<div class="std-tage">${tage}</div><h3 class="std-zwischen">Summe der Woche</h3>${stdTabelleHtml(kats, z.von, z.bis)}`;
+  }
+
+  function stdMonatHtml(kats, z) {
+    let tage = "";
+    for (let d = z.von; d <= z.bis; d = addTage(d, 1)) tage += stdTagHtml(d, kats, false);
+    return `${stdTabelleHtml(kats, z.von, z.bis)}
+      <h3 class="std-zwischen">Tage</h3>
+      ${tage ? `<div class="std-tage">${tage}</div>` : `<p class="notiz-meta">Keine Einträge in diesem Monat.</p>`}`;
+  }
+
+  function stdJahrHtml(kats, z) {
+    const j = Number(z.von.slice(0, 4));
+    const monate = [];
+    for (let m = 0; m < 12; m++) {
+      const von = `${j}-${String(m + 1).padStart(2, "0")}-01`;
+      const bis = addTage(datumLokalISO(new Date(j, m + 1, 1)), -1);
+      const teile = kats.map((k) => ({ k, ist: stdSumme(k.id, von, bis).ist })).filter((x) => x.ist);
+      const summe = teile.reduce((a, x) => a + x.ist, 0);
+      const name = new Date(von + "T12:00:00").toLocaleDateString("de-DE", { month: "long" });
+      monate.push(`<button type="button" class="std-monat-zeile" onclick="stdMonatOeffnen('${von}')">
+        <span class="std-monat-name">${name}</span>
+        <span class="std-monat-teile notiz-meta">${teile.map((x) => `${escapeHtml(x.k.name)} ${stdHm(x.ist)}`).join(" · ") || "–"}</span>
+        <span class="std-monat-summe">${summe ? stdHm(summe) + " h" : ""}</span>
+      </button>`);
+    }
+    return `${stdTabelleHtml(kats, z.von, z.bis)}<h3 class="std-zwischen">Monate</h3><div class="std-monate">${monate.join("")}</div>`;
+  }
+
+  function stdAbwesenheitenHtml(kats) {
+    const ids = new Set(kats.map((k) => String(k.id)));
+    const grenze = `${Number(heuteISO().slice(0, 4)) - 1}-01-01`;
+    const liste = std.abw.filter((a) => a.bis >= grenze && (!a.kategorie_id || ids.has(String(a.kategorie_id))))
+      .sort((a, b) => b.von.localeCompare(a.von));
+    return `<details class="anleitung-abschnitt std-block">
+      <summary>Abwesenheiten (Urlaub, krank, frei)${liste.length ? ` · ${liste.length}` : ""}</summary>
+      <div class="anleitung-text">
+        <div class="reiter-aktionen bib-aktionen"><button type="button" class="btn-secondary" onclick="blattNeu('stdabwesenheit', {})">${ic("plus")}Abwesenheit</button></div>
+        ${liste.length ? `<div class="notiz-list">${liste.map((a) => {
+          const k = a.kategorie_id ? stdKat(a.kategorie_id) : null;
+          const tage = Math.round((Date.parse(a.bis) - Date.parse(a.von)) / 86400000) + 1;
+          return `<button type="button" class="std-eintrag" onclick="blattOeffnen('stdabwesenheit','${escapeAttr(String(a.id))}')">
+            <span class="std-eintrag-text"><strong>${escapeHtml((STD_ARTEN.find(([x]) => x === a.art) || [0, a.art])[1])}</strong> · ${datumDe(a.von)}${a.bis !== a.von ? ` – ${datumDe(a.bis)}` : ""} · ${k ? escapeHtml(k.name) : "alle mit Soll"}${a.notiz ? `<span class="notiz-meta"> ${escapeHtml(a.notiz)}</span>` : ""}</span>
+            <span class="std-eintrag-dauer">${tage} ${tage === 1 ? "Tag" : "Tage"}</span>
+          </button>`;
+        }).join("")}</div>` : `<p class="notiz-meta">Noch keine. Urlaub, Krankheit und freie Tage senken das Soll an Arbeitstagen – Feiertage (NRW) zieht die App selbst ab.</p>`}
+      </div>
+    </details>`;
+  }
+
+  function stdKategorienHtml() {
+    const alle = stdKategorienSichtbar(true);
+    return `<details class="anleitung-abschnitt std-block"${std.kategorien.length ? "" : " open"}>
+      <summary>Kategorien &amp; Soll</summary>
+      <div class="anleitung-text">
+        <div class="reiter-aktionen bib-aktionen"><button type="button" class="btn-secondary" onclick="blattNeu('stdkategorie', {})">${ic("plus")}Kategorie</button></div>
+        ${alle.length ? `<div class="notiz-list">${alle.map((k) => {
+          const s = stdSollStand(k.id, heuteISO());
+          const soll = s && Number(s.minuten_woche)
+            ? `Soll ${stdHm(Number(s.minuten_woche))} h/Woche (${(s.tage || []).map((t) => STD_TAGE[Number(t) - 1]).join(", ")})`
+            : "ohne Soll";
+          return `<button type="button" class="std-eintrag" onclick="blattOeffnen('stdkategorie','${escapeAttr(String(k.id))}')">
+            <span class="std-punkt" style="background:${escapeAttr(stdFarbe(k))}"></span>
+            <span class="std-eintrag-text"><strong>${escapeHtml(k.name)}</strong>${k.archiviert ? " (archiviert)" : ""}<span class="notiz-meta"> ${escapeHtml((STD_BEREICHE.find(([b]) => b === k.bereich) || [0, k.bereich])[1])} · ${k.bezahlt ? "bezahlt" : "Ehrenamt / unbezahlt"} · ${soll}</span></span>
+          </button>`;
+        }).join("")}</div>` : `<p class="notiz-meta">Leg zuerst eine Kategorie an, z. B. „OGS“ (bezahlt, mit Soll) oder „AWO Vorstand“ (Ehrenamt, ohne Soll).</p>`}
+      </div>
+    </details>`;
+  }
+
+  function renderStunden() {
+    const el = document.getElementById("stunden-inhalt");
+    if (!el) return;
+    if (!std.geladen && !std.laedt && !std.fehler && !std.fehlt) stdLaden();
+    if (std.fehlt) { el.innerHTML = `<p class="empty-text">Für Stunden bitte zuerst <code>stunden_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`; return; }
+    if (std.fehler) { el.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(std.fehler)} <button class="link-btn" onclick="stdNeuLaden()">Nochmal versuchen</button></p>`; return; }
+    if (!std.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
+    if (!std.kategorien.length) { el.innerHTML = stdKategorienHtml(); return; }
+    const f = stdFilter();
+    const bereiche = STD_BEREICHE.filter(([b]) => std.kategorien.some((k) => k.bereich === b));
+    const filter = bereiche.length > 1
+      ? `<div class="schnell-chips std-filter" role="group" aria-label="Bereich">${[["alle", "Alle"], ...bereiche].map(([b, t]) =>
+        `<button type="button" class="schnell-chip${f === b ? " aktiv" : ""}" aria-pressed="${f === b}" onclick="stdFilterWaehlen('${b}')">${t}</button>`).join("")}</div>`
+      : "";
+    const kats = stdKategorienSichtbar(true);
+    const aktiv = kats.filter((k) => !k.archiviert);
+    const z = stdZeitraum();
+    const ansichten = [["woche", "Woche"], ["monat", "Monat"], ["jahr", "Jahr"]].map(([a, t]) =>
+      `<button type="button" class="schnell-chip${std.ansicht === a ? " aktiv" : ""}" aria-pressed="${std.ansicht === a}" onclick="stdAnsicht('${a}')">${t}</button>`).join("");
+    const inhalt = std.ansicht === "woche" ? stdWocheHtml(kats, z) : std.ansicht === "monat" ? stdMonatHtml(kats, z) : stdJahrHtml(kats, z);
+    const imZeitraum = heuteISO() >= z.von && heuteISO() <= z.bis;
+    el.innerHTML = `
+      ${filter}
+      <div class="reiter-aktionen bib-aktionen">
+        <button type="button" class="btn-primary" onclick="stdNeuerEintrag()"${aktiv.length ? "" : " disabled"}>${ic("plus")}Eintrag</button>
+        <button type="button" class="btn-secondary" onclick="blattNeu('stdabwesenheit', {})">${ic("kalender")}Abwesenheit</button>
+      </div>
+      ${stdSaldoKartenHtml(aktiv)}
+      <div class="schnell-chips std-ansicht" role="group" aria-label="Ansicht">${ansichten}</div>
+      <div class="std-nav">
+        <button type="button" class="btn-secondary ern-pfeil" onclick="stdBlaettern(-1)" aria-label="Zurück">${ic("zurueck")}</button>
+        <button type="button" class="std-nav-text" onclick="stdBlaettern(0)" title="Zu heute">${escapeHtml(stdZeitraumText(z))}${imZeitraum ? "" : " · heute"}</button>
+        <button type="button" class="btn-secondary ern-pfeil" onclick="stdBlaettern(1)" aria-label="Weiter">${ic("weiter")}</button>
+      </div>
+      ${inhalt}
+      ${stdAbwesenheitenHtml(kats)}
+      ${stdKategorienHtml()}`;
+  }
+
+  // ---- Bearbeiten-Blätter ----
+  function stdKatOptionen(aktuelleId) {
+    return std.kategorien.filter((k) => !k.archiviert || String(k.id) === String(aktuelleId))
+      .map((k) => [String(k.id), `${k.name}${k.bereich !== "privat" ? ` (${(STD_BEREICHE.find(([b]) => b === k.bereich) || [0, k.bereich])[1]})` : ""}`]);
+  }
+  function stdDauerText(w) {
+    const re = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!re.test(w.von || "") || !re.test(w.bis || "")) return "Dauer: –";
+    const sp = stdSpanne(w.von, w.bis);
+    const p = Math.max(0, Math.round(Number(w.pause) || 0));
+    if (!sp) return "Beginn und Ende sind gleich.";
+    if (p >= sp) return "Die Pause ist zu lang.";
+    return `Dauer: ${stdHm(sp - p)} h${stdUhrMin(w.bis) < stdUhrMin(w.von) ? " (über Mitternacht)" : ""}${p ? ` (${stdHm(sp)} minus ${p} Min. Pause)` : ""}`;
+  }
+
+  BLATT_ARTEN.stunde = {
+    titel: "Eintrag bearbeiten",
+    titelNeu: "Stunden eintragen",
+    finden: (id) => std.eintraege.find((e) => String(e.id) === String(id)),
+    laden: (e) => {
+      let letzte = "";
+      try { letzte = localStorage.getItem("std-letzte-kat") || ""; } catch (_e) { /* egal */ }
+      const opt = stdKatOptionen(e.kategorie_id);
+      const vorschlag = e.kategorie_id || (opt.some(([id]) => id === letzte) ? letzte : (stdKategorienSichtbar(false)[0] || std.kategorien[0] || {}).id);
+      return {
+        kategorie: String(vorschlag || ""), datum: e.datum || heuteISO(),
+        von: e.von ? String(e.von).slice(0, 5) : "", bis: e.bis ? String(e.bis).slice(0, 5) : "",
+        pause: e.pause_min ? String(e.pause_min) : "", notiz: e.notiz || "",
+      };
+    },
+    felder: [
+      { key: "kategorie", label: "Kategorie", typ: "auswahl", pflicht: true, optionen: (w) => stdKatOptionen(w.kategorie) },
+      { key: "datum", label: "Datum", typ: "datum", pflicht: true },
+      { key: "von", label: "Von", typ: "zeit", pflicht: true, halb: true },
+      { key: "bis", label: "Bis", typ: "zeit", pflicht: true, halb: true },
+      { key: "pause", label: "Pause (Minuten)", typ: "zahl", min: 0, platzhalter: "0" },
+      { key: "dauer", label: "Dauer", typ: "html", html: (w) => `<p class="blatt-info" id="std-blatt-dauer">${escapeHtml(stdDauerText(w))}</p>` },
+      { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional, z. B. Vorstandssitzung" },
+    ],
+    beimTippen: (w) => { const el = document.getElementById("std-blatt-dauer"); if (el) el.textContent = stdDauerText(w); },
+    pruefen: (w) => {
+      const sp = stdSpanne(w.von, w.bis);
+      const p = Math.round(Number(w.pause) || 0);
+      if (!sp) return "Beginn und Ende sind gleich.";
+      if (p < 0) return "Die Pause kann nicht negativ sein.";
+      if (p >= sp) return "Die Pause ist so lang wie die ganze Zeit.";
+      return "";
+    },
+    speichern: (id, w) => {
+      try { localStorage.setItem("std-letzte-kat", w.kategorie); } catch (_e) { /* egal */ }
+      return api("stunden_eintrag_speichern", { id, kategorie_id: w.kategorie, datum: w.datum, von: w.von, bis: w.bis, pause_min: Math.round(Number(w.pause) || 0), notiz: w.notiz });
+    },
+    loeschen: (id) => api("stunden_eintrag_loeschen", { id }),
+    loeschFrage: (e) => `Eintrag vom ${datumDe(e.datum || "")} löschen?`,
+    gespeichert: "Stunden gespeichert",
+    danach: () => { stdNeuLaden(); },
+  };
+
+  BLATT_ARTEN.stdabwesenheit = {
+    titel: "Abwesenheit bearbeiten",
+    titelNeu: "Abwesenheit eintragen",
+    finden: (id) => std.abw.find((a) => String(a.id) === String(id)),
+    laden: (a) => ({ art: a.art || "urlaub", von: a.von || heuteISO(), bis: a.bis || a.von || heuteISO(), kategorie: a.kategorie_id ? String(a.kategorie_id) : "", notiz: a.notiz || "" }),
+    felder: [
+      { key: "art", label: "Art", typ: "chips", optionen: STD_ARTEN },
+      { key: "von", label: "Von", typ: "datum", pflicht: true, halb: true },
+      { key: "bis", label: "Bis", typ: "datum", pflicht: true, halb: true },
+      { key: "kategorie", label: "Gilt für", typ: "auswahl", optionen: (w) => [["", "Alle Kategorien mit Soll"], ...stdKatOptionen(w.kategorie)],
+        hinweis: "Senkt das Soll an den Arbeitstagen im Zeitraum (zählt wie gearbeitet). Ohne Soll ändert sich nichts." },
+      { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional" },
+    ],
+    pruefen: (w) => (w.bis < w.von ? "„Bis“ liegt vor „Von“." : ""),
+    speichern: (id, w) => api("stunden_abwesenheit_speichern", { id, art: w.art, von: w.von, bis: w.bis, kategorie_id: w.kategorie || null, notiz: w.notiz }),
+    loeschen: (id) => api("stunden_abwesenheit_loeschen", { id }),
+    loeschFrage: (a) => `Abwesenheit ${datumDe(a.von || "")}${a.bis && a.bis !== a.von ? " – " + datumDe(a.bis) : ""} löschen?`,
+    gespeichert: "Abwesenheit gespeichert",
+    danach: () => { stdNeuLaden(); },
+  };
+
+  function stdStundenText(min) { return min ? String(Math.round(min / 60 * 100) / 100) : ""; }
+  function stdSollVerlaufHtml(w) {
+    const staende = w.id ? stdSollStaende(w.id) : [];
+    if (!staende.length) return `<p class="blatt-hinweis">Noch kein Soll gespeichert.</p>`;
+    const heute = heuteISO();
+    const aktuell = stdSollStand(w.id, heute);
+    return staende.map((s, i) => {
+      const naechster = staende[i + 1];
+      const text = Number(s.minuten_woche)
+        ? `${stdHm(Number(s.minuten_woche))} h/Woche · ${(s.tage || []).map((t) => STD_TAGE[Number(t) - 1]).join(", ")}`
+        : "kein Soll";
+      return `<div class="ern-ziel-stand">
+        <div class="ern-ziel-stand-text"><span><strong>Ab ${datumDe(s.gueltig_ab)}${naechster ? ` bis ${datumDe(addTage(naechster.gueltig_ab, -1))}` : ""}</strong>${s === aktuell ? ` <span class="badge">gilt heute</span>` : s.gueltig_ab > heute ? ` <span class="badge">geplant</span>` : ""}</span><span class="notiz-meta">${text}</span></div>
+        <button type="button" class="task-delete" onclick="stdSollLoeschen('${escapeAttr(String(s.id))}')" aria-label="Soll ab ${datumDe(s.gueltig_ab)} löschen">${ic("x")}</button>
+      </div>`;
+    }).reverse().join("");
+  }
+  window.stdSollLoeschen = async function(id) {
+    const s = std.soll.find((x) => String(x.id) === String(id));
+    if (!s || !confirm(`Soll-Stand ab ${datumDe(s.gueltig_ab)} löschen? Ab dann gilt wieder der vorherige Stand (oder keiner).`)) return;
+    try {
+      await api("stunden_soll_loeschen", { id });
+      window.blattSchliessen();
+      hinweisZeigen("Soll-Stand gelöscht");
+      stdNeuLaden();
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht gelöscht: " + (e.message || "Fehler"));
+    }
+  };
+
+  BLATT_ARTEN.stdkategorie = {
+    titel: "Kategorie bearbeiten",
+    titelNeu: "Neue Kategorie",
+    finden: (id) => stdKat(id),
+    laden: (k) => {
+      const s = k.id ? stdSollStand(k.id, heuteISO()) : null;
+      const tage = s ? (s.tage || []).map((t) => Number(t) - 1) : [0, 1, 2, 3, 4];
+      return {
+        id: k.id || "", name: k.name || "", bereich: k.bereich || aktiverBereich,
+        bezahlt: k.bezahlt ? "ja" : "nein", farbe: k.farbe || "",
+        soll_h: s && Number(s.minuten_woche) ? stdStundenText(Number(s.minuten_woche)) : "",
+        wochentage: tage, soll_ab: heuteISO(), hatte_soll: !!(k.id && stdSollStaende(k.id).length),
+        startsaldo: k.startsaldo_min ? stdStundenText(Number(k.startsaldo_min)) : "",
+        archiviert: k.archiviert ? "ja" : "nein",
+      };
+    },
+    felder: [
+      { key: "name", label: "Name", typ: "text", pflicht: true, platzhalter: "z. B. OGS, AWO Vorstand, zwischenkaffeeundchaos" },
+      { key: "bereich", label: "Bereich", typ: "chips", optionen: STD_BEREICHE },
+      { key: "bezahlt", label: "Art", typ: "chips", optionen: [["ja", "Bezahlt"], ["nein", "Ehrenamt / unbezahlt"]] },
+      { key: "farbe", label: "Farbe", typ: "chips", optionen: [["", "Automatisch"], ...STD_FARBEN.map(([h, n]) => [h, n])] },
+      { key: "soll_h", label: "Soll (Stunden pro Woche)", typ: "zahl", min: 0, schritt: "0.25", platzhalter: "leer = kein Soll",
+        hinweis: "z. B. 19,5 – wird gleichmäßig auf die Arbeitstage verteilt. Leer lassen für reine Ist-Stunden (z. B. Ehrenamt)." },
+      { key: "wochentage", label: "Arbeitstage", typ: "wochentage", wenn: (w) => w.soll_h !== "" && Number(w.soll_h) > 0 },
+      { key: "soll_ab", label: "Soll gilt ab", typ: "datum", wenn: (w) => w.soll_h !== "" || w.hatte_soll,
+        hinweis: "Ab diesem Tag zählt das Soll (frühere Tage behalten ihren Stand). Saldo zählt ab dem ersten Soll-Stand." },
+      { key: "startsaldo", label: "Übertrag (Stunden)", typ: "zahl", schritt: "0.25", platzhalter: "0", wenn: (w) => w.soll_h !== "" || w.hatte_soll,
+        hinweis: "Plus- oder Minusstunden von vorher, z. B. 3,5 oder -2." },
+      { key: "archiviert", label: "Archiviert", typ: "chips", optionen: [["nein", "Nein"], ["ja", "Ja – nicht mehr für neue Einträge"]], wenn: (w) => !!w.id },
+      { key: "verlauf", label: "Verlauf des Solls", typ: "html", wenn: (w) => w.hatte_soll, html: (w) => stdSollVerlaufHtml(w) },
+    ],
+    pruefen: (w) => {
+      if (w.soll_h !== "" && (!Number.isFinite(Number(w.soll_h)) || Number(w.soll_h) < 0 || Number(w.soll_h) > 100)) return "Soll bitte zwischen 0 und 100 Stunden.";
+      if (Number(w.soll_h) > 0 && !w.wochentage.length) return "Bitte mindestens einen Arbeitstag wählen.";
+      if (w.startsaldo !== "" && (!Number.isFinite(Number(w.startsaldo)) || Math.abs(Number(w.startsaldo)) > 1000)) return "Übertrag bitte zwischen -1000 und 1000 Stunden.";
+      if ((w.soll_h !== "" || w.hatte_soll) && !w.soll_ab) return "Bitte „Soll gilt ab“ wählen.";
+      return "";
+    },
+    speichern: (id, w) => {
+      const mitSoll = w.soll_h !== "" || w.hatte_soll;
+      return api("stunden_kategorie_speichern", {
+        id, name: w.name, bereich: w.bereich, bezahlt: w.bezahlt === "ja", farbe: w.farbe || null,
+        archiviert: w.archiviert === "ja",
+        startsaldo_min: w.startsaldo === "" ? 0 : Math.round(Number(w.startsaldo) * 60),
+        soll: mitSoll ? {
+          gueltig_ab: w.soll_ab || heuteISO(),
+          minuten_woche: w.soll_h === "" ? 0 : Math.round(Number(w.soll_h) * 60),
+          tage: [...w.wochentage].sort((a, b) => a - b).map((t) => t + 1),
+        } : null,
+      });
+    },
+    loeschen: (id) => api("stunden_kategorie_loeschen", { id }),
+    loeschFrage: (k) => `Kategorie „${k.name || ""}“ löschen? Geht nur, wenn sie keine Einträge hat – sonst archivieren.`,
+    gespeichert: (r) => (r && r.soll === "neu" ? "Kategorie gespeichert – neuer Soll-Stand" : r && r.soll === "ersetzt" ? "Kategorie gespeichert – Soll-Stand ersetzt" : "Kategorie gespeichert"),
+    danach: () => { stdNeuLaden(); },
+  };
+
   let blatt = null; // { art, id, werte }
 
   // Öffnet das Bearbeiten-Blatt für einen Eintrag
@@ -6872,6 +7409,7 @@
     if (aktiv === "methoden") renderMethoden();
     if (aktiv === "bibliothek") renderBibliothek();
     if (aktiv === "lernen") renderLernen();
+    if (aktiv === "stunden") renderStunden();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
     if (aktiv === "schluessel") renderSchluessel();
@@ -13465,6 +14003,19 @@
       luecken.push("Fragenkatalog: " + e.message);
     }
 
+    // Stunden (seit Session 58)
+    meldung("Lade Stunden …");
+    try {
+      const r = await api("stunden_laden");
+      if (!r.fehlt) {
+        liste.stunden_kategorien = r.kategorien || []; liste.stunden_soll = r.soll || [];
+        liste.stunden_eintraege = r.eintraege || []; liste.stunden_abwesenheiten = r.abwesenheiten || [];
+      }
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Stunden: " + e.message);
+    }
+
     meldung("Lade Einstellungen …");
     let pushEinstellungen = null;
     try {
@@ -13617,9 +14168,13 @@
     { k: "ep_fragen", t: "ep_fragen", name: "Fragenkatalog: Fragen mit Lernkartei", gruppe: "EP" },
     { k: "ep_fragen_versuche", t: "ep_fragen_versuche", name: "Fragenkatalog: gegebene Antworten", gruppe: "EP" },
     { k: "ep_pruefungen", t: "ep_pruefungen", name: "Prüfungssimulationen", gruppe: "EP" },
+    { k: "stunden_kategorien", t: "stunden_kategorien", name: "Stunden: Kategorien", gruppe: "Stunden" },
+    { k: "stunden_soll", t: "stunden_soll", name: "Stunden: Soll-Stände", gruppe: "Stunden" },
+    { k: "stunden_eintraege", t: "stunden_eintraege", name: "Stunden: Einträge", gruppe: "Stunden" },
+    { k: "stunden_abwesenheiten", t: "stunden_abwesenheiten", name: "Stunden: Abwesenheiten", gruppe: "Stunden" },
     { k: "verlauf", t: "verlauf", name: "Verlauf (letzte 50 je Bereich)", gruppe: "Sonstiges", nurErg: true },
   ];
-  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Sonstiges"];
+  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Stunden", "Sonstiges"];
 
   // Zustand der Karte (bleibt beim Neuzeichnen von Export erhalten)
   const wh = {
