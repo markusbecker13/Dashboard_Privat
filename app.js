@@ -5549,7 +5549,7 @@
     blatt = { art, id, werte };
     document.getElementById("blatt-titel").textContent = titel;
     // „Löschen“ nur bei vorhandenen Einträgen
-    document.getElementById("blatt-loeschen").classList.toggle("hidden", id === null);
+    document.getElementById("blatt-loeschen").classList.toggle("hidden", id === null || !BLATT_ARTEN[art].loeschen);
     document.getElementById("blatt-loeschen").textContent = BLATT_ARTEN[art].loeschText || "Löschen";
     blattMeldung("", false);
     blattRendern();
@@ -8822,7 +8822,12 @@
     return tage;
   }
   // Alle Termine (Einzel- und Vorkommen von Serien) zwischen von und bis, sortiert
-  function termineVorkommen(liste, von, bis) {
+  // mitAusfall (seit Session 60): ausgefallene Tage als _ausfall mitliefern
+  // (nur Kalender); sonst fehlen sie – Start, Frei, Push, Export sehen sie nicht
+  function terminAusfallAm(t, iso) {
+    return Array.isArray(t.ausfall_tage) && t.ausfall_tage.some((a) => String(a).slice(0, 10) === iso);
+  }
+  function termineVorkommen(liste, von, bis, mitAusfall = false) {
     const ergebnis = [];
     for (const t of liste || []) {
       if (!t.wiederholung) {
@@ -8833,7 +8838,9 @@
       const ende = t.wiederholung_bis && t.wiederholung_bis < bis ? t.wiederholung_bis : bis;
       const ab = von > t.datum ? von : t.datum;
       for (const iso of terminSerienTage(t, ab, ende)) {
-        ergebnis.push({ ...t, datum: iso, erledigt: false, _serie: true, _start: t.datum });
+        const ausfall = terminAusfallAm(t, iso);
+        if (ausfall && !mitAusfall) continue;
+        ergebnis.push({ ...t, datum: iso, erledigt: false, _serie: true, _start: t.datum, ...(ausfall ? { _ausfall: true } : {}) });
       }
     }
     return ergebnis.sort((a, b) => (a.datum + (a.uhrzeit || "99:99")).localeCompare(b.datum + (b.uhrzeit || "99:99")));
@@ -8909,8 +8916,8 @@
   }
 
   // Liefert die Termine des aktiven Bereichs an einem Tag (inkl. Serien), nach Uhrzeit sortiert
-  function termineAmTag(isoDatum) {
-    return termineVorkommen(termine.filter((t) => bereichVon(t) === aktiverBereich), isoDatum, isoDatum);
+  function termineAmTag(isoDatum, mitAusfall = false) {
+    return termineVorkommen(termine.filter((t) => bereichVon(t) === aktiverBereich), isoDatum, isoDatum, mitAusfall);
   }
 
   document.getElementById("cal-prev").addEventListener("click", () => {
@@ -9021,7 +9028,7 @@
     const panel = document.getElementById("cal-day-panel");
     if (!calAusgewaehlterTag) { panel.innerHTML = ""; return; }
 
-    const liste = termineAmTag(calAusgewaehlterTag);
+    const liste = termineAmTag(calAusgewaehlterTag, true);
     const [j,m,t] = calAusgewaehlterTag.split("-");
     const titel = `${t}. ${MONATSNAMEN[parseInt(m,10)-1]} ${j}`;
 
@@ -9030,10 +9037,18 @@
       : liste.map((t) => {
           const farbe = terminFarbe(t);
           const zusatz = terminZusatz(t, t.datum);
+          // Ausgefallenes Vorkommen einer Serie (seit Session 60): durchgestrichen, „wieder aktivieren“
+          if (t._ausfall) return `
+          <div class="termin-item termin-ausfall"${farbe ? ` style="box-shadow: inset 4px 0 0 ${farbe}; padding-left:0.7rem;"` : ""}>
+            <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
+            <span class="termin-titel"><s>${escapeHtml(t.titel)}</s><span class="termin-notiz">${ic("serie")} fällt aus</span></span>
+            <button class="link-btn" onclick="terminAusfallWeg('${t.id}','${t.datum}')">Wieder aktivieren</button>
+          </div>`;
           return `
           <div class="termin-item"${farbe ? ` style="box-shadow: inset 4px 0 0 ${farbe}; padding-left:0.7rem;"` : ""}>
             <span class="termin-zeit">${t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
             <span class="termin-titel">${terminMarkeHtml(t)}${escapeHtml(t.titel)}${zusatz ? `<span class="termin-notiz">${t._serie ? ic("serie") + " " : ""}${escapeHtml(zusatz)}</span>` : ""}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
+            ${t._serie ? `<button class="task-snooze" onclick="terminAusfallOeffnen('${t.id}','${t.datum}')" title="Fällt aus …" aria-label="Termin am ${formatDatumKurz(t.datum)} ausfallen lassen">${ic("x-kreis")}</button>` : ""}
             <button class="task-snooze" onclick="terminBearbeitenStart('${t.id}')" title="${t._serie ? "Serie bearbeiten" : "Bearbeiten"}" aria-label="${t._serie ? "Serie bearbeiten" : "Bearbeiten"}">${ic("stift")}</button>
             <button class="task-delete" onclick="terminLoeschen('${t.id}')" aria-label="${t._serie ? "Serie löschen" : "Löschen"}">${ic("x")}</button>
           </div>`; }).join("");
@@ -9093,6 +9108,78 @@
   }
 
   // Löscht einen Termin und lädt die Daten neu
+  // ---- Serientermine ausfallen lassen (seit Session 60) ----
+  // ausfall_tage an der Serie: einzelne Tage oder alle Vorkommen eines
+  // Zeitraums (Ferien). Die Serie selbst bleibt unverändert.
+  let terminAusfallTag = null;
+  window.terminAusfallOeffnen = function(id, iso) {
+    terminAusfallTag = iso;
+    blattOeffnen("terminausfall", id);
+  };
+  window.terminAusfallWeg = async function(id, iso) {
+    try {
+      await api("termin_ausfall", { id, tage: [iso], modus: "weg" });
+      hinweisZeigen("Termin wieder aktiv");
+      await ladeDaten();
+      if (aktiverTab === "kalender") renderKalender();
+      if (blatt && blatt.art === "terminausfall" && document.getElementById("blatt-dialog").open) {
+        const t = termine.find((x) => String(x.id) === String(id));
+        if (t) { blatt.werte.ausfaelle = (t.ausfall_tage || []).map((a) => String(a).slice(0, 10)); blattRendern(); }
+      }
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht geändert: " + (e.message || "Fehler"));
+    }
+  };
+  function terminAusfaelleHtml(w) {
+    const heute = heuteISO();
+    const liste = (w.ausfaelle || []).filter((a) => a >= addTage(heute, -60));
+    if (!liste.length) return `<p class="blatt-hinweis">Noch keine Ausfälle${(w.ausfaelle || []).length ? " (nur ältere)" : ""}.</p>`;
+    return `<div class="termin-ausfall-liste">${liste.map((a) => {
+      const wt = new Date(a + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
+      return `<span class="termin-ausfall-chip">${wt} ${datumDe(a)}<button type="button" onclick="terminAusfallWeg('${escapeAttr(String(w.id))}','${a}')" aria-label="Ausfall am ${datumDe(a)} zurücknehmen" title="wieder aktivieren">${ic("x")}</button></span>`;
+    }).join("")}</div>`;
+  }
+  BLATT_ARTEN.terminausfall = {
+    titel: "Termin fällt aus",
+    finden: (id) => termine.find((x) => String(x.id) === String(id) && x.wiederholung),
+    laden: (t) => {
+      const tag = terminAusfallTag || heuteISO();
+      return {
+        id: t.id, info: `${t.titel} · ${TERMIN_WDH[t.wiederholung] || ""}${t.uhrzeit ? " · " + t.uhrzeit.slice(0, 5) + " Uhr" : ""}`,
+        art: "einzeln", tag, von: tag, bis: addTage(tag, 13),
+        ausfaelle: (t.ausfall_tage || []).map((a) => String(a).slice(0, 10)),
+      };
+    },
+    felder: [
+      { key: "info", label: "Serie", typ: "info" },
+      { key: "art", label: "Was fällt aus?", typ: "chips", optionen: (w) => [["einzeln", `Nur am ${datumDe(w.tag)}`], ["zeitraum", "Zeitraum (z. B. Ferien)"]] },
+      { key: "von", label: "Von", typ: "datum", halb: true, wenn: (w) => w.art === "zeitraum" },
+      { key: "bis", label: "Bis", typ: "datum", halb: true, wenn: (w) => w.art === "zeitraum",
+        hinweis: "Alle Termine der Serie in diesem Zeitraum fallen aus. Die Serie läuft danach normal weiter." },
+      { key: "liste", label: "Bisherige Ausfälle", typ: "html", html: (w) => terminAusfaelleHtml(w) },
+    ],
+    pruefen: (w) => {
+      if (w.art !== "zeitraum") return "";
+      if (!w.von || !w.bis) return "Bitte Von und Bis wählen.";
+      if (w.bis < w.von) return "„Bis“ liegt vor „Von“.";
+      return "";
+    },
+    speichern: (id, w) => {
+      const t = termine.find((x) => String(x.id) === String(id));
+      let tage = [w.tag];
+      if (w.art === "zeitraum") {
+        const ab = w.von > t.datum ? w.von : t.datum;
+        const ende = t.wiederholung_bis && t.wiederholung_bis < w.bis ? t.wiederholung_bis : w.bis;
+        tage = ab <= ende ? terminSerienTage(t, ab, ende) : [];
+        if (!tage.length) return Promise.reject(new Error("In diesem Zeitraum findet der Termin gar nicht statt."));
+        if (tage.length > 400) return Promise.reject(new Error("Der Zeitraum ist zu lang (mehr als 400 Termine)."));
+      }
+      return api("termin_ausfall", { id, tage, modus: "hinzu" }).then((r) => ({ ...r, anzahl: tage.length }));
+    },
+    gespeichert: (r) => (r && r.anzahl > 1 ? `${r.anzahl} Termine fallen aus` : "Termin fällt aus"),
+    danach: () => { if (aktiverTab === "kalender") renderKalender(); },
+  };
+
   window.terminLoeschen = async function(id) {
     const t = termine.find((x) => String(x.id) === String(id));
     if (t && t.wiederholung && !confirm(`„${t.titel}“ wiederholt sich ${TERMIN_WDH[t.wiederholung] || ""}. Die ganze Serie löschen?`)) return;
