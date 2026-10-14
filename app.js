@@ -5538,10 +5538,12 @@
     datum: null,        // Datum im Ablesen-Formular (null = heute)
     eingaben: {},       // zaehler_id → eingetippter Stand (bleibt beim Neuzeichnen)
     speichert: false,
+    // Auswertung (seit Session 67): Art, Jahr, angetippter Monat (0–11)
+    awArt: null, awJahr: null, awMonat: null,
   };
   // Art → Name, Einheit, Farbe
   const ZL_ARTEN = {
-    strom_bezug: { name: "Strom Bezug (Netz)", kurz: "Bezug", einheit: "kWh", farbe: "#e07a1f" },
+    strom_bezug: { name: "Strom Bezug (Netz)", kurz: "Bezug", einheit: "kWh", farbe: "#d06c12" },
     strom_einspeisung: { name: "Strom Einspeisung", kurz: "Einspeisung", einheit: "kWh", farbe: "#1f9d6b" },
     pv_erzeugung: { name: "PV-Erzeugung", kurz: "PV", einheit: "kWh", farbe: "#b8860b" },
     wasser: { name: "Wasser", kurz: "Wasser", einheit: "m³", farbe: "#2f6fdf" },
@@ -5558,6 +5560,7 @@
       zl.zaehler = r.zaehler || [];
       zl.ablesungen = (r.ablesungen || []).map((a) => ({ ...a, stand: Number(a.stand), stand_alt: a.stand_alt === null || a.stand_alt === undefined ? null : Number(a.stand_alt) }));
       zl.geladen = true;
+      zlArtCache.clear();
     } catch (e) {
       if (e.message !== "unauthorized") zl.fehler = e.message || "Fehler";
     } finally {
@@ -5657,6 +5660,7 @@
     }
     el.innerHTML = `
       ${zlAblesenHtml(aktiv)}
+      ${zlAuswertungHtml()}
       <h2 class="std-zwischen">Deine Zähler</h2>
       <div class="zl-liste">${aktiv.map(zlKarteHtml).join("") || `<p class="empty-text">Alle Zähler sind archiviert.</p>`}</div>
       <div class="reiter-aktionen bib-aktionen">
@@ -5818,6 +5822,221 @@
       </details>
     </div>`;
   }
+
+  // ---- Auswertung (seit Session 67, Etappe 2) ----
+  // Der Verbrauch zwischen zwei Ablesungen wird gleichmäßig auf die Tage
+  // verteilt (Tag der Vorablesung bis Vortag der Ablesung). Mehrere Zähler
+  // gleicher Art werden zusammengezählt. Ein Tag gilt als „abgelesen“, wenn
+  // jeder Zähler der Art, der da schon lief, ihn abdeckt.
+  const ZL_AW_WORT = { strom_bezug: "Verbrauch", strom_einspeisung: "Einspeisung", pv_erzeugung: "Erzeugung", wasser: "Verbrauch" };
+
+  // Tageswerte eines Zählers: { werte: Map(tag → Menge), von, bis } (bis = exklusiv)
+  function zlTageswerte(zid) {
+    const r = zlReihe(zid);
+    const werte = new Map();
+    if (r.length < 2) return { werte, von: null, bis: null };
+    for (const iv of zlIntervalle(zid)) {
+      if (iv.tage <= 0) continue;
+      const proTag = iv.menge / iv.tage;
+      let d = iv.von;
+      for (let i = 0; i < iv.tage; i++) { werte.set(d, proTag); d = addTage(d, 1); }
+    }
+    return { werte, von: r[0].datum, bis: r[r.length - 1].datum };
+  }
+
+  // Tageswerte einer Art (alle Zähler summiert); Map(tag → Menge) nur für abgelesene Tage
+  const zlArtCache = new Map();
+  function zlArtTage(art) {
+    if (zlArtCache.has(art)) return zlArtCache.get(art);
+    const zaehler = zl.zaehler.filter((z) => z.art === art).map((z) => zlTageswerte(z.id)).filter((t) => t.von);
+    const tage = new Map();
+    if (zaehler.length) {
+      const start = zaehler.reduce((m, t) => (t.von < m ? t.von : m), zaehler[0].von);
+      const ende = zaehler.reduce((m, t) => (t.bis > m ? t.bis : m), zaehler[0].bis);
+      for (let d = start; d < ende; d = addTage(d, 1)) {
+        const laufend = zaehler.filter((t) => t.von <= d);
+        if (!laufend.length || laufend.some((t) => d >= t.bis)) continue;
+        tage.set(d, laufend.reduce((s, t) => s + (t.werte.get(d) || 0), 0));
+      }
+    }
+    zlArtCache.set(art, tage);
+    return tage;
+  }
+  function zlTageImMonat(j, m) { return new Date(Date.UTC(j, m, 0)).getUTCDate(); }
+  // 12 Monate eines Jahres: { menge, tage (abgelesen), alle (Tage im Monat) }
+  function zlMonate(art, jahr) {
+    const tage = zlArtTage(art);
+    return Array.from({ length: 12 }, (_, i) => {
+      const alle = zlTageImMonat(jahr, i + 1);
+      let menge = 0, anzahl = 0;
+      for (let t = 1; t <= alle; t++) {
+        const d = `${jahr}-${String(i + 1).padStart(2, "0")}-${String(t).padStart(2, "0")}`;
+        if (tage.has(d)) { menge += tage.get(d); anzahl++; }
+      }
+      return { menge, tage: anzahl, alle };
+    });
+  }
+  function zlVoll(m) { return m.tage === m.alle; }
+  // Gleicher Zeitraum: Tage des Jahres, die in beiden Jahren abgelesen sind (ohne 29.02.)
+  function zlGleicherZeitraum(art, jahr) {
+    const tage = zlArtTage(art);
+    let jetzt = 0, vor = 0, anzahl = 0, erster = null, letzter = null;
+    for (const [d, v] of tage) {
+      if (!d.startsWith(jahr + "-") || d.slice(5) === "02-29") continue;
+      const dv = `${jahr - 1}-${d.slice(5)}`;
+      if (!tage.has(dv)) continue;
+      jetzt += v; vor += tage.get(dv); anzahl++;
+      if (!erster || d < erster) erster = d;
+      if (!letzter || d > letzter) letzter = d;
+    }
+    return { jetzt, vor, anzahl, erster, letzter };
+  }
+  function zlProzent(neu, alt) {
+    if (!alt) return "";
+    const p = Math.round(((neu - alt) / alt) * 100);
+    return `${p > 0 ? "+" : p < 0 ? "−" : "±"}${Math.abs(p)} %`;
+  }
+  function zlJahre(art) {
+    const tage = zlArtTage(art);
+    const jahre = new Set();
+    for (const d of tage.keys()) jahre.add(Number(d.slice(0, 4)));
+    return [...jahre].sort();
+  }
+  function zlAwArten() { return ZL_ART_REIHE.filter((a) => zlArtTage(a).size > 0); }
+
+  function zlAuswertungHtml() {
+    const arten = zlAwArten();
+    if (!arten.length) {
+      return `<section class="zl-aw" aria-label="Auswertung"><h2 class="std-zwischen">Auswertung</h2>
+        <p class="notiz-meta">Sobald ein Zähler zwei Ablesungen hat, stehen hier Monatswerte und der Vorjahresvergleich.</p></section>`;
+    }
+    if (!arten.includes(zl.awArt)) zl.awArt = arten[0];
+    const art = zl.awArt;
+    const jahre = zlJahre(art);
+    if (!jahre.includes(zl.awJahr)) zl.awJahr = jahre[jahre.length - 1];
+    const jahr = zl.awJahr;
+    const info = ZL_ARTEN[art];
+    const dummy = { art };
+    const monate = zlMonate(art, jahr);
+    const vorjahr = zlMonate(art, jahr - 1);
+    const hatVorjahr = vorjahr.some((m) => m.tage > 0);
+    const summe = monate.reduce((s, m) => s + m.menge, 0);
+    const tageSumme = monate.reduce((s, m) => s + m.tage, 0);
+    const gz = zlGleicherZeitraum(art, jahr);
+    const wort = ZL_AW_WORT[art];
+    const chips = arten.map((a) => `<button type="button" class="schnell-chip${a === art ? " aktiv" : ""}" aria-pressed="${a === art}" onclick="zlAwArt('${a}')">${escapeHtml(ZL_ARTEN[a].kurz)}</button>`).join("");
+    const idx = jahre.indexOf(jahr);
+    const vergleich = gz.anzahl >= 14
+      ? `<span class="notiz-meta">Gleicher Zeitraum (${datumDe(gz.erster).slice(0, 6)}–${datumDe(gz.letzter).slice(0, 6)}): ${zlMenge(gz.jetzt, dummy)} statt ${zlMenge(gz.vor, dummy)} im Vorjahr · <strong>${zlProzent(gz.jetzt, gz.vor)}</strong></span>`
+      : `<span class="notiz-meta">Vorjahresvergleich, sobald derselbe Zeitraum im Vorjahr abgelesen ist (mind. 14 Tage).</span>`;
+    const zeilen = monate.map((m, i) => {
+      const v = vorjahr[i];
+      if (!m.tage && !v.tage) return "";
+      const delta = zlVoll(m) && zlVoll(v) && v.menge ? zlProzent(m.menge, v.menge) : "";
+      const teil = (x) => (x.tage && !zlVoll(x) ? `<span class="zl-teil" title="nur ${x.tage} von ${x.alle} Tagen">*</span>` : "");
+      return `<tr><td>${FIN_MONATSNAMEN_KURZ[i]}</td>
+        <td>${m.tage ? zlMenge(m.menge, dummy) + teil(m) : "–"}</td>
+        <td>${m.tage ? zlProTag(m.menge / m.tage, dummy).replace("/Tag", "") : "–"}</td>
+        <td>${v.tage ? zlMenge(v.menge, dummy) + teil(v) : "–"}</td>
+        <td>${delta || "–"}</td></tr>`;
+    }).join("");
+    return `<section class="zl-aw fin-chart-wrap" aria-label="Auswertung">
+      <h2 class="std-zwischen">Auswertung</h2>
+      <div class="schnell-chips std-filter" role="group" aria-label="Art">${chips}</div>
+      <div class="std-nav">
+        <button type="button" class="btn-secondary ern-pfeil" onclick="zlAwJahr(-1)" aria-label="Jahr zurück"${idx > 0 ? "" : " disabled"}>${ic("zurueck")}</button>
+        <span class="std-nav-text zl-aw-jahr">${jahr}</span>
+        <button type="button" class="btn-secondary ern-pfeil" onclick="zlAwJahr(1)" aria-label="Jahr weiter"${idx < jahre.length - 1 ? "" : " disabled"}>${ic("weiter")}</button>
+      </div>
+      <div class="zl-aw-kopf">
+        <span class="std-saldo-wert">${zlMenge(summe, dummy)}</span>
+        <span class="notiz-meta">${wort} ${jahr} an ${tageSumme} abgelesenen Tagen${tageSumme ? ` · Ø ${zlProTag(summe / tageSumme, dummy)}` : ""}</span>
+        ${vergleich}
+      </div>
+      ${zlAwChartSvg(monate, hatVorjahr ? vorjahr : null, info, jahr)}
+      <div class="fin-chart-legende">
+        <span><span class="fin-legende-punkt" style="background:${info.farbe};"></span>${jahr}</span>
+        ${hatVorjahr ? `<span><span class="fin-legende-punkt zl-legende-vj"></span>${jahr - 1}</span>` : ""}
+        <span>blass = Monat nur teilweise abgelesen</span>
+      </div>
+      <p class="notiz-meta zl-aw-detail" id="zl-aw-detail" aria-live="polite">${zl.awMonat !== null && zl.awMonat !== undefined ? zlAwDetailText(zl.awMonat, monate, vorjahr, jahr, dummy) : "Balken antippen für Details."}</p>
+      <details class="zl-verlauf">
+        <summary>Als Tabelle</summary>
+        <div class="zl-tabelle-wrap"><table class="std-tabelle zl-tabelle">
+          <thead><tr><th>Monat</th><th>${jahr}</th><th>Ø/Tag</th><th>${jahr - 1}</th><th>±</th></tr></thead>
+          <tbody>${zeilen}</tbody>
+        </table></div>
+        <p class="notiz-meta">* Monat nur teilweise abgelesen. ± nur bei vollständig abgelesenen Monaten. Zwischen zwei Ablesungen verteilt die App den Verbrauch gleichmäßig auf die Tage – bei langen Abständen sind Monatswerte daher geschätzt.</p>
+      </details>
+    </section>`;
+  }
+
+  function zlAwDetailText(i, monate, vorjahr, jahr, dummy) {
+    const m = monate[i], v = vorjahr[i];
+    if (!m.tage && !v.tage) return `${FIN_MONATSNAMEN_KURZ[i]} ${jahr}: keine Daten.`;
+    const teil = (x) => (x.tage && !zlVoll(x) ? ` (nur ${x.tage} von ${x.alle} Tagen)` : "");
+    let t = `${FIN_MONATSNAMEN_KURZ[i]} ${jahr}: ${m.tage ? zlMenge(m.menge, dummy) + teil(m) + ` · Ø ${zlProTag(m.menge / m.tage, dummy)}` : "keine Daten"}`;
+    if (v.tage) t += ` · Vorjahr ${zlMenge(v.menge, dummy)}${teil(v)}`;
+    if (zlVoll(m) && zlVoll(v) && v.menge) t += ` · ${zlProzent(m.menge, v.menge)}`;
+    return t;
+  }
+
+  // Balken je Monat, daneben schmal das Vorjahr (grau)
+  function zlAwChartSvg(monate, vorjahr, info, jahr) {
+    const breite = 360, hoehe = 200, unten = 22, oben = 16, links = 34, rechts = 2;
+    const max = Math.max(...monate.map((m) => m.menge), ...(vorjahr || []).map((m) => m.menge), 0);
+    if (!max) return `<p class="notiz-meta">Für ${jahr} noch keine Mengen.</p>`;
+    // Runde Achsenschritte (1, 2, 2,5, 5 × 10^n)
+    const roh = max / 3;
+    const p10 = Math.pow(10, Math.floor(Math.log10(roh)));
+    const schritt = [1, 2, 2.5, 5, 10].map((f) => f * p10).find((s) => s >= roh);
+    const oberkante = Math.ceil(max / schritt) * schritt;
+    const h = hoehe - oben - unten;
+    const y = (w) => oben + h * (1 - w / oberkante);
+    const gruppe = (breite - links - rechts) / 12;
+    const bJ = gruppe * (vorjahr ? 0.44 : 0.6), bV = gruppe * 0.26;
+    const einheit = info.einheit;
+    let raster = "";
+    for (let w = 0; w <= oberkante + 1e-9; w += schritt) {
+      raster += `<line x1="${links}" y1="${y(w).toFixed(1)}" x2="${breite - rechts}" y2="${y(w).toFixed(1)}" stroke="var(--border)" stroke-width="1"${w ? ' stroke-dasharray="2,4"' : ""}></line>
+        <text x="${links - 6}" y="${(y(w) + 3.5).toFixed(1)}" font-size="10" fill="var(--ink-dim)" text-anchor="end">${zlFmt(w, einheit === "m³" ? 1 : 0)}</text>`;
+    }
+    const balken = (x, wert, bw, fuellung, blass) => {
+      if (!wert || wert <= 0) return "";
+      const hh = Math.max(1, h * (wert / oberkante));
+      const r = Math.min(4, bw / 2, hh);
+      const x0 = x, y0 = y(0) - hh, x1 = x + bw, y1 = y(0);
+      // Oben gerundet, unten an der Grundlinie gerade
+      return `<path d="M${x0},${y1} V${y0 + r} Q${x0},${y0} ${x0 + r},${y0} H${x1 - r} Q${x1},${y0} ${x1},${y0 + r} V${y1} Z" fill="${fuellung}"${blass ? ' fill-opacity="0.4"' : ""}></path>`;
+    };
+    let marken = "";
+    monate.forEach((m, i) => {
+      const g0 = links + i * gruppe;
+      const xJ = g0 + (gruppe - bJ - (vorjahr ? bV + 2 : 0)) / 2;
+      const v = vorjahr ? vorjahr[i] : null;
+      const titel = `${FIN_MONATSNAMEN_KURZ[i]} ${jahr}: ${m.tage ? zlMenge(m.menge, { art: zl.awArt }) : "–"}${v && v.tage ? ` · ${jahr - 1}: ${zlMenge(v.menge, { art: zl.awArt })}` : ""}`;
+      marken += `<g class="zl-aw-monat${zl.awMonat === i ? " aktiv" : ""}" onclick="zlAwMonat(${i})">
+        <title>${escapeHtml(titel)}</title>
+        ${zl.awMonat === i ? `<rect x="${g0 + 1}" y="${oben - 4}" width="${gruppe - 2}" height="${h + 4}" rx="6" fill="var(--ink)" fill-opacity="0.06"></rect>` : ""}
+        ${balken(xJ, m.menge, bJ, info.farbe, m.tage && !zlVoll(m))}
+        ${v ? balken(xJ + bJ + 2, v.menge, bV, "var(--ink-dim)", true) : ""}
+        <rect x="${g0}" y="${oben}" width="${gruppe}" height="${h + unten}" fill="transparent"></rect>
+        <text x="${(g0 + gruppe / 2).toFixed(1)}" y="${hoehe - 6}" font-size="10" fill="var(--ink-dim)" text-anchor="middle">${FIN_MONATSNAMEN_KURZ[i]}</text>
+      </g>`;
+    });
+    return `<svg class="zl-aw-svg" viewBox="0 0 ${breite} ${hoehe}" role="img" aria-label="${escapeAttr(`${ZL_AW_WORT[zl.awArt]} je Monat ${jahr} in ${einheit}${vorjahr ? `, daneben ${jahr - 1}` : ""}`)}">
+      <text x="${links - 6}" y="${oben - 6}" font-size="10" fill="var(--ink-dim)" text-anchor="end">${einheit}</text>
+      ${raster}${marken}
+    </svg>`;
+  }
+
+  window.zlAwArt = function(a) { zl.awArt = a; zl.awMonat = null; renderZaehler(); };
+  window.zlAwJahr = function(r) {
+    const jahre = zlJahre(zl.awArt);
+    const i = jahre.indexOf(zl.awJahr) + r;
+    if (i >= 0 && i < jahre.length) { zl.awJahr = jahre[i]; zl.awMonat = null; renderZaehler(); }
+  };
+  window.zlAwMonat = function(i) { zl.awMonat = zl.awMonat === i ? null : i; renderZaehler(); };
 
   // Legt Strom Bezug, Einspeisung, PV-Erzeugung und Wasser an
   window.zlVorschlagAnlegen = async function() {
