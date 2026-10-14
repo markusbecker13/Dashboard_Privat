@@ -2185,3 +2185,36 @@
 
 /* NFC-Tags (seit Session 63) */
 .nfc-link { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; word-break: break-all; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-klein); padding: 0.5rem 0.6rem; margin: 0 0 0.5rem; }
+
+/* Zähler (seit Session 66): Ablesen, Zähler-Karten */
+.zl-ablesen { border: 1px solid var(--border); border-radius: 12px; padding: 0.4rem 0.85rem 0.6rem; margin: 0 0 1rem; background: var(--panel); }
+.zl-ablesen-kopf { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.zl-ablesen-kopf .std-zwischen { margin: 0.5rem auto 0.5rem 0; }
+.zl-datum { min-height: 44px; }
+.zl-ablesen-zeile { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.2rem 0.6rem; align-items: center; border-left: 4px solid var(--border); padding: 0.45rem 0 0.45rem 0.6rem; margin: 0.35rem 0; }
+.zl-ablesen-label { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.zl-name { font-weight: 600; }
+.zl-ablesen-feld { display: flex; align-items: center; gap: 0.35rem; }
+.zl-ablesen-feld input { width: 9rem; flex: 0 0 auto; min-height: 44px; text-align: right; font-variant-numeric: tabular-nums; font-size: 1rem; }
+.zl-einheit { color: var(--ink-dim); font-size: var(--fs-klein); font-weight: 500; min-width: 2.2em; }
+.zl-hinweis { grid-column: 1 / -1; min-height: 0; }
+.zl-hinweis:empty { display: none; }
+.zl-hinweis.zl-fehler { color: var(--overdue-text); font-weight: 600; }
+.zl-hinweis.zl-warnung { color: var(--today-text); font-weight: 600; }
+.zl-ablesen-feld input[aria-invalid="true"] { border-color: var(--overdue-border); }
+.zl-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: 0.6rem; margin: 0.4rem 0 0.8rem; }
+.zl-karte { background: var(--panel); }
+.zl-karte-kopf { display: flex; align-items: center; gap: 0.4rem; }
+.zl-karte-kopf .std-saldo-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.zl-stift { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.zl-karte .std-saldo-wert { font-variant-numeric: tabular-nums; }
+.zl-verlauf { margin-top: 0.4rem; }
+.zl-verlauf summary { cursor: pointer; padding: 0.7rem 0; font-weight: 600; font-size: var(--fs-klein); }
+.zl-verlauf-liste { max-height: 22rem; overflow-y: auto; }
+.zl-ablesung { font-size: 0.9rem; }
+.zl-ab-datum { flex: 0 0 auto; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.zl-ablesung .ic { vertical-align: -0.18em; width: 1em; height: 1em; }
+@media (max-width: 360px) {
+  .zl-ablesen-zeile { grid-template-columns: 1fr; }
+  .zl-ablesen-feld input { width: 100%; flex: 1 1 auto; }
+}
