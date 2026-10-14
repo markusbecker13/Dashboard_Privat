@@ -1020,6 +1020,23 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
+            <summary>Zähler <span class="anleitung-nur">(seit Session 66; nur Privat, unter „Planen“)</span></summary>
+            <div class="anleitung-text">
+              <p>Zählerstände für Strom-Bezug, Strom-Einspeisung, PV-Erzeugung und Wasser erfassen. Die App rechnet daraus den Verbrauch zwischen zwei Ablesungen – die Abstände dürfen unregelmäßig sein.</p>
+              <ul>
+                <li><strong>Zähler anlegen:</strong> beim ersten Öffnen „Die vier üblichen anlegen“ oder einzeln über „+ Zähler“. Je Zähler Name, Art (Strom/PV in kWh, Wasser in m³), Zählernummer und Notiz. Zwei PV-Wechselrichter = zwei PV-Zähler; die Auswertung zählt sie später zusammen. Zähler mit Ablesungen lassen sich nicht löschen, nur archivieren</li>
+                <li><strong>Ablesen:</strong> oben das Datum (Standard heute, nichts in der Zukunft), dann bei jedem Zähler den Stand eintippen – Komma oder Punkt, ohne Tausenderpunkte. Leere Felder werden übersprungen. Unter dem Feld steht sofort „+ Menge in x Tagen · Ø pro Tag“ (Wasser in Litern pro Tag). Gibt es am Tag schon eine Ablesung, wird sie ersetzt</li>
+                <li><strong>Prüfung:</strong> Ein Stand kleiner als der vorige (oder größer als ein späterer) wird nicht gespeichert – entweder Tippfehler oder der Zähler wurde getauscht. Ist der Verbrauch je Tag mehr als dreimal so hoch wie dein bisheriger Durchschnitt (ab 14 Tagen Daten), fragt die App nach</li>
+                <li><strong>Zähler-Karten:</strong> letzter Stand mit Datum, Verbrauch seit der Vorablesung, Durchschnitt über alles. „Ablesungen“ klappt alle auf, neueste oben, mit der Menge seit der vorigen. Antippen = ändern oder löschen</li>
+                <li><strong>Nachtragen:</strong> einzelne Ablesung mit beliebigem Datum, z. B. Werte von der letzten Jahresabrechnung</li>
+                <li><strong>Zählerwechsel:</strong> tauscht der Netzbetreiber oder Wasserversorger den Zähler, unter „Ablesungen“ → „Zählerwechsel“: Tag, Endstand des alten Zählers (steht im Wechselprotokoll), Startstand des neuen (meist 0), optional die neue Zählernummer. Der Verbrauch bis zum Wechsel zählt mit dem Endstand, danach rechnet die App mit dem neuen Zähler weiter</li>
+                <li>Noch nicht drin (nächste Etappen): Diagramme je Monat und Vorjahresvergleich, Tarife mit Kosten- und Abschlags-Hochrechnung, Eigenverbrauchs- und Autarkiequote, Erinnerung zum Ablesen</li>
+                <li>Gesichert über Export → Backup wie alle anderen Daten</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
             <summary>Ideen <span class="anleitung-nur">(Standard: OGS, AWO und Business, per Reiter-Verwaltung auch Privat)</span></summary>
             <div class="anleitung-text">
               <p>Sammlung für Angebots- und Projektideen, getrennt nach Bereich.</p>
@@ -1720,6 +1737,12 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <h1>Stunden <button class="hilfe-icon" data-hilfe="Arbeits- und Ehrenamtsstunden je Kategorie (z. B. OGS, AWO Vorstand, Business) – gemeinsam für alle Bereiche, oben nach Bereich filtern. „+ Eintrag“: Kategorie, Datum, von–bis (über Mitternacht geht), Pause in Minuten. Kategorien mit Soll (Stunden pro Woche, verteilt auf die gewählten Arbeitstage, mit „gilt ab“) zeigen Plus-/Minusstunden: oben der Saldo seit Beginn, unten Ist/Soll/± für Woche, Monat oder Jahr. Feiertage in NRW zieht die App selbst ab, Urlaub, krank und frei trägst du unter „Abwesenheit“ ein – sie senken das Soll. Ehrenamt ohne Soll zählt nur Ist-Stunden. Eintrag antippen = bearbeiten; ‹ › blättern, Datum antippen springt zu heute. „Start“ misst die Zeit live (Pause, Stopp → Eintrag), im „+“-Blatt geht „Stunden“ als Text (z. B. „OGS 11:30–15:45“); unten Excel und Drucken für den angezeigten Zeitraum.">?</button></h1>
         <p class="hero-text">Arbeits- und Ehrenamtsstunden – mit Soll, Plus- und Minusstunden.</p>
         <div id="stunden-inhalt"></div>
+      </div>
+
+      <div id="view-zaehler" class="hidden">
+        <h1>Zähler <button class="hilfe-icon" data-hilfe="Strom (Bezug und Einspeisung), PV-Erzeugung und Wasser – nur in Privat. Oben „Ablesen“: Datum wählen (Standard heute), bei jedem Zähler den Stand eintippen (Komma oder Punkt), „Speichern“ – leere Felder werden übersprungen. Unter jedem Feld steht sofort der Verbrauch seit der letzten Ablesung; ist der Stand kleiner als vorher, wird nicht gespeichert, ist der Verbrauch mehr als dreimal so hoch wie sonst, fragt die App nach. Darunter je Zähler der letzte Stand und der Verbrauch seit der Vorablesung; „Ablesungen“ klappt alle auf (antippen = ändern oder löschen), dort auch „Nachtragen“ und „Zählerwechsel“ (Endstand alt, Startstand neu). Diagramme, Kosten und PV-Quoten folgen.">?</button></h1>
+        <p class="hero-text">Strom, Einspeisung, PV und Wasser – Zählerstände ablesen, Verbrauch sehen.</p>
+        <div id="zaehler-inhalt"></div>
       </div>
 
       <div id="view-schluessel" class="hidden">
