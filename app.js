@@ -5540,6 +5540,8 @@
     speichert: false,
     // Auswertung (seit Session 67): Art, Jahr, angetippter Monat (0–11)
     awArt: null, awJahr: null, awMonat: null,
+    // Tarife (seit Session 68)
+    tarife: [], tarifeFehlt: false, pvJahr: null,
   };
   // Art → Name, Einheit, Farbe
   const ZL_ARTEN = {
@@ -5559,6 +5561,9 @@
       zl.fehlt = !!r.fehlt;
       zl.zaehler = r.zaehler || [];
       zl.ablesungen = (r.ablesungen || []).map((a) => ({ ...a, stand: Number(a.stand), stand_alt: a.stand_alt === null || a.stand_alt === undefined ? null : Number(a.stand_alt) }));
+      zl.tarife = (r.tarife || []).map((t) => ({ ...t, preis: Number(t.preis), grundpreis_monat: Number(t.grundpreis_monat) || 0,
+        abschlag_monat: t.abschlag_monat === null || t.abschlag_monat === undefined ? null : Number(t.abschlag_monat), abschlaege_jahr: Number(t.abschlaege_jahr) || 12 }));
+      zl.tarifeFehlt = !!r.tarife_fehlt;
       zl.geladen = true;
       zlArtCache.clear();
     } catch (e) {
@@ -5661,6 +5666,8 @@
     el.innerHTML = `
       ${zlAblesenHtml(aktiv)}
       ${zlAuswertungHtml()}
+      ${zlPvBilanzHtml()}
+      ${zlTarifeHtml()}
       <h2 class="std-zwischen">Deine Zähler</h2>
       <div class="zl-liste">${aktiv.map(zlKarteHtml).join("") || `<p class="empty-text">Alle Zähler sind archiviert.</p>`}</div>
       <div class="reiter-aktionen bib-aktionen">
@@ -5868,12 +5875,13 @@
     const tage = zlArtTage(art);
     return Array.from({ length: 12 }, (_, i) => {
       const alle = zlTageImMonat(jahr, i + 1);
-      let menge = 0, anzahl = 0;
+      let menge = 0, anzahl = 0, euro = 0;
+      const mitPreis = ZL_TARIF_ARTEN.includes(art) && zl.tarife.some((x) => x.art === art);
       for (let t = 1; t <= alle; t++) {
         const d = `${jahr}-${String(i + 1).padStart(2, "0")}-${String(t).padStart(2, "0")}`;
-        if (tage.has(d)) { menge += tage.get(d); anzahl++; }
+        if (tage.has(d)) { menge += tage.get(d); anzahl++; if (mitPreis) euro += zlEuroTag(art, d, tage.get(d)); }
       }
-      return { menge, tage: anzahl, alle };
+      return { menge, tage: anzahl, alle, euro: mitPreis ? euro : null };
     });
   }
   function zlVoll(m) { return m.tage === m.alle; }
@@ -5921,6 +5929,9 @@
     const vorjahr = zlMonate(art, jahr - 1);
     const hatVorjahr = vorjahr.some((m) => m.tage > 0);
     const summe = monate.reduce((s, m) => s + m.menge, 0);
+    const mitEuro = monate.some((m) => m.euro !== null);
+    const euroSumme = monate.reduce((s, m) => s + (m.euro || 0), 0);
+    const euroWort = art === "strom_einspeisung" ? "Vergütung" : "Kosten";
     const tageSumme = monate.reduce((s, m) => s + m.tage, 0);
     const gz = zlGleicherZeitraum(art, jahr);
     const wort = ZL_AW_WORT[art];
@@ -5937,6 +5948,7 @@
       return `<tr><td>${FIN_MONATSNAMEN_KURZ[i]}</td>
         <td>${m.tage ? zlMenge(m.menge, dummy) + teil(m) : "–"}</td>
         <td>${m.tage ? zlProTag(m.menge / m.tage, dummy).replace("/Tag", "") : "–"}</td>
+        ${mitEuro ? `<td>${m.tage ? zlEuro(m.euro, 0) : "–"}</td>` : ""}
         <td>${v.tage ? zlMenge(v.menge, dummy) + teil(v) : "–"}</td>
         <td>${delta || "–"}</td></tr>`;
     }).join("");
@@ -5951,6 +5963,7 @@
       <div class="zl-aw-kopf">
         <span class="std-saldo-wert">${zlMenge(summe, dummy)}</span>
         <span class="notiz-meta">${wort} ${jahr} an ${tageSumme} abgelesenen Tagen${tageSumme ? ` · Ø ${zlProTag(summe / tageSumme, dummy)}` : ""}</span>
+        ${mitEuro ? `<span class="notiz-meta">${euroWort} dafür: <strong>${zlEuro(euroSumme, 0)}</strong>${art === "strom_einspeisung" ? "" : " inkl. Grundpreis"}</span>` : ""}
         ${vergleich}
       </div>
       ${zlAwChartSvg(monate, hatVorjahr ? vorjahr : null, info, jahr)}
@@ -5963,7 +5976,7 @@
       <details class="zl-verlauf">
         <summary>Als Tabelle</summary>
         <div class="zl-tabelle-wrap"><table class="std-tabelle zl-tabelle">
-          <thead><tr><th>Monat</th><th>${jahr}</th><th>Ø/Tag</th><th>${jahr - 1}</th><th>±</th></tr></thead>
+          <thead><tr><th>Monat</th><th>${jahr}</th><th>Ø/Tag</th>${mitEuro ? `<th>€</th>` : ""}<th>${jahr - 1}</th><th>±</th></tr></thead>
           <tbody>${zeilen}</tbody>
         </table></div>
         <p class="notiz-meta">* Monat nur teilweise abgelesen. ± nur bei vollständig abgelesenen Monaten. Zwischen zwei Ablesungen verteilt die App den Verbrauch gleichmäßig auf die Tage – bei langen Abständen sind Monatswerte daher geschätzt.</p>
@@ -6037,6 +6050,302 @@
     if (i >= 0 && i < jahre.length) { zl.awJahr = jahre[i]; zl.awMonat = null; renderZaehler(); }
   };
   window.zlAwMonat = function(i) { zl.awMonat = zl.awMonat === i ? null : i; renderZaehler(); };
+
+  // ---- Tarife, Kosten, Abschlag, PV-Bilanz (seit Session 68, Etappe 3) ----
+  // Preise werden in € je kWh bzw. m³ gespeichert; im Blatt Strom in ct/kWh.
+  const ZL_TARIF_ARTEN = ["strom_bezug", "strom_einspeisung", "wasser"];
+  function zlEuro(n, stellen = 2) {
+    return Number(n).toLocaleString("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: stellen, maximumFractionDigits: stellen });
+  }
+  function zlTarife(art) {
+    return zl.tarife.filter((t) => t.art === art).sort((a, b) => String(a.gueltig_ab).localeCompare(String(b.gueltig_ab)));
+  }
+  // Tarif an einem Tag; vor dem ersten Tarif gilt der erste (geschätzt)
+  function zlTarifAm(art, tag) {
+    const liste = zlTarife(art);
+    if (!liste.length) return null;
+    let t = liste[0];
+    for (const x of liste) { if (x.gueltig_ab <= tag) t = x; else break; }
+    return t;
+  }
+  function zlGrundTag(t) { return t ? (Number(t.grundpreis_monat) || 0) * 12 / 365 : 0; }
+  // Euro für einen Tag: Menge × Preis (+ Grundpreis anteilig, außer Einspeisung)
+  function zlEuroTag(art, tag, menge) {
+    const t = zlTarifAm(art, tag);
+    if (!t) return 0;
+    return menge * Number(t.preis) + (art === "strom_einspeisung" ? 0 : zlGrundTag(t));
+  }
+  function zlMonatPlus(iso, n) {
+    const j = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)) - 1 + n, t = Number(iso.slice(8, 10));
+    const jj = j + Math.floor(m / 12), mm = ((m % 12) + 12) % 12;
+    const tt = Math.min(t, zlTageImMonat(jj, mm + 1));
+    return `${jj}-${String(mm + 1).padStart(2, "0")}-${String(tt).padStart(2, "0")}`;
+  }
+
+  // Abschlags-Hochrechnung für das laufende Abrechnungsjahr (Bezug, Wasser)
+  function zlHochrechnung(art) {
+    const liste = zlTarife(art);
+    const mitBeginn = liste.filter((t) => t.abrechnung_beginn).pop();
+    if (!mitBeginn) return { fehlt: "beginn" };
+    const heute = heuteISO();
+    let start = mitBeginn.abrechnung_beginn;
+    while (zlMonatPlus(start, 12) <= heute) start = zlMonatPlus(start, 12);
+    while (start > heute) start = zlMonatPlus(start, -12);
+    const ende = zlMonatPlus(start, 12);
+    const tage = zlArtTage(art);
+    // Schnitt: erst aus dem Abrechnungsjahr, sonst aus allen Daten
+    let summe = 0, anzahl = 0;
+    for (const [d, v] of tage) if (d >= start && d < ende) { summe += v; anzahl++; }
+    let schnitt = anzahl >= 14 ? summe / anzahl : null;
+    if (schnitt === null && tage.size >= 14) { let s = 0; for (const v of tage.values()) s += v; schnitt = s / tage.size; }
+    const nVorjahr = (() => { let n = 0; for (let d = start; d < ende; d = addTage(d, 1)) if (!tage.has(d) && tage.has(zlMonatPlus(d, -12))) n++; return n; })();
+    if (schnitt === null && !nVorjahr) return { fehlt: "daten", start, ende };
+    let menge = 0, kosten = 0, kostenBisher = 0, gemessen = 0, vorjahr = 0, geschaetzt = 0;
+    for (let d = start; d < ende; d = addTage(d, 1)) {
+      let v;
+      if (tage.has(d)) { v = tage.get(d); gemessen++; }
+      else if (tage.has(zlMonatPlus(d, -12))) { v = tage.get(zlMonatPlus(d, -12)); vorjahr++; }
+      else { v = schnitt || 0; geschaetzt++; }
+      menge += v;
+      const e = zlEuroTag(art, d, v);
+      kosten += e;
+      if (d <= heute) kostenBisher += e;
+    }
+    // Abschläge: n Zahlungen ab Beginn im Monatsabstand, Betrag laut gültigem Tarif
+    const n = Number((zlTarifAm(art, start) || mitBeginn).abschlaege_jahr) || 12;
+    let abschlaege = 0, bezahlt = 0, ohneAbschlag = false;
+    for (let k = 0; k < n; k++) {
+      const tag = zlMonatPlus(start, k);
+      const t = zlTarifAm(art, tag);
+      const a = t && t.abschlag_monat !== null && t.abschlag_monat !== undefined ? Number(t.abschlag_monat) : null;
+      if (a === null) { ohneAbschlag = true; continue; }
+      abschlaege += a;
+      if (tag <= heute) bezahlt += a;
+    }
+    const tageGesamt = zlTage(start, ende);
+    return { start, ende, menge, kosten, kostenBisher, abschlaege, bezahlt, n, ohneAbschlag, gemessen, vorjahr, geschaetzt, tageGesamt,
+      saldo: abschlaege - kosten, empfehlung: kosten / n };
+  }
+
+  function zlTarifText(t) {
+    if (!t) return "";
+    const preis = t.art === "wasser" ? `${zlEuro(t.preis)} je m³` : `${zlFmt(Number(t.preis) * 100, 2)} ct/kWh`;
+    const teile = [t.art === "strom_einspeisung" ? `Vergütung ${preis}` : `Arbeitspreis ${preis}`];
+    if (Number(t.grundpreis_monat)) teile.push(`Grundpreis ${zlEuro(t.grundpreis_monat)}/Monat`);
+    if (t.abschlag_monat !== null && t.abschlag_monat !== undefined) teile.push(`Abschlag ${zlEuro(t.abschlag_monat)} × ${t.abschlaege_jahr || 12}`);
+    return teile.join(" · ");
+  }
+
+  function zlTarifeHtml() {
+    const hatArt = (a) => zl.zaehler.some((z) => z.art === a);
+    const arten = ZL_TARIF_ARTEN.filter(hatArt);
+    if (!arten.length) return "";
+    if (zl.tarifeFehlt) {
+      return `<section class="zl-aw fin-chart-wrap"><h2 class="std-zwischen">Tarife &amp; Abschlag</h2>
+        <p class="notiz-meta">Für Tarife bitte <code>zaehler_tarife_setup.sql</code> ausführen und die neue <code>index.ts</code> einspielen.</p></section>`;
+    }
+    const heute = heuteISO();
+    const karten = arten.map((art) => {
+      const info = ZL_ARTEN[art];
+      const liste = zlTarife(art);
+      const aktuell = zlTarifAm(art, heute);
+      const geplant = liste.filter((t) => t.gueltig_ab > heute);
+      let hr = "";
+      if (aktuell && art !== "strom_einspeisung") {
+        const h = zlHochrechnung(art);
+        if (h.fehlt === "beginn") hr = `<p class="notiz-meta">Für die Hochrechnung im Tarif „Abrechnungsjahr beginnt am“ eintragen.</p>`;
+        else if (h.fehlt === "daten") hr = `<p class="notiz-meta">Hochrechnung ab 14 abgelesenen Tagen (Abrechnungsjahr ${datumDe(h.start)} – ${datumDe(addTage(h.ende, -1))}).</p>`;
+        else {
+          const plus = h.saldo >= 0;
+          const quellen = [`${h.gemessen} Tage abgelesen`, h.vorjahr ? `${h.vorjahr} Tage wie im Vorjahr` : "", h.geschaetzt ? `${h.geschaetzt} Tage mit Ø geschätzt` : ""].filter(Boolean).join(", ");
+          hr = `<div class="zl-hr">
+            <span class="notiz-meta">Abrechnungsjahr ${datumDe(h.start)} – ${datumDe(addTage(h.ende, -1))}</span>
+            ${h.ohneAbschlag && !h.abschlaege ? `<span class="notiz-meta">Kein Abschlag eingetragen.</span>` : `
+            <span class="zl-hr-ergebnis ${plus ? "std-plus" : "std-minus"}">${plus ? "Voraussichtlich Guthaben" : "Voraussichtlich Nachzahlung"} ${zlEuro(Math.abs(h.saldo), 0)}</span>`}
+            <span class="notiz-meta">Kosten hochgerechnet ${zlEuro(h.kosten, 0)} für ${zlMenge(h.menge, { art })}${h.abschlaege ? ` · Abschläge ${zlEuro(h.abschlaege, 0)}` : ""}</span>
+            <span class="notiz-meta">Bisher: Kosten ${zlEuro(h.kostenBisher, 0)}${h.abschlaege ? `, gezahlt ${zlEuro(h.bezahlt, 0)}` : ""} · passender Abschlag ≈ ${zlEuro(Math.ceil(h.empfehlung), 0)}</span>
+            <span class="notiz-meta zl-hr-quelle">${escapeHtml(quellen)}</span>
+          </div>`;
+        }
+      }
+      const verlauf = liste.slice().reverse().map((t) => `<button type="button" class="std-eintrag zl-ablesung" onclick="blattOeffnen('ztarif','${escapeAttr(String(t.id))}')">
+          <span class="zl-ab-datum">ab ${datumDe(t.gueltig_ab)}</span>
+          <span class="std-eintrag-text">${escapeHtml(zlTarifText(t))}${t.anbieter ? ` <span class="notiz-meta">· ${escapeHtml(t.anbieter)}</span>` : ""}</span>
+        </button>`).join("");
+      return `<div class="std-saldo-karte zl-karte" style="border-left-color:${info.farbe}">
+        <div class="zl-karte-kopf"><span class="std-saldo-name">${escapeHtml(info.name)}</span>${aktuell && aktuell.anbieter ? `<span class="badge">${escapeHtml(aktuell.anbieter)}</span>` : ""}</div>
+        ${aktuell ? `<span class="notiz-meta">${escapeHtml(zlTarifText(aktuell))}${aktuell.gueltig_ab > heute ? " (gilt erst ab " + datumDe(aktuell.gueltig_ab) + ")" : ""}</span>` : `<span class="notiz-meta">Noch kein Tarif.</span>`}
+        ${geplant.length && aktuell && aktuell.gueltig_ab <= heute ? `<span class="notiz-meta">Geplant: ab ${datumDe(geplant[0].gueltig_ab)} ${escapeHtml(zlTarifText(geplant[0]))}</span>` : ""}
+        ${hr}
+        ${liste.length ? `<details class="zl-verlauf">
+          <summary>Tarife (${liste.length})</summary>
+          <div class="zl-verlauf-liste">${verlauf || `<p class="notiz-meta">Noch keine.</p>`}</div>
+          <div class="reiter-aktionen bib-aktionen">
+            <button type="button" class="btn-secondary" onclick="zlTarifNeu('${art}')">${ic("plus")}Neuer Preisstand</button>
+          </div>
+        </details>` : `<div class="reiter-aktionen bib-aktionen"><button type="button" class="btn-secondary" onclick="zlTarifNeu('${art}')">${ic("plus")}Tarif eintragen</button></div>`}
+      </div>`;
+    }).join("");
+    return `<section class="zl-tarife" aria-label="Tarife und Abschlag">
+      <h2 class="std-zwischen">Tarife &amp; Abschlag</h2>
+      <div class="zl-liste">${karten}</div>
+    </section>`;
+  }
+
+  // Neuer Preisstand: Werte des letzten Tarifs der Art vorbelegen
+  window.zlTarifNeu = function(art) {
+    const letzter = zlTarife(art).pop();
+    blattNeu("ztarif", letzter ? { ...letzter, id: undefined, gueltig_ab: heuteISO() } : { art });
+  };
+
+  // ---- PV-Bilanz: Eigenverbrauch und Autarkie ----
+  // Je Tag, an dem Erzeugung, Einspeisung und Bezug abgelesen sind:
+  // Eigenverbrauch = Erzeugung − Einspeisung, Verbrauch = Bezug + Eigenverbrauch.
+  function zlPvMonate(jahr) {
+    const E = zlArtTage("pv_erzeugung"), F = zlArtTage("strom_einspeisung"), B = zlArtTage("strom_bezug");
+    const monate = Array.from({ length: 12 }, () => ({ e: 0, f: 0, b: 0, tage: 0, ersparnis: 0, erloes: 0 }));
+    for (const [d, e] of E) {
+      if (!d.startsWith(jahr + "-") || !F.has(d) || !B.has(d)) continue;
+      const m = monate[Number(d.slice(5, 7)) - 1];
+      const f = F.get(d), b = B.get(d);
+      const eigen = Math.max(0, e - f);
+      m.e += e; m.f += f; m.b += b; m.tage++;
+      const tb = zlTarifAm("strom_bezug", d), tf = zlTarifAm("strom_einspeisung", d);
+      if (tb) m.ersparnis += eigen * Number(tb.preis);
+      if (tf) m.erloes += f * Number(tf.preis);
+    }
+    return monate;
+  }
+  function zlPvJahre() {
+    const E = zlArtTage("pv_erzeugung"), F = zlArtTage("strom_einspeisung"), B = zlArtTage("strom_bezug");
+    const jahre = new Set();
+    for (const d of E.keys()) if (F.has(d) && B.has(d)) jahre.add(Number(d.slice(0, 4)));
+    return [...jahre].sort();
+  }
+  function zlQuote(teil, ganz) { return ganz > 0 ? Math.round((teil / ganz) * 100) : null; }
+
+  function zlPvBilanzHtml() {
+    const braucht = ["pv_erzeugung", "strom_einspeisung", "strom_bezug"];
+    if (!braucht.every((a) => zl.zaehler.some((z) => z.art === a))) return "";
+    const jahre = zlPvJahre();
+    if (!jahre.length) {
+      return `<section class="zl-aw fin-chart-wrap" aria-label="PV-Bilanz"><h2 class="std-zwischen">PV-Bilanz</h2>
+        <p class="notiz-meta">Eigenverbrauch und Autarkie erscheinen, sobald Erzeugung, Einspeisung und Bezug für dieselben Tage abgelesen sind – am besten alle drei am selben Tag ablesen.</p></section>`;
+    }
+    if (!jahre.includes(zl.pvJahr)) zl.pvJahr = jahre[jahre.length - 1];
+    const jahr = zl.pvJahr;
+    const idx = jahre.indexOf(jahr);
+    const monate = zlPvMonate(jahr);
+    const s = monate.reduce((a, m) => ({ e: a.e + m.e, f: a.f + m.f, b: a.b + m.b, tage: a.tage + m.tage, ersparnis: a.ersparnis + m.ersparnis, erloes: a.erloes + m.erloes }),
+      { e: 0, f: 0, b: 0, tage: 0, ersparnis: 0, erloes: 0 });
+    const eigen = Math.max(0, s.e - s.f);
+    const verbrauch = s.b + eigen;
+    const evq = zlQuote(eigen, s.e), aut = zlQuote(eigen, verbrauch);
+    const kwh = (n) => `${zlFmt(n, 0)} kWh`;
+    const hatBezugTarif = zlTarife("strom_bezug").length > 0, hatVerg = zlTarife("strom_einspeisung").length > 0;
+    const zeilen = monate.map((m, i) => {
+      if (!m.tage) return "";
+      const ei = Math.max(0, m.e - m.f);
+      return `<tr><td>${FIN_MONATSNAMEN_KURZ[i]}${m.tage < zlTageImMonat(jahr, i + 1) ? '<span class="zl-teil">*</span>' : ""}</td>
+        <td>${zlFmt(m.e, 0)}</td><td>${zlFmt(ei, 0)}</td><td>${zlFmt(m.b + ei, 0)}</td>
+        <td>${zlQuote(ei, m.e) ?? "–"} %</td><td>${zlQuote(ei, m.b + ei) ?? "–"} %</td></tr>`;
+    }).join("");
+    const balken = (wert, farbe, text) => `<div class="zl-pv-quote">
+        <div class="zl-pv-quote-kopf"><span>${text}</span><strong>${wert === null ? "–" : wert + " %"}</strong></div>
+        <div class="zl-pv-spur" role="presentation"><span style="width:${Math.max(0, Math.min(100, wert || 0))}%;background:${farbe}"></span></div>
+      </div>`;
+    return `<section class="zl-aw fin-chart-wrap" aria-label="PV-Bilanz">
+      <h2 class="std-zwischen">PV-Bilanz</h2>
+      <div class="std-nav">
+        <button type="button" class="btn-secondary ern-pfeil" onclick="zlPvJahr(-1)" aria-label="Jahr zurück"${idx > 0 ? "" : " disabled"}>${ic("zurueck")}</button>
+        <span class="std-nav-text zl-aw-jahr">${jahr}</span>
+        <button type="button" class="btn-secondary ern-pfeil" onclick="zlPvJahr(1)" aria-label="Jahr weiter"${idx < jahre.length - 1 ? "" : " disabled"}>${ic("weiter")}</button>
+      </div>
+      <p class="notiz-meta">${s.tage} Tage, an denen alle drei Zähler abgelesen sind.</p>
+      ${balken(aut, ZL_ARTEN.pv_erzeugung.farbe, "Autarkie – so viel deines Stroms kam vom Dach")}
+      ${balken(evq, ZL_ARTEN.strom_einspeisung.farbe, "Eigenverbrauch – so viel des PV-Stroms hast du selbst genutzt")}
+      <dl class="zl-pv-zahlen">
+        <div><dt>Erzeugt</dt><dd>${kwh(s.e)}</dd></div>
+        <div><dt>Selbst genutzt</dt><dd>${kwh(eigen)}</dd></div>
+        <div><dt>Eingespeist</dt><dd>${kwh(s.f)}</dd></div>
+        <div><dt>Aus dem Netz</dt><dd>${kwh(s.b)}</dd></div>
+        <div><dt>Verbrauch gesamt</dt><dd>${kwh(verbrauch)}</dd></div>
+        ${hatBezugTarif ? `<div><dt>Gespart (nicht gekauft)</dt><dd>${zlEuro(s.ersparnis, 0)}</dd></div>` : ""}
+        ${hatVerg ? `<div><dt>Einspeisevergütung</dt><dd>${zlEuro(s.erloes, 0)}</dd></div>` : ""}
+      </dl>
+      ${!hatVerg ? `<p class="notiz-meta">Mit einem Tarif für die Einspeisung (Vergütung je kWh) steht hier auch der Erlös.</p>` : ""}
+      <details class="zl-verlauf">
+        <summary>Je Monat</summary>
+        <div class="zl-tabelle-wrap"><table class="std-tabelle zl-tabelle">
+          <thead><tr><th>Monat</th><th>Erzeugt</th><th>Selbst</th><th>Verbrauch</th><th>Eigen&shy;verbr.</th><th>Autarkie</th></tr></thead>
+          <tbody>${zeilen}</tbody>
+        </table></div>
+        <p class="notiz-meta">kWh. * Monat nur teilweise abgelesen. Ohne Speicher gilt: selbst genutzt = erzeugt − eingespeist. Kommt ein Batteriespeicher dazu, zählen seine Lade-/Entladeverluste mit hinein.</p>
+      </details>
+    </section>`;
+  }
+  window.zlPvJahr = function(r) {
+    const jahre = zlPvJahre();
+    const i = jahre.indexOf(zl.pvJahr) + r;
+    if (i >= 0 && i < jahre.length) { zl.pvJahr = jahre[i]; renderZaehler(); }
+  };
+
+  BLATT_ARTEN.ztarif = {
+    titel: "Tarif bearbeiten",
+    titelNeu: "Tarif eintragen",
+    finden: (id) => zl.tarife.find((t) => String(t.id) === String(id)),
+    laden: (t) => {
+      const art = t.art || "strom_bezug";
+      const preis = t.preis !== undefined && t.preis !== null ? (art === "wasser" ? Number(t.preis) : Number(t.preis) * 100) : null;
+      const zahl = (n, st) => (n === null || n === undefined || n === "" ? "" : zlFmt(Number(n), st).replace(/\./g, ""));
+      return {
+        id: t.id || "", art, gueltig_ab: t.gueltig_ab || heuteISO(),
+        preis: zahl(preis, art === "wasser" ? 4 : 3), grundpreis: zahl(t.grundpreis_monat, 2),
+        abschlag: zahl(t.abschlag_monat, 2), abschlaege: String(t.abschlaege_jahr || 12),
+        beginn: t.abrechnung_beginn || "", anbieter: t.anbieter || "", notiz: t.notiz || "",
+      };
+    },
+    felder: [
+      { key: "art", label: "Für", typ: "chips", wenn: (w) => !w.id, optionen: ZL_TARIF_ARTEN.map((a) => [a, ZL_ARTEN[a].name]) },
+      { key: "gueltig_ab", label: "Gilt ab", typ: "datum", pflicht: true, hinweis: "Ändert sich der Preis, einen neuen Stand mit neuem Datum anlegen – frühere Tage behalten ihren Preis." },
+      { key: "preis", label: "Arbeitspreis (ct/kWh, brutto)", typ: "zahl", eingabe: "text", schritt: "any", pflicht: true, wenn: (w) => w.art === "strom_bezug", platzhalter: "z. B. 35,50" },
+      { key: "preis", label: "Einspeisevergütung (ct/kWh)", typ: "zahl", eingabe: "text", schritt: "any", pflicht: true, wenn: (w) => w.art === "strom_einspeisung", platzhalter: "z. B. 8,2",
+        hinweis: "Steht in der Abrechnung des Netzbetreibers; hängt vom Inbetriebnahme-Datum der Anlage ab." },
+      { key: "preis", label: "Preis je m³ (€, Wasser + Abwasser zusammen)", typ: "zahl", eingabe: "text", schritt: "any", pflicht: true, wenn: (w) => w.art === "wasser", platzhalter: "z. B. 4,85" },
+      { key: "grundpreis", label: "Grundpreis (€/Monat)", typ: "zahl", eingabe: "text", schritt: "any", wenn: (w) => w.art !== "strom_einspeisung", platzhalter: "0",
+        hinweis: "Bei Wasser alle Grundgebühren zusammen, auf den Monat umgerechnet." },
+      { key: "abschlag", label: "Abschlag (€ je Zahlung)", typ: "zahl", eingabe: "text", schritt: "any", wenn: (w) => w.art !== "strom_einspeisung", platzhalter: "leer = keiner" },
+      { key: "abschlaege", label: "Abschläge im Jahr", typ: "chips", wenn: (w) => w.art !== "strom_einspeisung" && w.abschlag !== "", optionen: [["12", "12"], ["11", "11"], ["4", "4 (vierteljährlich)"], ["1", "1"]] },
+      { key: "beginn", label: "Abrechnungsjahr beginnt am", typ: "datum", wenn: (w) => w.art !== "strom_einspeisung",
+        hinweis: "Ein beliebiges Jahr reicht, z. B. das Datum der letzten Zählerablesung für die Jahresabrechnung. Damit rechnet die App Guthaben oder Nachzahlung hoch." },
+      { key: "anbieter", label: "Anbieter / Tarif", typ: "text", platzhalter: "optional, z. B. Vattenfall ÖkoStrom24 Treue" },
+      { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional" },
+    ],
+    pruefen: (w) => {
+      const zahlOk = (t) => t === "" || Number.isFinite(zlZahl(t));
+      if (!Number.isFinite(zlZahl(w.preis))) return "Preis bitte als Zahl (Komma oder Punkt).";
+      if (w.art !== "wasser" && zlZahl(w.preis) > 500) return "Strompreis bitte in Cent je kWh (z. B. 35,50).";
+      if (!zahlOk(w.grundpreis) || !zahlOk(w.abschlag)) return "Grundpreis und Abschlag bitte als Zahl.";
+      return "";
+    },
+    speichern: (id, w) => {
+      const p = zlZahl(w.preis);
+      const einsp = w.art === "strom_einspeisung";
+      return api("zaehler_tarif_speichern", {
+        id, art: w.art, gueltig_ab: w.gueltig_ab,
+        preis: w.art === "wasser" ? p : Math.round(p * 1000) / 100000,
+        grundpreis_monat: einsp || w.grundpreis === "" ? 0 : zlZahl(w.grundpreis),
+        abschlag_monat: einsp || w.abschlag === "" ? null : zlZahl(w.abschlag),
+        abschlaege_jahr: Number(w.abschlaege) || 12,
+        abrechnung_beginn: einsp ? null : (w.beginn || null),
+        anbieter: w.anbieter, notiz: w.notiz,
+      });
+    },
+    loeschen: (id) => api("zaehler_tarif_loeschen", { id }),
+    loeschFrage: (t) => `Tarif ab ${datumDe(t.gueltig_ab || "")} löschen?`,
+    gespeichert: "Tarif gespeichert",
+    danach: () => { zlNeuLaden(); },
+  };
 
   // Legt Strom Bezug, Einspeisung, PV-Erzeugung und Wasser an
   window.zlVorschlagAnlegen = async function() {
@@ -15645,7 +15954,7 @@
     meldung("Lade Zähler …");
     try {
       const r = await api("zaehler_laden");
-      if (!r.fehlt) { liste.zaehler = r.zaehler || []; liste.zaehler_ablesungen = r.ablesungen || []; }
+      if (!r.fehlt) { liste.zaehler = r.zaehler || []; liste.zaehler_ablesungen = r.ablesungen || []; if (!r.tarife_fehlt) liste.zaehler_tarife = r.tarife || []; }
     } catch (e) {
       if (e.message === "unauthorized") throw e;
       luecken.push("Zähler: " + e.message);
@@ -15809,6 +16118,7 @@
     { k: "stunden_abwesenheiten", t: "stunden_abwesenheiten", name: "Stunden: Abwesenheiten", gruppe: "Stunden" },
     { k: "zaehler", t: "zaehler", name: "Zähler", gruppe: "Zähler" },
     { k: "zaehler_ablesungen", t: "zaehler_ablesungen", name: "Zähler: Ablesungen", gruppe: "Zähler" },
+    { k: "zaehler_tarife", t: "zaehler_tarife", name: "Zähler: Tarife", gruppe: "Zähler" },
     { k: "verlauf", t: "verlauf", name: "Verlauf (letzte 50 je Bereich)", gruppe: "Sonstiges", nurErg: true },
   ];
   const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Stunden", "Zähler", "Sonstiges"];
