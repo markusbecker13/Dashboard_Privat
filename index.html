@@ -1020,7 +1020,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Zähler <span class="anleitung-nur">(seit Session 66; nur Privat, unter „Planen“)</span></summary>
+            <summary>Zähler <span class="anleitung-nur">(seit Session 66/67; nur Privat, unter „Planen“)</span></summary>
             <div class="anleitung-text">
               <p>Zählerstände für Strom-Bezug, Strom-Einspeisung, PV-Erzeugung und Wasser erfassen. Die App rechnet daraus den Verbrauch zwischen zwei Ablesungen – die Abstände dürfen unregelmäßig sein.</p>
               <ul>
@@ -1030,7 +1030,10 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Zähler-Karten:</strong> letzter Stand mit Datum, Verbrauch seit der Vorablesung, Durchschnitt über alles. „Ablesungen“ klappt alle auf, neueste oben, mit der Menge seit der vorigen. Antippen = ändern oder löschen</li>
                 <li><strong>Nachtragen:</strong> einzelne Ablesung mit beliebigem Datum, z. B. Werte von der letzten Jahresabrechnung</li>
                 <li><strong>Zählerwechsel:</strong> tauscht der Netzbetreiber oder Wasserversorger den Zähler, unter „Ablesungen“ → „Zählerwechsel“: Tag, Endstand des alten Zählers (steht im Wechselprotokoll), Startstand des neuen (meist 0), optional die neue Zählernummer. Der Verbrauch bis zum Wechsel zählt mit dem Endstand, danach rechnet die App mit dem neuen Zähler weiter</li>
-                <li>Noch nicht drin (nächste Etappen): Diagramme je Monat und Vorjahresvergleich, Tarife mit Kosten- und Abschlags-Hochrechnung, Eigenverbrauchs- und Autarkiequote, Erinnerung zum Ablesen</li>
+                <li><strong>Auswertung</strong> (seit Session 67): oben die Art wählen (Bezug, Einspeisung, PV, Wasser – mehrere Zähler gleicher Art werden zusammengezählt), mit ‹ › das Jahr. Groß die Menge des Jahres an den abgelesenen Tagen, darunter der <em>gleiche Zeitraum im Vorjahr</em> mit ± in Prozent (nur Tage, die in beiden Jahren abgelesen sind, mindestens 14)</li>
+                <li><strong>Balken je Monat</strong> in der Farbe der Art, daneben schmal und grau das Vorjahr. Blass = Monat nur teilweise abgelesen. Balken antippen zeigt Menge, Ø pro Tag, Vorjahr und ± darunter. „Als Tabelle“ klappt alle Monate auf; ± nur bei vollständig abgelesenen Monaten</li>
+                <li><strong>So wird gerechnet:</strong> Der Verbrauch zwischen zwei Ablesungen wird gleichmäßig auf die Tage dazwischen verteilt. Bei monatlicher Ablesung passt das gut, bei langen Abständen (z. B. nur Jahresabrechnung) sind die Monatswerte geschätzt – Heizperiode oder Urlaub sieht man dann nicht. Mehrere Zähler einer Art bitte am selben Tag ablesen; ein Tag zählt nur, wenn jeder Zähler der Art ihn abdeckt</li>
+                <li>Noch nicht drin (nächste Etappen): Tarife mit Kosten- und Abschlags-Hochrechnung, Eigenverbrauchs- und Autarkiequote, Erinnerung zum Ablesen</li>
                 <li>Gesichert über Export → Backup wie alle anderen Daten</li>
               </ul>
             </div>
@@ -1740,7 +1743,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-zaehler" class="hidden">
-        <h1>Zähler <button class="hilfe-icon" data-hilfe="Strom (Bezug und Einspeisung), PV-Erzeugung und Wasser – nur in Privat. Oben „Ablesen“: Datum wählen (Standard heute), bei jedem Zähler den Stand eintippen (Komma oder Punkt), „Speichern“ – leere Felder werden übersprungen. Unter jedem Feld steht sofort der Verbrauch seit der letzten Ablesung; ist der Stand kleiner als vorher, wird nicht gespeichert, ist der Verbrauch mehr als dreimal so hoch wie sonst, fragt die App nach. Darunter je Zähler der letzte Stand und der Verbrauch seit der Vorablesung; „Ablesungen“ klappt alle auf (antippen = ändern oder löschen), dort auch „Nachtragen“ und „Zählerwechsel“ (Endstand alt, Startstand neu). Diagramme, Kosten und PV-Quoten folgen.">?</button></h1>
+        <h1>Zähler <button class="hilfe-icon" data-hilfe="Strom (Bezug und Einspeisung), PV-Erzeugung und Wasser – nur in Privat. Oben „Ablesen“: Datum wählen (Standard heute), bei jedem Zähler den Stand eintippen (Komma oder Punkt), „Speichern“ – leere Felder werden übersprungen. Unter jedem Feld steht sofort der Verbrauch seit der letzten Ablesung; ist der Stand kleiner als vorher, wird nicht gespeichert, ist der Verbrauch mehr als dreimal so hoch wie sonst, fragt die App nach. Darunter je Zähler der letzte Stand und der Verbrauch seit der Vorablesung; „Ablesungen“ klappt alle auf (antippen = ändern oder löschen), dort auch „Nachtragen“ und „Zählerwechsel“ (Endstand alt, Startstand neu). „Auswertung“: Art wählen (mehrere Zähler gleicher Art zusammengezählt), Jahr blättern; Balken je Monat, grau daneben das Vorjahr, Balken antippen für Details, Tabelle aufklappbar. Kosten und PV-Quoten folgen.">?</button></h1>
         <p class="hero-text">Strom, Einspeisung, PV und Wasser – Zählerstände ablesen, Verbrauch sehen.</p>
         <div id="zaehler-inhalt"></div>
       </div>
