@@ -121,7 +121,7 @@
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
     rezepte: "view-rezepte", ernaehrung: "view-ernaehrung", schluessel: "view-schluessel",
-    bibliothek: "view-bibliothek", lernen: "view-lernen", stunden: "view-stunden",
+    bibliothek: "view-bibliothek", lernen: "view-lernen", stunden: "view-stunden", zaehler: "view-zaehler",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -135,11 +135,11 @@
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
     ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"], ["bibliothek", "Bibliothek"], ["lernen", "Lernen"],
-    ["stunden", "Stunden"],
+    ["stunden", "Stunden"], ["zaehler", "Zähler"],
   ];
   // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
-  const NUR_PRIVAT_REITER = ["ernaehrung"];
+  const NUR_PRIVAT_REITER = ["ernaehrung", "zaehler"]; // Zähler seit Session 66 (Haushaltsdaten)
   // Reiter nur für EP (seit Session 50): Bibliothek der Ausbildungsunterlagen,
   // seit Session 52 dazu Lernen (Fragenkatalog)
   const NUR_EP_REITER = ["bibliothek", "lernen"];
@@ -156,7 +156,7 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden"],
+      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden", "zaehler"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten", "stunden"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel", "stunden"],
@@ -186,7 +186,7 @@
       .filter((k) => !epTabs.includes(k));
     return [
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
-      { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen", "stunden"] },
+      { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen", "stunden", "zaehler"] },
       { schluessel: "sammeln", label: "Sammeln", tabs: sammeln },
       { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: [...new Set([...epTabs, "bibliothek", "lernen"]), "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
       { schluessel: "verwalten", label: "Verwalten", tabs: ["export", "verlauf", "anleitung"] },
@@ -5526,6 +5526,405 @@
     danach: () => { stdNeuLaden(); },
   };
 
+  // ==========================================================
+  // Zähler (seit Session 66, Etappe 1): Strom Bezug, Strom Einspeisung,
+  // PV-Erzeugung, Wasser. Zählerstände ablesen (mehrere Zähler auf einmal),
+  // Verbrauch zwischen zwei Ablesungen, Zählerwechsel. Nur Privat.
+  // Tabellen: zaehler, zaehler_ablesungen – geladen erst beim Öffnen.
+  // ==========================================================
+  const zl = {
+    geladen: false, laedt: false, fehlt: false, fehler: "",
+    zaehler: [], ablesungen: [],
+    datum: null,        // Datum im Ablesen-Formular (null = heute)
+    eingaben: {},       // zaehler_id → eingetippter Stand (bleibt beim Neuzeichnen)
+    speichert: false,
+  };
+  // Art → Name, Einheit, Farbe
+  const ZL_ARTEN = {
+    strom_bezug: { name: "Strom Bezug (Netz)", kurz: "Bezug", einheit: "kWh", farbe: "#e07a1f" },
+    strom_einspeisung: { name: "Strom Einspeisung", kurz: "Einspeisung", einheit: "kWh", farbe: "#1f9d6b" },
+    pv_erzeugung: { name: "PV-Erzeugung", kurz: "PV", einheit: "kWh", farbe: "#b8860b" },
+    wasser: { name: "Wasser", kurz: "Wasser", einheit: "m³", farbe: "#2f6fdf" },
+  };
+  const ZL_ART_REIHE = Object.keys(ZL_ARTEN);
+
+  async function zlLaden() {
+    if (zl.laedt) return;
+    zl.laedt = true; zl.fehler = "";
+    if (aktiverTab === "zaehler") renderZaehler();
+    try {
+      const r = await api("zaehler_laden");
+      zl.fehlt = !!r.fehlt;
+      zl.zaehler = r.zaehler || [];
+      zl.ablesungen = (r.ablesungen || []).map((a) => ({ ...a, stand: Number(a.stand), stand_alt: a.stand_alt === null || a.stand_alt === undefined ? null : Number(a.stand_alt) }));
+      zl.geladen = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") zl.fehler = e.message || "Fehler";
+    } finally {
+      zl.laedt = false;
+    }
+    if (aktiverTab === "zaehler") renderZaehler();
+  }
+  window.zlNeuLaden = function() { zl.geladen = false; zl.fehler = ""; zlLaden(); };
+
+  // ---- Rechnen ----
+  function zlArt(z) { return ZL_ARTEN[z && z.art] || ZL_ARTEN.strom_bezug; }
+  function zlZaehler(id) { return zl.zaehler.find((z) => String(z.id) === String(id)); }
+  function zlSortiert(liste) {
+    return liste.slice().sort((a, b) => (ZL_ART_REIHE.indexOf(a.art) - ZL_ART_REIHE.indexOf(b.art)) ||
+      ((Number(a.sortierung) || 0) - (Number(b.sortierung) || 0)) || String(a.name).localeCompare(String(b.name), "de"));
+  }
+  // Ablesungen eines Zählers, aufsteigend nach Datum
+  function zlReihe(zid) {
+    return zl.ablesungen.filter((a) => String(a.zaehler_id) === String(zid))
+      .sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
+  }
+  function zlTage(von, bis) { return Math.round((Date.parse(bis + "T12:00:00Z") - Date.parse(von + "T12:00:00Z")) / 86400000); }
+  // Wert, mit dem eine Ablesung den vorigen Stand „abschließt“ (beim Wechsel der Endstand des alten Zählers)
+  function zlEndwert(a) { return a.art === "wechsel" ? Number(a.stand_alt) : Number(a.stand); }
+  // Zeiträume zwischen zwei Ablesungen: { von, bis, tage, menge, ablesung }
+  function zlIntervalle(zid) {
+    const r = zlReihe(zid);
+    const out = [];
+    for (let i = 1; i < r.length; i++) {
+      out.push({ von: r[i - 1].datum, bis: r[i].datum, tage: zlTage(r[i - 1].datum, r[i].datum), menge: zlEndwert(r[i]) - Number(r[i - 1].stand), ablesung: r[i] });
+    }
+    return out;
+  }
+  // Durchschnitt je Tag über die ganze Reihe (null bei zu wenig Daten)
+  function zlSchnitt(zid, ohneId) {
+    const iv = zlIntervalle(zid).filter((x) => !ohneId || String(x.ablesung.id) !== String(ohneId));
+    const tage = iv.reduce((s, x) => s + x.tage, 0);
+    if (tage < 14) return null;
+    return iv.reduce((s, x) => s + x.menge, 0) / tage;
+  }
+  // „12,5“ → 12.5; leer/ungültig → NaN
+  function zlZahl(t) {
+    const s = String(t ?? "").trim().replace(/\s/g, "").replace(",", ".");
+    return /^\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+  }
+  function zlFmt(n, stellen = 3) { return Number(n).toLocaleString("de-DE", { maximumFractionDigits: stellen }); }
+  function zlMenge(n, z) { return zlArt(z).einheit === "m³" ? `${zlFmt(n, 3)} m³` : `${zlFmt(n, 1)} kWh`; }
+  // Durchschnitt je Tag: Wasser in Litern, Strom in kWh
+  function zlProTag(n, z) { return zlArt(z).einheit === "m³" ? `${zlFmt(n * 1000, 0)} l/Tag` : `${zlFmt(n, 1)} kWh/Tag`; }
+
+  // Prüft einen neuen/geänderten Stand gegen die Nachbarn.
+  // Liefert { fehler, warnung, text } – fehler blockiert, warnung fragt nach.
+  function zlPruefen(zid, datum, stand, art, standAlt, ohneId) {
+    const z = zlZaehler(zid);
+    const reihe = zlReihe(zid).filter((a) => String(a.id) !== String(ohneId || ""));
+    const vor = reihe.filter((a) => a.datum < datum).pop();
+    const nach = reihe.find((a) => a.datum > datum);
+    const ende = art === "wechsel" ? standAlt : stand;
+    if (reihe.some((a) => a.datum === datum)) return { fehler: `Am ${datumDe(datum)} gibt es schon eine Ablesung – bitte die ändern.` };
+    if (vor && ende < Number(vor.stand)) {
+      return { fehler: art === "wechsel"
+        ? `Endstand ist kleiner als am ${datumDe(vor.datum)} (${zlFmt(vor.stand)}).`
+        : `Kleiner als am ${datumDe(vor.datum)} (${zlFmt(vor.stand)}). Zähler getauscht? Dann „Zählerwechsel“.` };
+    }
+    if (nach && zlEndwert(nach) < stand) return { fehler: `Größer als am ${datumDe(nach.datum)} (${zlFmt(zlEndwert(nach))}).` };
+    if (!vor) return { text: "Erste Ablesung – Verbrauch ab der nächsten." };
+    const tage = zlTage(vor.datum, datum);
+    const menge = ende - Number(vor.stand);
+    let text = `+${zlMenge(menge, z)} in ${tage} Tag${tage === 1 ? "" : "en"}`;
+    if (tage > 0) text += ` · Ø ${zlProTag(menge / tage, z)}`;
+    const schnitt = zlSchnitt(zid, ohneId);
+    if (schnitt && tage > 0 && menge / tage > schnitt * 3 && menge > 0) {
+      return { warnung: `Deutlich mehr als üblich (sonst Ø ${zlProTag(schnitt, z)}) – Tippfehler?`, text };
+    }
+    return { text };
+  }
+
+  // ---- Anzeige ----
+  function renderZaehler() {
+    const el = document.getElementById("zaehler-inhalt");
+    if (!el) return;
+    if (!zl.geladen && !zl.laedt && !zl.fehler && !zl.fehlt) zlLaden();
+    if (zl.fehlt) { el.innerHTML = `<p class="empty-text">Für Zähler bitte zuerst <code>zaehler_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`; return; }
+    if (zl.fehler) { el.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(zl.fehler)} <button class="link-btn" onclick="zlNeuLaden()">Nochmal versuchen</button></p>`; return; }
+    if (!zl.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
+    const aktiv = zlSortiert(zl.zaehler.filter((z) => !z.archiviert));
+    const archiv = zlSortiert(zl.zaehler.filter((z) => z.archiviert));
+    if (!zl.zaehler.length) {
+      el.innerHTML = `
+        <p class="empty-text">Noch keine Zähler. Lege für jeden Zähler einen Eintrag an – bei zwei PV-Wechselrichtern zwei PV-Zähler, sie werden später zusammengezählt.</p>
+        <div class="reiter-aktionen bib-aktionen">
+          <button type="button" class="btn-primary" onclick="zlVorschlagAnlegen()">${ic("plus")}Die vier üblichen anlegen</button>
+          <button type="button" class="btn-secondary" onclick="blattNeu('zaehler', {})">${ic("plus")}Einzeln anlegen</button>
+        </div>
+        <p class="notiz-meta">„Die vier üblichen“: Strom Bezug, Strom Einspeisung, PV-Erzeugung und Wasser – Namen und Zählernummern kannst du danach ändern.</p>`;
+      return;
+    }
+    el.innerHTML = `
+      ${zlAblesenHtml(aktiv)}
+      <h2 class="std-zwischen">Deine Zähler</h2>
+      <div class="zl-liste">${aktiv.map(zlKarteHtml).join("") || `<p class="empty-text">Alle Zähler sind archiviert.</p>`}</div>
+      <div class="reiter-aktionen bib-aktionen">
+        <button type="button" class="btn-secondary" onclick="blattNeu('zaehler', {})">${ic("plus")}Zähler</button>
+      </div>
+      ${archiv.length ? `<details class="anleitung-abschnitt std-block">
+        <summary>Archiviert (${archiv.length})</summary>
+        <div class="anleitung-text"><div class="zl-liste">${archiv.map(zlKarteHtml).join("")}</div></div>
+      </details>` : ""}`;
+    zlAblesenHinweiseAktualisieren();
+  }
+
+  // Formular „Ablesen“: ein Feld je aktivem Zähler, gemeinsames Datum
+  function zlAblesenHtml(aktiv) {
+    if (!aktiv.length) return "";
+    const heute = heuteISO();
+    const datum = zl.datum || heute;
+    const zeilen = aktiv.map((z) => {
+      const reihe = zlReihe(z.id);
+      const vor = reihe.filter((a) => a.datum < datum).pop();
+      const amTag = reihe.find((a) => a.datum === datum);
+      const a = zlArt(z);
+      const zid = escapeAttr(String(z.id));
+      const wert = zl.eingaben[z.id] !== undefined ? zl.eingaben[z.id] : "";
+      return `<div class="zl-ablesen-zeile" style="border-left-color:${a.farbe}">
+        <label class="zl-ablesen-label" for="zl-in-${zid}">
+          <span class="zl-name">${escapeHtml(z.name)}</span>
+          <span class="notiz-meta">${vor ? `zuletzt ${zlFmt(vor.stand)} ${a.einheit} am ${datumDe(vor.datum)}${vor.art === "wechsel" ? " (neuer Zähler)" : ""}` : "noch keine Ablesung"}${amTag ? ` · am Tag schon ${zlFmt(amTag.stand)} – wird ersetzt` : ""}</span>
+        </label>
+        <div class="zl-ablesen-feld">
+          <input type="text" inputmode="decimal" id="zl-in-${zid}" data-zl="${zid}" value="${escapeAttr(wert)}" placeholder="${vor ? escapeAttr(zlFmt(vor.stand)) : "Stand"}" autocomplete="off" aria-describedby="zl-hw-${zid}">
+          <span class="zl-einheit">${a.einheit}</span>
+        </div>
+        <span class="zl-hinweis notiz-meta" id="zl-hw-${zid}" aria-live="polite"></span>
+      </div>`;
+    }).join("");
+    return `<section class="zl-ablesen" aria-label="Zählerstände ablesen">
+      <div class="zl-ablesen-kopf">
+        <h2 class="std-zwischen">Ablesen</h2>
+        <input type="date" id="zl-datum" class="zl-datum" aria-label="Datum der Ablesung" value="${datum}" max="${heute}" onchange="zlDatumSetzen(this.value)">
+      </div>
+      ${zeilen}
+      <div class="reiter-aktionen bib-aktionen">
+        <button type="button" class="btn-primary" id="zl-speichern" onclick="zlAblesenSpeichern()"${zl.speichert ? " disabled" : ""}>${ic("ok-kreis")}Speichern</button>
+      </div>
+      <p class="notiz-meta">Nur ausgefüllte Felder werden gespeichert. Komma oder Punkt – beides geht.</p>
+    </section>`;
+  }
+
+  // Live-Hinweis unter jedem Feld (ohne Neuzeichnen, damit der Fokus bleibt)
+  function zlAblesenHinweiseAktualisieren() {
+    const datum = zl.datum || heuteISO();
+    document.querySelectorAll("#zaehler-inhalt [data-zl]").forEach((inp) => {
+      const zid = inp.dataset.zl;
+      if (!inp.dataset.verbunden) {
+        inp.dataset.verbunden = "1";
+        inp.addEventListener("input", () => { zl.eingaben[zid] = inp.value; zlAblesenHinweiseAktualisieren(); });
+        inp.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.zlAblesenSpeichern(); } });
+      }
+      const hw = document.getElementById("zl-hw-" + zid);
+      if (!hw) return;
+      const t = String(inp.value || "").trim();
+      hw.classList.remove("zl-fehler", "zl-warnung");
+      inp.removeAttribute("aria-invalid");
+      if (!t) { hw.textContent = ""; return; }
+      const n = zlZahl(t);
+      if (!Number.isFinite(n)) { hw.textContent = "Bitte nur eine Zahl (z. B. 12345,6)."; hw.classList.add("zl-fehler"); inp.setAttribute("aria-invalid", "true"); return; }
+      const amTag = zlReihe(zid).find((a) => a.datum === datum);
+      if (amTag && amTag.art === "wechsel") { hw.textContent = "An dem Tag ist ein Zählerwechsel eingetragen – bitte dort ändern."; hw.classList.add("zl-fehler"); return; }
+      const p = zlPruefen(zid, datum, n, "ablesung", null, amTag && amTag.id);
+      if (p.fehler) { hw.textContent = p.fehler; hw.classList.add("zl-fehler"); inp.setAttribute("aria-invalid", "true"); return; }
+      hw.textContent = p.warnung ? `${p.text} – ${p.warnung}` : p.text;
+      if (p.warnung) hw.classList.add("zl-warnung");
+    });
+  }
+
+  window.zlDatumSetzen = function(v) {
+    const heute = heuteISO();
+    zl.datum = v && v <= heute ? v : heute;
+    renderZaehler();
+  };
+
+  window.zlAblesenSpeichern = async function() {
+    if (zl.speichert) return;
+    const datum = zl.datum || heuteISO();
+    const werte = [];
+    const warnungen = [];
+    for (const z of zl.zaehler.filter((x) => !x.archiviert)) {
+      const t = String(zl.eingaben[z.id] ?? "").trim();
+      if (!t) continue;
+      const n = zlZahl(t);
+      if (!Number.isFinite(n)) { alert(`${z.name}: bitte nur eine Zahl eingeben.`); return; }
+      const amTag = zlReihe(z.id).find((a) => a.datum === datum);
+      if (amTag && amTag.art === "wechsel") { alert(`${z.name}: An dem Tag ist ein Zählerwechsel eingetragen – bitte dort ändern.`); return; }
+      const p = zlPruefen(z.id, datum, n, "ablesung", null, amTag && amTag.id);
+      if (p.fehler) { alert(`${z.name}: ${p.fehler}`); return; }
+      if (p.warnung) warnungen.push(`${z.name}: ${p.text}. ${p.warnung}`);
+      werte.push({ zaehler_id: z.id, stand: n });
+    }
+    if (!werte.length) { alert("Bitte mindestens einen Zählerstand eingeben."); return; }
+    if (warnungen.length && !confirm(`${warnungen.join("\n")}\n\nTrotzdem speichern?`)) return;
+    zl.speichert = true;
+    const knopf = document.getElementById("zl-speichern");
+    if (knopf) knopf.disabled = true;
+    try {
+      const r = await api("zaehler_ablesungen_sammeln", { datum, werte });
+      zl.eingaben = {};
+      hinweisZeigen(`${r.anzahl} Zählerstand${r.anzahl === 1 ? "" : "stände"} gespeichert${r.ersetzt ? ` (${r.ersetzt} ersetzt)` : ""}`);
+      zl.speichert = false;
+      zlNeuLaden();
+    } catch (e) {
+      zl.speichert = false;
+      if (knopf) knopf.disabled = false;
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
+
+  // Karte je Zähler: letzter Stand, Verbrauch seit der Vorablesung, alle Ablesungen aufklappbar
+  function zlKarteHtml(z) {
+    const a = zlArt(z);
+    const reihe = zlReihe(z.id);
+    const letzte = reihe[reihe.length - 1];
+    const iv = zlIntervalle(z.id);
+    const letztesIv = iv[iv.length - 1];
+    const schnitt = zlSchnitt(z.id);
+    const zid = escapeAttr(String(z.id));
+    const verbrauch = letztesIv
+      ? `<span class="notiz-meta">Seit ${datumDe(letztesIv.von)}: <strong>${zlMenge(letztesIv.menge, z)}</strong> in ${letztesIv.tage} Tag${letztesIv.tage === 1 ? "" : "en"}${letztesIv.tage > 0 ? ` · Ø ${zlProTag(letztesIv.menge / letztesIv.tage, z)}` : ""}</span>`
+      : `<span class="notiz-meta">${letzte ? "Verbrauch ab der zweiten Ablesung." : "Noch keine Ablesung."}</span>`;
+    // Ablesungen neueste zuerst, mit Menge seit der vorigen
+    const mengeBis = new Map(iv.map((x) => [String(x.ablesung.id), x]));
+    const zeilen = reihe.slice().reverse().map((ab) => {
+      const x = mengeBis.get(String(ab.id));
+      const wechsel = ab.art === "wechsel";
+      return `<button type="button" class="std-eintrag zl-ablesung" onclick="blattOeffnen('zablesung','${escapeAttr(String(ab.id))}')">
+        <span class="zl-ab-datum">${datumDe(ab.datum)}</span>
+        <span class="std-eintrag-text">${wechsel ? `${ic("wiederholen")} Wechsel: alt ${zlFmt(ab.stand_alt)} → neu ${zlFmt(ab.stand)}` : zlFmt(ab.stand)}${ab.notiz ? ` <span class="notiz-meta">· ${escapeHtml(ab.notiz)}</span>` : ""}</span>
+        <span class="std-eintrag-dauer">${x ? "+" + zlMenge(x.menge, z) : ""}</span>
+      </button>`;
+    }).join("");
+    return `<div class="std-saldo-karte zl-karte" style="border-left-color:${a.farbe}">
+      <div class="zl-karte-kopf">
+        <span class="std-saldo-name">${escapeHtml(z.name)}</span>
+        <span class="badge">${escapeHtml(a.kurz)}</span>
+        <button type="button" class="task-delete zl-stift" onclick="blattOeffnen('zaehler','${zid}')" aria-label="${escapeAttr(z.name)} bearbeiten">${ic("stift")}</button>
+      </div>
+      ${z.nummer ? `<span class="notiz-meta">Nr. ${escapeHtml(z.nummer)}</span>` : ""}
+      <span class="std-saldo-wert">${letzte ? `${zlFmt(letzte.stand)} <span class="zl-einheit">${a.einheit}</span>` : "–"}</span>
+      ${letzte ? `<span class="notiz-meta">am ${datumDe(letzte.datum)}${letzte.art === "wechsel" ? " (neuer Zähler)" : ""}</span>` : ""}
+      ${verbrauch}
+      ${schnitt !== null ? `<span class="notiz-meta">Insgesamt Ø ${zlProTag(schnitt, z)} seit ${datumDe(reihe[0].datum)}</span>` : ""}
+      <details class="zl-verlauf">
+        <summary>Ablesungen (${reihe.length})</summary>
+        <div class="zl-verlauf-liste">${zeilen || `<p class="notiz-meta">Noch keine.</p>`}</div>
+        <div class="reiter-aktionen bib-aktionen">
+          <button type="button" class="btn-secondary" onclick="blattNeu('zablesung', { zaehler_id: '${zid}' })">${ic("plus")}Nachtragen</button>
+          <button type="button" class="btn-secondary" onclick="blattNeu('zablesung', { zaehler_id: '${zid}', art: 'wechsel' })">${ic("wiederholen")}Zählerwechsel</button>
+        </div>
+      </details>
+    </div>`;
+  }
+
+  // Legt Strom Bezug, Einspeisung, PV-Erzeugung und Wasser an
+  window.zlVorschlagAnlegen = async function() {
+    const liste = [
+      ["Strom Bezug", "strom_bezug"], ["Strom Einspeisung", "strom_einspeisung"],
+      ["PV-Erzeugung", "pv_erzeugung"], ["Wasser", "wasser"],
+    ];
+    try {
+      for (let i = 0; i < liste.length; i++) {
+        await api("zaehler_speichern", { name: liste[i][0], art: liste[i][1], sortierung: i });
+      }
+      hinweisZeigen("Vier Zähler angelegt");
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht alle angelegt: " + (e.message || "Fehler"));
+    }
+    zlNeuLaden();
+  };
+
+  BLATT_ARTEN.zaehler = {
+    titel: "Zähler bearbeiten",
+    titelNeu: "Neuer Zähler",
+    finden: (id) => zlZaehler(id),
+    laden: (z) => ({
+      id: z.id || "", name: z.name || "", art: z.art || "strom_bezug", nummer: z.nummer || "",
+      notiz: z.notiz || "", archiviert: z.archiviert ? "ja" : "nein",
+      hat_ablesungen: !!(z.id && zlReihe(z.id).length),
+    }),
+    felder: [
+      { key: "name", label: "Name", typ: "text", pflicht: true, platzhalter: "z. B. Strom Bezug, PV Wechselrichter Ost, Wasser" },
+      { key: "art", label: "Art", typ: "chips", optionen: ZL_ART_REIHE.map((k) => [k, ZL_ARTEN[k].name]),
+        hinweis: "Strom und PV in kWh, Wasser in m³. Mehrere Zähler gleicher Art werden in der Auswertung zusammengezählt." },
+      { key: "nummer", label: "Zählernummer", typ: "text", platzhalter: "optional, steht auf dem Zähler" },
+      { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional, z. B. Ort im Keller" },
+      { key: "archiviert", label: "Archiviert", typ: "chips", optionen: [["nein", "Nein"], ["ja", "Ja – nicht mehr ablesen"]], wenn: (w) => !!w.id },
+    ],
+    pruefen: (w) => {
+      const z = w.id ? zlZaehler(w.id) : null;
+      if (z && w.hat_ablesungen && z.art !== w.art && zlArt(z).einheit !== ZL_ARTEN[w.art].einheit) return "Der Zähler hat schon Ablesungen – die Einheit (kWh/m³) lässt sich nicht mehr wechseln. Lieber einen neuen Zähler anlegen.";
+      return "";
+    },
+    speichern: (id, w) => api("zaehler_speichern", { id, name: w.name, art: w.art, nummer: w.nummer, notiz: w.notiz, archiviert: w.archiviert === "ja" }),
+    loeschen: (id) => api("zaehler_loeschen", { id }),
+    loeschFrage: (z) => `Zähler „${z.name || ""}“ löschen? Geht nur ohne Ablesungen – sonst archivieren.`,
+    gespeichert: "Zähler gespeichert",
+    danach: () => { zlNeuLaden(); },
+  };
+
+  BLATT_ARTEN.zablesung = {
+    titel: "Ablesung bearbeiten",
+    titelNeu: "Ablesung nachtragen",
+    finden: (id) => zl.ablesungen.find((a) => String(a.id) === String(id)),
+    laden: (a) => {
+      const wechsel = a.art === "wechsel";
+      const z = zlZaehler(a.zaehler_id);
+      return {
+        id: a.id || "", zaehler_id: String(a.zaehler_id || ""), art: wechsel ? "wechsel" : "ablesung",
+        datum: a.datum || heuteISO(),
+        stand: a.stand !== undefined && a.stand !== null ? zlFmt(a.stand).replace(/\./g, "") : (wechsel ? "0" : ""),
+        stand_alt: a.stand_alt !== undefined && a.stand_alt !== null ? zlFmt(a.stand_alt).replace(/\./g, "") : "",
+        nummer_neu: "", notiz: a.notiz || "",
+        titelinfo: "Bis zum Wechsel zählt der Endstand des alten Zählers, danach der neue.",
+        einheit: z ? zlArt(z).einheit : "",
+      };
+    },
+    felder: [
+      { key: "zaehler_id", label: "Zähler", typ: "auswahl", wenn: (w) => !w.id,
+        optionen: () => zlSortiert(zl.zaehler.filter((z) => !z.archiviert)).map((z) => [String(z.id), `${z.name} (${zlArt(z).einheit})`]) },
+      { key: "titelinfo", label: "So wird gerechnet", typ: "info", wenn: (w) => w.art === "wechsel" },
+      { key: "datum", label: "Datum", typ: "datum", pflicht: true },
+      { key: "stand_alt", label: "Endstand des alten Zählers", typ: "zahl", eingabe: "text", schritt: "any", wenn: (w) => w.art === "wechsel", pflicht: true,
+        hinweis: "Letzter Stand vor dem Ausbau – steht meist im Wechselprotokoll des Netzbetreibers bzw. Wasserversorgers." },
+      { key: "stand", label: "Zählerstand", typ: "zahl", eingabe: "text", schritt: "any", pflicht: true, wenn: (w) => w.art !== "wechsel" },
+      { key: "stand", label: "Startstand des neuen Zählers", typ: "zahl", eingabe: "text", schritt: "any", wenn: (w) => w.art === "wechsel",
+        hinweis: "Meist 0. Ab hier rechnet die App mit dem neuen Zähler weiter." },
+      { key: "nummer_neu", label: "Neue Zählernummer", typ: "text", platzhalter: "optional", wenn: (w) => w.art === "wechsel" && !w.id },
+      { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional" },
+    ],
+    pruefen: (w) => {
+      if (!w.zaehler_id) return "Bitte einen Zähler wählen.";
+      if (w.datum > heuteISO()) return "Das Datum liegt in der Zukunft.";
+      const stand = zlZahl(w.stand);
+      if (!Number.isFinite(stand)) return w.art === "wechsel" ? "Startstand bitte als Zahl (meist 0)." : "Zählerstand bitte als Zahl.";
+      let alt = null;
+      if (w.art === "wechsel") {
+        alt = zlZahl(w.stand_alt);
+        if (!Number.isFinite(alt)) return "Endstand des alten Zählers bitte als Zahl.";
+      }
+      const p = zlPruefen(w.zaehler_id, w.datum, stand, w.art, alt, w.id);
+      if (p.fehler) return p.fehler;
+      if (p.warnung && !confirm(`${p.text}. ${p.warnung}\n\nTrotzdem speichern?`)) return "Nicht gespeichert.";
+      return "";
+    },
+    speichern: (id, w) => api("zaehler_ablesung_speichern", {
+      id, zaehler_id: w.zaehler_id, art: w.art, datum: w.datum, stand: zlZahl(w.stand),
+      stand_alt: w.art === "wechsel" ? zlZahl(w.stand_alt) : null, nummer_neu: w.nummer_neu, notiz: w.notiz,
+    }),
+    loeschen: (id) => api("zaehler_ablesung_loeschen", { id }),
+    loeschFrage: (a) => `${a.art === "wechsel" ? "Zählerwechsel" : "Ablesung"} vom ${datumDe(a.datum || "")} löschen?`,
+    // Titel passend zu Ablesung oder Wechsel
+    beimRendern: (w) => {
+      const t = document.getElementById("blatt-titel");
+      if (t) t.textContent = w.art === "wechsel" ? (w.id ? "Zählerwechsel bearbeiten" : "Zählerwechsel eintragen") : (w.id ? "Ablesung bearbeiten" : "Ablesung nachtragen");
+    },
+    gespeichert: (r, w) => (w.art === "wechsel" ? "Zählerwechsel gespeichert" : "Ablesung gespeichert"),
+    danach: () => { zlNeuLaden(); },
+  };
+
   let blatt = null; // { art, id, werte }
 
   // Öffnet das Bearbeiten-Blatt für einen Eintrag
@@ -8119,6 +8518,7 @@
     if (aktiv === "bibliothek") renderBibliothek();
     if (aktiv === "lernen") renderLernen();
     if (aktiv === "stunden") renderStunden();
+    if (aktiv === "zaehler") renderZaehler();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
     if (aktiv === "schluessel") renderSchluessel();
@@ -15022,6 +15422,16 @@
       luecken.push("Stunden: " + e.message);
     }
 
+    // Zähler (seit Session 66)
+    meldung("Lade Zähler …");
+    try {
+      const r = await api("zaehler_laden");
+      if (!r.fehlt) { liste.zaehler = r.zaehler || []; liste.zaehler_ablesungen = r.ablesungen || []; }
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Zähler: " + e.message);
+    }
+
     meldung("Lade Einstellungen …");
     let pushEinstellungen = null;
     try {
@@ -15178,9 +15588,11 @@
     { k: "stunden_soll", t: "stunden_soll", name: "Stunden: Soll-Stände", gruppe: "Stunden" },
     { k: "stunden_eintraege", t: "stunden_eintraege", name: "Stunden: Einträge", gruppe: "Stunden" },
     { k: "stunden_abwesenheiten", t: "stunden_abwesenheiten", name: "Stunden: Abwesenheiten", gruppe: "Stunden" },
+    { k: "zaehler", t: "zaehler", name: "Zähler", gruppe: "Zähler" },
+    { k: "zaehler_ablesungen", t: "zaehler_ablesungen", name: "Zähler: Ablesungen", gruppe: "Zähler" },
     { k: "verlauf", t: "verlauf", name: "Verlauf (letzte 50 je Bereich)", gruppe: "Sonstiges", nurErg: true },
   ];
-  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Stunden", "Sonstiges"];
+  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Stunden", "Zähler", "Sonstiges"];
 
   // Zustand der Karte (bleibt beim Neuzeichnen von Export erhalten)
   const wh = {
