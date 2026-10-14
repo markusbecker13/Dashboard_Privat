@@ -8705,6 +8705,7 @@
           <input type="time" id="push-morgens-zeit" value="${escapeAttr(String(e.morgens_uhrzeit || "07:00").slice(0, 5))}" aria-label="Uhrzeit der Morgen-Übersicht"></label>
         <p class="notiz-meta push-erklaerung">Termine, fällige Aufgaben, Einheiten und Weiterbildung des Tages – an leeren Tagen kommt nichts.</p>
         ${pushGeburtstagHtml(e, chips)}
+        ${pushZaehlerHtml(e, chips, bereiche)}
         <label class="push-schalter"><input type="checkbox" id="push-termine"${e.termine_an ? " checked" : ""}> Vor Terminen und Aufgaben mit Uhrzeit</label>
         <div class="schnell-chips push-chips" role="group" aria-label="Vorlauf">${chips("vorlauf", PUSH_VORLAUF.map(([w, t]) => [String(w), t]), (w) => Number(w) === Number(e.vorlauf_min))}</div>
         <div class="schnell-label push-label">Bereiche</div>
@@ -8729,6 +8730,8 @@
       push.einst.termine_an = document.getElementById("push-termine").checked;
       const gebAn = document.getElementById("push-geburtstage");
       if (gebAn) push.einst.geburtstage_an = gebAn.checked;
+      const zAn = document.getElementById("push-zaehler");
+      if (zAn) push.einst.zaehler_an = zAn.checked;
       const ruheAn = document.getElementById("push-ruhe-an");
       if (ruheAn) {
         push.einst.ruhe_an = ruheAn.checked;
@@ -8738,7 +8741,7 @@
     };
     ["push-morgens", "push-morgens-zeit", "push-termine"].forEach((id) => document.getElementById(id).addEventListener("change", merk));
     // Geburtstage: Erklärung hängt an Morgen-Übersicht und Schalter
-    ["push-geburtstage", "push-morgens", "push-morgens-zeit"].forEach((id) => {
+    ["push-geburtstage", "push-zaehler", "push-morgens", "push-morgens-zeit"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", () => { merk(); pushRendern(); });
     });
@@ -8767,6 +8770,22 @@
       <p class="notiz-meta push-erklaerung">${e.geburtstage_an
         ? `Kommt ${escapeHtml(wann)}, ${escapeHtml(wie)}. Zählt Termine der Kategorien mit der Art „Geburtstag“ (Kalender → Zahnrad).`
         : "Aus – Geburtstage stehen dann nur als Termin in der Morgen-Übersicht."}</p>`;
+  }
+
+  // ---- Zähler ablesen (seit Session 69) ----
+  const PUSH_ZAEHLER_TAG = [[1, "am 1."], [5, "am 5."], [15, "am 15."], [28, "am 28."]];
+  function pushZaehlerHtml(e, chips, bereiche) {
+    if (!Object.prototype.hasOwnProperty.call(e, "zaehler_an")) {
+      return `<p class="notiz-meta push-erklaerung">Für die Erinnerung zum Zähler-Ablesen bitte zuerst <code>zaehler_erinnerung_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    const tag = Number(e.zaehler_tag) || 1;
+    const zeit = String(e.morgens_uhrzeit || "07:00").slice(0, 5);
+    const ohnePrivat = !bereiche.includes("privat");
+    return `<label class="push-schalter"><input type="checkbox" id="push-zaehler"${e.zaehler_an ? " checked" : ""}> Zähler ablesen (monatlich)</label>
+      ${e.zaehler_an ? `<div class="schnell-chips push-chips" role="group" aria-label="Tag im Monat">${chips("zaehlertag", PUSH_ZAEHLER_TAG.map(([w, t]) => [String(w), t]), (w) => Number(w) === tag)}</div>` : ""}
+      <p class="notiz-meta push-erklaerung">${e.zaehler_an
+        ? `Kommt am ${tag}. des Monats um ${escapeHtml(zeit)}, wenn ein Zähler seit Monatsanfang noch nicht abgelesen ist (Ablesungen aus den letzten 3 Tagen des Vormonats zählen mit) – 3 Tage später einmal nachgefasst. Antippen öffnet den Reiter Zähler.${ohnePrivat ? " <strong>Dafür unten bei „Bereiche“ auch Privat wählen.</strong>" : ""}`
+        : "Aus – keine Erinnerung zum Ablesen."}</p>`;
   }
 
   // ---- Ruhezeit (seit Session 38) ----
@@ -8817,6 +8836,7 @@
     if (name === "ruhe") e.ruhe_nachholen = wert === "nachholen";
     if (name === "vorlauf") e.vorlauf_min = Number(wert);
     if (name === "gebvorlauf") e.geburtstage_vorlauf = Number(wert);
+    if (name === "zaehlertag") e.zaehler_tag = Number(wert);
     if (name === "titel") e.ohne_titel = wert === "ohne";
     if (name === "bereich") {
       const b = new Set(Array.isArray(e.bereiche) ? e.bereiche : []);
@@ -8844,6 +8864,9 @@
         // Geburtstage (seit Session 47) nur, wenn der Server sie kennt
         ...(Object.prototype.hasOwnProperty.call(e, "geburtstage_an")
           ? { geburtstage_an: !!e.geburtstage_an, geburtstage_vorlauf: Number(e.geburtstage_vorlauf ?? 3) } : {}),
+        // Zähler-Erinnerung (seit Session 69) nur, wenn der Server sie kennt
+        ...(Object.prototype.hasOwnProperty.call(e, "zaehler_an")
+          ? { zaehler_an: !!e.zaehler_an, zaehler_tag: Number(e.zaehler_tag) || 1 } : {}),
       });
       push.meldung = "Gespeichert.";
     } catch (err) {
