@@ -8721,7 +8721,8 @@
           <button type="button" class="btn-secondary" onclick="pushTest(false)">Test an alle senden</button>` : `<p class="notiz-meta">Noch kein Gerät.</p>`}
       </section>
       ${vorlesenEinstHtml()}
-      <p class="schnell-status push-meldung" role="status" aria-live="polite">${escapeHtml(push.meldung || push.fehler || "")}</p>`;
+      <p class="schnell-status push-meldung" role="status" aria-live="polite">${escapeHtml(push.meldung || push.fehler || "")}</p>
+      ${pushDiagnoseHtml()}`;
     // Eingaben merken, damit Neuzeichnen (Chips) nichts verliert
     const merk = () => {
       if (!push.einst) return;
@@ -8771,6 +8772,63 @@
         ? `Kommt ${escapeHtml(wann)}, ${escapeHtml(wie)}. Zählt Termine der Kategorien mit der Art „Geburtstag“ (Kalender → Zahnrad).`
         : "Aus – Geburtstage stehen dann nur als Termin in der Morgen-Übersicht."}</p>`;
   }
+
+  // ---- Diagnose (seit Session 70): was meldet der Browser wirklich? ----
+  // Hilft bei „abgelehnt“, obwohl in Chrome/Android alles erlaubt scheint.
+  function pushDiagnoseZeilen() {
+    const ua = navigator.userAgent;
+    const chrome = (/Chrome\/(\d+)/.exec(ua) || [])[1];
+    const zeilen = [
+      ["Erlaubnis (Notification)", "Notification" in window ? Notification.permission : "nicht vorhanden"],
+      ["Erlaubnis (Permissions-API)", push.diagPerm || (navigator.permissions ? "…" : "nicht vorhanden")],
+      ["Läuft als", pushIstInstalliert() ? "installierte App" : "Browser-Tab"],
+      ["WebView", /; wv\)/.test(ua) || /\bwv\b/.test(ua) ? "JA – eingebettete Ansicht, dort gibt es keine Benachrichtigungen" : "nein"],
+      ["Browser", chrome ? `Chrome/Chromium ${chrome}` : (/Firefox\/(\d+)/.exec(ua) || [])[0] || "unbekannt"],
+      ["Sicherer Kontext (https)", window.isSecureContext ? "ja" : "NEIN"],
+      ["Service Worker", "serviceWorker" in navigator ? (navigator.serviceWorker.controller ? "aktiv" : "registriert, steuert Seite nicht") : "nicht vorhanden"],
+      ["Push-Abo auf diesem Gerät", push.abo ? (pushDiesesAktiv() ? "ja, Server kennt es" : "ja, Server kennt es NICHT") : "nein"],
+      ["Adresse", location.origin],
+      ["App-Version", (document.querySelector('script[src^="app.js"]') || {}).getAttribute ? document.querySelector('script[src^="app.js"]').getAttribute("src") : "?"],
+    ];
+    return zeilen;
+  }
+  function pushDiagnoseHtml() {
+    // Permissions-API einmal nachfragen (asynchron), dann neu zeichnen
+    if (!push.diagPerm && navigator.permissions && navigator.permissions.query) {
+      push.diagPerm = "…";
+      navigator.permissions.query({ name: "notifications" })
+        .then((r) => { push.diagPerm = r.state; pushRendern(); })
+        .catch((e) => { push.diagPerm = "Fehler: " + (e.message || e); pushRendern(); });
+    }
+    const zeilen = pushDiagnoseZeilen();
+    return `<details class="anleitung-abschnitt push-diagnose"${push.diagOffen ? " open" : ""} ontoggle="pushDiagUmschalten(this.open)">
+      <summary>Diagnose</summary>
+      <div class="anleitung-text">
+        <table class="std-tabelle push-diag-tabelle"><tbody>${zeilen.map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`).join("")}</tbody></table>
+        <div class="push-knoepfe">
+          <button type="button" class="btn-secondary" onclick="pushDiagFragen()">Erlaubnis jetzt anfragen</button>
+          <button type="button" class="btn-secondary" onclick="pushDiagKopieren()">${ic("kopieren")}Kopieren</button>
+        </div>
+        ${push.diagErgebnis ? `<p class="notiz-meta">${escapeHtml(push.diagErgebnis)}</p>` : ""}
+        <p class="notiz-meta">„denied“ = vom Browser oder Android gesperrt, „default“ = noch nicht gefragt, „granted“ = erlaubt. Beim Melden der Ergebnisse einfach „Kopieren“ und einfügen.</p>
+      </div>
+    </details>`;
+  }
+  window.pushDiagUmschalten = function(offen) { push.diagOffen = offen; };
+  window.pushDiagFragen = async function() {
+    const vorher = "Notification" in window ? Notification.permission : "–";
+    const t0 = Date.now();
+    let ergebnis;
+    try { ergebnis = await Notification.requestPermission(); } catch (e) { ergebnis = "Fehler: " + (e.message || e); }
+    const ms = Date.now() - t0;
+    push.diagErgebnis = `Anfrage: vorher „${vorher}“, Antwort „${ergebnis}“ nach ${ms} ms${ms < 300 ? " – kam sofort, also ohne Dialog (vom System/Browser blockiert)" : ""}.`;
+    push.diagPerm = "";
+    pushRendern();
+  };
+  window.pushDiagKopieren = async function() {
+    const text = pushDiagnoseZeilen().map(([k, v]) => `${k}: ${v}`).join("\n") + (push.diagErgebnis ? "\n" + push.diagErgebnis : "") + "\n" + navigator.userAgent;
+    try { await navigator.clipboard.writeText(text); hinweisZeigen("Diagnose kopiert"); } catch (_e) { prompt("Diagnose kopieren:", text); }
+  };
 
   // ---- Zähler ablesen (seit Session 69) ----
   const PUSH_ZAEHLER_TAG = [[1, "am 1."], [5, "am 5."], [15, "am 15."], [28, "am 28."]];
