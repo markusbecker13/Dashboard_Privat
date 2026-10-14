@@ -2218,3 +2218,33 @@
   .zl-ablesen-zeile { grid-template-columns: 1fr; }
   .zl-ablesen-feld input { width: 100%; flex: 1 1 auto; }
 }
+
+/* Zähler Etappe 2 (seit Session 67): Auswertung mit Monatsbalken und Vorjahr */
+.zl-aw { margin: 0 0 1rem; }
+.zl-aw .std-zwischen { margin-top: 0; }
+.zl-aw-jahr { display: flex; align-items: center; justify-content: center; cursor: default; }
+.zl-aw-kopf { display: flex; flex-direction: column; gap: 0.15rem; margin: 0.2rem 0 0.6rem; }
+.zl-aw-svg { width: 100%; height: auto; display: block; }
+.zl-aw-monat { cursor: pointer; }
+.zl-aw-monat:focus { outline: none; }
+.zl-legende-vj { background: var(--ink-dim); opacity: 0.4; }
+.zl-aw .fin-chart-legende { flex-wrap: wrap; gap: 0.3rem 1rem; }
+.zl-aw-detail { min-height: 1.4em; margin: 0.5rem 0 0; }
+.zl-tabelle-wrap { overflow-x: auto; }
+.zl-tabelle { font-size: 0.85rem; }
+.zl-teil { color: var(--ink-dim); margin-left: 0.1em; }
+
+/* Zähler Etappe 3 (seit Session 68): Tarife, Hochrechnung, PV-Bilanz */
+.zl-tarife { margin: 0 0 1rem; }
+.zl-hr { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 0.45rem; padding-top: 0.45rem; border-top: 1px solid var(--border); }
+.zl-hr-ergebnis { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.zl-hr-quelle { font-size: 0.75rem; }
+.zl-pv-quote { margin: 0.5rem 0 0.7rem; }
+.zl-pv-quote-kopf { display: flex; justify-content: space-between; gap: 0.6rem; align-items: baseline; font-size: var(--fs-klein); color: var(--ink-dim); }
+.zl-pv-quote-kopf strong { color: var(--ink); font-size: 1.25rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.zl-pv-spur { height: 10px; border-radius: 5px; background: var(--border); overflow: hidden; margin-top: 0.25rem; }
+.zl-pv-spur span { display: block; height: 100%; border-radius: 5px; }
+.zl-pv-zahlen { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 7.5rem), 1fr)); gap: 0.5rem 0.8rem; margin: 0.6rem 0; }
+.zl-pv-zahlen div { display: flex; flex-direction: column; }
+.zl-pv-zahlen dt { font-size: 0.75rem; color: var(--ink-dim); }
+.zl-pv-zahlen dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
