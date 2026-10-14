@@ -2248,3 +2248,8 @@
 .zl-pv-zahlen div { display: flex; flex-direction: column; }
 .zl-pv-zahlen dt { font-size: 0.75rem; color: var(--ink-dim); }
 .zl-pv-zahlen dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Benachrichtigungen: Diagnose (seit Session 70) */
+.push-diagnose { margin-top: 0.8rem; }
+.push-diag-tabelle td { text-align: left !important; vertical-align: top; overflow-wrap: anywhere; }
+.push-diag-tabelle td:first-child { color: var(--ink-dim); width: 45%; }
