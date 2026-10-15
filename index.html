@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css?v=71">
+<link rel="stylesheet" href="style.css?v=72">
 </head>
 <body>
   <!-- Linien-Icons (seit Session 35, Icons Etappe A). Eigene Zeichnungen, 24er-Raster,
@@ -1038,6 +1038,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Hochrechnung:</strong> für das laufende Abrechnungsjahr. Abgelesene Tage zählen wie gemessen, fehlende Tage wie im Vorjahr (falls abgelesen), sonst mit dem Durchschnitt. Kosten = Menge × Preis des Tages + Grundpreis; dagegen die Abschläge (Betrag laut Tarif am Zahltag). Ergebnis: voraussichtlich Guthaben oder Nachzahlung, dazu „bisher“ und ein passender Abschlag. Eine Schätzung – Preisänderungen, die noch nicht eingetragen sind, kennt die App nicht</li>
                 <li><strong>Kosten in der Auswertung:</strong> mit Tarif steht bei Bezug und Wasser „Kosten dafür“ (inkl. Grundpreis), bei Einspeisung die Vergütung, in der Tabelle zusätzlich je Monat</li>
                 <li><strong>PV-Bilanz:</strong> braucht Erzeugung, Einspeisung und Bezug für dieselben Tage. Selbst genutzt = erzeugt − eingespeist, Verbrauch gesamt = aus dem Netz + selbst genutzt. <em>Autarkie</em> = selbst genutzt ÷ Verbrauch gesamt, <em>Eigenverbrauch</em> = selbst genutzt ÷ erzeugt. Mit Tarifen auch „Gespart“ (selbst genutzt × Arbeitspreis) und die Einspeisevergütung; je Monat aufklappbar. Mit Batteriespeicher stecken dessen Verluste im „selbst genutzt“</li>
+                <li><strong>Schnellstart</strong> (seit Session 72): App-Symbol lange drücken → „Zähler ablesen“ öffnet direkt den Reiter. Android übernimmt neue Verknüpfungen erst beim nächsten Update der installierten App, das kann ein paar Tage dauern</li>
                 <li><strong>Erinnerung zum Ablesen</strong> (seit Session 69): ⋮-Menü → Benachrichtigungen → „Zähler ablesen (monatlich)“ und den Tag wählen (1., 5., 15. oder 28.). Die Nachricht kommt an dem Tag zur Uhrzeit der Morgen-Übersicht – aber nur, wenn ein aktiver Zähler seit Monatsanfang noch nicht abgelesen ist (Ablesungen aus den letzten 3 Tagen des Vormonats zählen mit). Ist 3 Tage später immer noch etwas offen, kommt sie einmal erneut. Antippen öffnet den Reiter Zähler. Bei „Bereiche“ muss Privat gewählt sein; die Ruhezeit gilt auch hier</li>
                 <li>Gesichert über Export → Backup wie alle anderen Daten</li>
               </ul>
@@ -2123,6 +2124,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
     </dialog>
   </div>
 
-<script src="app.js?v=71"></script>
+<script src="app.js?v=72"></script>
 </body>
 </html>
