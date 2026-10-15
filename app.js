@@ -8436,6 +8436,12 @@
         }
 
         if (gewuenschterTab && VIEW_ELEMENTE[gewuenschterTab]) {
+          // Reiter im aktiven Bereich ausgeblendet (z. B. Zähler nur in Privat)?
+          // Dann in einen Bereich wechseln, der ihn hat (seit Session 72)
+          if (aktiverBereich === "verwaltung" || !reiterIstSichtbar(aktiverBereich, gewuenschterTab)) {
+            const ziel = BEREICH_FARBWELT.find((b) => reiterIstSichtbar(b, gewuenschterTab));
+            if (ziel) window.bereichAuswaehlen(ziel);
+          }
           tabWechseln(gewuenschterTab);
         }
         geteiltenInhaltVerarbeiten();
