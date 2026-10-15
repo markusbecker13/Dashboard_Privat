@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css?v=72">
+<link rel="stylesheet" href="style.css?v=73">
 </head>
 <body>
   <!-- Linien-Icons (seit Session 35, Icons Etappe A). Eigene Zeichnungen, 24er-Raster,
@@ -1439,7 +1439,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <p><strong>Als App installieren (Android):</strong> Seite in Chrome öffnen → Drei-Punkte-Menü → „App installieren". Liegt danach als eigenes Icon auf dem Homescreen, öffnet ohne Browser-Leiste. Icon lange gedrückt halten → Schnellzugriff „Neue Notiz" springt direkt in den Notizen-Tab.</p>
               <p><strong>Geschwindigkeit</strong> (seit Session 64): Nach jeder Eingabe lädt die App alle Daten neu. Der Server holt sie jetzt gleichzeitig statt nacheinander, merkt sich die Login-Prüfung eine Minute lang und schreibt den Verlauf im Hintergrund – das Neuladen sollte dadurch spürbar schneller sein. Abmelden wirkt sofort; ein anderes Gerät mit demselben, gerade abgemeldeten Login kann höchstens noch eine Minute weiterarbeiten.</p>
               <p><strong>Sofort sichtbar</strong> (seit Session 65): Aufgaben und Termine abhaken, Aufgaben löschen, Einkauf hinzufügen/abhaken/löschen, Notizen hinzufügen/löschen und Wischen in Start erscheinen sofort – gespeichert wird im Hintergrund. Klappt das Speichern nicht, nimmt die App die Änderung zurück und meldet den Fehler (der Text steht dann wieder im Feld). Nach dem Laden zeichnet die App zuerst den sichtbaren Reiter, die übrigen kurz danach.</p>
-              <p><strong>NFC-Tags</strong> (seit Session 63): ⋮-Menü → „NFC-Tags“. Wählen: <em>Öffnen</em> (Bereich + Reiter), <em>Stunden Start/Stopp</em> (Kategorie) oder <em>„+“-Blatt</em> (Bereich + Art). Auf dem Android-Handy in Chrome bzw. der App „Auf NFC-Tag schreiben“ antippen und den Tag an die Rückseite halten (beim ersten Mal NFC erlauben; NFC am Handy einschalten; Inhalt wird überschrieben). Am Laptop nur „Link kopieren“ – dann mit einer NFC-App als URL schreiben. Beim Antippen: Stunden starten, bzw. stoppen und speichern, wenn genau diese Kategorie läuft (unter 2 Minuten mit Rückfrage; läuft eine andere, fragt die App vor dem Wechsel) – jeweils mit „Rückgängig“. Neu laden löst nichts doppelt aus. Im Tag steht kein Passwort; ein fremdes Handy landet nur bei der Anmeldung. Ob die App oder ein Chrome-Tab aufgeht, entscheidet Android.</p>
+              <p><strong>NFC-Tags</strong> (seit Session 63): ⋮-Menü → „NFC-Tags“. Wählen: <em>Öffnen</em> (Bereich + Reiter), <em>Stunden Start/Stopp</em> (Kategorie) oder <em>„+“-Blatt</em> (Bereich + Art). Auf dem Android-Handy in Chrome bzw. der App „Auf NFC-Tag schreiben“ antippen und den Tag an die Rückseite halten (beim ersten Mal NFC erlauben; NFC am Handy einschalten; Inhalt wird überschrieben). Am Laptop nur „Link kopieren“ – dann mit einer NFC-App als URL schreiben. <strong>Bewährt</strong> (z. B. mit Samsung Internet): „Link kopieren“ und in der Android-App <em>NFC Tools</em> unter Schreiben → Datensatz hinzufügen → „URL/URI“ einfügen und auf den Tag schreiben. Ein leerer Tag zeigt sonst nur Androids „Neues Tag erkannt – leeres Tag“. Beim Antippen: Stunden starten, bzw. stoppen und speichern, wenn genau diese Kategorie läuft (unter 2 Minuten mit Rückfrage; läuft eine andere, fragt die App vor dem Wechsel) – jeweils mit „Rückgängig“. Neu laden löst nichts doppelt aus. Im Tag steht kein Passwort; ein fremdes Handy landet nur bei der Anmeldung. Ob die App oder ein Chrome-Tab aufgeht, entscheidet Android.</p>
               <p><strong>Passwort ändern:</strong> Supabase-Dashboard → Edge Functions → Secrets → <code>APP_PASSWORD</code> löschen, neu anlegen. Kein Redeploy nötig. Ein zuvor ausgestelltes Token bleibt bis zum Ablauf (90 Tage) weiterhin gültig, unabhängig vom Passwort.</p>
               <p><strong>Login-Schutz:</strong> Token statt Passwort im Browser, Rate-Limiting nach 5 Fehlversuchen in 15 Minuten, Zugriff nur von deiner GitHub-Pages-Adresse, strikte Inhalts-Regeln (CSP) gegen eingeschleuste Skripte.</p>
             </div>
@@ -2124,6 +2124,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
     </dialog>
   </div>
 
-<script src="app.js?v=72"></script>
+<script src="app.js?v=73"></script>
 </body>
 </html>
