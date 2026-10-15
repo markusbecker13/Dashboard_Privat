@@ -8321,8 +8321,8 @@
     return `<p class="nfc-link" id="nfc-link">${link ? escapeHtml(link) : "Bitte zuerst eine Kategorie anlegen."}</p>
       <button type="button" class="btn-secondary" onclick="nfcLinkKopieren()"${link ? "" : " disabled"}>${ic("kopieren")}Link kopieren</button>
       <p class="blatt-hinweis">${kannSchreiben
-        ? "„Auf NFC-Tag schreiben“ und dann den Tag an die Rückseite des Handys halten. Der Tag muss beschreibbar sein (z. B. NTAG213/215); ein vorhandener Inhalt wird überschrieben."
-        : "Dieses Gerät kann keine NFC-Tags schreiben (das geht nur mit Chrome auf Android). Link kopieren und mit einer NFC-App als „URL“ auf den Tag schreiben – oder das Blatt auf dem Handy öffnen."}</p>`;
+        ? "Erst „Auf NFC-Tag schreiben“ antippen, dann den Tag an die Rückseite des Handys halten. Der Tag muss beschreibbar sein (z. B. NTAG213/215); ein vorhandener Inhalt wird überschrieben. Klappt es nicht: „Link kopieren“ und mit der App NFC Tools schreiben."
+        : "Dieser Browser kann keine NFC-Tags schreiben. Bewährt: „Link kopieren“ und mit der Android-App NFC Tools unter Schreiben → Datensatz hinzufügen → „URL/URI“ auf den Tag schreiben."}</p>`;
   }
   window.nfcLinkKopieren = async function() {
     if (!blatt || blatt.art !== "nfc") return;
