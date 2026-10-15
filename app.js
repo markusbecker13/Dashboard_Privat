@@ -8706,6 +8706,7 @@
         <p class="notiz-meta push-erklaerung">Termine, fällige Aufgaben, Einheiten und Weiterbildung des Tages – an leeren Tagen kommt nichts.</p>
         ${pushGeburtstagHtml(e, chips)}
         ${pushZaehlerHtml(e, chips, bereiche)}
+        ${pushAwoHtml(e, chips, bereiche)}
         <label class="push-schalter"><input type="checkbox" id="push-termine"${e.termine_an ? " checked" : ""}> Vor Terminen und Aufgaben mit Uhrzeit</label>
         <div class="schnell-chips push-chips" role="group" aria-label="Vorlauf">${chips("vorlauf", PUSH_VORLAUF.map(([w, t]) => [String(w), t]), (w) => Number(w) === Number(e.vorlauf_min))}</div>
         <div class="schnell-label push-label">Bereiche</div>
@@ -8733,6 +8734,10 @@
       if (gebAn) push.einst.geburtstage_an = gebAn.checked;
       const zAn = document.getElementById("push-zaehler");
       if (zAn) push.einst.zaehler_an = zAn.checked;
+      const sAn = document.getElementById("push-schluessel");
+      if (sAn) push.einst.schluessel_an = sAn.checked;
+      const vAn = document.getElementById("push-vermietung");
+      if (vAn) push.einst.vermietung_an = vAn.checked;
       const ruheAn = document.getElementById("push-ruhe-an");
       if (ruheAn) {
         push.einst.ruhe_an = ruheAn.checked;
@@ -8742,7 +8747,7 @@
     };
     ["push-morgens", "push-morgens-zeit", "push-termine"].forEach((id) => document.getElementById(id).addEventListener("change", merk));
     // Geburtstage: Erklärung hängt an Morgen-Übersicht und Schalter
-    ["push-geburtstage", "push-zaehler", "push-morgens", "push-morgens-zeit"].forEach((id) => {
+    ["push-geburtstage", "push-zaehler", "push-schluessel", "push-vermietung", "push-morgens", "push-morgens-zeit"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", () => { merk(); pushRendern(); });
     });
@@ -8830,6 +8835,28 @@
     try { await navigator.clipboard.writeText(text); hinweisZeigen("Diagnose kopiert"); } catch (_e) { prompt("Diagnose kopieren:", text); }
   };
 
+  // ---- Schlüssel-Rückgaben und Vermietungen (seit Session 71) ----
+  const PUSH_AWO_VORLAUF = [[0, "Nur am Tag"], [1, "1 Tag vorher"], [3, "3 Tage"], [7, "1 Woche"]];
+  function pushAwoHtml(e, chips, bereiche) {
+    if (!Object.prototype.hasOwnProperty.call(e, "schluessel_an")) {
+      return `<p class="notiz-meta push-erklaerung">Für Erinnerungen an Schlüssel-Rückgaben und Vermietungen bitte zuerst <code>push_awo_erinnerungen_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    const zeit = String(e.morgens_uhrzeit || "07:00").slice(0, 5);
+    const wann = (v) => (v === 0 ? "am Tag selbst" : `am Tag selbst und ${v === 1 ? "1 Tag" : v === 7 ? "1 Woche" : v + " Tage"} vorher`);
+    const vS = Number(e.schluessel_vorlauf ?? 1), vV = Number(e.vermietung_vorlauf ?? 1);
+    const fehlt = (tab) => !BEREICH_FARBWELT.some((b) => bereiche.includes(b) && reiterIstSichtbar(b, tab));
+    return `<label class="push-schalter"><input type="checkbox" id="push-schluessel"${e.schluessel_an ? " checked" : ""}> Schlüssel-Rückgaben</label>
+      ${e.schluessel_an ? `<div class="schnell-chips push-chips" role="group" aria-label="Schlüssel vorher">${chips("schluesselvorlauf", PUSH_AWO_VORLAUF.map(([w, t]) => [String(w), t]), (w) => Number(w) === vS)}</div>` : ""}
+      <p class="notiz-meta push-erklaerung">${e.schluessel_an
+        ? `Für ausgegebene Schlüssel mit „Rückgabe bis“: ${escapeHtml(wann(vS))} um ${escapeHtml(zeit)}; überfällige am Tag danach und dann jede Woche, bis sie zurück sind.${fehlt("schluessel") ? " <strong>Bei „Bereiche“ fehlt der Bereich mit dem Reiter Schlüssel.</strong>" : ""}`
+        : "Aus."}</p>
+      <label class="push-schalter"><input type="checkbox" id="push-vermietung"${e.vermietung_an ? " checked" : ""}> Vermietungen</label>
+      ${e.vermietung_an ? `<div class="schnell-chips push-chips" role="group" aria-label="Vermietungen vorher">${chips("vermietungvorlauf", PUSH_AWO_VORLAUF.map(([w, t]) => [String(w), t]), (w) => Number(w) === vV)}</div>` : ""}
+      <p class="notiz-meta push-erklaerung">${e.vermietung_an
+        ? `Raumvermietungen ${escapeHtml(wann(vV))} um ${escapeHtml(zeit)}, mit Uhrzeit, Raum und Anlass (bei „Nur Uhrzeit“ ohne Raum und Anlass).${fehlt("raumplanung") ? " <strong>Bei „Bereiche“ fehlt der Bereich mit dem Reiter Raumplanung.</strong>" : ""}`
+        : "Aus."}</p>`;
+  }
+
   // ---- Zähler ablesen (seit Session 69) ----
   const PUSH_ZAEHLER_TAG = [[1, "am 1."], [5, "am 5."], [15, "am 15."], [28, "am 28."]];
   function pushZaehlerHtml(e, chips, bereiche) {
@@ -8895,6 +8922,8 @@
     if (name === "vorlauf") e.vorlauf_min = Number(wert);
     if (name === "gebvorlauf") e.geburtstage_vorlauf = Number(wert);
     if (name === "zaehlertag") e.zaehler_tag = Number(wert);
+    if (name === "schluesselvorlauf") e.schluessel_vorlauf = Number(wert);
+    if (name === "vermietungvorlauf") e.vermietung_vorlauf = Number(wert);
     if (name === "titel") e.ohne_titel = wert === "ohne";
     if (name === "bereich") {
       const b = new Set(Array.isArray(e.bereiche) ? e.bereiche : []);
@@ -8925,6 +8954,10 @@
         // Zähler-Erinnerung (seit Session 69) nur, wenn der Server sie kennt
         ...(Object.prototype.hasOwnProperty.call(e, "zaehler_an")
           ? { zaehler_an: !!e.zaehler_an, zaehler_tag: Number(e.zaehler_tag) || 1 } : {}),
+        // Schlüssel/Vermietungen (seit Session 71) nur, wenn der Server sie kennt
+        ...(Object.prototype.hasOwnProperty.call(e, "schluessel_an")
+          ? { schluessel_an: !!e.schluessel_an, schluessel_vorlauf: Number(e.schluessel_vorlauf ?? 1),
+            vermietung_an: !!e.vermietung_an, vermietung_vorlauf: Number(e.vermietung_vorlauf ?? 1) } : {}),
       });
       push.meldung = "Gespeichert.";
     } catch (err) {
