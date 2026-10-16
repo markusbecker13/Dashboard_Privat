@@ -122,6 +122,7 @@
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
     rezepte: "view-rezepte", ernaehrung: "view-ernaehrung", schluessel: "view-schluessel",
     bibliothek: "view-bibliothek", lernen: "view-lernen", stunden: "view-stunden", zaehler: "view-zaehler",
+    kommando: "view-kommando",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -135,7 +136,7 @@
     ["ogsinventar", "Inventar"], ["ogsprojekte", "Projekte"], ["verleih", "Verleih"],
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
     ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"], ["bibliothek", "Bibliothek"], ["lernen", "Lernen"],
-    ["stunden", "Stunden"], ["zaehler", "Zähler"],
+    ["stunden", "Stunden"], ["zaehler", "Zähler"], ["kommando", "Kommandozentrale"],
   ];
   // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
@@ -156,14 +157,16 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden", "zaehler"],
+      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden", "zaehler", "kommando"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
-      "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten", "stunden"],
-    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel", "stunden"],
-    business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen", "stunden"],
+      "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten", "stunden", "kommando"],
+    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel", "stunden", "kommando"],
+    business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen", "stunden", "kommando"],
     // Erlebnispädagogik (seit Session 49): Methodenkartei + Weiterbildung zogen aus Privat hierher
-    ep: ["heute", "aufgaben", "kalender", "notizen", "links", "bibliothek", "lernen", "methoden", "spiele", "verlauf", "anleitung"],
+    ep: ["heute", "aufgaben", "kalender", "notizen", "links", "bibliothek", "lernen", "methoden", "spiele", "verlauf", "anleitung", "kommando"],
   };
+  // Kommandozentrale (seit Session 73) ist in allen Bereichen standardmäßig an –
+  // dieselben Daten überall, je Bereich in der Reiter-Verwaltung ausblendbar
 
   // Prüft, ob ein Reiter im Bereich sichtbar ist (Nutzereinstellung, sonst Standardliste; manche nur privat)
   function reiterIstSichtbar(bereich, schluessel) {
@@ -186,6 +189,8 @@
       .filter((k) => !epTabs.includes(k));
     return [
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
+      // Seit Session 73: eigener Punkt in der Leiste unten
+      { schluessel: "kommando", label: "Zentrale", tabs: ["kommando"] },
       { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen", "stunden", "zaehler"] },
       { schluessel: "sammeln", label: "Sammeln", tabs: sammeln },
       { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: [...new Set([...epTabs, "bibliothek", "lernen"]), "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
@@ -378,6 +383,7 @@
     heute: `<svg ${SVG_ATTR}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
     planen: `<svg ${SVG_ATTR}><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
     sammeln: `<svg ${SVG_ATTR}><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>`,
+    kommando: `<svg ${SVG_ATTR}><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg>`,
     arbeit: `<svg ${SVG_ATTR}><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>`,
     verwalten: `<svg ${SVG_ATTR}><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>`,
   };
@@ -5527,6 +5533,534 @@
   };
 
   // ==========================================================
+  // Kommandozentrale (seit Session 73, Phase 1 / Etappe 1): alle Projekte
+  // und Aufgaben aller Lebensbereiche an einem Ort. Eigene Tabellen
+  // kz_bereiche, kz_projekte, kz_aufgaben (kz_tageslog ohne Oberfläche).
+  // Keine App-Bereich-Trennung – in Privat, OGS, AWO, Business und EP
+  // dieselben Daten. Aufgaben ohne Bereich und ohne Projekt = Eingang.
+  // Geladen erst beim Öffnen (eigene Aktion kz_laden).
+  // ==========================================================
+  const kz = {
+    geladen: false, laedt: false, fehlt: false, fehler: "",
+    bereiche: [], projekte: [], aufgaben: [],
+    speichert: false,
+  };
+  const KZ_HEUTE_MAX = 3;
+  const KZ_PROJEKT_STATUS = [["aktiv", "Aktiv"], ["wartet", "Wartet"], ["hintergrund", "Hintergrund"], ["idee", "Idee"], ["abgeschlossen", "Abgeschlossen"]];
+  const KZ_PROJEKT_REIHE = ["aktiv", "wartet", "hintergrund", "idee", "abgeschlossen"];
+  const KZ_AUFGABE_STATUS = [["offen", "Offen"], ["wartet", "Wartet"], ["erledigt", "Erledigt"]];
+  const KZ_SCHUTZ_DIENSTLICH = "Dienstlicher Bereich: keine Namen Dritter – Kürzel oder Rollen nutzen, z. B. „Rückruf Elternteil T.“.";
+  const KZ_SCHUTZ_ALLGEMEIN = "Bitte keine Namen oder Gesundheitsdaten Dritter eintragen – Kürzel oder Rollen reichen.";
+
+  // Auf-/Zu-Zustand von Bereichen und Projekten (nur dieses Gerät)
+  const kzOffen = {};
+  try { Object.assign(kzOffen, JSON.parse(localStorage.getItem("kz-offen") || "{}")); } catch (_e) { /* leer lassen */ }
+  window.kzUmklappen = function(el) {
+    kzOffen[el.dataset.kzKlapp] = el.open;
+    try { localStorage.setItem("kz-offen", JSON.stringify(kzOffen)); } catch (_e) { /* egal */ }
+  };
+
+  async function kzLaden() {
+    if (kz.laedt) return;
+    kz.laedt = true; kz.fehler = "";
+    if (aktiverTab === "kommando") renderKommando();
+    try {
+      const r = await api("kz_laden");
+      kz.fehlt = !!r.fehlt;
+      kz.bereiche = r.bereiche || [];
+      kz.projekte = r.projekte || [];
+      kz.aufgaben = r.aufgaben || [];
+      kz.geladen = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") kz.fehler = e.message || "Fehler";
+    } finally {
+      kz.laedt = false;
+    }
+    if (aktiverTab === "kommando") renderKommando();
+  }
+  window.kzNeuLaden = function() { kz.geladen = false; kz.fehler = ""; kzLaden(); };
+
+  // ---- Hilfen ----
+  function kzBereich(id) { return kz.bereiche.find((b) => String(b.id) === String(id)); }
+  function kzProjekt(id) { return kz.projekte.find((p) => String(p.id) === String(id)); }
+  function kzAufgabe(id) { return kz.aufgaben.find((a) => String(a.id) === String(id)); }
+  function kzBereicheSortiert() {
+    return kz.bereiche.slice().sort((a, b) => (Number(a.sortierung) || 0) - (Number(b.sortierung) || 0) || String(a.name).localeCompare(String(b.name), "de"));
+  }
+  function kzIstEingang(a) { return !a.bereich_id && !a.projekt_id && a.status !== "erledigt"; }
+  function kzEingang() { return kz.aufgaben.filter(kzIstEingang).sort((a, b) => String(a.erstellt_am).localeCompare(String(b.erstellt_am))); }
+  function kzHeuteAnzahl(ohneId) { return kz.aufgaben.filter((a) => a.heute && String(a.id) !== String(ohneId || "")).length; }
+  // Tage von iso bis heute (positiv = Vergangenheit)
+  function kzTageSeit(iso) {
+    if (!iso) return null;
+    return Math.round((Date.parse(heuteISO() + "T12:00:00Z") - Date.parse(String(iso).slice(0, 10) + "T12:00:00Z")) / 86400000);
+  }
+  function kzSeitText(tage) { return tage <= 0 ? "seit heute" : tage === 1 ? "seit gestern" : `seit ${tage} Tagen`; }
+  // „noch 7 Wochen“ / „noch 5 Tage“ / „Ziel heute“ / „Ziel seit 3 Tagen überschritten“
+  function kzZielText(iso) {
+    const rest = -kzTageSeit(iso);
+    if (rest < 0) return { text: `Ziel ${datumDe(iso)} – ${-rest === 1 ? "seit gestern" : `seit ${-rest} Tagen`} überschritten`, rot: true };
+    if (rest === 0) return { text: "Ziel heute", rot: false, bald: true };
+    if (rest < 14) return { text: `noch ${rest} ${rest === 1 ? "Tag" : "Tage"} (bis ${datumDe(iso)})`, rot: false, bald: true };
+    const w = Math.round(rest / 7);
+    return { text: `noch ${w} Wochen (bis ${datumDe(iso)})`, rot: false };
+  }
+  function kzStatusText(liste, wert) { const f = liste.find(([k]) => k === wert); return f ? f[1] : wert; }
+  // Wiedervorlage erreicht?
+  function kzWiedervorlageFaellig(x) { return x.status === "wartet" && !!x.wiedervorlage && x.wiedervorlage <= heuteISO(); }
+  function kzWartetText(x) {
+    if (x.status !== "wartet") return "";
+    const seit = kzTageSeit(x.wartet_seit);
+    return `wartet${x.wartet_auf ? ` auf ${x.wartet_auf}` : ""}${seit !== null ? " · " + kzSeitText(seit) : ""}`;
+  }
+  // Offene Aufgaben zuerst (heute, überfällig, nach Fälligkeit), dann wartende (Wiedervorlage erreicht zuerst)
+  function kzAufgabenSortiert(liste) {
+    const rang = (a) => (a.status === "offen" ? 0 : a.status === "wartet" ? 1 : 2);
+    return liste.slice().sort((a, b) => rang(a) - rang(b)
+      || (b.heute ? 1 : 0) - (a.heute ? 1 : 0)
+      || (kzWiedervorlageFaellig(b) ? 1 : 0) - (kzWiedervorlageFaellig(a) ? 1 : 0)
+      || (a.faellig_am ? 0 : 1) - (b.faellig_am ? 0 : 1)
+      || String(a.faellig_am || "").localeCompare(String(b.faellig_am || ""))
+      || String(a.erstellt_am).localeCompare(String(b.erstellt_am)));
+  }
+  function kzProjekteSortiert(liste) {
+    return liste.slice().sort((a, b) => KZ_PROJEKT_REIHE.indexOf(a.status) - KZ_PROJEKT_REIHE.indexOf(b.status)
+      || (kzWiedervorlageFaellig(b) ? 1 : 0) - (kzWiedervorlageFaellig(a) ? 1 : 0)
+      || (Number(a.sortierung) || 0) - (Number(b.sortierung) || 0)
+      || String(a.name).localeCompare(String(b.name), "de"));
+  }
+  function kzOhneSchritt(p) { return p.status === "aktiv" && !String(p.naechster_schritt || "").trim(); }
+
+  // ---- Anzeige ----
+  function renderKommando() {
+    const el = document.getElementById("kommando-inhalt");
+    if (!el) return;
+    if (!kz.geladen && !kz.laedt && !kz.fehler && !kz.fehlt) kzLaden();
+    if (kz.fehlt) { el.innerHTML = `<p class="empty-text">Für die Kommandozentrale bitte zuerst <code>kommandozentrale_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`; return; }
+    if (kz.fehler) { el.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(kz.fehler)} <button class="link-btn" onclick="kzNeuLaden()">Nochmal versuchen</button></p>`; return; }
+    if (!kz.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
+    // Eingabefeld beim Neuzeichnen behalten (Text und Fokus)
+    const altFeld = document.getElementById("kz-schnell");
+    const altText = altFeld ? altFeld.value : "";
+    const hatteFokus = altFeld && document.activeElement === altFeld;
+
+    const bereiche = kzBereicheSortiert();
+    const aktive = bereiche.filter((b) => !b.archiviert);
+    const archiv = bereiche.filter((b) => b.archiviert);
+    const heuteN = kzHeuteAnzahl();
+    el.innerHTML = `
+      ${kzSchnellHtml()}
+      ${kzEingangHtml()}
+      <div class="reiter-aktionen kz-aktionen">
+        <button type="button" class="btn-secondary" onclick="kzProjektNeu()">${ic("plus")}Projekt</button>
+        <button type="button" class="btn-secondary" onclick="kzAufgabeNeu()">${ic("plus")}Aufgabe</button>
+        <span class="notiz-meta kz-heute-stand" title="Aufgaben, die für heute markiert sind">Heute: ${heuteN} von ${KZ_HEUTE_MAX}</span>
+      </div>
+      <div class="kz-bereiche">${aktive.map(kzBereichHtml).join("") || `<p class="empty-text">Noch keine Bereiche – unten unter „Bereiche verwalten“ anlegen.</p>`}</div>
+      ${archiv.length ? `<details class="anleitung-abschnitt kz-archiv" data-kz-klapp="archiv"${kzOffen.archiv ? " open" : ""} ontoggle="kzUmklappen(this)">
+        <summary>Archivierte Bereiche (${archiv.length})</summary>
+        <div class="anleitung-text">${archiv.map(kzBereichHtml).join("")}</div>
+      </details>` : ""}
+      ${kzBereicheVerwaltenHtml(bereiche)}`;
+    const feld = document.getElementById("kz-schnell");
+    if (feld) {
+      feld.value = altText;
+      feld.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.kzSchnellSpeichern(); } });
+      if (hatteFokus) feld.focus();
+    }
+  }
+
+  function kzSchnellHtml() {
+    return `<div class="kz-schnell">
+        <label class="schnell-label" for="kz-schnell">Schnell notieren – landet im Eingang</label>
+        <div class="kz-schnell-zeile">
+          <input type="text" id="kz-schnell" maxlength="300" autocomplete="off" enterkeyhint="done" placeholder="Was ist dir eingefallen? Enter speichert">
+          <button type="button" class="btn-primary" id="kz-schnell-knopf" onclick="kzSchnellSpeichern()"${kz.speichert ? " disabled" : ""}>${ic("plus")}<span>Eingang</span></button>
+        </div>
+        <p class="blatt-hinweis">${escapeHtml(KZ_SCHUTZ_ALLGEMEIN)} Diktieren geht über das Mikrofon der Tastatur.</p>
+      </div>`;
+  }
+
+  function kzEingangHtml() {
+    const liste = kzEingang();
+    const alt = liste.filter((a) => kzTageSeit(a.erstellt_am) > 3).length;
+    return `<section class="kz-eingang${liste.length ? "" : " leer"}" aria-labelledby="kz-eingang-titel">
+        <h2 class="std-zwischen" id="kz-eingang-titel">${ic("eingang")} Eingang (${liste.length})</h2>
+        ${alt ? `<p class="kz-warnung">${ic("warnung")} ${alt} ${alt === 1 ? "Eintrag liegt" : "Einträge liegen"} schon länger als 3 Tage – zuordnen oder löschen.</p>` : ""}
+        ${liste.length ? `<div class="task-list">${liste.map((a) => {
+          const tage = kzTageSeit(a.erstellt_am);
+          return `<button type="button" class="kz-eingang-zeile${tage > 3 ? " alt" : ""}" onclick="blattOeffnen('kzaufgabe', '${escapeAttr(String(a.id))}')">
+              <span class="kz-eingang-titel">${escapeHtml(a.titel)}</span>
+              <span class="notiz-meta">${escapeHtml(tage <= 0 ? "heute" : tage === 1 ? "gestern" : `vor ${tage} Tagen`)} · zuordnen ${ic("weiter")}</span>
+            </button>`;
+        }).join("")}</div>` : `<p class="notiz-meta">Leer – alles zugeordnet.</p>`}
+      </section>`;
+  }
+
+  function kzBereichHtml(b) {
+    const projekte = kz.projekte.filter((p) => String(p.bereich_id) === String(b.id));
+    const laufend = kzProjekteSortiert(projekte.filter((p) => p.status !== "abgeschlossen"));
+    const fertig = projekte.filter((p) => p.status === "abgeschlossen")
+      .sort((x, y) => String(y.abgeschlossen_am || "").localeCompare(String(x.abgeschlossen_am || "")));
+    const ohneProjekt = kz.aufgaben.filter((a) => String(a.bereich_id) === String(b.id) && !a.projekt_id);
+    const ohneProjektOffen = kzAufgabenSortiert(ohneProjekt.filter((a) => a.status !== "erledigt"));
+    const aufgabenOffen = kz.aufgaben.filter((a) => String(a.bereich_id) === String(b.id) && a.status !== "erledigt");
+    const nAktiv = projekte.filter((p) => p.status === "aktiv").length;
+    const nOhneSchritt = projekte.filter(kzOhneSchritt).length;
+    const nWv = [...projekte, ...aufgabenOffen].filter(kzWiedervorlageFaellig).length;
+    const schluessel = "b-" + b.id;
+    const offen = kzOffen[schluessel] !== undefined ? kzOffen[schluessel] : (nAktiv > 0 || aufgabenOffen.length > 0);
+    const bid = escapeAttr(String(b.id));
+    const meta = [nAktiv ? `${nAktiv} aktiv` : "", laufend.length - nAktiv > 0 ? `${laufend.length - nAktiv} weitere` : "",
+      aufgabenOffen.length ? `${aufgabenOffen.length} offen` : ""].filter(Boolean).join(" · ") || "leer";
+    return `<details class="anleitung-abschnitt kz-bereich" data-kz-klapp="${escapeAttr(schluessel)}"${offen ? " open" : ""} ontoggle="kzUmklappen(this)">
+        <summary>
+          <span class="kz-bereich-name">${escapeHtml(b.name)}</span>
+          ${b.dienstlich ? `<span class="badge kz-dienstlich">dienstlich</span>` : ""}
+          <span class="kz-bereich-meta notiz-meta">${escapeHtml(meta)}</span>
+          ${nOhneSchritt ? `<span class="badge overdue">${nOhneSchritt} ohne nächsten Schritt</span>` : ""}
+          ${nWv ? `<span class="badge today">${nWv} Wiedervorlage</span>` : ""}
+        </summary>
+        <div class="anleitung-text kz-bereich-inhalt">
+          ${laufend.map(kzProjektHtml).join("") || `<p class="notiz-meta">Noch kein Projekt.</p>`}
+          ${ohneProjektOffen.length ? `<div class="kz-ohne-projekt">
+            <div class="schnell-label">Aufgaben ohne Projekt</div>
+            <div class="task-list">${ohneProjektOffen.map(kzAufgabeHtml).join("")}</div>
+          </div>` : ""}
+          ${kzErledigteHtml(ohneProjekt, "bo-" + b.id)}
+          <div class="kz-bereich-knoepfe">
+            <button type="button" class="link-btn" onclick="kzProjektNeu('${bid}')">${ic("plus")}Projekt in ${escapeHtml(b.name)}</button>
+            <button type="button" class="link-btn" onclick="kzAufgabeNeu('${bid}')">${ic("plus")}Aufgabe ohne Projekt</button>
+          </div>
+          ${fertig.length ? `<details class="kz-abgeschlossen" data-kz-klapp="ab-${bid}"${kzOffen["ab-" + b.id] ? " open" : ""} ontoggle="kzUmklappen(this)">
+            <summary>Abgeschlossen (${fertig.length})</summary>
+            ${fertig.map(kzProjektHtml).join("")}
+          </details>` : ""}
+        </div>
+      </details>`;
+  }
+
+  function kzProjektHtml(p) {
+    const aufgaben = kz.aufgaben.filter((a) => String(a.projekt_id) === String(p.id));
+    const offenListe = kzAufgabenSortiert(aufgaben.filter((a) => a.status !== "erledigt"));
+    const nOffen = offenListe.filter((a) => a.status === "offen").length;
+    const nWartet = offenListe.length - nOffen;
+    const pid = escapeAttr(String(p.id));
+    const schluessel = "p-" + p.id;
+    const offen = !!kzOffen[schluessel];
+    const ohneSchritt = kzOhneSchritt(p);
+    const ziel = p.zieldatum && p.status !== "abgeschlossen" ? kzZielText(p.zieldatum) : null;
+    const wv = kzWiedervorlageFaellig(p);
+    const zeilen = [];
+    if (p.status !== "abgeschlossen") {
+      if (ohneSchritt) zeilen.push(`<span class="kz-rot">${ic("warnung")} Nächster Schritt fehlt</span>`);
+      else if (p.naechster_schritt) zeilen.push(`<span class="kz-schritt">${ic("weiter")} ${escapeHtml(p.naechster_schritt)}</span>`);
+    }
+    if (p.status === "wartet") zeilen.push(`<span class="notiz-meta${wv ? " kz-wv" : ""}">${escapeHtml(kzWartetText(p))}${p.wiedervorlage ? ` · Wiedervorlage ${escapeHtml(datumDe(p.wiedervorlage))}${wv ? " – jetzt nachhaken" : ""}` : ""}</span>`);
+    if (ziel) zeilen.push(`<span class="notiz-meta${ziel.rot ? " kz-rot" : ""}">${escapeHtml(ziel.text)}</span>`);
+    if (p.status === "abgeschlossen" && p.abgeschlossen_am) zeilen.push(`<span class="notiz-meta">abgeschlossen am ${escapeHtml(datumDe(String(p.abgeschlossen_am).slice(0, 10)))}</span>`);
+    const zahl = [nOffen ? `${nOffen} offen` : "", nWartet ? `${nWartet} wartet` : ""].filter(Boolean).join(" · ") || "keine offenen Aufgaben";
+    return `<details class="kz-projekt kz-status-${escapeAttr(p.status)}${ohneSchritt ? " kz-fehlt" : ""}${wv ? " kz-wv-rand" : ""}" data-kz-klapp="${escapeAttr(schluessel)}"${offen ? " open" : ""} ontoggle="kzUmklappen(this)">
+        <summary>
+          <span class="kz-projekt-kopf">
+            <span class="kz-projekt-name">${escapeHtml(p.name)}</span>
+            <span class="kz-status-pille kz-pille-${escapeAttr(p.status)}">${escapeHtml(kzStatusText(KZ_PROJEKT_STATUS, p.status))}</span>
+          </span>
+          ${zeilen.map((z) => `<span class="kz-projekt-zeile">${z}</span>`).join("")}
+          <span class="kz-projekt-zeile notiz-meta">${escapeHtml(zahl)}</span>
+        </summary>
+        <div class="kz-projekt-inhalt">
+          ${p.beschreibung ? `<p class="kz-beschreibung">${escapeHtml(p.beschreibung)}</p>` : ""}
+          ${offenListe.length ? `<div class="task-list">${offenListe.map(kzAufgabeHtml).join("")}</div>` : ""}
+          ${kzErledigteHtml(aufgaben, "pe-" + p.id)}
+          <div class="kz-bereich-knoepfe">
+            <button type="button" class="link-btn" onclick="kzAufgabeNeu('', '${pid}')">${ic("plus")}Aufgabe</button>
+            <button type="button" class="link-btn" onclick="blattOeffnen('kzprojekt', '${pid}')">${ic("stift")}Projekt bearbeiten</button>
+          </div>
+        </div>
+      </details>`;
+  }
+
+  // Erledigte Aufgaben eingeklappt (neueste zuerst, höchstens 30)
+  function kzErledigteHtml(aufgaben, schluessel) {
+    const fertig = aufgaben.filter((a) => a.status === "erledigt").sort((a, b) => String(b.erledigt_am || "").localeCompare(String(a.erledigt_am || "")));
+    if (!fertig.length) return "";
+    return `<details class="kz-erledigt" data-kz-klapp="${escapeAttr(schluessel)}"${kzOffen[schluessel] ? " open" : ""} ontoggle="kzUmklappen(this)">
+        <summary>Erledigt (${fertig.length})</summary>
+        <div class="task-list">${fertig.slice(0, 30).map(kzAufgabeHtml).join("")}</div>
+        ${fertig.length > 30 ? `<p class="notiz-meta">… und ${fertig.length - 30} ältere.</p>` : ""}
+      </details>`;
+  }
+
+  function kzAufgabeHtml(a) {
+    const done = a.status === "erledigt";
+    const aid = escapeAttr(String(a.id));
+    const heute = heuteISO();
+    const meta = [];
+    if (a.heute) meta.push(badgeHtml("reminder", `Heute${a.heute_seit && a.heute_seit < heute ? " · " + kzSeitText(kzTageSeit(a.heute_seit)) : ""}`));
+    if (!done && a.faellig_am) {
+      if (a.faellig_am < heute) meta.push(badgeHtml("overdue", `überfällig · ${datumDe(a.faellig_am)}`));
+      else if (a.faellig_am === heute) meta.push(badgeHtml("today", "heute fällig"));
+      else meta.push(badgeHtml("", `fällig ${datumDe(a.faellig_am)}`));
+    }
+    if (a.status === "wartet") meta.push(badgeHtml(kzWiedervorlageFaellig(a) ? "today" : "", kzWartetText(a)));
+    if (a.status === "wartet" && a.wiedervorlage) meta.push(badgeHtml(kzWiedervorlageFaellig(a) ? "today" : "", `Wiedervorlage ${datumDe(a.wiedervorlage)}`));
+    if (done && a.erledigt_am) meta.push(badgeHtml("", `erledigt ${datumDe(String(a.erledigt_am).slice(0, 10))}`));
+    const klasse = done ? "" : a.faellig_am && a.faellig_am < heute ? " ueberfaellig" : a.heute ? " heute" : "";
+    return `<div class="task kz-aufgabe${klasse}${a.status === "wartet" ? " kz-wartet" : ""}">
+        ${a.status === "wartet"
+          ? `<span class="task-check kz-check-wartet" title="wartet" aria-hidden="true">${ic("stoppuhr")}</span>`
+          : `<button type="button" class="task-check ${done ? "done" : ""}" onclick="kzUmschalten('${aid}')" aria-label="${done ? "Wieder öffnen" : "Erledigt"}: ${escapeAttr(a.titel)}">${done ? "✓" : ""}</button>`}
+        <button type="button" class="task-info kz-aufgabe-info" onclick="blattOeffnen('kzaufgabe', '${aid}')">
+          <span class="task-titel ${done ? "done" : ""}">${escapeHtml(a.titel)}</span>
+          ${a.notiz && !done ? `<span class="kz-notiz">${escapeHtml(a.notiz)}</span>` : ""}
+          ${meta.length ? `<span class="task-meta">${meta.join("")}</span>` : ""}
+        </button>
+        <button type="button" class="task-edit-btn" onclick="blattOeffnen('kzaufgabe', '${aid}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
+      </div>`;
+  }
+
+  function kzBereicheVerwaltenHtml(bereiche) {
+    return `<details class="anleitung-abschnitt kz-verwalten" data-kz-klapp="verwalten"${kzOffen.verwalten ? " open" : ""} ontoggle="kzUmklappen(this)">
+        <summary>${ic("zahnrad")} Bereiche verwalten</summary>
+        <div class="anleitung-text">
+          <p class="notiz-meta" style="margin-top:0;">Reihenfolge mit ↑ ↓, Stift = Name, „dienstlich“ und Archivieren. Dienstliche Bereiche zeigen im Formular einen deutlichen Datenschutz-Hinweis.</p>
+          <div class="kz-bereich-liste">${bereiche.map((b, i) => `
+            <div class="kz-bereich-zeile${b.archiviert ? " archiviert" : ""}">
+              <span class="kz-bereich-zeile-name">${escapeHtml(b.name)}${b.dienstlich ? ` <span class="badge kz-dienstlich">dienstlich</span>` : ""}${b.archiviert ? ` <span class="badge">archiviert</span>` : ""}</span>
+              <button type="button" class="task-edit-btn" onclick="kzBereichSchieben('${escapeAttr(String(b.id))}', -1)" ${i === 0 ? "disabled" : ""} aria-label="${escapeAttr(b.name)} nach oben">↑</button>
+              <button type="button" class="task-edit-btn" onclick="kzBereichSchieben('${escapeAttr(String(b.id))}', 1)" ${i === bereiche.length - 1 ? "disabled" : ""} aria-label="${escapeAttr(b.name)} nach unten">↓</button>
+              <button type="button" class="task-edit-btn" onclick="blattOeffnen('kzbereich', '${escapeAttr(String(b.id))}')" aria-label="${escapeAttr(b.name)} bearbeiten" title="Bearbeiten">${ic("stift")}</button>
+            </div>`).join("")}</div>
+          <button type="button" class="btn-secondary" onclick="blattNeu('kzbereich', {})">${ic("plus")}Bereich</button>
+        </div>
+      </details>`;
+  }
+
+  // ---- Aktionen ----
+  window.kzSchnellSpeichern = async function() {
+    const feld = document.getElementById("kz-schnell");
+    const titel = feld ? feld.value.trim() : "";
+    if (!titel) { if (feld) feld.focus(); return; }
+    if (kz.speichert) return;
+    kz.speichert = true;
+    const knopf = document.getElementById("kz-schnell-knopf");
+    if (knopf) knopf.disabled = true;
+    try {
+      const r = await api("kz_aufgabe_speichern", { titel });
+      if (r.aufgabe) kz.aufgaben.push(r.aufgabe); else kz.geladen = false;
+      if (feld) feld.value = "";
+      hinweisZeigen("Im Eingang");
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    } finally {
+      kz.speichert = false;
+    }
+    if (kz.geladen) renderKommando(); else kzLaden();
+    const neu = document.getElementById("kz-schnell");
+    if (neu) neu.focus();
+  };
+
+  // Kreis: offen ↔ erledigt (sofort sichtbar, gespeichert im Hintergrund)
+  window.kzUmschalten = async function(id) {
+    const a = kzAufgabe(id);
+    if (!a || a.status === "wartet") return;
+    const vorher = { status: a.status, erledigt_am: a.erledigt_am, heute: a.heute, heute_seit: a.heute_seit };
+    const neu = a.status === "erledigt" ? "offen" : "erledigt";
+    Object.assign(a, neu === "erledigt"
+      ? { status: "erledigt", erledigt_am: new Date().toISOString(), heute: false, heute_seit: null }
+      : { status: "offen", erledigt_am: null });
+    renderKommando();
+    try {
+      await api("kz_aufgabe_status", { id: a.id, status: neu });
+      hinweisZeigen(neu === "erledigt" ? "Erledigt" : "Wieder offen", neu === "erledigt" ? async () => {
+        try { await api("kz_aufgabe_status", { id: a.id, status: "offen" }); } catch (e) { if (e.message !== "unauthorized") alert("Nicht zurückgenommen: " + e.message); }
+        kzNeuLaden();
+      } : undefined);
+    } catch (e) {
+      Object.assign(a, vorher);
+      renderKommando();
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
+
+  window.kzBereichSchieben = async function(id, richtung) {
+    const liste = kzBereicheSortiert();
+    const i = liste.findIndex((b) => String(b.id) === String(id));
+    const j = i + richtung;
+    if (i < 0 || j < 0 || j >= liste.length) return;
+    [liste[i], liste[j]] = [liste[j], liste[i]];
+    liste.forEach((b, k) => { b.sortierung = k; });
+    renderKommando();
+    try { await api("kz_bereiche_reihenfolge", { ids: liste.map((b) => b.id) }); }
+    catch (e) { if (e.message !== "unauthorized") alert("Reihenfolge nicht gespeichert: " + (e.message || "Fehler")); kzNeuLaden(); }
+  };
+
+  window.kzProjektNeu = function(bereichId) {
+    const erster = kzBereicheSortiert().find((b) => !b.archiviert);
+    window.blattNeu("kzprojekt", { bereich_id: bereichId || (erster ? erster.id : ""), status: "aktiv" });
+  };
+  window.kzAufgabeNeu = function(bereichId, projektId) {
+    const p = projektId ? kzProjekt(projektId) : null;
+    window.blattNeu("kzaufgabe", { bereich_id: p ? p.bereich_id : (bereichId || ""), projekt_id: projektId || "" });
+  };
+
+  // ---- Blätter ----
+  // Bereichs-Chips: aktive Bereiche, dazu der aktuelle, falls archiviert
+  function kzBereichOptionen(aktuell, mitEingang) {
+    const liste = kzBereicheSortiert().filter((b) => !b.archiviert || String(b.id) === String(aktuell));
+    return [...(mitEingang ? [["", "Eingang"]] : []), ...liste.map((b) => [String(b.id), b.name])];
+  }
+  // Datenschutz-Hinweis passend zum gewählten Bereich
+  function kzSchutzHtml(bereichId) {
+    const b = kzBereich(bereichId);
+    return b && b.dienstlich
+      ? `<p class="kz-schutz dienstlich">${ic("warnung")} ${escapeHtml(KZ_SCHUTZ_DIENSTLICH)}</p>`
+      : `<p class="blatt-hinweis">${escapeHtml(KZ_SCHUTZ_ALLGEMEIN)}</p>`;
+  }
+
+  BLATT_ARTEN.kzaufgabe = {
+    titel: "Aufgabe bearbeiten",
+    titelNeu: "Neue Aufgabe",
+    finden: (id) => kzAufgabe(id),
+    laden: (a) => ({
+      id: a.id || "", titel: a.titel || "", notiz: a.notiz || "",
+      bereich_id: a.bereich_id ? String(a.bereich_id) : "", projekt_id: a.projekt_id ? String(a.projekt_id) : "",
+      status: a.status || "offen", faellig_am: a.faellig_am || "", heute: a.heute ? "ja" : "nein",
+      wartet_auf: a.wartet_auf || "", wiedervorlage: a.wiedervorlage || "",
+      _eingang: !!a.id && kzIstEingang(a), _letzterStatus: a.status || "offen",
+    }),
+    felder: [
+      { key: "titel", label: "Aufgabe", typ: "text", pflicht: true, platzhalter: "Was ist zu tun?" },
+      { key: "bereich_id", label: "Bereich", typ: "chips", optionen: (w) => kzBereichOptionen(w.bereich_id, true),
+        hinweis: "„Eingang“ = noch nicht zugeordnet. Mit Projekt gilt dessen Bereich." },
+      { key: "projekt_id", label: "Projekt", typ: "auswahl", wenn: (w) => !!w.bereich_id,
+        optionen: (w) => [["", "Ohne Projekt"], ...kzProjekteSortiert(kz.projekte.filter((p) => String(p.bereich_id) === String(w.bereich_id)
+          && (p.status !== "abgeschlossen" || String(p.id) === String(w.projekt_id)))).map((p) => [String(p.id), p.name + (p.status === "abgeschlossen" ? " (abgeschlossen)" : "")])] },
+      { key: "status", label: "Status", typ: "chips", optionen: KZ_AUFGABE_STATUS },
+      { key: "wartet_auf", label: "Wartet auf", typ: "text", wenn: (w) => w.status === "wartet", platzhalter: "optional, z. B. Rückmeldung Vorstand, Finanzmittel" },
+      { key: "wiedervorlage", label: "Wiedervorlage", typ: "datum", wenn: (w) => w.status === "wartet",
+        hinweis: "optional – ab dem Tag wird die Aufgabe hervorgehoben, damit du nachhakst" },
+      { key: "faellig_am", label: "Fällig am", typ: "datum", wenn: (w) => w.status !== "erledigt", hinweis: "optional" },
+      { key: "heute", label: "Für heute", typ: "chips", wenn: (w) => w.status === "offen",
+        optionen: [["nein", "Nein"], ["ja", "Ja – eine der 3 für heute"]] },
+      { key: "notiz", label: "Notiz", typ: "text-lang", zeilen: 3, platzhalter: "optional" },
+      { key: "_schutz", label: "Datenschutz", typ: "html", html: (w) => kzSchutzHtml(w.bereich_id) },
+    ],
+    pruefen: (w) => {
+      if (w.status === "offen" && w.heute === "ja" && !(kzAufgabe(w.id) || {}).heute && kzHeuteAnzahl(w.id) >= KZ_HEUTE_MAX) {
+        return "Höchstens 3 Aufgaben für heute – erst eine andere abwählen.";
+      }
+      return "";
+    },
+    speichern: (id, w) => api("kz_aufgabe_speichern", {
+      id, titel: w.titel, notiz: w.notiz, bereich_id: w.bereich_id || null, projekt_id: w.bereich_id ? (w.projekt_id || null) : null,
+      status: w.status, faellig_am: w.status === "erledigt" ? null : (w.faellig_am || null), heute: w.status === "offen" && w.heute === "ja",
+      wartet_auf: w.wartet_auf, wiedervorlage: w.wiedervorlage || null,
+    }),
+    loeschen: (id) => api("kz_aufgabe_loeschen", { id }),
+    loeschFrage: (a) => `Aufgabe „${a.titel || ""}“ löschen?`,
+    beimRendern: (w) => {
+      const t = document.getElementById("blatt-titel");
+      if (t) t.textContent = w._eingang ? "Eingang zuordnen" : (w.id ? "Aufgabe bearbeiten" : "Neue Aufgabe");
+      // Projekt passt nicht mehr zum gewählten Bereich → leeren
+      const p = w.projekt_id ? kzProjekt(w.projekt_id) : null;
+      if (p && String(p.bereich_id) !== String(w.bereich_id)) w.projekt_id = "";
+      // Gerade auf „wartet“ gestellt: gleich nach dem Worauf fragen
+      if (w.status !== w._letzterStatus) {
+        w._letzterStatus = w.status;
+        if (w.status === "wartet") { const f = document.getElementById("blatt-f-wartet_auf"); if (f) f.focus(); }
+      }
+      const h = document.querySelector("#blatt-felder [aria-label='Für heute']");
+      if (h) {
+        const n = kzHeuteAnzahl(w.id);
+        const hinweis = document.createElement("span");
+        hinweis.className = "blatt-hinweis";
+        hinweis.textContent = `Gerade ${n} von ${KZ_HEUTE_MAX} vergeben${n >= KZ_HEUTE_MAX && w.heute !== "ja" ? " – erst eine andere abwählen" : ""}.`;
+        h.after(hinweis);
+      }
+    },
+    gespeichert: (r, w) => (w._eingang && w.bereich_id ? "Zugeordnet" : "Aufgabe gespeichert"),
+    danach: () => { kzNeuLaden(); },
+  };
+
+  BLATT_ARTEN.kzprojekt = {
+    titel: "Projekt bearbeiten",
+    titelNeu: "Neues Projekt",
+    finden: (id) => kzProjekt(id),
+    laden: (p) => ({
+      id: p.id || "", name: p.name || "", bereich_id: p.bereich_id ? String(p.bereich_id) : "",
+      status: p.status || "idee", naechster_schritt: p.naechster_schritt || "", zieldatum: p.zieldatum || "",
+      wartet_auf: p.wartet_auf || "", wiedervorlage: p.wiedervorlage || "", beschreibung: p.beschreibung || "",
+      _letzterStatus: p.status || "idee",
+    }),
+    felder: [
+      { key: "name", label: "Projekt", typ: "text", pflicht: true, platzhalter: "z. B. Sommerfest 2027" },
+      { key: "bereich_id", label: "Bereich", typ: "chips", optionen: (w) => kzBereichOptionen(w.bereich_id, false) },
+      { key: "status", label: "Status", typ: "chips", optionen: KZ_PROJEKT_STATUS,
+        hinweis: "Aktiv = du arbeitest gerade daran · Hintergrund = läuft nebenbei · Idee = irgendwann · Wartet = hängt an jemand anderem" },
+      { key: "naechster_schritt", label: "Nächster Schritt", typ: "text", platzhalter: "Was ist als Nächstes konkret zu tun?",
+        hinweis: "Pflicht bei „Aktiv“ – sonst bleibt das Projekt liegen." },
+      { key: "wartet_auf", label: "Wartet auf", typ: "text", wenn: (w) => w.status === "wartet", platzhalter: "optional" },
+      { key: "wiedervorlage", label: "Wiedervorlage", typ: "datum", wenn: (w) => w.status === "wartet", hinweis: "optional" },
+      { key: "zieldatum", label: "Zieldatum", typ: "datum", hinweis: "optional – zeigt „noch X Wochen“" },
+      { key: "beschreibung", label: "Beschreibung", typ: "text-lang", zeilen: 3, platzhalter: "optional" },
+      { key: "_schutz", label: "Datenschutz", typ: "html", html: (w) => kzSchutzHtml(w.bereich_id) },
+    ],
+    pruefen: (w) => {
+      if (!w.bereich_id) return "Bitte einen Bereich wählen.";
+      if (w.status === "aktiv" && !w.naechster_schritt) return "Aktive Projekte brauchen einen nächsten Schritt – was ist als Nächstes zu tun?";
+      const doppelt = kz.projekte.find((p) => String(p.id) !== String(w.id) && String(p.bereich_id) === String(w.bereich_id)
+        && String(p.name).toLowerCase() === w.name.toLowerCase());
+      if (doppelt) return "In diesem Bereich gibt es schon ein Projekt mit diesem Namen.";
+      return "";
+    },
+    speichern: (id, w) => api("kz_projekt_speichern", {
+      id, name: w.name, bereich_id: w.bereich_id, status: w.status, naechster_schritt: w.naechster_schritt,
+      zieldatum: w.zieldatum || null, wartet_auf: w.wartet_auf, wiedervorlage: w.wiedervorlage || null, beschreibung: w.beschreibung,
+    }),
+    loeschen: (id) => api("kz_projekt_loeschen", { id }),
+    loeschFrage: (p) => {
+      const n = kz.aufgaben.filter((a) => String(a.projekt_id) === String(p.id)).length;
+      return `Projekt „${p.name || ""}“ löschen?` + (n ? ` Die ${n} ${n === 1 ? "Aufgabe bleibt" : "Aufgaben bleiben"} im Bereich, dann ohne Projekt.` : "");
+    },
+    beimRendern: (w) => {
+      if (w.status !== w._letzterStatus) {
+        const war = w._letzterStatus;
+        w._letzterStatus = w.status;
+        const ziel = w.status === "wartet" ? "blatt-f-wartet_auf" : w.status === "aktiv" && !w.naechster_schritt && war !== "aktiv" ? "blatt-f-naechster_schritt" : "";
+        const f = ziel && document.getElementById(ziel);
+        if (f) f.focus();
+      }
+    },
+    gespeichert: "Projekt gespeichert",
+    danach: () => { kzNeuLaden(); },
+  };
+
+  BLATT_ARTEN.kzbereich = {
+    titel: "Bereich bearbeiten",
+    titelNeu: "Neuer Bereich",
+    finden: (id) => kzBereich(id),
+    laden: (b) => ({ id: b.id || "", name: b.name || "", dienstlich: b.dienstlich ? "ja" : "nein", archiviert: b.archiviert ? "ja" : "nein" }),
+    felder: [
+      { key: "name", label: "Name", typ: "text", pflicht: true, platzhalter: "z. B. Garten, Verein" },
+      { key: "dienstlich", label: "Dienstlich", typ: "chips", optionen: [["nein", "Nein – privat"], ["ja", "Ja – dienstlich / Ehrenamt / Business"]],
+        hinweis: "Dienstlich: deutlicher Hinweis „keine Namen Dritter“ im Formular. Später gehen dienstliche Inhalte nicht an den KI-Tagesabschluss." },
+      { key: "archiviert", label: "Archiviert", typ: "chips", wenn: (w) => !!w.id, optionen: [["nein", "Nein"], ["ja", "Ja – steht unten, nicht mehr zur Auswahl"]] },
+    ],
+    pruefen: (w) => {
+      if (w.name.length > 60) return "Höchstens 60 Zeichen.";
+      if (kz.bereiche.some((b) => String(b.id) !== String(w.id) && String(b.name).toLowerCase() === w.name.toLowerCase())) return "Einen Bereich mit diesem Namen gibt es schon.";
+      return "";
+    },
+    speichern: (id, w) => api("kz_bereich_speichern", { id, name: w.name, dienstlich: w.dienstlich === "ja", archiviert: w.archiviert === "ja" }),
+    loeschen: (id) => api("kz_bereich_loeschen", { id }),
+    loeschFrage: (b) => `Bereich „${b.name || ""}“ löschen? Geht nur, wenn er keine Projekte und Aufgaben hat – sonst archivieren.`,
+    gespeichert: "Bereich gespeichert",
+    danach: () => { kzNeuLaden(); },
+  };
+
+  // ==========================================================
   // Zähler (seit Session 66, Etappe 1): Strom Bezug, Strom Einspeisung,
   // PV-Erzeugung, Wasser. Zählerstände ablesen (mehrere Zähler auf einmal),
   // Verbrauch zwischen zwei Ablesungen, Zählerwechsel. Nur Privat.
@@ -9167,6 +9701,7 @@
     if (aktiv === "lernen") renderLernen();
     if (aktiv === "stunden") renderStunden();
     if (aktiv === "zaehler") renderZaehler();
+    if (aktiv === "kommando") renderKommando();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
     if (aktiv === "schluessel") renderSchluessel();
@@ -16080,6 +16615,19 @@
       luecken.push("Zähler: " + e.message);
     }
 
+    // Kommandozentrale (seit Session 73), inkl. Tageslog
+    meldung("Lade Kommandozentrale …");
+    try {
+      const r = await api("kz_laden", { mit_tageslog: true });
+      if (!r.fehlt) {
+        liste.kz_bereiche = r.bereiche || []; liste.kz_projekte = r.projekte || [];
+        liste.kz_tageslog = r.tageslog || []; liste.kz_aufgaben = r.aufgaben || [];
+      }
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Kommandozentrale: " + e.message);
+    }
+
     meldung("Lade Einstellungen …");
     let pushEinstellungen = null;
     try {
@@ -16239,9 +16787,13 @@
     { k: "zaehler", t: "zaehler", name: "Zähler", gruppe: "Zähler" },
     { k: "zaehler_ablesungen", t: "zaehler_ablesungen", name: "Zähler: Ablesungen", gruppe: "Zähler" },
     { k: "zaehler_tarife", t: "zaehler_tarife", name: "Zähler: Tarife", gruppe: "Zähler" },
+    { k: "kz_bereiche", t: "kz_bereiche", name: "Kommandozentrale: Bereiche", gruppe: "Kommandozentrale" },
+    { k: "kz_projekte", t: "kz_projekte", name: "Kommandozentrale: Projekte", gruppe: "Kommandozentrale" },
+    { k: "kz_tageslog", t: "kz_tageslog", name: "Kommandozentrale: Tageslog", gruppe: "Kommandozentrale" },
+    { k: "kz_aufgaben", t: "kz_aufgaben", name: "Kommandozentrale: Aufgaben", gruppe: "Kommandozentrale" },
     { k: "verlauf", t: "verlauf", name: "Verlauf (letzte 50 je Bereich)", gruppe: "Sonstiges", nurErg: true },
   ];
-  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Stunden", "Zähler", "Sonstiges"];
+  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Stunden", "Zähler", "Kommandozentrale", "Sonstiges"];
 
   // Zustand der Karte (bleibt beim Neuzeichnen von Export erhalten)
   const wh = {
