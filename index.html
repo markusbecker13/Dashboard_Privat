@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css?v=75">
+<link rel="stylesheet" href="style.css?v=76">
 </head>
 <body>
   <!-- Linien-Icons (seit Session 35, Icons Etappe A). Eigene Zeichnungen, 24er-Raster,
@@ -902,6 +902,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Schnell notieren vom Homescreen:</strong> App-Symbol lange drücken → „Schnell notieren“ öffnet die Kommandozentrale mit dem Cursor im Eingabefeld. Android übernimmt die neue Verknüpfung erst beim nächsten Update der installierten App (kann ein paar Tage dauern). Ob die Tastatur von selbst aufgeht, entscheidet das Handy – sonst einmal ins Feld tippen</li>
                 <li><strong>Bereiche verwalten</strong> (ganz unten): Reihenfolge mit ↑ ↓, Stift für Name, „dienstlich“ und Archivieren, „+ Bereich“. Archivierte Bereiche stehen unten unter „Archivierte Bereiche“ und fehlen bei der Auswahl. Löschen geht nur bei leeren Bereichen</li>
                 <li><strong>Datenschutz:</strong> Im Formular steht immer ein Hinweis, bei dienstlichen Bereichen deutlich: keine Namen Dritter, Kürzel oder Rollen nutzen („Rückruf Elternteil T.“). Eine technische Sperre gibt es nicht. Dienstliche Inhalte sollen später nicht an den KI-Tagesabschluss gehen (Einschätzung, keine Rechtsprüfung)</li>
+                <li><strong>Aus dem Reiter Aufgaben übernehmen</strong> (seit Session 75, in „Alle Projekte“ über „Bereiche verwalten“, nur solange es etwas zu übernehmen gibt): offene Aufgaben <em>ohne</em> Uhrzeit und <em>ohne</em> Wiederholung ziehen um – mit Fälligkeit, Notiz und Projekt. Je App-Bereich wählst du den Ziel-Bereich (vorbelegt: Privat → Privat, OGS → OGS Rapunzel Kinderhaus, AWO → AWO Ortsverein, Business → zwischenkaffeeundchaos, EP → Erlebnispädagogik; „nicht übernehmen“ geht auch) und kannst einzelne Aufgaben abhaken. Gleichnamige Projekte im Ziel-Bereich werden wiederverwendet, neue bekommen den Status „Hintergrund“ – danach durchsehen und Aktives mit nächstem Schritt nach vorne holen. <strong>Vorher lädt die App ein Komplett-Backup herunter</strong> (<code>…-vor-uebernahme.json</code>), danach werden die Originale im alten Reiter <strong>gelöscht</strong>. Aufgaben mit Uhrzeit oder Wiederholung, Erledigtes und die alten Projekte (an denen auch Notizen und Links hängen) bleiben. Bricht es mittendrin ab, legt ein zweiter Durchlauf nichts doppelt an. Den alten Reiter danach bei Bedarf je Bereich in der Reiter-Verwaltung ausblenden</li>
                 <li><strong>Backup:</strong> Bereiche, Projekte, Aufgaben und das (noch leere) Tageslog sind im Komplett-Backup, Gruppe „Kommandozentrale“</li>
               </ul>
             </div>
@@ -2153,6 +2154,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
     </dialog>
   </div>
 
-<script src="app.js?v=75"></script>
+<script src="app.js?v=76"></script>
 </body>
 </html>
