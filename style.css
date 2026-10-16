@@ -2373,3 +2373,55 @@
 .kz-bereich-knoepfe .link-btn { text-align: left; }
 .kz-aufgabe-info { align-items: flex-start; text-align: left; }
 .kz-aufgabe-info * { text-align: left; }
+
+/* ==========================================================
+   Kommandozentrale Etappe 2 (seit Session 74): Heute-Ansicht,
+   Stern für die Top 3, Heute-Karte auf der Willkommensseite
+   ========================================================== */
+.kz-ansicht { margin: 0 0 0.9rem; }
+.kz-heute { display: flex; flex-direction: column; gap: 0.9rem; margin: 0 0 1rem; }
+.kz-heute .std-zwischen { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.45rem; }
+.kz-heute .std-zwischen .ic { color: var(--accent); }
+.kz-ueber .std-zwischen .ic { color: var(--overdue-text); }
+.kz-top-frei { margin: 0.4rem 0 0; }
+
+.kz-morgen { background: var(--today-bg); border: 1px solid var(--today-border); border-radius: var(--r-karte); padding: 0.8rem 0.9rem; }
+.kz-morgen .std-zwischen .ic { color: var(--today-text); }
+.kz-morgen > .notiz-meta { margin: 0 0 0.55rem; }
+.kz-morgen-liste { display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 0.4rem; }
+.kz-morgen-zeile { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 0.6rem;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-mittel); padding: 0.55rem 0.7rem; }
+.kz-morgen-titel { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1 1 10rem; overflow-wrap: anywhere; }
+.kz-morgen-titel .notiz-meta { margin: 0; }
+.kz-morgen-knoepfe { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.kz-morgen-knoepfe button { margin: 0; padding: 0.4rem 0.85rem; font-size: 0.85rem; }
+
+.kz-stern { flex: none; background: none; border: none; cursor: pointer; font-size: 1.25rem; line-height: 1;
+  min-width: 2.2rem; min-height: 2.2rem; color: var(--ink-dim); border-radius: var(--r-pille); }
+.kz-stern.an { color: var(--accent); }
+.kz-stern:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.kz-wartet-projekt { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; width: 100%; text-align: left;
+  background: var(--panel); border: 1px dashed var(--today-border); border-radius: var(--r-mittel); padding: 0.6rem 0.8rem;
+  color: var(--ink); font: inherit; cursor: pointer; }
+.kz-wartet-projekt.faellig { border-style: solid; background: var(--today-bg); }
+.kz-wartet-projekt-kopf { display: flex; gap: 0.5rem; align-items: flex-start; justify-content: space-between; width: 100%; }
+.kz-wartet-projekt .task-titel { overflow-wrap: anywhere; }
+.kz-aufgabe.kz-wartet .badge.today, .kz-wartet-projekt .badge.today { font-weight: 600; }
+
+/* Heute-Karte über den Bereichs-Karten (Willkommensseite, neutrale Farbwelt) */
+.kz-heute-karte { width: 100%; max-width: 30rem; margin: 0 auto 1rem; }
+.kz-heute-karte:empty { display: none; }
+.kz-karte { display: flex; flex-direction: column; gap: 0.35rem; width: 100%; text-align: left; cursor: pointer;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--border); border-radius: var(--r-karte);
+  padding: 0.85rem 1rem; font: inherit; box-shadow: 0 2px 10px var(--schatten); }
+.kz-karte:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.kz-karte-kopf { display: flex; align-items: center; gap: 0.4rem; font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; }
+.kz-karte-kopf .notiz-meta { margin: 0 0 0 auto; font-family: var(--font-text); }
+.kz-karte-liste { margin: 0; padding-left: 1.3rem; font-size: 0.92rem; }
+.kz-karte-liste li { margin: 0.1rem 0; overflow-wrap: anywhere; }
+.kz-karte-leer { font-size: 0.9rem; color: var(--ink-dim); }
+.kz-karte-zusatz { font-size: 0.82rem; color: var(--ink-dim); }
+.kz-karte-rot { color: var(--overdue-text); font-weight: 600; }
+.kz-karte-weiter { display: inline-flex; align-items: center; gap: 0.2rem; align-self: flex-end; font-size: 0.85rem; font-weight: 600; color: var(--accent); }
+.kz-karte-weiter .ic { width: 0.95rem; height: 0.95rem; }
