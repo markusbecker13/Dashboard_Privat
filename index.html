@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css?v=74">
+<link rel="stylesheet" href="style.css?v=75">
 </head>
 <body>
   <!-- Linien-Icons (seit Session 35, Icons Etappe A). Eigene Zeichnungen, 24er-Raster,
@@ -116,6 +116,7 @@
   <div id="bereich-screen" class="hidden">
     <div class="willkommen-datum" id="willkommen-datum"></div>
     <h1 class="willkommen-titel">Moin.<br>Wohin heute?</h1>
+    <div id="kz-heute-karte" class="kz-heute-karte"></div>
     <div class="bereich-liste">
       <button class="bereich-karte bereich-karte--privat" onclick="bereichAuswaehlen('privat')">
         <img class="bereich-karte-rund" src="icons/privat.png" alt="">
@@ -885,7 +886,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
-            <summary>Kommandozentrale <span class="anleitung-nur">(seit Session 73; in allen Bereichen, überall dieselben Daten)</span></summary>
+            <summary>Kommandozentrale <span class="anleitung-nur">(seit Session 73/74; in allen Bereichen, überall dieselben Daten)</span></summary>
             <div class="anleitung-text">
               <p>Alle Projekte und Aufgaben aus allen Lebensbereichen an einem Ort – Privat, Haus, Jugendwerk, AWO, OGS, zwischenkaffeeundchaos, Erlebnispädagogik, Technik. Eigener Punkt <strong>Zentrale</strong> in der Leiste unten. Die Lebensbereiche sind eine eigene Liste und nicht dasselbe wie die App-Bereiche (Privat/OGS/AWO/Business/EP): Öffnest du die Zentrale in OGS oder in Privat, siehst du dieselben Daten. In der Reiter-Verwaltung lässt sie sich je App-Bereich ausblenden. Die bisherigen Reiter Aufgaben und Projekte laufen unverändert weiter (Übernahme kommt später).</p>
               <ul>
@@ -895,7 +896,10 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Projekte:</strong> sortiert nach Status – aktiv, wartet, Hintergrund, Idee; abgeschlossene eingeklappt unten im Bereich. Je Projekt der <strong>nächste Schritt</strong>, das Zieldatum („noch 7 Wochen“, rot wenn überschritten) und die Zahl offener Aufgaben. Antippen klappt die Aufgaben auf, dort „+ Aufgabe“ und „Projekt bearbeiten“. <strong>Aktive Projekte brauchen einen nächsten Schritt</strong> – ohne lässt sich ein Projekt nicht auf „aktiv“ speichern; fehlt er trotzdem (z. B. aus einem Import), ist das Projekt rot markiert</li>
                 <li><strong>Aufgaben:</strong> Kreis = erledigt (unten kurz „Rückgängig“), Antippen = bearbeiten. Felder: Bereich, Projekt (optional – mit Projekt gilt dessen Bereich), Status, Fälligkeit, „für heute“, Notiz. Aufgaben ohne Projekt stehen im Bereich unter „Aufgaben ohne Projekt“, erledigte jeweils eingeklappt unter „Erledigt“</li>
                 <li><strong>Wartet:</strong> Status „wartet“ bei Aufgabe oder Projekt – dann fragt das Blatt gleich „wartet auf“ (z. B. Rückmeldung, Finanzmittel) und Wiedervorlage, beides optional. Angezeigt wird „wartet seit X Tagen“. Ist die Wiedervorlage erreicht, rückt der Eintrag nach oben und ist gelb hervorgehoben. Wartende Aufgaben haben statt des Kreises eine Uhr – zum Erledigen erst auf „offen“ oder direkt „erledigt“ stellen</li>
-                <li><strong>Für heute:</strong> höchstens 3 Aufgaben gleichzeitig (auch der Server lässt keine vierte zu). Die Markierung bleibt stehen, bis du sie erledigst, auf „wartet“ stellst oder abwählst. Oben steht „Heute: x von 3“. Die eigene Heute-Ansicht mit „Gestern nicht geschafft – behalten oder zurücklegen?“ kommt im nächsten Schritt</li>
+                <li><strong>Top 3 für heute:</strong> höchstens 3 Aufgaben gleichzeitig (auch der Server lässt keine vierte zu). Der <strong>Stern ☆</strong> an jeder offenen Aufgabe holt sie in die Top 3, ★ legt sie zurück; im Blatt geht es über „Für heute“. Die Markierung bleibt stehen, bis du sie erledigst, auf „wartet“ stellst oder zurücklegst. An der Aufgabe steht „Top 3 seit 2 Tagen“</li>
+                <li><strong>Ansicht „Heute“</strong> (seit Session 74, Standard): oben umschalten zwischen <em>Heute</em> und <em>Alle Projekte</em>, das Gerät merkt sich die Wahl. „Heute“ zeigt der Reihe nach: <em>Gestern nicht geschafft</em> (Top-3-Aufgaben von gestern oder früher – je Aufgabe „Behalten“ oder „Zurücklegen“, bei mehreren „Alle behalten“; die Frage kommt einmal am Tag, auf allen Geräten gleich), <em>Deine Top 3</em> mit der Zahl freier Plätze, <em>Überfällig</em>, <em>Heute fällig</em> (beide als Vorschläge mit ☆), <em>Wartet</em> (Aufgaben und Projekte, erreichte Wiedervorlage zuerst und gelb) und den <em>Eingang</em> mit dem Hinweis bei Einträgen älter als 3 Tage. Bei jeder Aufgabe steht ihr Projekt bzw. Bereich</li>
+                <li><strong>Heute-Karte auf der Willkommensseite</strong> (⋮ → Bereichsübersicht): die Top 3, dazu „x überfällig“, „gestern nicht geschafft“, Wiedervorlagen und der Eingang. Antippen öffnet die Kommandozentrale in der Heute-Ansicht (im zuletzt genutzten App-Bereich)</li>
+                <li><strong>Schnell notieren vom Homescreen:</strong> App-Symbol lange drücken → „Schnell notieren“ öffnet die Kommandozentrale mit dem Cursor im Eingabefeld. Android übernimmt die neue Verknüpfung erst beim nächsten Update der installierten App (kann ein paar Tage dauern). Ob die Tastatur von selbst aufgeht, entscheidet das Handy – sonst einmal ins Feld tippen</li>
                 <li><strong>Bereiche verwalten</strong> (ganz unten): Reihenfolge mit ↑ ↓, Stift für Name, „dienstlich“ und Archivieren, „+ Bereich“. Archivierte Bereiche stehen unten unter „Archivierte Bereiche“ und fehlen bei der Auswahl. Löschen geht nur bei leeren Bereichen</li>
                 <li><strong>Datenschutz:</strong> Im Formular steht immer ein Hinweis, bei dienstlichen Bereichen deutlich: keine Namen Dritter, Kürzel oder Rollen nutzen („Rückruf Elternteil T.“). Eine technische Sperre gibt es nicht. Dienstliche Inhalte sollen später nicht an den KI-Tagesabschluss gehen (Einschätzung, keine Rechtsprüfung)</li>
                 <li><strong>Backup:</strong> Bereiche, Projekte, Aufgaben und das (noch leere) Tageslog sind im Komplett-Backup, Gruppe „Kommandozentrale“</li>
@@ -1455,7 +1459,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
             <summary>Technische Bedienung</summary>
             <div class="anleitung-text">
               <p><strong>Abmelden:</strong> im ⋮-Menü oben rechts in der Kopfzeile. Meldet die Session serverseitig ab und entfernt das gespeicherte Token auf diesem Gerät.</p>
-              <p><strong>Als App installieren (Android):</strong> Seite in Chrome öffnen → Drei-Punkte-Menü → „App installieren". Liegt danach als eigenes Icon auf dem Homescreen, öffnet ohne Browser-Leiste. Icon lange gedrückt halten → Schnellzugriff „Neue Notiz" springt direkt in den Notizen-Tab.</p>
+              <p><strong>Als App installieren (Android):</strong> Seite in Chrome öffnen → Drei-Punkte-Menü → „App installieren". Liegt danach als eigenes Icon auf dem Homescreen, öffnet ohne Browser-Leiste. Icon lange gedrückt halten → Schnellzugriffe „Schnell notieren“ (Eingang der Kommandozentrale, seit Session 74), „Neue Notiz" (Notizen-Tab) und „Zähler ablesen“.</p>
               <p><strong>Geschwindigkeit</strong> (seit Session 64): Nach jeder Eingabe lädt die App alle Daten neu. Der Server holt sie jetzt gleichzeitig statt nacheinander, merkt sich die Login-Prüfung eine Minute lang und schreibt den Verlauf im Hintergrund – das Neuladen sollte dadurch spürbar schneller sein. Abmelden wirkt sofort; ein anderes Gerät mit demselben, gerade abgemeldeten Login kann höchstens noch eine Minute weiterarbeiten.</p>
               <p><strong>Sofort sichtbar</strong> (seit Session 65): Aufgaben und Termine abhaken, Aufgaben löschen, Einkauf hinzufügen/abhaken/löschen, Notizen hinzufügen/löschen und Wischen in Start erscheinen sofort – gespeichert wird im Hintergrund. Klappt das Speichern nicht, nimmt die App die Änderung zurück und meldet den Fehler (der Text steht dann wieder im Feld). Nach dem Laden zeichnet die App zuerst den sichtbaren Reiter, die übrigen kurz danach.</p>
               <p><strong>NFC-Tags</strong> (seit Session 63): ⋮-Menü → „NFC-Tags“. Wählen: <em>Öffnen</em> (Bereich + Reiter), <em>Stunden Start/Stopp</em> (Kategorie) oder <em>„+“-Blatt</em> (Bereich + Art). Auf dem Android-Handy in Chrome bzw. der App „Auf NFC-Tag schreiben“ antippen und den Tag an die Rückseite halten (beim ersten Mal NFC erlauben; NFC am Handy einschalten; Inhalt wird überschrieben). Am Laptop nur „Link kopieren“ – dann mit einer NFC-App als URL schreiben. <strong>Bewährt</strong> (z. B. mit Samsung Internet): „Link kopieren“ und in der Android-App <em>NFC Tools</em> unter Schreiben → Datensatz hinzufügen → „URL/URI“ einfügen und auf den Tag schreiben. Ein leerer Tag zeigt sonst nur Androids „Neues Tag erkannt – leeres Tag“. Beim Antippen: Stunden starten, bzw. stoppen und speichern, wenn genau diese Kategorie läuft (unter 2 Minuten mit Rückfrage; läuft eine andere, fragt die App vor dem Wechsel) – jeweils mit „Rückgängig“. Neu laden löst nichts doppelt aus. Im Tag steht kein Passwort; ein fremdes Handy landet nur bei der Anmeldung. Ob die App oder ein Chrome-Tab aufgeht, entscheidet Android.</p>
@@ -1774,7 +1778,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-kommando" class="hidden">
-        <h1>Kommandozentrale <button class="hilfe-icon" data-hilfe="Alle Projekte und Aufgaben aller Lebensbereiche an einem Ort – in jedem App-Bereich dieselben Daten. Oben „Schnell notieren“: tippen oder diktieren, Enter – landet im Eingang. Einen Eingang-Eintrag antippen, um ihn einem Bereich (und optional Projekt) zuzuordnen. Darunter die Bereiche, aufklappbar: Projekte nach Status (aktiv, wartet, Hintergrund, Idee), je Projekt der nächste Schritt, das Zieldatum und die offenen Aufgaben. Aktive Projekte ohne nächsten Schritt sind rot. Kreis = erledigt, Antippen = bearbeiten (Status „wartet“ mit „wartet auf“ und Wiedervorlage, Fälligkeit, „für heute“ – höchstens 3). Unten „Bereiche verwalten“: Reihenfolge, dienstlich, archivieren.">?</button></h1>
+        <h1>Kommandozentrale <button class="hilfe-icon" data-hilfe="Alle Projekte und Aufgaben aller Lebensbereiche an einem Ort – in jedem App-Bereich dieselben Daten. Oben „Schnell notieren“: tippen oder diktieren, Enter – landet im Eingang. Einen Eingang-Eintrag antippen, um ihn einem Bereich (und optional Projekt) zuzuordnen. Darunter die Bereiche, aufklappbar: Projekte nach Status (aktiv, wartet, Hintergrund, Idee), je Projekt der nächste Schritt, das Zieldatum und die offenen Aufgaben. Aktive Projekte ohne nächsten Schritt sind rot. Kreis = erledigt, Stern ☆ = in die Top 3 für heute (höchstens 3), Antippen = bearbeiten (Status „wartet“ mit „wartet auf“ und Wiedervorlage, Fälligkeit). Oben umschalten: „Heute“ zeigt „Gestern nicht geschafft – behalten oder zurücklegen?“, die Top 3, Überfälliges, heute Fälliges und Wartendes; „Alle Projekte“ die Bereiche. Unten „Bereiche verwalten“: Reihenfolge, dienstlich, archivieren.">?</button></h1>
         <p class="hero-text">Alles Offene aus allen Bereichen – Projekte mit nächstem Schritt, Aufgaben und ein Eingang für schnelle Gedanken.</p>
         <div id="kommando-inhalt"></div>
       </div>
@@ -2149,6 +2153,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
     </dialog>
   </div>
 
-<script src="app.js?v=74"></script>
+<script src="app.js?v=75"></script>
 </body>
 </html>
