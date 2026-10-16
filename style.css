@@ -2249,7 +2249,127 @@
 .zl-pv-zahlen dt { font-size: 0.75rem; color: var(--ink-dim); }
 .zl-pv-zahlen dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* Benachrichtigungen: Diagnose (seit Session 70) */
-.push-diagnose { margin-top: 0.8rem; }
-.push-diag-tabelle td { text-align: left !important; vertical-align: top; overflow-wrap: anywhere; }
-.push-diag-tabelle td:first-child { color: var(--ink-dim); width: 45%; }
+/* ==========================================================
+   Kommandozentrale (seit Session 73, Etappe 1)
+   ========================================================== */
+.kz-schnell { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-karte); padding: 0.8rem 0.9rem; margin: 0 0 1rem; }
+.kz-schnell .schnell-label { display: block; margin-bottom: 0.4rem; }
+.kz-schnell-zeile { display: flex; gap: 0.5rem; align-items: stretch; }
+.kz-schnell-zeile input { flex: 1; min-width: 0; margin: 0; }
+.kz-schnell-zeile .btn-primary { flex: none; display: inline-flex; align-items: center; gap: 0.3rem; margin: 0; }
+.kz-schnell .blatt-hinweis { display: block; margin-top: 0.4rem; }
+
+.kz-eingang { margin: 0 0 1rem; }
+.kz-eingang .std-zwischen { display: flex; align-items: center; gap: 0.4rem; margin-top: 0; }
+.kz-eingang .std-zwischen .ic { color: var(--accent); }
+.kz-eingang-zeile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; width: 100%; text-align: left;
+  background: var(--panel); border: 1px dashed var(--ink-dim); border-radius: var(--r-mittel); padding: 0.65rem 0.8rem;
+  color: var(--ink); font: inherit; cursor: pointer;
+}
+.kz-eingang-zeile.alt { border-style: solid; border-color: var(--today-border); background: var(--today-bg); }
+.kz-eingang-zeile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kz-eingang-titel { font-size: 0.95rem; overflow-wrap: anywhere; }
+.kz-eingang-zeile .notiz-meta { display: inline-flex; align-items: center; gap: 0.2rem; margin: 0; }
+.kz-eingang-zeile .notiz-meta .ic { width: 0.9rem; height: 0.9rem; }
+.kz-warnung { background: var(--today-bg); color: var(--today-text); border: 1px solid var(--today-border); border-radius: var(--r-mittel);
+  padding: 0.45rem 0.7rem; font-size: 0.85rem; margin: 0 0 0.5rem; display: flex; gap: 0.4rem; align-items: flex-start; }
+.kz-warnung .ic { flex: none; margin-top: 0.1rem; }
+
+.kz-aktionen { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 0.8rem; }
+.kz-aktionen .btn-secondary { display: inline-flex; align-items: center; gap: 0.3rem; margin: 0; }
+.kz-heute-stand { margin: 0 0 0 auto; white-space: nowrap; }
+
+.kz-bereich summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; }
+.kz-bereich-name { font-weight: 700; }
+.kz-bereich-meta { font-family: var(--font-text); font-weight: 400; margin: 0; }
+.kz-bereich summary .badge { font-family: var(--font-text); font-weight: 600; }
+.badge.kz-dienstlich { border-style: dashed; }
+.kz-bereich-inhalt { display: flex; flex-direction: column; gap: 0.6rem; }
+.kz-bereich-knoepfe { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; }
+.kz-bereich-knoepfe .link-btn { display: inline-flex; align-items: center; gap: 0.25rem; }
+.kz-ohne-projekt .schnell-label { display: block; margin: 0.2rem 0 0.35rem; }
+
+.kz-projekt { background: var(--bg); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--r-mittel); }
+.kz-projekt.kz-status-aktiv { border-left-color: var(--accent); }
+.kz-projekt.kz-status-wartet { border-left-color: var(--today-border); }
+.kz-projekt.kz-status-abgeschlossen { opacity: 0.75; }
+.kz-projekt.kz-fehlt { border-color: var(--overdue-border); border-left-color: var(--overdue-text); background: var(--overdue-bg); }
+.kz-projekt.kz-wv-rand { border-color: var(--today-border); background: var(--today-bg); }
+.kz-projekt > summary { list-style: none; cursor: pointer; padding: 0.6rem 0.75rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.kz-projekt > summary::-webkit-details-marker { display: none; }
+.kz-projekt-kopf { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.kz-projekt-name { font-weight: 700; font-size: 0.95rem; overflow-wrap: anywhere; }
+.kz-projekt-name::before { content: "▸ "; color: var(--accent); }
+.kz-projekt[open] .kz-projekt-name::before { content: "▾ "; }
+.kz-projekt-zeile { display: block; font-size: 0.85rem; overflow-wrap: anywhere; }
+.kz-projekt-zeile .notiz-meta { margin: 0; }
+.kz-schritt { display: inline; }
+.kz-schritt .ic, .kz-rot .ic { width: 0.9rem; height: 0.9rem; vertical-align: -0.12em; }
+.kz-rot { color: var(--overdue-text); font-weight: 600; }
+.notiz-meta.kz-rot { color: var(--overdue-text); }
+.kz-wv { color: var(--today-text); font-weight: 600; }
+.kz-status-pille { flex: none; font-size: 0.72rem; font-weight: 600; padding: 0.1rem 0.55rem; border-radius: var(--r-pille);
+  border: 1px solid var(--border); background: var(--panel); color: var(--ink-dim); white-space: nowrap; }
+.kz-pille-aktiv { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.kz-pille-wartet { background: var(--today-bg); border-color: var(--today-border); color: var(--today-text); }
+.kz-pille-idee { border-style: dashed; }
+.kz-pille-abgeschlossen { background: var(--ok-bg); border-color: var(--ok-rand); color: var(--ok-text); }
+.kz-projekt-inhalt { padding: 0 0.75rem 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.kz-beschreibung { margin: 0; white-space: pre-line; font-size: 0.85rem; color: var(--ink-dim); }
+
+.kz-aufgabe { padding: 0.55rem 0.65rem; gap: 0.55rem; }
+.kz-aufgabe-info { background: none; border: none; padding: 0; margin: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.kz-aufgabe-info:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.kz-aufgabe .task-titel { overflow-wrap: anywhere; }
+.kz-notiz { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line;
+  font-size: var(--fs-klein); color: var(--ink-dim); }
+.kz-aufgabe .task-meta { margin-top: 0.1rem; }
+.kz-aufgabe.kz-wartet { border-style: dashed; }
+.kz-check-wartet { border-style: dashed; color: var(--ink-dim); cursor: default; }
+.kz-check-wartet .ic { width: 0.85rem; height: 0.85rem; }
+
+.kz-erledigt > summary, .kz-abgeschlossen > summary { cursor: pointer; font-size: 0.85rem; color: var(--ink-dim); font-weight: 600; padding: 0.15rem 0; }
+.kz-erledigt .task-list, .kz-abgeschlossen .kz-projekt { margin-top: 0.4rem; }
+
+.kz-verwalten summary .ic { vertical-align: -0.15em; }
+.kz-bereich-liste { display: flex; flex-direction: column; gap: 0.35rem; margin: 0 0 0.7rem; }
+.kz-bereich-zeile { display: flex; align-items: center; gap: 0.2rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-mittel); padding: 0.35rem 0.4rem 0.35rem 0.7rem; }
+.kz-bereich-zeile.archiviert { opacity: 0.65; }
+.kz-bereich-zeile-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.kz-bereich-zeile .task-edit-btn { opacity: 0.8; font-size: 1rem; min-width: 2rem; min-height: 2rem; }
+.kz-bereich-zeile .task-edit-btn:disabled { opacity: 0.25; cursor: default; }
+
+.kz-schutz.dienstlich { margin: 0; padding: 0.5rem 0.7rem; border-radius: var(--r-mittel); font-size: 0.85rem; font-weight: 600;
+  background: var(--overdue-bg); color: var(--overdue-text); border: 1px solid var(--overdue-border); display: flex; gap: 0.4rem; align-items: flex-start; }
+.kz-schutz.dienstlich .ic { flex: none; margin-top: 0.1rem; }
+
+/* Leiste unten mit sechs Knöpfen (seit Session 73 mit „Zentrale“): auf
+   schmalen Handys enger, der aktive Punkt dann ohne Beschriftung */
+@media (max-width: 380px) {
+  .bottom-nav:has(> :nth-child(6)) { padding: 0 0.25rem; }
+  .bottom-nav:has(> :nth-child(6)) .bottom-nav-btn { min-width: 2.6rem; padding: 0 0.35rem; }
+  .bottom-nav:has(> :nth-child(6)) .bottom-nav-btn.aktiv { padding: 0 0.6rem; }
+  .bottom-nav:has(> :nth-child(6)) .bottom-nav-label { display: none; }
+  .bottom-nav:has(> :nth-child(6)) .bottom-nav-plus { width: 3.1rem; height: 3.1rem; }
+}
+/* Langes Wort im Titel: auf schmalen Handys kleiner statt seitlich zu scrollen */
+#view-kommando h1 { font-size: clamp(1.45rem, 7.6vw, var(--fs-titel)); overflow-wrap: anywhere; }
+/* Verschachtelte Aufklapper in der Kommandozentrale: nicht wie die äußeren Abschnitte */
+.kz-bereich .kz-projekt > summary, .kz-bereich .kz-erledigt > summary, .kz-bereich .kz-abgeschlossen > summary {
+  font-family: var(--font-text); text-align: left; padding-left: 0.75rem;
+}
+.kz-bereich .kz-erledigt > summary, .kz-bereich .kz-abgeschlossen > summary { padding: 0.15rem 0; }
+.kz-bereich .kz-projekt > summary::before { content: none; }
+.kz-bereich .kz-erledigt > summary::before, .kz-bereich .kz-abgeschlossen > summary::before { content: "▸ "; color: var(--accent); }
+.kz-bereich .kz-erledigt[open] > summary::before, .kz-bereich .kz-abgeschlossen[open] > summary::before { content: "▾ "; }
+.kz-bereich .kz-projekt > summary .kz-projekt-zeile { font-weight: 400; }
+.kz-bereich .kz-projekt > summary { align-items: stretch; }
+.kz-bereich .kz-projekt > summary, .kz-bereich .kz-projekt > summary * { text-align: left; }
+.kz-projekt-kopf { width: 100%; }
+.anleitung-abschnitt.kz-bereich > summary::before, .anleitung-abschnitt.kz-bereich[open] > summary::before { content: none; }
+.kz-bereich-name::before { content: "▸ "; color: var(--accent); }
+.kz-bereich[open] > summary .kz-bereich-name::before { content: "▾ "; }
+.kz-bereich-knoepfe .link-btn { text-align: left; }
+.kz-aufgabe-info { align-items: flex-start; text-align: left; }
+.kz-aufgabe-info * { text-align: left; }
