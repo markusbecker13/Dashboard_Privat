@@ -2425,3 +2425,17 @@
 .kz-karte-rot { color: var(--overdue-text); font-weight: 600; }
 .kz-karte-weiter { display: inline-flex; align-items: center; gap: 0.2rem; align-self: flex-end; font-size: 0.85rem; font-weight: 600; color: var(--accent); }
 .kz-karte-weiter .ic { width: 0.95rem; height: 0.95rem; }
+
+/* Kommandozentrale Phase 2 (seit Session 75): Übernahme aus dem Reiter Aufgaben */
+.kz-ueb summary .ic { vertical-align: -0.15em; }
+.kz-ueb-gruppe { border: 1px solid var(--border); border-radius: var(--r-mittel); padding: 0.55rem 0.7rem; margin: 0 0 0.6rem; background: var(--bg); }
+.kz-ueb-kopf { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; margin-bottom: 0.4rem; }
+.kz-ueb-kopf .notiz-meta { margin: 0; }
+.kz-ueb-ziel { display: inline-flex; align-items: center; gap: 0.3rem; flex: 1 1 12rem; min-width: 0; }
+.kz-ueb-ziel select { flex: 1; min-width: 0; margin: 0; }
+.kz-ueb-liste { display: flex; flex-direction: column; gap: 0.25rem; }
+.kz-ueb-liste.aus { opacity: 0.5; }
+.kz-ueb-haken span { overflow-wrap: anywhere; }
+.kz-ueb-ergebnis { background: var(--ok-bg); border: 1px solid var(--ok-rand); border-radius: var(--r-mittel); padding: 0.6rem 0.8rem; margin: 0 0 0.8rem; }
+.kz-ueb-ergebnis ul { margin: 0 0 0.5rem; }
+section.kz-ueb { margin: 0 0 0.8rem; }
