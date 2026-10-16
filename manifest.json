@@ -1,7 +1,7 @@
 {
   "name": "Dashboard",
   "short_name": "Dashboard",
-  "description": "Persönliches Dashboard für Privat, OGS Rapunzel, AWO OV Liblar, Business (zwischenkaffeeundchaos) und Erlebnispädagogik: Aufgaben, Kalender mit Google-Sync, Notizen, Finanzen mit Prognose, Stunden, Zähler, Training, Ernährung, Rezepte, Spiele, Methoden und Einheiten, Lernen, Inventar, Verleih, Raumplanung und Schlüssel – mit Push-Erinnerungen.",
+  "description": "Persönliches Dashboard für Privat, OGS Rapunzel, AWO OV Liblar, Business (zwischenkaffeeundchaos) und Erlebnispädagogik: Aufgaben, Kalender mit Google-Sync, Notizen, Finanzen mit Prognose, Stunden, Zähler, Kommandozentrale, Training, Ernährung, Rezepte, Spiele, Methoden und Einheiten, Lernen, Inventar, Verleih, Raumplanung und Schlüssel – mit Push-Erinnerungen.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#cfe6fb",
@@ -19,6 +19,12 @@
     }
   ],
   "shortcuts": [
+    {
+      "name": "Schnell notieren",
+      "short_name": "Notieren",
+      "url": "./index.html?tab=kommando&fokus=schnell",
+      "description": "Gedanken direkt in den Eingang der Kommandozentrale"
+    },
     {
       "name": "Neue Notiz",
       "short_name": "Notiz",
