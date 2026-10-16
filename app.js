@@ -5673,6 +5673,7 @@
         <summary>Archivierte Bereiche (${archiv.length})</summary>
         <div class="anleitung-text">${archiv.map(kzBereichHtml).join("")}</div>
       </details>` : ""}
+      ${kzUebernahmeHtml()}
       ${kzBereicheVerwaltenHtml(bereiche)}`;
     const feld = document.getElementById("kz-schnell");
     if (feld) {
@@ -5686,6 +5687,108 @@
     kz.ansicht = a === "alles" ? "alles" : "heute";
     try { localStorage.setItem("kz-ansicht", kz.ansicht); } catch (_e) { /* egal */ }
     renderKommando();
+  };
+
+  // ---- Übernahme aus dem alten Reiter Aufgaben (seit Session 75) ----
+  // Nur offene Aufgaben ohne Uhrzeit und ohne Wiederholung. Vorher lädt die
+  // App ein Komplett-Backup herunter, danach löscht der Server die Originale.
+  // Die alten Projekte bleiben (Notizen und Links hängen auch daran).
+  const KZ_UEB_STANDARD = { privat: "privat", ogs: "ogs rapunzel kinderhaus", awo: "awo ortsverein liblar/köttingen", business: "zwischenkaffeeundchaos", ep: "erlebnispädagogik" };
+  const kzUeb = { abgewaehlt: new Set(), ziel: {}, laeuft: false, status: "", ergebnis: null };
+  function kzUebKandidaten() {
+    return aufgaben.filter((a) => !a.erledigt && !a.uhrzeit && !(Number(a.erinnere_alle_tage) > 0) && !istTempId(a.id));
+  }
+  function kzUebBleiben() {
+    return aufgaben.filter((a) => !a.erledigt && (a.uhrzeit || Number(a.erinnere_alle_tage) > 0)).length;
+  }
+  function kzUebZiel(appB) {
+    if (kzUeb.ziel[appB] !== undefined) return kzUeb.ziel[appB];
+    const b = kz.bereiche.find((x) => !x.archiviert && String(x.name).toLowerCase() === KZ_UEB_STANDARD[appB]);
+    return b ? String(b.id) : "";
+  }
+  window.kzUebZielSetzen = function(appB, wert) { kzUeb.ziel[appB] = wert; renderKommando(); };
+  window.kzUebHaken = function(id, an) { if (an) kzUeb.abgewaehlt.delete(String(id)); else kzUeb.abgewaehlt.add(String(id)); renderKommando(); };
+  window.kzUebAlle = function(appB, an) {
+    kzUebKandidaten().filter((a) => bereichVon(a) === appB).forEach((a) => { if (an) kzUeb.abgewaehlt.delete(String(a.id)); else kzUeb.abgewaehlt.add(String(a.id)); });
+    renderKommando();
+  };
+
+  function kzUebernahmeHtml() {
+    const kand = kzUebKandidaten();
+    const e = kzUeb.ergebnis;
+    if (!kand.length && !e) return "";
+    const ergebnisHtml = e ? `<div class="kz-ueb-ergebnis" role="status">
+        <p><strong>${ic("ok-kreis")} ${e.uebernommen} ${e.uebernommen === 1 ? "Aufgabe" : "Aufgaben"} übernommen</strong>${e.neue_projekte ? `, ${e.neue_projekte} ${e.neue_projekte === 1 ? "Projekt" : "Projekte"} angelegt (Status „Hintergrund“ – bitte durchsehen)` : ""}${e.schon_da ? `, ${e.schon_da} waren schon da` : ""}. Sicherung: ${escapeHtml(e.datei || "")}</p>
+        ${e.uebersprungen && e.uebersprungen.length ? `<p class="notiz-meta">Nicht übernommen:</p><ul class="notiz-meta">${e.uebersprungen.slice(0, 10).map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>` : ""}
+        ${e.nicht_geloescht && e.nicht_geloescht.length ? `<p class="kz-warnung">${ic("warnung")} Im alten Reiter nicht gelöscht (bitte von Hand): ${escapeHtml(e.nicht_geloescht.join(", "))}</p>` : ""}
+        <p class="notiz-meta">${kzUebBleiben() ? `Im alten Reiter ${kzUebBleiben() === 1 ? "bleibt 1 Aufgabe" : `bleiben ${kzUebBleiben()} Aufgaben`} mit Uhrzeit oder Wiederholung – den Reiter deshalb nur ausblenden, wenn du die anders löst.` : "Im alten Reiter ist nichts Offenes mehr."} Ausblenden geht je Bereich unter ⋮ → Reiter verwalten.</p>
+        <button type="button" class="link-btn" onclick="kzUebFertig()">Hinweis schließen</button>
+      </div>` : "";
+    if (!kand.length) return `<section class="kz-ueb">${ergebnisHtml}</section>`;
+    const gruppen = BEREICH_FARBWELT.map((b) => [b, kand.filter((a) => bereichVon(a) === b)]).filter(([, l]) => l.length);
+    const optionen = (gewaehlt) => `<option value="">– nicht übernehmen –</option>` + kzBereicheSortiert().filter((b) => !b.archiviert)
+      .map((b) => `<option value="${escapeAttr(String(b.id))}"${String(b.id) === gewaehlt ? " selected" : ""}>${escapeHtml(b.name)}</option>`).join("");
+    const gewaehlt = kand.filter((a) => !kzUeb.abgewaehlt.has(String(a.id)) && kzUebZiel(bereichVon(a)));
+    const projektName = (id) => { const p = projekte.find((x) => String(x.id) === String(id)); return p ? p.name : ""; };
+    return `<details class="anleitung-abschnitt kz-ueb" data-kz-klapp="ueb"${kzOffen.ueb || e ? " open" : ""} ontoggle="kzUmklappen(this)">
+        <summary>${ic("import")} Aus dem Reiter Aufgaben übernehmen (${kand.length})</summary>
+        <div class="anleitung-text">
+          ${ergebnisHtml}
+          <p>Offene Aufgaben ohne Uhrzeit und ohne Wiederholung ziehen in die Kommandozentrale um – mit Projekt (gleichnamige werden wiederverwendet, neue bekommen den Status „Hintergrund“), Fälligkeit und Notiz. Vorher lädt die App ein <strong>Komplett-Backup</strong> herunter, danach werden die Originale im alten Reiter <strong>gelöscht</strong>. ${kzUebBleiben() ? `${kzUebBleiben() === 1 ? "1 Aufgabe" : `${kzUebBleiben()} Aufgaben`} mit Uhrzeit oder Wiederholung und alles Erledigte bleiben dort.` : "Erledigtes bleibt dort."} Die alten Projekte bleiben ebenfalls (Notizen und Links nutzen sie).</p>
+          ${gruppen.map(([b, liste]) => {
+            const ziel = kzUebZiel(b);
+            const an = liste.filter((a) => !kzUeb.abgewaehlt.has(String(a.id))).length;
+            return `<div class="kz-ueb-gruppe">
+              <div class="kz-ueb-kopf">
+                <strong>${escapeHtml(BEREICH_KNOPF_TEXT[b] || b)}</strong> <span class="notiz-meta">${an}/${liste.length}</span>
+                <label class="kz-ueb-ziel">→ <select onchange="kzUebZielSetzen('${b}', this.value)" aria-label="Ziel-Bereich für ${escapeAttr(BEREICH_KNOPF_TEXT[b] || b)}">${optionen(ziel)}</select></label>
+                <button type="button" class="link-btn" onclick="kzUebAlle('${b}', ${an < liste.length})">${an < liste.length ? "alle" : "keine"}</button>
+              </div>
+              <div class="kz-ueb-liste${ziel ? "" : " aus"}">${liste.map((a) => {
+                const pn = a.projekt_id ? projektName(a.projekt_id) : "";
+                const meta = [pn, a.faellig_am ? `fällig ${datumDe(a.faellig_am)}` : ""].filter(Boolean).join(" · ");
+                return `<label class="blatt-haken kz-ueb-haken"><input type="checkbox"${kzUeb.abgewaehlt.has(String(a.id)) ? "" : " checked"}${ziel ? "" : " disabled"} onchange="kzUebHaken('${escapeAttr(String(a.id))}', this.checked)">
+                  <span>${escapeHtml(a.titel)}${meta ? `<span class="blatt-hinweis">${escapeHtml(meta)}</span>` : ""}</span></label>`;
+              }).join("")}</div>
+            </div>`;
+          }).join("")}
+          ${kzUeb.status ? `<p class="notiz-meta" role="status"><strong>${escapeHtml(kzUeb.status)}</strong></p>` : ""}
+          <button type="button" class="btn-primary" onclick="kzUebStarten()"${kzUeb.laeuft || !gewaehlt.length ? " disabled" : ""}>${ic("export")}Backup laden und ${gewaehlt.length} übernehmen</button>
+        </div>
+      </details>`;
+  }
+
+  window.kzUebFertig = function() { kzUeb.ergebnis = null; renderKommando(); };
+
+  window.kzUebStarten = async function() {
+    if (kzUeb.laeuft) return;
+    const ids = kzUebKandidaten().filter((a) => !kzUeb.abgewaehlt.has(String(a.id)) && kzUebZiel(bereichVon(a))).map((a) => a.id);
+    if (!ids.length) return;
+    if (!confirm(`${ids.length} ${ids.length === 1 ? "Aufgabe" : "Aufgaben"} in die Kommandozentrale übernehmen?\n\nVorher wird ein Komplett-Backup heruntergeladen. Danach werden die Originale im Reiter Aufgaben gelöscht.`)) return;
+    kzUeb.laeuft = true;
+    const zuordnung = {};
+    BEREICH_FARBWELT.forEach((b) => { const z = kzUebZiel(b); if (z) zuordnung[b] = z; });
+    const meldung = (t) => { kzUeb.status = t; renderKommando(); };
+    try {
+      const sicherung = await backupErstellen((t) => meldung("Sicherung: " + t), "-vor-uebernahme");
+      if (sicherung.luecken.length && !confirm(`Die Sicherung ist unvollständig:\n${sicherung.luecken.join("\n")}\n\nTrotzdem übernehmen?`)) {
+        kzUeb.status = `Abgebrochen. Sicherung ${sicherung.datei} wurde trotzdem heruntergeladen.`;
+        return;
+      }
+      meldung(`Übernehme ${ids.length} …`);
+      const r = await api("kz_uebernahme", { zuordnung, ids });
+      kzUeb.ergebnis = { ...r, datei: sicherung.datei };
+      kzUeb.status = "";
+      kzUeb.abgewaehlt.clear();
+      hinweisZeigen(`${r.uebernommen} übernommen`);
+      await ladeDaten();
+      kzNeuLaden();
+    } catch (e) {
+      if (e.message !== "unauthorized") kzUeb.status = "Fehler: " + (e.message || "unbekannt") + " – nichts verloren, die Sicherung liegt in deinen Downloads.";
+    } finally {
+      kzUeb.laeuft = false;
+      renderKommando();
+    }
   };
 
   // ---- Heute-Ansicht (seit Session 74) ----
