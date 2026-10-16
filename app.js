@@ -355,6 +355,7 @@
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("app").classList.add("hidden");
     document.getElementById("bereich-screen").classList.remove("hidden");
+    kzKarteRendern(); // Heute-Karte der Kommandozentrale (seit Session 74)
   }
 
   // Blendet die App ein, setzt Name, Untertitel und Farbwelt des aktiven Bereichs
@@ -5544,7 +5545,10 @@
     geladen: false, laedt: false, fehlt: false, fehler: "",
     bereiche: [], projekte: [], aufgaben: [],
     speichert: false,
+    // Seit Session 74: Ansicht „heute“ oder „alles“ (je Gerät gemerkt); Fokus ins Eingabefeld nach App-Verknüpfung
+    ansicht: "heute", fokusSchnell: false,
   };
+  try { if (localStorage.getItem("kz-ansicht") === "alles") kz.ansicht = "alles"; } catch (_e) { /* egal */ }
   const KZ_HEUTE_MAX = 3;
   const KZ_PROJEKT_STATUS = [["aktiv", "Aktiv"], ["wartet", "Wartet"], ["hintergrund", "Hintergrund"], ["idee", "Idee"], ["abgeschlossen", "Abgeschlossen"]];
   const KZ_PROJEKT_REIHE = ["aktiv", "wartet", "hintergrund", "idee", "abgeschlossen"];
@@ -5577,6 +5581,7 @@
       kz.laedt = false;
     }
     if (aktiverTab === "kommando") renderKommando();
+    kzKarteRendern();
   }
   window.kzNeuLaden = function() { kz.geladen = false; kz.fehler = ""; kzLaden(); };
 
@@ -5648,8 +5653,15 @@
     const aktive = bereiche.filter((b) => !b.archiviert);
     const archiv = bereiche.filter((b) => b.archiviert);
     const heuteN = kzHeuteAnzahl();
-    el.innerHTML = `
+    const umschalter = `<div class="schnell-chips kz-ansicht" role="group" aria-label="Ansicht">
+        <button type="button" class="schnell-chip${kz.ansicht === "heute" ? " aktiv" : ""}" aria-pressed="${kz.ansicht === "heute"}" onclick="kzAnsicht('heute')">Heute</button>
+        <button type="button" class="schnell-chip${kz.ansicht === "alles" ? " aktiv" : ""}" aria-pressed="${kz.ansicht === "alles"}" onclick="kzAnsicht('alles')">Alle Projekte</button>
+      </div>`;
+    if (kz.ansicht === "heute") {
+      el.innerHTML = kzSchnellHtml() + umschalter + kzHeuteHtml() + kzEingangHtml();
+    } else el.innerHTML = `
       ${kzSchnellHtml()}
+      ${umschalter}
       ${kzEingangHtml()}
       <div class="reiter-aktionen kz-aktionen">
         <button type="button" class="btn-secondary" onclick="kzProjektNeu()">${ic("plus")}Projekt</button>
@@ -5666,9 +5678,177 @@
     if (feld) {
       feld.value = altText;
       feld.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); window.kzSchnellSpeichern(); } });
-      if (hatteFokus) feld.focus();
+      if (hatteFokus || kz.fokusSchnell) feld.focus();
+      kz.fokusSchnell = false;
     }
   }
+  window.kzAnsicht = function(a) {
+    kz.ansicht = a === "alles" ? "alles" : "heute";
+    try { localStorage.setItem("kz-ansicht", kz.ansicht); } catch (_e) { /* egal */ }
+    renderKommando();
+  };
+
+  // ---- Heute-Ansicht (seit Session 74) ----
+  // Gestern (oder früher) markiert und heute noch nicht bestätigt
+  function kzNichtGeschafft() {
+    const heute = heuteISO();
+    return kz.aufgaben.filter((a) => a.heute && a.heute_seit && a.heute_seit < heute && (a.heute_bestaetigt_am || a.heute_seit) < heute);
+  }
+  function kzOffenAlle() { return kz.aufgaben.filter((a) => a.status === "offen" && !kzIstEingang(a)); }
+  function kzUeberfaellig() { const h = heuteISO(); return kzAufgabenSortiert(kzOffenAlle().filter((a) => a.faellig_am && a.faellig_am < h)); }
+  function kzHeuteFaellig() { const h = heuteISO(); return kzAufgabenSortiert(kzOffenAlle().filter((a) => a.faellig_am === h)); }
+  // Wartende Aufgaben und Projekte: Wiedervorlage erreicht zuerst, dann am längsten wartend
+  function kzWartendeAlle() {
+    const liste = [
+      ...kz.aufgaben.filter((a) => a.status === "wartet").map((x) => ({ typ: "aufgabe", x })),
+      ...kz.projekte.filter((p) => p.status === "wartet").map((x) => ({ typ: "projekt", x })),
+    ];
+    return liste.sort((a, b) => (kzWiedervorlageFaellig(b.x) ? 1 : 0) - (kzWiedervorlageFaellig(a.x) ? 1 : 0)
+      || String(a.x.wiedervorlage || "9999").localeCompare(String(b.x.wiedervorlage || "9999"))
+      || String(a.x.wartet_seit || "").localeCompare(String(b.x.wartet_seit || "")));
+  }
+  // Wo gehört die Aufgabe hin? Projektname, ohne Projekt der Bereich
+  function kzHerkunft(a) {
+    const p = a.projekt_id ? kzProjekt(a.projekt_id) : null;
+    const b = kzBereich(p ? p.bereich_id : a.bereich_id);
+    return p ? p.name : b ? b.name : "";
+  }
+
+  function kzHeuteHtml() {
+    const top = kzAufgabenSortiert(kz.aufgaben.filter((a) => a.heute));
+    const frei = KZ_HEUTE_MAX - top.length;
+    const nicht = kzNichtGeschafft();
+    const ueber = kzUeberfaellig();
+    const faellig = kzHeuteFaellig();
+    const wartend = kzWartendeAlle();
+    const teile = [];
+    if (nicht.length) {
+      teile.push(`<section class="kz-morgen" aria-labelledby="kz-morgen-titel">
+          <h2 class="std-zwischen" id="kz-morgen-titel">${ic("sonnenaufgang")} Gestern nicht geschafft</h2>
+          <p class="notiz-meta">Behalten oder zurücklegen? Zurückgelegt bleibt die Aufgabe offen, nur nicht mehr in den Top 3.</p>
+          <div class="kz-morgen-liste">${nicht.map((a) => {
+            const aid = escapeAttr(String(a.id));
+            return `<div class="kz-morgen-zeile">
+                <span class="kz-morgen-titel">${escapeHtml(a.titel)}<span class="notiz-meta">${escapeHtml(`in Top 3 ${kzSeitText(kzTageSeit(a.heute_seit))}`)}</span></span>
+                <span class="kz-morgen-knoepfe">
+                  <button type="button" class="btn-primary" onclick="kzBehalten(['${aid}'])">Behalten</button>
+                  <button type="button" class="btn-secondary" onclick="kzHeuteSetzen('${aid}', false)">Zurücklegen</button>
+                </span>
+              </div>`;
+          }).join("")}</div>
+          ${nicht.length > 1 ? `<button type="button" class="link-btn" onclick="kzBehalten(${escapeAttr(JSON.stringify(nicht.map((a) => String(a.id))))})">Alle ${nicht.length} behalten</button>` : ""}
+        </section>`);
+    }
+    teile.push(`<section class="kz-top" aria-labelledby="kz-top-titel">
+        <h2 class="std-zwischen" id="kz-top-titel">${ic("pokal")} Deine Top 3 <span class="such-gruppe-zahl">${top.length}/${KZ_HEUTE_MAX}</span></h2>
+        ${top.length ? `<div class="task-list">${top.map((a) => kzAufgabeHtml(a, true)).join("")}</div>` : ""}
+        ${frei > 0 ? `<p class="notiz-meta kz-top-frei">${top.length ? `Noch ${frei} frei.` : "Noch nichts für heute festgelegt."} Mit ☆ an einer Aufgabe holst du sie in die Top 3 – Vorschläge stehen unten.</p>` : ""}
+      </section>`);
+    const liste = (titel, icon, eintraege, klasse) => (eintraege.length ? `<section class="kz-heute-block ${klasse || ""}">
+        <h2 class="std-zwischen">${ic(icon)} ${titel} <span class="such-gruppe-zahl">${eintraege.length}</span></h2>
+        <div class="task-list">${eintraege.slice(0, 20).map((a) => kzAufgabeHtml(a, true)).join("")}</div>
+        ${eintraege.length > 20 ? `<p class="notiz-meta">… und ${eintraege.length - 20} weitere unter „Alle Projekte“.</p>` : ""}
+      </section>` : "");
+    teile.push(liste("Überfällig", "warnung", ueber.filter((a) => !a.heute), "kz-ueber"));
+    teile.push(liste("Heute fällig", "kalender", faellig.filter((a) => !a.heute)));
+    if (wartend.length) {
+      teile.push(`<section class="kz-heute-block" aria-labelledby="kz-wartet-titel">
+          <h2 class="std-zwischen" id="kz-wartet-titel">${ic("stoppuhr")} Wartet <span class="such-gruppe-zahl">${wartend.length}</span></h2>
+          <div class="task-list">${wartend.map(({ typ, x }) => typ === "aufgabe" ? kzAufgabeHtml(x, true) : kzWartetProjektHtml(x)).join("")}</div>
+        </section>`);
+    }
+    if (!ueber.length && !faellig.length && !wartend.length && !top.length && !nicht.length) {
+      teile.push(`<p class="empty-text">Nichts Dringendes. Unter „Alle Projekte“ findest du alles Offene.</p>`);
+    }
+    return `<div class="kz-heute">${teile.join("")}</div>`;
+  }
+
+  function kzWartetProjektHtml(p) {
+    const wv = kzWiedervorlageFaellig(p);
+    const b = kzBereich(p.bereich_id);
+    return `<button type="button" class="kz-wartet-projekt${wv ? " faellig" : ""}" onclick="blattOeffnen('kzprojekt', '${escapeAttr(String(p.id))}')">
+        <span class="kz-wartet-projekt-kopf"><span class="task-titel">${escapeHtml(p.name)}</span><span class="kz-status-pille kz-pille-wartet">Projekt</span></span>
+        <span class="task-meta">${badgeHtml(wv ? "today" : "", kzWartetText(p))}${p.wiedervorlage ? badgeHtml(wv ? "today" : "", `Wiedervorlage ${datumDe(p.wiedervorlage)}`) : ""}${b ? badgeHtml("", b.name) : ""}</span>
+      </button>`;
+  }
+
+  // ☆/★: für heute markieren bzw. zurücklegen (sofort sichtbar)
+  window.kzHeuteSetzen = async function(id, an) {
+    const a = kzAufgabe(id);
+    if (!a) return;
+    if (an && !a.heute && kzHeuteAnzahl(id) >= KZ_HEUTE_MAX) { hinweisZeigen("Höchstens 3 für heute – erst eine andere abwählen"); return; }
+    const vorher = { heute: a.heute, heute_seit: a.heute_seit, heute_bestaetigt_am: a.heute_bestaetigt_am };
+    Object.assign(a, an ? { heute: true, heute_seit: heuteISO(), heute_bestaetigt_am: heuteISO() } : { heute: false, heute_seit: null, heute_bestaetigt_am: null });
+    renderKommando();
+    kzKarteRendern();
+    try {
+      await api("kz_heute", { id: a.id, heute: !!an });
+      hinweisZeigen(an ? "In den Top 3" : "Zurückgelegt");
+    } catch (e) {
+      Object.assign(a, vorher);
+      renderKommando();
+      kzKarteRendern();
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
+  window.kzBehalten = async function(ids) {
+    const heute = heuteISO();
+    const liste = ids.map(kzAufgabe).filter(Boolean);
+    const vorher = liste.map((a) => a.heute_bestaetigt_am);
+    liste.forEach((a) => { a.heute_bestaetigt_am = heute; });
+    renderKommando();
+    kzKarteRendern();
+    try {
+      await api("kz_heute_behalten", { ids: liste.map((a) => a.id) });
+      hinweisZeigen(liste.length === 1 ? "Bleibt für heute" : `${liste.length} bleiben für heute`);
+    } catch (e) {
+      liste.forEach((a, i) => { a.heute_bestaetigt_am = vorher[i]; });
+      renderKommando();
+      kzKarteRendern();
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
+
+  // ---- Heute-Karte auf der Willkommensseite (seit Session 74) ----
+  function kzKarteRendern() {
+    const el = document.getElementById("kz-heute-karte");
+    if (!el) return;
+    const sichtbar = !document.getElementById("bereich-screen").classList.contains("hidden");
+    if (!sichtbar) return;
+    if (!kz.geladen) {
+      el.innerHTML = "";
+      if (!kz.laedt && !kz.fehler && !kz.fehlt && token) kzLaden();
+      return;
+    }
+    if (!BEREICH_FARBWELT.some((b) => reiterIstSichtbar(b, "kommando"))) { el.innerHTML = ""; return; }
+    const top = kzAufgabenSortiert(kz.aufgaben.filter((a) => a.heute));
+    const ueber = kzUeberfaellig().length;
+    const nicht = kzNichtGeschafft().length;
+    const eingang = kzEingang().length;
+    const wv = kzWartendeAlle().filter(({ x }) => kzWiedervorlageFaellig(x)).length;
+    const zusatz = [
+      ueber ? `<span class="kz-karte-rot">${ueber} überfällig</span>` : "",
+      nicht ? `<span>${nicht} gestern nicht geschafft</span>` : "",
+      wv ? `<span>${wv} Wiedervorlage</span>` : "",
+      eingang ? `<span>Eingang ${eingang}</span>` : "",
+    ].filter(Boolean).join(" · ");
+    el.innerHTML = `<button type="button" class="kz-karte" onclick="kzVonStartOeffnen()">
+        <span class="kz-karte-kopf">${ic("pokal")} Heute <span class="notiz-meta">${top.length}/${KZ_HEUTE_MAX}</span></span>
+        ${top.length ? `<ol class="kz-karte-liste">${top.map((a) => `<li>${escapeHtml(a.titel)}</li>`).join("")}</ol>`
+          : `<span class="kz-karte-leer">Noch keine Top 3 für heute festgelegt.</span>`}
+        ${zusatz ? `<span class="kz-karte-zusatz">${zusatz}</span>` : ""}
+        <span class="kz-karte-weiter">Zur Kommandozentrale ${ic("weiter")}</span>
+      </button>`;
+  }
+  window.kzVonStartOeffnen = function() {
+    const gemerkt = localStorage.getItem("aktiver-bereich");
+    let bereich = BEREICH_FARBWELT.includes(gemerkt) ? gemerkt : "privat";
+    if (!reiterIstSichtbar(bereich, "kommando")) bereich = BEREICH_FARBWELT.find((b) => reiterIstSichtbar(b, "kommando")) || bereich;
+    kz.ansicht = "heute";
+    zeigeApp();
+    window.bereichAuswaehlen(bereich);
+    tabWechseln("kommando");
+  };
 
   function kzSchnellHtml() {
     return `<div class="kz-schnell">
@@ -5792,12 +5972,14 @@
       </details>`;
   }
 
-  function kzAufgabeHtml(a) {
+  // mitHerkunft: in der Heute-Ansicht steht dabei, zu welchem Projekt/Bereich die Aufgabe gehört
+  function kzAufgabeHtml(a, mitHerkunft) {
     const done = a.status === "erledigt";
     const aid = escapeAttr(String(a.id));
     const heute = heuteISO();
     const meta = [];
-    if (a.heute) meta.push(badgeHtml("reminder", `Heute${a.heute_seit && a.heute_seit < heute ? " · " + kzSeitText(kzTageSeit(a.heute_seit)) : ""}`));
+    if (a.heute) meta.push(badgeHtml("reminder", a.heute_seit && a.heute_seit < heute ? `Top 3 ${kzSeitText(kzTageSeit(a.heute_seit))}` : "Top 3 heute"));
+    if (mitHerkunft === true) { const h = kzHerkunft(a); if (h) meta.push(badgeHtml("", h)); }
     if (!done && a.faellig_am) {
       if (a.faellig_am < heute) meta.push(badgeHtml("overdue", `überfällig · ${datumDe(a.faellig_am)}`));
       else if (a.faellig_am === heute) meta.push(badgeHtml("today", "heute fällig"));
@@ -5816,6 +5998,9 @@
           ${a.notiz && !done ? `<span class="kz-notiz">${escapeHtml(a.notiz)}</span>` : ""}
           ${meta.length ? `<span class="task-meta">${meta.join("")}</span>` : ""}
         </button>
+        ${a.status === "offen" ? `<button type="button" class="kz-stern${a.heute ? " an" : ""}" onclick="kzHeuteSetzen('${aid}', ${!a.heute})"
+          aria-pressed="${!!a.heute}" aria-label="${a.heute ? "Aus den Top 3 zurücklegen" : "In die Top 3 für heute"}: ${escapeAttr(a.titel)}"
+          title="${a.heute ? "Zurücklegen" : "Für heute"}">${a.heute ? "★" : "☆"}</button>` : ""}
         <button type="button" class="task-edit-btn" onclick="blattOeffnen('kzaufgabe', '${aid}')" title="Bearbeiten" aria-label="Bearbeiten">${ic("stift")}</button>
       </div>`;
   }
@@ -8976,6 +9161,8 @@
             const ziel = BEREICH_FARBWELT.find((b) => reiterIstSichtbar(b, gewuenschterTab));
             if (ziel) window.bereichAuswaehlen(ziel);
           }
+          // „Schnell notieren“ (seit Session 74): gleich ins Eingabefeld
+          if (gewuenschterTab === "kommando" && urlParams.get("fokus") === "schnell") { kz.fokusSchnell = true; kz.ansicht = "heute"; }
           tabWechseln(gewuenschterTab);
         }
         geteiltenInhaltVerarbeiten();
