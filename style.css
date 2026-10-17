@@ -2466,3 +2466,11 @@ section.kz-ueb { margin: 0 0 0.8rem; }
 .kz-ta-tag { padding: 0.5rem 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
 .kz-ta-tag + .kz-ta-tag { border-top: 1px solid var(--border); }
 .kz-ta-tag p { flex-basis: 100%; margin: 0; overflow-wrap: anywhere; }
+
+/* Reiter-Leiste am PC (seit Session 81): Mit der Maus lässt sich die
+   Leiste ohne sichtbare Scrollleiste nicht wischen – Reiter rechts
+   (z. B. Ernährung, Lernhilfe) waren dann unerreichbar. Bei Maus/Trackpad
+   bricht die Leiste deshalb um, am Handy bleibt sie wischbar. */
+@media (hover: hover) and (pointer: fine) {
+  .reiter-leiste { flex-wrap: wrap; overflow-x: visible; }
+}
