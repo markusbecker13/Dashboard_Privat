@@ -269,6 +269,8 @@
     const name = document.getElementById("brand-name");
     const eintrag = BEREICH_LOGO[welt];
     if (logo) {
+      // Fehlt die Bilddatei (z. B. icons/ep.png), Namen statt kaputtem Bild zeigen (Review 17.10.2026)
+      logo.onerror = () => { logo.classList.add("hidden"); if (name) name.classList.remove("hidden"); };
       if (eintrag) {
         logo.src = eintrag.src;
         logo.alt = eintrag.alt;
@@ -20427,11 +20429,6 @@
   // ==========================================================
   // Finanzen-Modul: Buchungen (Schnellerfassung, Liste, CSV-Import)
   // ==========================================================
-  const MONATSNAMEN_FIN = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
-
-  function heuteISOFin() {
-    return heuteISO();
-  }
 
   // Wählt Ausgabe/Einnahme für die Schnellerfassung und setzt die erste passende Kategorie
   window.buchungTypWaehlen = function (typ) {
@@ -20502,7 +20499,7 @@
               <button class="fin-loesch-btn" onclick="buchungLoeschen('${b.id}')" title="Löschen" aria-label="Löschen">${ic("x")}</button>
             </div>`;
         }).join("")
-      : `<p class="empty-text">Keine Buchungen in ${MONATSNAMEN_FIN[finBuchMonat - 1]} ${finBuchJahr}.</p>`;
+      : `<p class="empty-text">Keine Buchungen in ${MONATSNAMEN[finBuchMonat - 1]} ${finBuchJahr}.</p>`;
 
     const kategorien = buchungTypAusgewaehlt === "einnahme" ? FIN_KAT_EINNAHME : FIN_KAT_AUSGABE;
 
@@ -20523,7 +20520,7 @@
         </div>
 
         <div class="row">
-          <input type="date" id="neue-buchung-datum" value="${heuteISOFin()}">
+          <input type="date" id="neue-buchung-datum" value="${heuteISO()}">
           <input type="text" id="neue-buchung-notiz" placeholder="Notiz (optional)">
         </div>
 
@@ -20548,7 +20545,7 @@
 
       <div class="cal-header">
         <div class="cal-nav"><button onclick="finBuchungMonatVerschieben(-1)" aria-label="Vormonat">${ic("zurueck")}</button></div>
-        <h2>${MONATSNAMEN_FIN[finBuchMonat - 1]} ${finBuchJahr}${istAktuellerMonat ? " · aktuell" : ""}</h2>
+        <h2>${MONATSNAMEN[finBuchMonat - 1]} ${finBuchJahr}${istAktuellerMonat ? " · aktuell" : ""}</h2>
         <div class="cal-nav"><button onclick="finBuchungMonatVerschieben(1)" aria-label="Nächster Monat">${ic("weiter")}</button></div>
       </div>
 
@@ -20588,7 +20585,7 @@
     const betragFeld = document.getElementById("neue-buchung-betrag");
     const betrag = betragFeld.value;
     if (!betrag || finZahl(betrag) <= 0) { betragFeld.focus(); return; }
-    const datum = document.getElementById("neue-buchung-datum").value || heuteISOFin();
+    const datum = document.getElementById("neue-buchung-datum").value || heuteISO();
     const notiz = document.getElementById("neue-buchung-notiz").value.trim();
     await api("buchung_hinzufuegen", {
       datum, betrag, notiz,
@@ -20645,29 +20642,81 @@
     return -1;
   }
 
-  // Zerlegt CSV-Text in Kopfzeile und Zeilen; Trennzeichen (; oder ,) wird automatisch erkannt
+  // Zerlegt CSV-Text in Kopfzeile und Zeilen; Trennzeichen (; oder ,) wird
+  // automatisch erkannt. Seit Review 17.10.2026: Felder in Anführungszeichen
+  // dürfen das Trennzeichen, Zeilenumbrüche und "" (= ein ") enthalten –
+  // vorher verschob z. B. "Miete; Okt";-850,00 die Spalten.
   function parseCsvText(text) {
-    const erstenZeilen = text.split(/\r?\n/).slice(0, 5).join("\n");
-    const anzahlSemikolon = (erstenZeilen.match(/;/g) || []).length;
-    const anzahlKomma = (erstenZeilen.match(/,/g) || []).length;
-    const trenner = anzahlSemikolon >= anzahlKomma ? ";" : ",";
+    const roh = String(text || "").replace(/^\uFEFF/, "");
+    const zaehle = (zeichen) => {
+      // nur außerhalb von Anführungszeichen, in den ersten 5 Zeilen
+      let n = 0, inQ = false, zeilen = 0;
+      for (let i = 0; i < roh.length && zeilen < 5; i++) {
+        const c = roh[i];
+        if (c === '"') inQ = !inQ;
+        else if (!inQ && c === "\n") zeilen++;
+        else if (!inQ && c === zeichen) n++;
+      }
+      return n;
+    };
+    const trenner = zaehle(";") >= zaehle(",") ? ";" : ",";
 
-    const zeilen = text.split(/\r?\n/).filter((z) => z.trim().length > 0);
-    const parseZeile = (z) => z.split(trenner).map((f) => f.trim().replace(/^"|"$/g, ""));
-
-    const header = parseZeile(zeilen[0]);
-    const rows = zeilen.slice(1).map(parseZeile);
-    return { header, rows };
+    const alle = [];
+    let zeile = [], feld = "", inQ = false, warQuote = false;
+    const feldEnde = () => { zeile.push(warQuote ? feld : feld.trim()); feld = ""; warQuote = false; };
+    const zeileEnde = () => {
+      feldEnde();
+      if (zeile.some((f) => f.trim().length > 0)) alle.push(zeile);
+      zeile = [];
+    };
+    for (let i = 0; i < roh.length; i++) {
+      const c = roh[i];
+      if (inQ) {
+        if (c === '"') {
+          if (roh[i + 1] === '"') { feld += '"'; i++; } else inQ = false;
+        } else feld += c;
+      } else if (c === '"') {
+        // Anführungszeichen nur am Feldanfang öffnen (Leerzeichen davor sind egal)
+        if (!feld.trim()) { feld = ""; inQ = true; warQuote = true; } else feld += c;
+      } else if (c === trenner) feldEnde();
+      else if (c === "\n") zeileEnde();
+      else if (c === "\r") { /* \r\n und einzelnes \r ignorieren */ }
+      else if (warQuote) { if (c.trim()) feld += c; } // Text nach dem schließenden " (selten) anhängen
+      else feld += c;
+    }
+    if (feld.length || zeile.length || warQuote) zeileEnde();
+    const header = alle[0] || [];
+    return { header, rows: alle.slice(1), trenner };
   }
 
-  // Wandelt einen CSV-Betrag (deutsches oder englisches Format) in eine Zahl um, sonst null
+  // Wandelt einen CSV-Betrag (deutsches oder englisches Format) in eine Zahl
+  // um, sonst null. Seit Review 17.10.2026: Stehen Punkt und Komma drin, ist
+  // das weiter rechts stehende Zeichen der Dezimaltrenner ("1.234,56" und
+  // "1,234.56" → 1234.56). Mehrere gleiche Zeichen = Tausendertrenner.
+  // Ein einzelner Punkt bleibt Dezimalpunkt ("12.5" → 12.5). Währungszeichen,
+  // Leerzeichen und ein nachgestelltes Minus ("850,00-") werden verstanden.
   function parseCsvBetrag(raw) {
-    let s = (raw || "").trim();
+    let s = String(raw ?? "").replace(/[\s\u00A0\u202F]|€|EUR/gi, "").replace(/\u2212/g, "-");
     if (!s) return null;
-    if (s.includes(".") && s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
-    else if (s.includes(",")) s = s.replace(",", ".");
-    const n = parseFloat(s);
-    return Number.isFinite(n) ? n : null;
+    let negativ = false;
+    if (/^\(.*\)$/.test(s)) { negativ = true; s = s.slice(1, -1); }
+    if (/-$/.test(s) && !/^-/.test(s)) { negativ = true; s = s.slice(0, -1); }
+    if (!/^[+-]?[\d.,]+$/.test(s) || !/\d/.test(s)) return null;
+    const punkt = s.lastIndexOf("."), komma = s.lastIndexOf(",");
+    if (punkt > -1 && komma > -1) {
+      const dez = punkt > komma ? "." : ",";
+      const tausend = dez === "." ? /,/g : /\./g;
+      s = s.replace(tausend, "");
+      if (dez === ",") s = s.replace(",", ".");
+    } else if (komma > -1) {
+      s = (s.match(/,/g).length > 1) ? s.replace(/,/g, "") : s.replace(",", ".");
+    } else if (punkt > -1 && s.match(/\./g).length > 1) {
+      s = s.replace(/\./g, "");
+    }
+    if ((s.match(/\./g) || []).length > 1) return null;
+    const n = Number(s);
+    if (!Number.isFinite(n)) return null;
+    return negativ ? -Math.abs(n) : n;
   }
 
   // Wandelt ein CSV-Datum (TT.MM.JJJJ, TT.MM.JJ, JJJJ-MM-TT, TT/MM/JJJJ) in ISO um, sonst null
