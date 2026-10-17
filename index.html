@@ -1051,7 +1051,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           <details class="anleitung-abschnitt">
             <summary>Lernhilfe <span class="anleitung-nur">(seit Session 80/81; nur Privat, unter „Sammeln“)</span></summary>
             <div class="anleitung-text">
-              <p>Übungen für ein Kind, das von zu Hause auf einer eigenen Seite übt (Kinderseite ab Etappe 3). Läuft privat; echte Nutzung erst nach schriftlicher Einwilligung beider Sorgeberechtigten.</p>
+              <p>Übungen für ein Kind, das von zu Hause auf einer eigenen Seite übt (Kinderseite <code>lernen.html</code>). Läuft privat; echte Nutzung erst nach schriftlicher Einwilligung beider Sorgeberechtigten.</p>
               <ul>
                 <li><strong>Kind anlegen:</strong> „+ Kind“, nur ein Pseudonym (z. B. „Fuchs“) und ein Symbol – kein echter Name, keine Schule, nichts zum Förderbedarf</li>
                 <li><strong>QR-Code:</strong> erstellt den Zugang. Auf dem Gerät des Kindes scannen oder den Link öffnen – das Gerät merkt sich den Zugang. Der Code wird <em>nur einmal</em> angezeigt; gespeichert ist nur ein Prüfwert (Hash). Ein neuer Code macht den alten sofort ungültig. „Sperren“ hält den Zugang an, „Freigeben“ lässt denselben Code wieder zu. Der Schlüssel steht im Link hinter „#“ und geht deshalb nicht an den Webserver. Nicht in Gruppen-Chats teilen</li>
@@ -1064,6 +1064,11 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Mit Claude erstellen:</strong> Wunsch und Fach eintragen, „Für Claude kopieren“, im Claude-Chat einfügen. Claudes Antwort (JSON, gern mit Text drumherum) hier einfügen oder als Datei wählen, „Prüfen“. Die Vorschau zeigt jede Übung mit Hinweisen; „speichern“ übernimmt alle fehlerfreien, „Im Formular öffnen“ zum Nacharbeiten. Über das Kind geht nichts an Claude</li>
                 <li><strong>Freigeben:</strong> unter jeder Übung den Namen des Kindes antippen – erst dann sieht es die Übung. Optional „fällig“. Nochmal antippen nimmt die Freigabe zurück. Bei freigegebenen Übungen steht „neu“ oder die besten Sterne und wie oft gemacht</li>
                 <li><strong>Ändern und löschen:</strong> Übung antippen. Ergebnisse bleiben, auch wenn du die Übung später änderst oder löschst – jeder Durchgang speichert eine Kopie der Aufgaben. „Archiviert“ blendet sie beim Kind aus</li>
+                <li><strong>Kinderseite:</strong> QR-Code scannen oder Link öffnen – das Gerät merkt sich den Zugang, der Schlüssel verschwindet sofort aus der Adresse; danach reicht ein Lesezeichen oder „Zum Startbildschirm“. Das Kind sieht seine Fächer und darin die freigegebenen Übungen (fällige zuerst, „neu“, beste Sterne) und übt Aufgabe für Aufgabe</li>
+                <li><strong>Antippen statt Ziehen:</strong> Auswahl antippen; Zuordnen = Teil antippen, es landet im markierten Platz (Platz antippen legt es zurück); Sortieren = Teile der Reihe nach antippen. Lücken werden eingetippt (bei Rechenaufgaben mit Zahlentastatur, ohne Autokorrektur)</li>
+                <li><strong>Rückmeldung:</strong> „Fertig ✓“ prüft auf dem Server. Beim ersten Fehler „Fast!“ – Richtiges bleibt grün stehen, Falsches kommt zurück. Danach oder bei richtig: Lösung, Erklärung, „Weiter“. Am Ende 1–3 Sterne und die Summe (je Übung zählt die beste Runde)</li>
+                <li><strong>🔊 Vorlesen</strong> nur mit Stimmen, die auf dem Gerät laufen – sonst fehlt der Knopf (Online-Stimmen würden den Text an einen fremden Dienst schicken). In „Englisch“ liest eine englische Gerätestimme die Antworten, falls vorhanden</li>
+                <li>Neu laden mitten in einer Übung: es geht bei der aktuellen Aufgabe weiter. „✕“ fragt nach; abgebrochene Runden bringen keine Sterne. Die Seite lädt nichts von Dritten und spricht nur mit <code>lernen-api</code></li>
                 <li><strong>Kind löschen</strong> (Bearbeiten-Blatt): löscht auch alle Freigaben und Ergebnisse – so ist alles weg, wenn die Begleitung endet</li>
                 <li>Bewusst <em>nicht</em> im Komplett-Backup, damit beim Löschen nichts in alten Sicherungen übrig bleibt</li>
               </ul>
