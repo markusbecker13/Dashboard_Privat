@@ -2444,3 +2444,25 @@ section.kz-ueb { margin: 0 0 0.8rem; }
 .push-schalter.push-unterpunkt { padding-left: 1.75rem; min-height: 36px; }
 .push-schalter.push-unterpunkt:has(input:disabled) { color: var(--ink-dim); }
 .push-schalter.push-unterpunkt + .push-erklaerung { padding-left: 1.75rem; }
+
+/* ==========================================================
+   Kommandozentrale – Tagesabschluss (seit Session 77)
+   ========================================================== */
+.kz-ta { display: flex; flex-direction: column; gap: 1rem; }
+.kz-ta-kopf { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; }
+.kz-ta-datum { display: flex; flex-direction: column; gap: 0.25rem; }
+.kz-ta-datum input { min-height: 44px; }
+.kz-ta-feld { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.kz-ta textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.kz-ta-paket, .kz-ta-vorschau { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.85rem; border: 1px solid var(--border); border-radius: var(--r-mittel); min-width: 0; }
+.kz-ta-vorschau { border-color: var(--accent); }
+.kz-ta-vorschau .std-zwischen { margin: 0; }
+.kz-ta-liste { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-mittel); }
+.kz-ta-zeile { display: flex; flex-direction: column; gap: 0.35rem; padding-bottom: 0.5rem; }
+.kz-ta-zeile + .kz-ta-zeile, .kz-ta-liste > .blatt-haken + .blatt-haken { border-top: 1px solid var(--border); }
+.kz-ta-zeile select { margin: 0 0.75rem; min-height: 40px; max-width: calc(100% - 1.5rem); }
+.kz-ta-liste .blatt-haken > span { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.kz-ta-liste .blatt-haken input { flex-shrink: 0; }
+.kz-ta-tag { padding: 0.5rem 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+.kz-ta-tag + .kz-ta-tag { border-top: 1px solid var(--border); }
+.kz-ta-tag p { flex-basis: 100%; margin: 0; overflow-wrap: anywhere; }

@@ -5548,7 +5548,7 @@
     // Seit Session 74: Ansicht „heute“ oder „alles“ (je Gerät gemerkt); Fokus ins Eingabefeld nach App-Verknüpfung
     ansicht: "heute", fokusSchnell: false,
   };
-  try { if (localStorage.getItem("kz-ansicht") === "alles") kz.ansicht = "alles"; } catch (_e) { /* egal */ }
+  try { const a = localStorage.getItem("kz-ansicht"); if (a === "alles" || a === "abschluss") kz.ansicht = a; } catch (_e) { /* egal */ }
   const KZ_HEUTE_MAX = 3;
   const KZ_PROJEKT_STATUS = [["aktiv", "Aktiv"], ["wartet", "Wartet"], ["hintergrund", "Hintergrund"], ["idee", "Idee"], ["abgeschlossen", "Abgeschlossen"]];
   const KZ_PROJEKT_REIHE = ["aktiv", "wartet", "hintergrund", "idee", "abgeschlossen"];
@@ -5656,7 +5656,13 @@
     const umschalter = `<div class="schnell-chips kz-ansicht" role="group" aria-label="Ansicht">
         <button type="button" class="schnell-chip${kz.ansicht === "heute" ? " aktiv" : ""}" aria-pressed="${kz.ansicht === "heute"}" onclick="kzAnsicht('heute')">Heute</button>
         <button type="button" class="schnell-chip${kz.ansicht === "alles" ? " aktiv" : ""}" aria-pressed="${kz.ansicht === "alles"}" onclick="kzAnsicht('alles')">Alle Projekte</button>
+        <button type="button" class="schnell-chip${kz.ansicht === "abschluss" ? " aktiv" : ""}" aria-pressed="${kz.ansicht === "abschluss"}" onclick="kzAnsicht('abschluss')">Tagesabschluss</button>
       </div>`;
+    if (kz.ansicht === "abschluss") {
+      el.innerHTML = umschalter + kzAbschlussHtml();
+      kzAbschlussBinden();
+      return;
+    }
     if (kz.ansicht === "heute") {
       el.innerHTML = kzSchnellHtml() + umschalter + kzHeuteHtml() + kzEingangHtml();
     } else el.innerHTML = `
@@ -5684,7 +5690,7 @@
     }
   }
   window.kzAnsicht = function(a) {
-    kz.ansicht = a === "alles" ? "alles" : "heute";
+    kz.ansicht = a === "alles" || a === "abschluss" ? a : "heute";
     try { localStorage.setItem("kz-ansicht", kz.ansicht); } catch (_e) { /* egal */ }
     renderKommando();
   };
@@ -5789,6 +5795,293 @@
       kzUeb.laeuft = false;
       renderKommando();
     }
+  };
+
+  // ---- Tagesabschluss (seit Session 77) ----
+  // Zwei Felder: Privat (geht über die Zwischenablage an Claude) und
+  // Dienstlich (bleibt nur in der App). Stimmung nur für dich. Claude
+  // antwortet mit einem Paket (JSON, typ "kz_tagesabschluss"), das die App
+  // als Vorschau zeigt: Zusammenfassung, neue Aufgaben, Erledigt-Vorschläge –
+  // übernommen wird nur, was angehakt ist. Rohtexte löscht der Server nach 30 Tagen.
+  const kzTa = {
+    geladen: false, laedt: false, fehlt: false, sqlFehlt: false, fehler: "", eintraege: [], rohtextTage: 30,
+    datum: null, privat: null, dienstlich: null, stimmung: null, // null = aus dem gespeicherten Eintrag
+    paketText: "", vorschau: null, status: "", speichert: false,
+  };
+  const KZ_STIMMUNG = [[1, "1 · mies"], [2, "2"], [3, "3 · okay"], [4, "4"], [5, "5 · super"]];
+
+  async function kzTaLaden() {
+    if (kzTa.laedt) return;
+    kzTa.laedt = true; kzTa.fehler = "";
+    try {
+      const r = await api("kz_tageslog_laden", { tage: 60 });
+      kzTa.fehlt = !!r.fehlt; kzTa.eintraege = r.eintraege || []; kzTa.sqlFehlt = !!r.sql_fehlt;
+      kzTa.rohtextTage = r.rohtext_tage || 30; kzTa.geladen = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") kzTa.fehler = e.message || "Fehler";
+    } finally { kzTa.laedt = false; }
+    if (aktiverTab === "kommando" && kz.ansicht === "abschluss") renderKommando();
+  }
+  function kzTaDatum() { return kzTa.datum || heuteISO(); }
+  function kzTaEintrag(datum) { return kzTa.eintraege.find((e) => e.datum === (datum || kzTaDatum())); }
+  // Feldwert: Eingetipptes, sonst gespeicherter Stand
+  function kzTaWert(feld) {
+    const e = kzTaEintrag() || {};
+    if (feld === "privat") return kzTa.privat !== null ? kzTa.privat : (e.rohtext || "");
+    if (feld === "dienstlich") return kzTa.dienstlich !== null ? kzTa.dienstlich : (e.rohtext_dienstlich || "");
+    return kzTa.stimmung !== null ? kzTa.stimmung : (e.stimmung || "");
+  }
+
+  function kzAbschlussHtml() {
+    if (!kzTa.geladen && !kzTa.laedt && !kzTa.fehler && !kzTa.fehlt) kzTaLaden();
+    if (kzTa.fehlt) return `<p class="empty-text">Für den Tagesabschluss bitte zuerst <code>kommandozentrale_setup.sql</code> ausführen.</p>`;
+    if (kzTa.fehler) return `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(kzTa.fehler)} <button class="link-btn" onclick="kzTaNeu()">Nochmal versuchen</button></p>`;
+    if (!kzTa.geladen) return `<p class="empty-text">Lädt …</p>`;
+    const datum = kzTaDatum();
+    const e = kzTaEintrag();
+    const st = Number(kzTaWert("stimmung")) || 0;
+    const heute = heuteISO();
+    const verlauf = kzTa.eintraege.filter((x) => x.zusammenfassung || x.stimmung || x.rohtext || x.rohtext_dienstlich);
+    return `<div class="kz-ta">
+      ${kzTa.sqlFehlt ? `<p class="kz-warnung">${ic("warnung")} Für das Feld „Dienstlich“ bitte <code>kommandozentrale_tagesabschluss_setup.sql</code> ausführen.</p>` : ""}
+      <div class="kz-ta-kopf">
+        <label class="kz-ta-datum"><span class="schnell-label">Tag</span>
+          <input type="date" id="kz-ta-datum" value="${escapeAttr(datum)}" max="${escapeAttr(heute)}"></label>
+        ${e && e.verarbeitet_am ? `<span class="badge reminder">${ic("ok-kreis")} abgeschlossen</span>` : ""}
+      </div>
+      <section class="kz-ta-feld">
+        <label class="schnell-label" for="kz-ta-privat">Privat – geht an Claude</label>
+        <textarea id="kz-ta-privat" class="schnell-notiz" rows="6" maxlength="20000" placeholder="Was war heute? Was ist erledigt, was ist neu dazugekommen, was beschäftigt dich?">${escapeHtml(kzTaWert("privat"))}</textarea>
+        <p class="blatt-hinweis">Diktieren über das Mikrofon der Tastatur. Keine Namen oder Gesundheitsdaten Dritter – Kürzel oder Rollen reichen.</p>
+      </section>
+      <section class="kz-ta-feld">
+        <label class="schnell-label" for="kz-ta-dienstlich">Dienstlich – bleibt nur in der App</label>
+        <textarea id="kz-ta-dienstlich" class="schnell-notiz" rows="4" maxlength="20000" placeholder="Jugendwerk, AWO, OGS, zwischenkaffeeundchaos …">${escapeHtml(kzTaWert("dienstlich"))}</textarea>
+        <p class="kz-schutz dienstlich">${ic("warnung")} Geht nie an Claude. Auch hier keine Namen Dritter.</p>
+      </section>
+      <section class="kz-ta-feld">
+        <span class="schnell-label">Stimmung – nur für dich</span>
+        <div class="schnell-chips" role="group" aria-label="Stimmung">${KZ_STIMMUNG.map(([w, t]) =>
+          `<button type="button" class="schnell-chip${st === w ? " aktiv" : ""}" aria-pressed="${st === w}" onclick="kzTaStimmung(${w})">${t}</button>`).join("")}</div>
+      </section>
+      <div class="reiter-aktionen kz-aktionen">
+        <button type="button" class="btn-secondary" onclick="kzTaSpeichern(true)"${kzTa.speichert ? " disabled" : ""}>Speichern</button>
+        <button type="button" class="btn-primary" onclick="kzTaKopieren()"${kzTa.speichert ? " disabled" : ""}>${ic("kopieren")}Für Claude kopieren</button>
+      </div>
+      <p class="notiz-meta">„Für Claude kopieren“ speichert und legt Privat-Text, Anweisung und deine offenen Aufgaben aus <strong>nicht dienstlichen</strong> Bereichen in die Zwischenablage – Dienstliches und den Eingang nicht. Dann im Chat mit Claude einfügen und die Antwort unten einfügen. Rohtexte werden nach ${kzTa.rohtextTage} Tagen gelöscht, Zusammenfassung und Stimmung bleiben.</p>
+      <section class="kz-ta-paket">
+        <label class="schnell-label" for="kz-ta-paket">Antwort von Claude einfügen</label>
+        <textarea id="kz-ta-paket" class="schnell-notiz" rows="3" placeholder="Die ganze Antwort einfügen – die App sucht das Paket darin">${escapeHtml(kzTa.paketText)}</textarea>
+        <div class="reiter-aktionen kz-aktionen">
+          <button type="button" class="btn-secondary" onclick="kzTaPaketPruefen()">${ic("lupe")}Prüfen</button>
+          <label class="btn-secondary bib-datei-knopf">${ic("import")}Paket (.json)<input type="file" accept="application/json,.json,.txt" class="bib-unsichtbar" onchange="kzTaPaketDatei(this)"></label>
+        </div>
+      </section>
+      ${kzTa.status ? `<p class="notiz-meta" role="status"><strong>${escapeHtml(kzTa.status)}</strong></p>` : ""}
+      ${kzTa.vorschau ? kzTaVorschauHtml() : ""}
+      ${verlauf.length ? `<details class="anleitung-abschnitt kz-ta-verlauf" data-kz-klapp="ta-verlauf"${kzOffen["ta-verlauf"] ? " open" : ""} ontoggle="kzUmklappen(this)">
+        <summary>Letzte Tage (${verlauf.length})</summary>
+        <div class="anleitung-text">${verlauf.map((x) => `<div class="kz-ta-tag">
+            <button type="button" class="link-btn" onclick="kzTaTagWaehlen('${escapeAttr(x.datum)}')">${escapeHtml(rueckTag(x.datum))}</button>
+            ${x.stimmung ? `<span class="badge">Stimmung ${Number(x.stimmung)}</span>` : ""}
+            ${x.zusammenfassung ? `<p>${escapeHtml(x.zusammenfassung)}</p>` : `<p class="notiz-meta">${x.rohtext || x.rohtext_dienstlich ? "noch nicht abgeschlossen" : "ohne Zusammenfassung"}</p>`}
+          </div>`).join("")}</div>
+      </details>` : ""}
+    </div>`;
+  }
+
+  function kzTaVorschauHtml() {
+    const v = kzTa.vorschau;
+    const privatB = kzBereicheSortiert().filter((b) => !b.archiviert && !b.dienstlich);
+    return `<section class="kz-ta-vorschau" aria-labelledby="kz-ta-vorschau-titel">
+      <h2 class="std-zwischen" id="kz-ta-vorschau-titel">${ic("funkeln")} Vorschlag von Claude – erst prüfen</h2>
+      ${v.datum && v.datum !== kzTaDatum() ? `<p class="kz-warnung">${ic("warnung")} Das Paket ist für ${escapeHtml(datumDe(v.datum))}, gewählt ist ${escapeHtml(datumDe(kzTaDatum()))}. Übernommen wird für den gewählten Tag.</p>` : ""}
+      <label class="schnell-label" for="kz-ta-zus">Zusammenfassung (änderbar)</label>
+      <textarea id="kz-ta-zus" class="schnell-notiz" rows="4" maxlength="5000">${escapeHtml(v.zusammenfassung)}</textarea>
+      ${v.aufgaben.length ? `<div class="schnell-label">Neue Aufgaben</div>
+        <div class="kz-ta-liste">${v.aufgaben.map((a, i) => `<div class="kz-ta-zeile">
+            <label class="blatt-haken"><input type="checkbox" data-ta-auf="${i}"${a.an ? " checked" : ""}><span>${escapeHtml(a.titel)}${a.faellig_am ? `<span class="blatt-hinweis">fällig ${escapeHtml(datumDe(a.faellig_am))}</span>` : ""}${a.notiz ? `<span class="blatt-hinweis">${escapeHtml(a.notiz)}</span>` : ""}</span></label>
+            <select data-ta-bereich="${i}" aria-label="Bereich für ${escapeAttr(a.titel)}">
+              <option value="">Eingang</option>
+              ${privatB.map((b) => `<option value="${escapeAttr(String(b.id))}"${String(b.id) === String(a.bereich_id) ? " selected" : ""}>${escapeHtml(b.name)}${a.projekt_id && String(b.id) === String(a.bereich_id) ? ` · ${escapeHtml((kzProjekt(a.projekt_id) || {}).name || "")}` : ""}</option>`).join("")}
+            </select>
+          </div>`).join("")}</div>` : `<p class="notiz-meta">Keine neuen Aufgaben.</p>`}
+      ${v.erledigt.length ? `<div class="schnell-label">Als erledigt abhaken</div>
+        <div class="kz-ta-liste">${v.erledigt.map((x, i) => `<label class="blatt-haken"><input type="checkbox" data-ta-erl="${i}"${x.an ? " checked" : ""}><span>${escapeHtml(x.aufgabe.titel)}${x.grund ? `<span class="blatt-hinweis">${escapeHtml(x.grund)}</span>` : ""}</span></label>`).join("")}</div>` : ""}
+      ${v.unbekannt ? `<p class="notiz-meta">${v.unbekannt} Erledigt-${v.unbekannt === 1 ? "Vorschlag passte" : "Vorschläge passten"} zu keiner offenen Aufgabe und ${v.unbekannt === 1 ? "wird" : "werden"} ignoriert.</p>` : ""}
+      <div class="reiter-aktionen kz-aktionen">
+        <button type="button" class="btn-primary" onclick="kzTaUebernehmen()"${kzTa.speichert ? " disabled" : ""}>${ic("ok-kreis")}Übernehmen</button>
+        <button type="button" class="btn-secondary" onclick="kzTaVerwerfen()">Verwerfen</button>
+      </div>
+    </section>`;
+  }
+
+  // Eingaben ohne Neuzeichnen merken
+  function kzAbschlussBinden() {
+    const set = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener("input", () => fn(el.value)); };
+    set("kz-ta-privat", (v) => { kzTa.privat = v; });
+    set("kz-ta-dienstlich", (v) => { kzTa.dienstlich = v; });
+    set("kz-ta-paket", (v) => { kzTa.paketText = v; });
+    set("kz-ta-zus", (v) => { if (kzTa.vorschau) kzTa.vorschau.zusammenfassung = v; });
+    const d = document.getElementById("kz-ta-datum");
+    if (d) d.addEventListener("change", () => window.kzTaTagWaehlen(d.value));
+    document.querySelectorAll("[data-ta-auf]").forEach((cb) => cb.addEventListener("change", () => { kzTa.vorschau.aufgaben[cb.dataset.taAuf].an = cb.checked; }));
+    document.querySelectorAll("[data-ta-erl]").forEach((cb) => cb.addEventListener("change", () => { kzTa.vorschau.erledigt[cb.dataset.taErl].an = cb.checked; }));
+    document.querySelectorAll("[data-ta-bereich]").forEach((sel) => sel.addEventListener("change", () => {
+      const a = kzTa.vorschau.aufgaben[sel.dataset.taBereich];
+      a.bereich_id = sel.value; a.projekt_id = "";
+    }));
+  }
+  window.kzTaNeu = function() { kzTa.geladen = false; kzTa.fehler = ""; kzTaLaden(); renderKommando(); };
+  window.kzTaStimmung = function(w) { kzTa.stimmung = Number(kzTaWert("stimmung")) === w ? "" : w; renderKommando(); };
+  window.kzTaTagWaehlen = function(datum) {
+    if (!datum || datum > heuteISO()) return;
+    if ((kzTa.privat !== null || kzTa.dienstlich !== null || kzTa.stimmung !== null) && !confirm("Ungespeicherte Eingaben für diesen Tag verwerfen?")) { renderKommando(); return; }
+    kzTa.datum = datum; kzTa.privat = null; kzTa.dienstlich = null; kzTa.stimmung = null;
+    renderKommando();
+    window.scrollTo({ top: 0 });
+  };
+
+  async function kzTaSpeichernIntern() {
+    const r = await api("kz_tageslog_speichern", {
+      datum: kzTaDatum(), rohtext: kzTaWert("privat"), rohtext_dienstlich: kzTaWert("dienstlich"), stimmung: kzTaWert("stimmung") || null,
+    });
+    if (r.eintrag) {
+      kzTa.eintraege = kzTa.eintraege.filter((x) => x.datum !== r.eintrag.datum);
+      kzTa.eintraege.unshift(r.eintrag);
+      kzTa.eintraege.sort((a, b) => String(b.datum).localeCompare(String(a.datum)));
+    }
+    kzTa.privat = null; kzTa.dienstlich = null; kzTa.stimmung = null;
+  }
+  window.kzTaSpeichern = async function(meldung) {
+    if (kzTa.speichert) return;
+    kzTa.speichert = true;
+    try { await kzTaSpeichernIntern(); if (meldung) hinweisZeigen("Tagesabschluss gespeichert"); }
+    catch (e) { if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler")); }
+    finally { kzTa.speichert = false; renderKommando(); }
+  };
+
+  // Text für Claude: Anweisung, Privat-Text, offene private Aufgaben (mit Kurz-ID), private Bereiche und Projekte
+  function kzTaClaudeText() {
+    const datum = kzTaDatum();
+    const privatB = kzBereicheSortiert().filter((b) => !b.archiviert && !b.dienstlich);
+    const privatIds = new Set(privatB.map((b) => String(b.id)));
+    // Eingang bewusst nicht: noch nicht zugeordnet, könnte Dienstliches sein
+    const offen = kz.aufgaben.filter((a) => a.status !== "erledigt" && a.bereich_id && privatIds.has(String(a.bereich_id)));
+    const projekte = kz.projekte.filter((p) => p.status !== "abgeschlossen" && privatIds.has(String(p.bereich_id)));
+    const zeile = (a) => {
+      const p = a.projekt_id ? kzProjekt(a.projekt_id) : null;
+      const b = kzBereich(p ? p.bereich_id : a.bereich_id);
+      return `- [${String(a.id).slice(0, 8)}] ${a.titel}${b ? ` (${b.name}${p ? ` / ${p.name}` : ""})` : ""}${a.status === "wartet" ? " – wartet" : ""}`;
+    };
+    return [
+      `TAGESABSCHLUSS ${datum} – für die Kommandozentrale in meinem Dashboard.`,
+      ``,
+      `Bitte lies meinen Tagesrückblick und antworte mit genau einem JSON-Codeblock in diesem Format (sonst nichts, keine Erklärung):`,
+      "```json",
+      `{"typ":"kz_tagesabschluss","version":1,"datum":"${datum}","zusammenfassung":"2–5 Sätze","aufgaben":[{"titel":"…","bereich":"Name aus der Liste oder leer","projekt":"Name aus der Liste oder leer","faellig_am":"JJJJ-MM-TT oder leer","notiz":"optional"}],"erledigt":[{"id":"8-stellige ID aus der Liste","grund":"kurz, warum"}]}`,
+      "```",
+      `Regeln:`,
+      `- zusammenfassung: sachlich, in Du-Form, ohne Namen Dritter.`,
+      `- aufgaben: nur konkrete neue To-dos, die ich erwähne und die noch nicht in der Liste unten stehen. Bereich und Projekt nur aus den Listen, sonst leer lassen. faellig_am nur, wenn ich einen Tag nenne (heute ist ${datum}).`,
+      `- erledigt: nur Aufgaben aus der Liste unten, von denen ich sage, dass sie erledigt sind – mit ihrer ID in eckigen Klammern.`,
+      `- Leere Listen sind in Ordnung.`,
+      ``,
+      `BEREICHE: ${privatB.map((b) => b.name).join(", ") || "–"}`,
+      `PROJEKTE: ${projekte.map((p) => `${p.name} (${(kzBereich(p.bereich_id) || {}).name || ""})`).join("; ") || "–"}`,
+      `OFFENE AUFGABEN:`,
+      ...(offen.length ? offen.map(zeile) : ["- keine"]),
+      ``,
+      `MEIN TAG:`,
+      kzTaWert("privat") || "(leer)",
+    ].join("\n");
+  }
+  window.kzTaKopieren = async function() {
+    if (!String(kzTaWert("privat")).trim()) { alert("Das Feld „Privat“ ist leer – dort steht, was an Claude geht."); return; }
+    if (kzTa.speichert) return;
+    kzTa.speichert = true;
+    try { await kzTaSpeichernIntern(); }
+    catch (e) { kzTa.speichert = false; if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler")); renderKommando(); return; }
+    kzTa.speichert = false;
+    const text = kzTaClaudeText();
+    try {
+      await navigator.clipboard.writeText(text);
+      kzTa.status = "Kopiert – jetzt im Chat mit Claude einfügen, die Antwort dann unten einfügen.";
+    } catch (_e) {
+      downloadDatei(`tagesabschluss-${kzTaDatum()}.txt`, text, "text/plain;charset=utf-8");
+      kzTa.status = "Kopieren ging nicht – als Textdatei heruntergeladen. Inhalt im Chat mit Claude einfügen.";
+    }
+    renderKommando();
+  };
+
+  // Paket aus beliebigem Text lesen (ganze Antwort mit Codeblock geht auch)
+  function kzTaPaketLesen(text) {
+    const roh = String(text || "");
+    const a = roh.indexOf("{"), b = roh.lastIndexOf("}");
+    if (a < 0 || b <= a) throw new Error("Kein Paket gefunden – bitte die Antwort von Claude mit dem { … }-Block einfügen.");
+    let p;
+    try { p = JSON.parse(roh.slice(a, b + 1)); } catch (_e) { throw new Error("Das Paket ist kein gültiges JSON – ggf. Claude bitten, es nochmal als JSON-Codeblock zu schicken."); }
+    if (!p || p.typ !== "kz_tagesabschluss") throw new Error("Das ist kein Tagesabschluss-Paket (typ „kz_tagesabschluss“ fehlt).");
+    const name = (x) => String(x || "").trim().toLowerCase();
+    const privatB = kz.bereiche.filter((x) => !x.archiviert && !x.dienstlich);
+    const aufgaben = (Array.isArray(p.aufgaben) ? p.aufgaben : []).slice(0, 50).map((x) => {
+      const titel = String(x && x.titel || "").trim().slice(0, 300);
+      if (!titel) return null;
+      const b = privatB.find((y) => name(y.name) === name(x.bereich));
+      const pr = b ? kz.projekte.find((y) => String(y.bereich_id) === String(b.id) && name(y.name) === name(x.projekt)) : null;
+      const faellig = /^\d{4}-\d{2}-\d{2}$/.test(String(x.faellig_am || "")) ? x.faellig_am : "";
+      return { titel, bereich_id: b ? String(b.id) : "", projekt_id: pr ? String(pr.id) : "", faellig_am: faellig, notiz: String(x.notiz || "").trim().slice(0, 1000), an: true };
+    }).filter(Boolean);
+    const offen = kz.aufgaben.filter((x) => x.status !== "erledigt" && x.bereich_id);
+    let unbekannt = 0;
+    const gesehen = new Set();
+    const erledigt = [];
+    (Array.isArray(p.erledigt) ? p.erledigt : []).slice(0, 50).forEach((x) => {
+      const kurz = String(x && x.id || "").replace(/[^0-9a-f]/gi, "").toLowerCase().slice(0, 8);
+      const treffer = kurz.length >= 6 ? offen.filter((y) => String(y.id).toLowerCase().startsWith(kurz)) : [];
+      if (treffer.length !== 1 || gesehen.has(treffer[0].id)) { unbekannt++; return; }
+      const bb = kzBereich(treffer[0].bereich_id);
+      if (bb && bb.dienstlich) { unbekannt++; return; }
+      gesehen.add(treffer[0].id);
+      erledigt.push({ aufgabe: treffer[0], grund: String(x.grund || "").trim().slice(0, 200), an: true });
+    });
+    return { datum: /^\d{4}-\d{2}-\d{2}$/.test(String(p.datum || "")) ? p.datum : null,
+      zusammenfassung: String(p.zusammenfassung || "").trim().slice(0, 5000), aufgaben, erledigt, unbekannt };
+  }
+  window.kzTaPaketPruefen = function() {
+    try {
+      kzTa.vorschau = kzTaPaketLesen(kzTa.paketText);
+      kzTa.status = "";
+    } catch (e) { kzTa.vorschau = null; kzTa.status = e.message; }
+    renderKommando();
+    const v = document.querySelector(".kz-ta-vorschau");
+    if (v) v.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  window.kzTaPaketDatei = async function(input) {
+    const datei = input.files && input.files[0];
+    input.value = "";
+    if (!datei) return;
+    kzTa.paketText = await datei.text();
+    window.kzTaPaketPruefen();
+  };
+  window.kzTaVerwerfen = function() { kzTa.vorschau = null; kzTa.status = ""; renderKommando(); };
+  window.kzTaUebernehmen = async function() {
+    const v = kzTa.vorschau;
+    if (!v || kzTa.speichert) return;
+    const aufgaben = v.aufgaben.filter((a) => a.an).map((a) => ({ titel: a.titel, bereich_id: a.bereich_id || null, projekt_id: a.projekt_id || null, faellig_am: a.faellig_am || null, notiz: a.notiz || null }));
+    const erledigt_ids = v.erledigt.filter((x) => x.an).map((x) => x.aufgabe.id);
+    kzTa.speichert = true;
+    try {
+      const r = await api("kz_tagesabschluss_uebernehmen", { datum: kzTaDatum(), zusammenfassung: v.zusammenfassung, aufgaben, erledigt_ids });
+      kzTa.vorschau = null; kzTa.paketText = "";
+      kzTa.status = `Übernommen: Zusammenfassung, ${r.angelegt} neue ${r.angelegt === 1 ? "Aufgabe" : "Aufgaben"}, ${r.abgehakt} erledigt.${r.fehler && r.fehler.length ? " Nicht angelegt: " + r.fehler.join("; ") : ""}`;
+      hinweisZeigen("Tagesabschluss übernommen");
+      kzTa.geladen = false;
+      kzNeuLaden();
+      kzTaLaden();
+    } catch (e) {
+      if (e.message !== "unauthorized") kzTa.status = "Nicht übernommen: " + (e.message || "Fehler");
+    } finally { kzTa.speichert = false; renderKommando(); }
   };
 
   // ---- Heute-Ansicht (seit Session 74) ----
