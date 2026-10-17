@@ -11,7 +11,7 @@
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <link rel="stylesheet" href="style.css?v=81">
-<link rel="stylesheet" href="lernhilfe.css?v=83">
+<link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
   <!-- Linien-Icons (seit Session 35, Icons Etappe A). Eigene Zeichnungen, 24er-Raster,
@@ -1070,10 +1070,13 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>🔊 Vorlesen</strong> nur mit Stimmen, die auf dem Gerät laufen – sonst fehlt der Knopf (Online-Stimmen würden den Text an einen fremden Dienst schicken). In „Englisch“ liest eine englische Gerätestimme die Antworten, falls vorhanden</li>
                 <li>Neu laden mitten in einer Übung: es geht bei der aktuellen Aufgabe weiter. „✕“ fragt nach; abgebrochene Runden bringen keine Sterne. Die Seite lädt nichts von Dritten und spricht nur mit <code>lernen-api</code></li>
                 <li><strong>Sammelalbum</strong> (auf der Kinderseite über die Sterne oder „📒 Mein Album“): je Fach ein Sticker-Set (Wald, Meer, Bauernhof, Dschungel, Weltall, Unterwegs, Obst, Fantasie). Alle 3 Sterne in einem Fach gibt es den nächsten Sticker; je Übung zählt die beste Runde. Ein volles Set (12) startet das nächste. Dazu 12 Abzeichen (z. B. Erste Übung, Ohne Fehler, Besser geworden, 3 Tage hintereinander, 10 Übungen, Fach-Profi) – noch nicht erreichte grau mit Hinweis. Am Ende einer Übung zeigt die Seite Neues. Alles wird aus den Ergebnissen berechnet, nichts extra gespeichert</li>
-                <li><strong>Neue Ergebnisse:</strong> oben im Reiter die fertigen Runden, die du noch nicht gesehen hast – Kind, Übung, Sterne, Prozent, wie viele gleich bzw. im 2. Versuch richtig, Dauer, Zeitpunkt. „Alle gesehen“ räumt die Liste. Die Auswertung je Aufgabe kommt später</li>
+                <li><strong>Neue Ergebnisse:</strong> oben im Reiter die fertigen Runden, die du noch nicht gesehen hast – Kind, Übung, Sterne, Prozent, wie viele gleich bzw. im 2. Versuch richtig, Dauer, Zeitpunkt. „Alle gesehen“ räumt die Liste. Eine Zeile antippen öffnet das Ergebnis im Detail</li>
+                <li><strong>Ergebnis im Detail:</strong> jede Aufgabe mit der Antwort im 1. und ggf. 2. Versuch (mit Zeit), richtig/falsch und der Lösung. Öffnen zählt als gesehen. „Ergebnis löschen“ entfernt die Runde (das Album rechnet neu)</li>
+                <li><strong>Auswertung</strong> (Knopf beim Kind): Fach wählen, dann Kennzahlen, Verlauf in % je Runde, je Fach mit Trend (ab 4 Runden), „oft falsch beim ersten Versuch“ mit letzter Antwort und Lösung, alle Runden (antippen = Detail). <em>Excel</em> mit Übersicht, Runden, allen Antworten und „Oft falsch“; <em>Drucken / PDF</em> über den Druckdialog; <em>Alle Ergebnisse löschen</em> (Kind, Zugang und Freigaben bleiben – z. B. für Testrunden). Export und Ausdruck enthalten Daten über das Kind – nur nach Absprache mit den Eltern weitergeben</li>
+                <li><strong>Aufräumen</strong> (unter „Fächer verwalten“): löscht abgebrochene Runden älter als 30 Tage und Bilder, die keine Übung und kein Ergebnis mehr braucht</li>
                 <li><strong>Benachrichtigung:</strong> ⋮ → „Benachrichtigungen &amp; Vorlesen“ → „Lernhilfe: neue Ergebnisse“ (vorher <code>lernen_push_setup.sql</code> ausführen). Kurz nach dem Üben „Neue Lernergebnisse – 2 Übungen fertig“, gebündelt (sobald 10 Minuten nichts Neues fertig wurde, spätestens nach 1 Stunde), Ruhezeit beachtet, nie mit Pseudonym, Übung oder Punkten. In der Morgen-Übersicht: „Lernhilfe: 2 neue Ergebnisse · 1 Übung fällig, noch nicht gemacht“. Bei „Bereiche“ muss Privat gewählt sein</li>
                 <li><strong>Kind löschen</strong> (Bearbeiten-Blatt): löscht auch alle Freigaben und Ergebnisse – so ist alles weg, wenn die Begleitung endet</li>
-                <li>Bewusst <em>nicht</em> im Komplett-Backup, damit beim Löschen nichts in alten Sicherungen übrig bleibt</li>
+                <li><strong>Komplett-Backup:</strong> nur Fächer, Übungen und Aufgaben (ohne Bilder) – bewusst keine Kinder, Zugänge, Freigaben oder Ergebnisse, damit beim Löschen nichts in alten Sicherungen übrig bleibt</li>
               </ul>
             </div>
           </details>
@@ -2196,6 +2199,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=83"></script>
+<script src="app.js?v=84"></script>
 </body>
 </html>

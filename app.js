@@ -17235,6 +17235,17 @@
       luecken.push("Zähler: " + e.message);
     }
 
+    // Lernhilfe (seit Session 84): nur Fächer, Übungen und Aufgaben – keine
+    // Kinder, Zugänge, Freigaben oder Ergebnisse (Löschen soll vollständig sein)
+    meldung("Lade Lernhilfe-Übungen …");
+    try {
+      const r = await api("lern_laden");
+      if (!r.fehlt) { liste.lern_faecher = r.faecher || []; liste.lern_uebungen = r.uebungen || []; liste.lern_aufgaben = r.aufgaben || []; }
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Lernhilfe-Übungen: " + e.message);
+    }
+
     // Kommandozentrale (seit Session 73), inkl. Tageslog
     meldung("Lade Kommandozentrale …");
     try {
@@ -17276,6 +17287,7 @@
         "Nicht enthalten: Login-Sessions, Google-Zugang, Push-Schlüssel und angemeldete Geräte, BLS-Lebensmittel (jederzeit neu importierbar), gespeicherte Open-Food-Facts-Produkte (werden beim Scannen neu geholt).",
         "Hochgeladene Dateien (Projekt- und Spieldateien, Rezeptfotos, Bilder im Training, Weiterbildungsnachweise) liegen nur im Supabase-Speicher; die Datei listet sie auf, enthält sie aber nicht.",
         "Verlauf: nur die letzten 50 Einträge je Bereich (so viel liefert die App).",
+        "Lernhilfe: nur Fächer, Übungen und Aufgaben (ohne Bilder) – bewusst keine Kinder, Zugänge, Freigaben oder Ergebnisse.",
         "Ernährungseinträge in der Form des Ernährungs-Exports (ohne interne IDs).",
         "Wiederherstellen: im Reiter Export, Karte „Wiederherstellen“.",
       ],
@@ -17411,9 +17423,12 @@
     { k: "kz_projekte", t: "kz_projekte", name: "Kommandozentrale: Projekte", gruppe: "Kommandozentrale" },
     { k: "kz_tageslog", t: "kz_tageslog", name: "Kommandozentrale: Tageslog", gruppe: "Kommandozentrale" },
     { k: "kz_aufgaben", t: "kz_aufgaben", name: "Kommandozentrale: Aufgaben", gruppe: "Kommandozentrale" },
+    { k: "lern_faecher", t: "lern_faecher", name: "Lernhilfe: Fächer", gruppe: "Lernhilfe" },
+    { k: "lern_uebungen", t: "lern_uebungen", name: "Lernhilfe: Übungen", gruppe: "Lernhilfe" },
+    { k: "lern_aufgaben", t: "lern_aufgaben", name: "Lernhilfe: Aufgaben (ohne Bilder)", gruppe: "Lernhilfe" },
     { k: "verlauf", t: "verlauf", name: "Verlauf (letzte 50 je Bereich)", gruppe: "Sonstiges", nurErg: true },
   ];
-  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Stunden", "Zähler", "Kommandozentrale", "Sonstiges"];
+  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Stunden", "Zähler", "Kommandozentrale", "Lernhilfe", "Sonstiges"];
 
   // Zustand der Karte (bleibt beim Neuzeichnen von Export erhalten)
   const wh = {
@@ -24884,6 +24899,9 @@
     ed: null,           // Übung im Formular
     speichert: false,
     wunsch: "", wunschFach: "", paketText: "", paket: null, // Claude-Paket
+    // Auswertung (seit Session 84): aw = Auswertung eines Kindes, erg = ein Ergebnis im Detail
+    aw: null,           // { kindId, laedt, fehler, daten: { durchlaeufe, antworten }, fach }
+    erg: null,          // { id, laedt, fehler, daten, zurueck: "liste" | "auswertung" }
   };
   const LH_TYPEN = {
     auswahl: { name: "Auswahl", hilfe: "Frage mit 2–4 Antworten, eine ist richtig" },
@@ -25056,6 +25074,8 @@
     if (!lh.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
     if (lh.ansicht === "editor" && lh.ed) { el.innerHTML = lhEditorHtml(); return; }
     if (lh.ansicht === "paket") { el.innerHTML = lhPaketHtml(); return; }
+    if (lh.ansicht === "auswertung" && lh.aw) { el.innerHTML = lhAuswertungHtml(); return; }
+    if (lh.ansicht === "ergebnis" && lh.erg) { el.innerHTML = lhErgebnisHtml(); return; }
     lh.ansicht = "liste";
     el.innerHTML = lhNeueErgebnisseHtml() + lhKinderHtml() + lhUebungenHtml() + lhFaecherHtml();
   }
@@ -25077,13 +25097,14 @@
         min ? `${min} Min.` : "",
         d.wiederholung ? "Wiederholung" : "",
       ].filter(Boolean).join(" · ");
-      return `<li class="lh-ergebnis">
+      return `<li><button type="button" class="lh-ergebnis" onclick="lhErgebnisOeffnen('${escapeAttr(String(d.id))}', 'liste')">
         <span class="lh-ergebnis-sterne" aria-label="${sterne} von 3 Sternen">${"★".repeat(sterne)}${"☆".repeat(3 - sterne)}</span>
         <span class="lh-ergebnis-text">
           <strong>${escapeHtml(k ? (k.symbol || "") + " " + k.pseudonym : "Kind gelöscht")} · ${escapeHtml(d.uebung_titel || "")}</strong>
           <span class="notiz-meta">${escapeHtml(d.fach_name || "")} · ${Number(d.punkte_prozent) || 0} % · ${escapeHtml(teile)} · ${escapeHtml(lhZeitpunkt(d.beendet_am))}</span>
         </span>
-      </li>`;
+        <span class="lh-pfeil" aria-hidden="true">${ic("weiter")}</span>
+      </button></li>`;
     }).join("");
     return `<section class="lh-neu" aria-label="Neue Ergebnisse">
       <h2 class="std-zwischen">${ic("pokal")} Neue Ergebnisse <span class="zl-gruppe-zahl">${neu.length}</span></h2>
@@ -25092,6 +25113,391 @@
       <button type="button" class="btn-secondary" onclick="lhErgebnisseGesehen()">${ic("ok-kreis")}Alle gesehen</button>
     </section>`;
   }
+  // ==========================================================
+  // Auswertung (seit Session 84, Etappe 5a): je Kind Kennzahlen, Verlauf,
+  // je Fach, schwierige Aufgaben, alle Runden; ein Ergebnis im Detail;
+  // Export als Excel und zum Drucken/PDF; Löschen; Aufräumen.
+  // Grundlage ist die Kopie der Aufgaben im Durchlauf – spätere Änderungen
+  // an einer Übung verändern alte Ergebnisse nicht.
+  // ==========================================================
+  function lhLoesungText(a) {
+    const i = (a && a.inhalt) || {};
+    if (a.typ === "auswahl") { const o = (i.optionen || [])[Number(i.richtig)]; return o ? `${o.emoji ? o.emoji + " " : ""}${o.text || ""}` : ""; }
+    if (a.typ === "eingabe") return String(i.text || "").replace(LH_LUECKE, (_m, inner) => `[${String(inner).split("|")[0].trim()}]`);
+    if (a.typ === "zuordnen") return (i.paare || []).map((x) => `${x.links} → ${x.rechts}`).join("; ");
+    return (i.teile || []).join(" ");
+  }
+  function lhAntwortText(a, antwort) {
+    const i = (a && a.inhalt) || {};
+    const w = antwort || {};
+    if (a.typ === "auswahl") { const o = (i.optionen || [])[Number(w.wahl)]; return o ? `${o.emoji ? o.emoji + " " : ""}${o.text || ""}` : "–"; }
+    if (a.typ === "eingabe") {
+      const werte = Array.isArray(w.luecken) ? w.luecken : [];
+      let n = 0;
+      return String(i.text || "").replace(LH_LUECKE, () => `[${werte[n++] ?? ""}]`);
+    }
+    if (a.typ === "zuordnen") {
+      const p = i.paare || [], z = Array.isArray(w.zuordnung) ? w.zuordnung : [];
+      return p.map((x, k) => `${x.links} → ${(p[Number(z[k])] || {}).rechts ?? "?"}`).join("; ");
+    }
+    const t = i.teile || [], r = Array.isArray(w.reihenfolge) ? w.reihenfolge : [];
+    return r.map((x) => t[Number(x)] ?? "?").join(" ");
+  }
+  const lhTypName = (t) => (LH_TYPEN[t] ? LH_TYPEN[t].name : t);
+  function lhDatumZeit(iso) {
+    const d = new Date(iso);
+    if (!iso || isNaN(d)) return "";
+    return d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+  function lhTagLokal(iso) {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function lhMinuten(sek) {
+    const s = Number(sek) || 0;
+    if (!s) return "–";
+    const min = Math.round(s / 60);
+    return min < 60 ? `${Math.max(1, min)} Min.` : `${Math.floor(min / 60)} Std. ${min % 60} Min.`;
+  }
+  const lhMittel = (l) => (l.length ? Math.round(l.reduce((a, b) => a + b, 0) / l.length) : null);
+
+  // Zahlen für die Auswertung (gefiltert nach Fach)
+  function lhAwRechnen() {
+    const alle = lh.aw.daten.durchlaeufe;
+    const imFach = (d) => lh.aw.fach === "alle" || d.fach_name === lh.aw.fach;
+    const runden = alle.filter((d) => imFach(d));
+    const fertig = runden.filter((d) => d.beendet_am).sort((a, b) => String(a.beendet_am).localeCompare(String(b.beendet_am)));
+    const abgebrochen = runden.filter((d) => !d.beendet_am);
+    const prozente = fertig.map((d) => Number(d.punkte_prozent) || 0);
+    const kenn = {
+      runden: fertig.length, abgebrochen: abgebrochen.length, mittel: lhMittel(prozente),
+      zeit: fertig.reduce((s, d) => s + (Number(d.dauer_sek) || 0), 0),
+      tage: new Set(fertig.map((d) => lhTagLokal(d.beendet_am))).size,
+      erste: fertig.length ? fertig[0].beendet_am : null, letzte: fertig.length ? fertig[fertig.length - 1].beendet_am : null,
+      gleich: fertig.reduce((s, d) => s + (Number(d.richtig_erster) || 0), 0),
+      aufgaben: fertig.reduce((s, d) => s + (Number(d.anzahl_aufgaben) || 0), 0),
+    };
+    // je Fach (immer alle Fächer, unabhängig vom Filter)
+    const faecher = [...new Set(alle.map((d) => d.fach_name))].sort((a, b) => a.localeCompare(b, "de"));
+    const jeFach = faecher.map((name) => {
+      const l = alle.filter((d) => d.fach_name === name && d.beendet_am).sort((a, b) => String(a.beendet_am).localeCompare(String(b.beendet_am)));
+      const p = l.map((d) => Number(d.punkte_prozent) || 0);
+      let trend = null;
+      if (p.length >= 4) trend = lhMittel(p.slice(-3)) - lhMittel(p.slice(0, -3));
+      return { name, runden: l.length, mittel: lhMittel(p), trend, zeit: l.reduce((s, d) => s + (Number(d.dauer_sek) || 0), 0), sterne: l.reduce((s, d) => s + (Number(d.sterne) || 0), 0) };
+    });
+    // schwierige Aufgaben: wie oft im 1. Versuch falsch
+    const ant = new Map();
+    for (const a of lh.aw.daten.antworten) ant.set(`${a.durchlauf_id}|${a.aufgabe_id}|${a.versuch}`, a);
+    const agg = new Map();
+    for (const d of fertig) {
+      for (const a of (Array.isArray(d.aufgaben) ? d.aufgaben : [])) {
+        const v1 = ant.get(`${d.id}|${a.id}|1`);
+        if (!v1) continue;
+        const v2 = ant.get(`${d.id}|${a.id}|2`);
+        const key = `${d.uebung_titel}|${a.frage}|${a.typ}`;
+        const x = agg.get(key) || { uebung: d.uebung_titel, fach: d.fach_name, a, n: 0, falsch1: 0, falschEnde: 0, letzteFalsch: "" };
+        x.n++;
+        if (!v1.richtig) { x.falsch1++; x.letzteFalsch = lhAntwortText(a, v1.antwort); x.a = a; }
+        if (!v1.richtig && (!v2 || !v2.richtig)) x.falschEnde++;
+        agg.set(key, x);
+      }
+    }
+    const schwierig = [...agg.values()].filter((x) => x.falsch1 > 0)
+      .sort((p, q) => q.falsch1 / q.n - p.falsch1 / p.n || q.falsch1 - p.falsch1).slice(0, 8);
+    return { runden, fertig, abgebrochen, kenn, jeFach, schwierig, faecher };
+  }
+
+  // Verlauf: Prozent je Runde (eine Linie, Akzentfarbe, Punkte mit Tooltip)
+  function lhVerlaufSvg(fertig, druck = false) {
+    if (fertig.length < 2) return `<p class="notiz-meta">Der Verlauf erscheint ab zwei fertigen Runden.</p>`;
+    const W = 320, H = 130, L = 30, R = 8, O = 10, U = 22;
+    const n = fertig.length;
+    const x = (i) => L + (i * (W - L - R)) / (n - 1);
+    const y = (p) => O + ((100 - p) * (H - O - U)) / 100;
+    const farbe = druck ? "#1b1b1b" : "var(--accent)";
+    const linie = fertig.map((d, i) => `${x(i).toFixed(1)},${y(Number(d.punkte_prozent) || 0).toFixed(1)}`).join(" ");
+    const gitter = [0, 50, 100].map((p) => `<line x1="${L}" x2="${W - R}" y1="${y(p)}" y2="${y(p)}" stroke="${druck ? "#ccc" : "var(--border)"}" stroke-width="1"/>
+      <text x="${L - 6}" y="${y(p) + 4}" text-anchor="end" font-size="10" fill="${druck ? "#555" : "var(--ink-dim)"}">${p}</text>`).join("");
+    const punkte = fertig.map((d, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(Number(d.punkte_prozent) || 0).toFixed(1)}" r="4" fill="${farbe}" stroke="${druck ? "#fff" : "var(--panel)"}" stroke-width="2">
+      <title>${escapeHtml(lhDatumZeit(d.beendet_am))} · ${escapeHtml(d.uebung_titel)} · ${Number(d.punkte_prozent) || 0} %</title></circle>`).join("");
+    const datum = (iso) => new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+    const achse = `<text x="${L}" y="${H - 6}" font-size="10" fill="${druck ? "#555" : "var(--ink-dim)"}">${datum(fertig[0].beendet_am)}</text>
+      <text x="${W - R}" y="${H - 6}" font-size="10" text-anchor="end" fill="${druck ? "#555" : "var(--ink-dim)"}">${datum(fertig[n - 1].beendet_am)}</text>`;
+    return `<svg class="lh-verlauf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ergebnis in Prozent je Runde, ${n} Runden">
+      ${gitter}<polyline points="${linie}" fill="none" stroke="${farbe}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${punkte}${achse}</svg>`;
+  }
+
+  window.lhAuswertungOeffnen = async function(kid) {
+    lh.aw = { kindId: kid, laedt: true, fehler: "", daten: null, fach: "alle" };
+    lh.ansicht = "auswertung";
+    renderLernhilfe();
+    window.scrollTo(0, 0);
+    try {
+      const r = await api("lern_auswertung", { kind_id: kid });
+      if (!lh.aw || lh.aw.kindId !== kid) return;
+      lh.aw.daten = { durchlaeufe: r.durchlaeufe || [], antworten: r.antworten || [] };
+    } catch (e) {
+      if (e.message === "unauthorized") return;
+      if (lh.aw) lh.aw.fehler = e.message || "Fehler";
+    }
+    if (lh.aw) lh.aw.laedt = false;
+    if (aktiverTab === "lernhilfe" && lh.ansicht === "auswertung") renderLernhilfe();
+  };
+  window.lhAuswertungZu = function() { lh.aw = null; lh.ansicht = "liste"; renderLernhilfe(); };
+  window.lhAwFach = function(f) { if (lh.aw) { lh.aw.fach = f; renderLernhilfe(); } };
+
+  function lhAuswertungHtml() {
+    const k = lhKind(lh.aw.kindId);
+    const name = k ? `${k.symbol || ""} ${k.pseudonym}` : "Kind";
+    const kopf = `<button type="button" class="link-btn einheit-zurueck" onclick="lhAuswertungZu()">${ic("zurueck")} Zur Übersicht</button>
+      <h2 class="std-zwischen lh-aw-titel">Auswertung · ${escapeHtml(name)}</h2>`;
+    if (lh.aw.laedt) return kopf + `<p class="empty-text">Lädt …</p>`;
+    if (lh.aw.fehler) return kopf + `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(lh.aw.fehler)}</p>`;
+    const z = lhAwRechnen();
+    if (!lh.aw.daten.durchlaeufe.length) return kopf + `<p class="empty-text">Noch keine Runden.</p>`;
+    const chips = ["alle", ...z.faecher].map((f) => `<button type="button" class="schnell-chip${lh.aw.fach === f ? " aktiv" : ""}" aria-pressed="${lh.aw.fach === f}" onclick="lhAwFach('${escapeAttr(f)}')">${escapeHtml(f === "alle" ? "Alle Fächer" : f)}</button>`).join("");
+    const kz = z.kenn;
+    const kacheln = [
+      [kz.runden, kz.runden === 1 ? "Runde fertig" : "Runden fertig"],
+      [kz.mittel === null ? "–" : kz.mittel + " %", "im Schnitt"],
+      [kz.aufgaben ? Math.round((kz.gleich / kz.aufgaben) * 100) + " %" : "–", "gleich richtig"],
+      [lhMinuten(kz.zeit), "geübt"],
+      [kz.tage, kz.tage === 1 ? "Tag" : "Tage"],
+      [kz.abgebrochen, "abgebrochen"],
+    ].map(([w, t]) => `<div class="lern-zahl"><span class="lern-zahl-wert">${escapeHtml(String(w))}</span><span class="lern-zahl-text">${escapeHtml(t)}</span></div>`).join("");
+    const fachZeilen = z.jeFach.map((f) => `<tr><td>${escapeHtml(f.name)}</td><td>${f.runden}</td><td>${f.mittel === null ? "–" : f.mittel + " %"}</td>
+      <td>${f.trend === null ? "–" : f.trend > 2 ? `↑ +${f.trend}` : f.trend < -2 ? `↓ ${f.trend}` : "→"}</td><td>${escapeHtml(lhMinuten(f.zeit))}</td></tr>`).join("");
+    const schwer = z.schwierig.map((x) => `<li class="lh-schwer">
+      <strong>${escapeHtml(x.a.frage)}</strong>
+      <span class="notiz-meta">${escapeHtml(x.fach)} · ${escapeHtml(x.uebung)} · ${escapeHtml(lhTypName(x.a.typ))} · ${x.falsch1} von ${x.n} Mal im 1. Versuch falsch${x.falschEnde ? `, ${x.falschEnde}× auch im 2.` : ""}</span>
+      <span class="notiz-meta">Zuletzt: „${escapeHtml(x.letzteFalsch)}“ – richtig: „${escapeHtml(lhLoesungText(x.a))}“</span>
+    </li>`).join("");
+    const runden = [...z.runden].sort((a, b) => String(b.gestartet_am).localeCompare(String(a.gestartet_am))).map((d) => {
+      if (!d.beendet_am) {
+        return `<li class="lh-runde abgebrochen"><span class="lh-ergebnis-sterne" aria-hidden="true">–</span><span class="lh-ergebnis-text"><strong>${escapeHtml(d.uebung_titel)}</strong>
+          <span class="notiz-meta">${escapeHtml(d.fach_name)} · abgebrochen · ${escapeHtml(lhDatumZeit(d.gestartet_am))}</span></span></li>`;
+      }
+      const st = Number(d.sterne) || 0;
+      return `<li><button type="button" class="lh-ergebnis" onclick="lhErgebnisOeffnen('${escapeAttr(String(d.id))}', 'auswertung')">
+        <span class="lh-ergebnis-sterne" aria-label="${st} von 3 Sternen">${lhSterne(st)}</span>
+        <span class="lh-ergebnis-text"><strong>${escapeHtml(d.uebung_titel)}${d.gesehen_am ? "" : ` <span class="badge reminder">neu</span>`}</strong>
+          <span class="notiz-meta">${escapeHtml(d.fach_name)} · ${Number(d.punkte_prozent) || 0} % · ${d.richtig_erster}/${d.anzahl_aufgaben} gleich richtig · ${escapeHtml(lhMinuten(d.dauer_sek))}${d.wiederholung ? " · Wiederholung" : ""} · ${escapeHtml(lhDatumZeit(d.beendet_am))}</span></span>
+        <span class="lh-pfeil" aria-hidden="true">${ic("weiter")}</span></button></li>`;
+    }).join("");
+    const kid = escapeAttr(String(lh.aw.kindId));
+    return kopf + `
+      <div class="schnell-chips lh-aw-chips" role="group" aria-label="Fach">${chips}</div>
+      <div class="lern-ueberblick lh-aw-zahlen">${kacheln}</div>
+      <section class="lh-aw-block"><h3 class="lh-aw-h3">Verlauf${lh.aw.fach === "alle" ? "" : " · " + escapeHtml(lh.aw.fach)} <span class="notiz-meta">Ergebnis in % je Runde</span></h3>${lhVerlaufSvg(z.fertig)}</section>
+      <section class="lh-aw-block"><h3 class="lh-aw-h3">Je Fach</h3>
+        <div class="zl-tabelle-wrap"><table class="std-tabelle lh-aw-tabelle"><thead><tr><th>Fach</th><th>Runden</th><th>Ø</th><th>Trend</th><th>Zeit</th></tr></thead><tbody>${fachZeilen}</tbody></table></div>
+        <p class="notiz-meta">Trend: die letzten 3 Runden im Vergleich zu den Runden davor (ab 4 Runden).</p></section>
+      <section class="lh-aw-block"><h3 class="lh-aw-h3">Oft falsch beim ersten Versuch</h3>
+        ${schwer ? `<ul class="lh-schwer-liste">${schwer}</ul>` : `<p class="notiz-meta">Noch nichts – alles beim ersten Mal richtig oder zu wenige Runden.</p>`}</section>
+      <section class="lh-aw-block"><h3 class="lh-aw-h3">Alle Runden</h3><ul class="lh-ergebnisse">${runden}</ul></section>
+      <div class="reiter-aktionen bib-aktionen lh-aw-aktionen">
+        <button type="button" class="btn-secondary" onclick="lhAwExcel()">${ic("export")}Excel</button>
+        <button type="button" class="btn-secondary" onclick="lhAwDrucken()">${ic("drucken")}Drucken / PDF</button>
+        <button type="button" class="btn-secondary lh-loeschen" onclick="lhErgebnisseLoeschen('${kid}')">${ic("x")}Alle Ergebnisse löschen …</button>
+      </div>
+      <p class="notiz-meta">Export und Ausdruck enthalten Daten über das Kind (Pseudonym, Ergebnisse) – nur weitergeben, wenn das mit den Eltern so abgesprochen ist, und nicht unverschlüsselt aufbewahren.</p>`;
+  }
+
+  // ---- Ein Ergebnis im Detail ----
+  window.lhErgebnisOeffnen = async function(id, zurueck) {
+    lh.erg = { id, laedt: true, fehler: "", daten: null, zurueck: zurueck === "auswertung" ? "auswertung" : "liste" };
+    lh.ansicht = "ergebnis";
+    renderLernhilfe();
+    window.scrollTo(0, 0);
+    try {
+      const r = await api("lern_ergebnis_details", { id });
+      if (!lh.erg || lh.erg.id !== id) return;
+      lh.erg.daten = r;
+      // gilt jetzt als gesehen
+      const jetzt = new Date().toISOString();
+      for (const liste of [lh.durchlaeufe, lh.aw && lh.aw.daten ? lh.aw.daten.durchlaeufe : []]) {
+        const d = liste.find((x) => String(x.id) === String(id));
+        if (d && !d.gesehen_am) d.gesehen_am = jetzt;
+      }
+    } catch (e) {
+      if (e.message === "unauthorized") return;
+      if (lh.erg) lh.erg.fehler = e.message || "Fehler";
+    }
+    if (lh.erg) lh.erg.laedt = false;
+    if (aktiverTab === "lernhilfe" && lh.ansicht === "ergebnis") renderLernhilfe();
+  };
+  window.lhErgebnisZu = function() {
+    const ziel = lh.erg ? lh.erg.zurueck : "liste";
+    lh.erg = null;
+    lh.ansicht = ziel === "auswertung" && lh.aw ? "auswertung" : "liste";
+    renderLernhilfe();
+  };
+
+  function lhErgebnisHtml() {
+    const kopf = `<button type="button" class="link-btn einheit-zurueck" onclick="lhErgebnisZu()">${ic("zurueck")} Zurück</button>`;
+    if (lh.erg.laedt) return kopf + `<p class="empty-text">Lädt …</p>`;
+    if (lh.erg.fehler) return kopf + `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(lh.erg.fehler)}</p>`;
+    const d = lh.erg.daten.durchlauf;
+    const antworten = lh.erg.daten.antworten || [];
+    const urls = lh.erg.daten.bild_urls || {};
+    const k = lhKind(d.kind_id);
+    const st = Number(d.sterne) || 0;
+    const aufgaben = (Array.isArray(d.aufgaben) ? d.aufgaben : []).map((a, i) => {
+      const v = [1, 2].map((n) => antworten.find((x) => x.aufgabe_id === a.id && x.versuch === n)).filter(Boolean);
+      const ok = v.length && v[v.length - 1].richtig;
+      const status = !v.length ? "nicht beantwortet" : v[0].richtig ? "gleich richtig" : ok ? "im 2. Versuch richtig" : "falsch";
+      const klasse = !v.length ? "" : v[0].richtig ? "ok" : ok ? "halb" : "nein";
+      const versuche = v.map((x) => `<li class="${x.richtig ? "lh-v-ok" : "lh-v-nein"}">${ic(x.richtig ? "ok-kreis" : "x-kreis")}
+        <span>${x.versuch}. Versuch: „${escapeHtml(lhAntwortText(a, x.antwort))}“${x.dauer_ms ? ` <span class="notiz-meta">(${Math.max(1, Math.round(x.dauer_ms / 1000))} s)</span>` : ""}</span></li>`).join("");
+      return `<article class="lh-auf ${klasse}">
+        <div class="lh-auf-kopf"><strong>${i + 1}. ${escapeHtml(lhTypName(a.typ))}</strong><span class="lh-auf-status">${escapeHtml(status)}</span></div>
+        ${a.bild_pfad && urls[a.bild_pfad] ? `<img class="lh-auf-bild" src="${escapeAttr(urls[a.bild_pfad])}" alt="">` : ""}
+        <p class="lh-auf-frage">${a.emoji ? escapeHtml(a.emoji) + " " : ""}${escapeHtml(a.frage)}</p>
+        <ul class="lh-versuche">${versuche}</ul>
+        ${ok && v.length === 1 ? "" : `<p class="notiz-meta">Richtig: „${escapeHtml(lhLoesungText(a))}“</p>`}
+      </article>`;
+    }).join("");
+    return kopf + `
+      <h2 class="std-zwischen lh-aw-titel">${escapeHtml(d.uebung_titel)}</h2>
+      <p class="notiz-meta">${escapeHtml(k ? (k.symbol || "") + " " + k.pseudonym : "")} · ${escapeHtml(d.fach_name)} · ${escapeHtml(lhDatumZeit(d.beendet_am || d.gestartet_am))}${d.wiederholung ? " · Wiederholung" : ""}</p>
+      <div class="lern-ueberblick lh-aw-zahlen">
+        <div class="lern-zahl"><span class="lern-zahl-wert lh-gold">${lhSterne(st)}</span><span class="lern-zahl-text">Sterne</span></div>
+        <div class="lern-zahl"><span class="lern-zahl-wert">${d.beendet_am ? (Number(d.punkte_prozent) || 0) + " %" : "–"}</span><span class="lern-zahl-text">${d.beendet_am ? "Ergebnis" : "abgebrochen"}</span></div>
+        <div class="lern-zahl"><span class="lern-zahl-wert">${d.richtig_erster}/${d.anzahl_aufgaben}</span><span class="lern-zahl-text">gleich richtig</span></div>
+        <div class="lern-zahl"><span class="lern-zahl-wert">${escapeHtml(lhMinuten(d.dauer_sek))}</span><span class="lern-zahl-text">Dauer</span></div>
+      </div>
+      <div class="lh-auf-liste">${aufgaben}</div>
+      <div class="reiter-aktionen bib-aktionen lh-aw-aktionen">
+        <button type="button" class="btn-secondary lh-loeschen" onclick="lhErgebnisLoeschen('${escapeAttr(String(d.id))}')">${ic("x")}Ergebnis löschen</button>
+      </div>`;
+  }
+
+  window.lhErgebnisLoeschen = async function(id) {
+    if (!confirm("Dieses Ergebnis mit allen Antworten löschen?\n\nDas lässt sich nicht rückgängig machen. Die Sterne im Album des Kindes werden neu berechnet.")) return;
+    try {
+      await api("lern_ergebnis_loeschen", { id });
+    } catch (e) {
+      if (e.message !== "unauthorized") hinweisZeigen("Nicht gelöscht: " + (e.message || "Fehler"));
+      return;
+    }
+    lh.durchlaeufe = lh.durchlaeufe.filter((d) => String(d.id) !== String(id));
+    if (lh.aw && lh.aw.daten) {
+      lh.aw.daten.durchlaeufe = lh.aw.daten.durchlaeufe.filter((d) => String(d.id) !== String(id));
+      lh.aw.daten.antworten = lh.aw.daten.antworten.filter((a) => String(a.durchlauf_id) !== String(id));
+    }
+    hinweisZeigen("Ergebnis gelöscht");
+    window.lhErgebnisZu();
+  };
+
+  window.lhErgebnisseLoeschen = async function(kid) {
+    const k = lhKind(kid);
+    const n = lh.aw && lh.aw.daten ? lh.aw.daten.durchlaeufe.length : 0;
+    if (!confirm(`Alle ${n} Runden von ${k ? k.pseudonym : "diesem Kind"} löschen – mit allen Antworten?\n\nDas Kind, sein Zugang und die Freigaben bleiben. Sterne und Album fangen wieder bei null an. Nicht rückgängig zu machen.`)) return;
+    try {
+      const r = await api("lern_ergebnisse_loeschen", { kind_id: kid });
+      hinweisZeigen(`${r.geloescht || 0} Runden gelöscht`);
+    } catch (e) {
+      if (e.message !== "unauthorized") hinweisZeigen("Nicht gelöscht: " + (e.message || "Fehler"));
+      return;
+    }
+    lh.durchlaeufe = lh.durchlaeufe.filter((d) => String(d.kind_id) !== String(kid));
+    window.lhAuswertungOeffnen(kid);
+  };
+
+  window.lhAufraeumen = async function(knopf) {
+    if (knopf) knopf.disabled = true;
+    try {
+      const r = await api("lern_aufraeumen", {});
+      hinweisZeigen(r.abgebrochen || r.bilder ? `Aufgeräumt: ${r.abgebrochen} abgebrochene Runden, ${r.bilder} Bilder` : "Nichts aufzuräumen");
+      if (r.abgebrochen) window.lhNeuLaden();
+    } catch (e) {
+      if (e.message !== "unauthorized") hinweisZeigen("Aufräumen ging nicht: " + (e.message || "Fehler"));
+    } finally {
+      if (knopf) knopf.disabled = false;
+    }
+  };
+
+  // ---- Export: Excel ----
+  window.lhAwExcel = function() {
+    if (!lh.aw || !lh.aw.daten) return;
+    if (typeof XLSX === "undefined") { hinweisZeigen("Excel-Export nicht geladen – Seite neu laden"); return; }
+    const k = lhKind(lh.aw.kindId);
+    const name = k ? k.pseudonym : "Kind";
+    const z = lhAwRechnen();
+    const kz = z.kenn;
+    const uebersicht = [
+      { Angabe: "Kind (Pseudonym)", Wert: name },
+      { Angabe: "Fach", Wert: lh.aw.fach === "alle" ? "alle" : lh.aw.fach },
+      { Angabe: "Zeitraum", Wert: kz.erste ? `${lhDatumZeit(kz.erste)} – ${lhDatumZeit(kz.letzte)}` : "–" },
+      { Angabe: "Runden fertig", Wert: kz.runden },
+      { Angabe: "Runden abgebrochen", Wert: kz.abgebrochen },
+      { Angabe: "Ergebnis im Schnitt (%)", Wert: kz.mittel ?? "" },
+      { Angabe: "Aufgaben gleich richtig (%)", Wert: kz.aufgaben ? Math.round((kz.gleich / kz.aufgaben) * 100) : "" },
+      { Angabe: "Übungszeit (Min.)", Wert: Math.round(kz.zeit / 60) },
+      { Angabe: "Tage geübt", Wert: kz.tage },
+      { Angabe: "Erstellt am", Wert: lhDatumZeit(new Date().toISOString()) },
+    ];
+    const jeFach = z.jeFach.map((f) => ({ Fach: f.name, Runden: f.runden, "Ø %": f.mittel ?? "", "Trend (Prozentpunkte)": f.trend ?? "", "Zeit (Min.)": Math.round(f.zeit / 60), Sterne: f.sterne }));
+    const runden = [...z.runden].sort((a, b) => String(a.gestartet_am).localeCompare(String(b.gestartet_am))).map((d) => ({
+      Start: lhDatumZeit(d.gestartet_am), Ende: lhDatumZeit(d.beendet_am), Fach: d.fach_name, Übung: d.uebung_titel,
+      Status: d.beendet_am ? "fertig" : "abgebrochen", Wiederholung: d.wiederholung ? "ja" : "nein", Aufgaben: d.anzahl_aufgaben,
+      "Gleich richtig": d.beendet_am ? d.richtig_erster : "", "Im 2. Versuch": d.beendet_am ? d.richtig_zweiter : "", Falsch: d.beendet_am ? d.falsch : "",
+      "Ergebnis %": d.beendet_am ? d.punkte_prozent : "", Sterne: d.beendet_am ? d.sterne : "", "Dauer (Min.)": d.dauer_sek ? Math.round(d.dauer_sek / 6) / 10 : "",
+    }));
+    const runIds = new Map(z.runden.map((d) => [String(d.id), d]));
+    const antworten = lh.aw.daten.antworten.filter((a) => runIds.has(String(a.durchlauf_id))).map((a) => {
+      const d = runIds.get(String(a.durchlauf_id));
+      const liste = Array.isArray(d.aufgaben) ? d.aufgaben : [];
+      const nr = liste.findIndex((x) => x.id === a.aufgabe_id);
+      const auf = liste[nr] || { typ: "", frage: "", inhalt: {} };
+      return {
+        Zeit: lhDatumZeit(a.beantwortet_am), Fach: d.fach_name, Übung: d.uebung_titel, Nr: nr + 1, Art: lhTypName(auf.typ), Aufgabe: auf.frage,
+        Versuch: a.versuch, Antwort: lhAntwortText(auf, a.antwort), Richtig: a.richtig ? "ja" : "nein",
+        "Zeit (s)": a.dauer_ms ? Math.round(a.dauer_ms / 100) / 10 : "", Lösung: lhLoesungText(auf),
+      };
+    });
+    const schwierig = z.schwierig.map((x) => ({ Fach: x.fach, Übung: x.uebung, Aufgabe: x.a.frage, Art: lhTypName(x.a.typ), Gesehen: x.n, "1. Versuch falsch": x.falsch1, "Auch 2. falsch": x.falschEnde, "Zuletzt geantwortet": x.letzteFalsch, Lösung: lhLoesungText(x.a) }));
+    const wb = XLSX.utils.book_new();
+    const blatt = (zeilen, titel) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(zeilen.length ? zeilen : [{ Hinweis: "Keine Einträge" }]), titel);
+    blatt(uebersicht, "Übersicht");
+    blatt(jeFach, "Je Fach");
+    blatt(runden, "Runden");
+    blatt(antworten, "Antworten");
+    blatt(schwierig, "Oft falsch");
+    const datei = `lernhilfe-${name.replace(/[^\p{L}\p{N}_-]+/gu, "_")}-${heuteISO()}.xlsx`;
+    XLSX.writeFile(wb, datei);
+    hinweisZeigen("Excel gespeichert: " + datei);
+  };
+
+  // ---- Export: Drucken / PDF (über den Druckdialog) ----
+  window.lhAwDrucken = function() {
+    if (!lh.aw || !lh.aw.daten) return;
+    const k = lhKind(lh.aw.kindId);
+    const name = k ? k.pseudonym : "Kind";
+    const z = lhAwRechnen();
+    const kz = z.kenn;
+    const td = "padding:4px 6px;border-bottom:1px solid #ccc;text-align:left;vertical-align:top;";
+    const th = td + "font-weight:600;border-bottom:1.5px solid #333;";
+    const tabelle = (kopf, zeilen) => `<table style="border-collapse:collapse;width:100%;font-size:9.5pt;margin:4px 0 12px;"><thead><tr>${kopf.map((h) => `<th style="${th}">${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${zeilen.map((r) => `<tr>${r.map((c) => `<td style="${td}">${escapeHtml(String(c))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    const h2 = (t) => `<h2 style="font-size:12pt;margin:14px 0 4px;">${escapeHtml(t)}</h2>`;
+    const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#111;font-size:10pt;">
+      <h1 style="font-size:16pt;margin:0 0 2px;">Lernstand · ${escapeHtml(name)}</h1>
+      <p style="margin:0 0 10px;color:#444;">${lh.aw.fach === "alle" ? "Alle Fächer" : "Fach: " + escapeHtml(lh.aw.fach)} · ${kz.erste ? `${escapeHtml(lhDatumZeit(kz.erste))} bis ${escapeHtml(lhDatumZeit(kz.letzte))}` : "noch keine fertigen Runden"} · erstellt ${escapeHtml(lhDatumZeit(new Date().toISOString()))}</p>
+      ${tabelle(["Runden fertig", "abgebrochen", "Ø Ergebnis", "gleich richtig", "Übungszeit", "Tage"],
+        [[kz.runden, kz.abgebrochen, kz.mittel === null ? "–" : kz.mittel + " %", kz.aufgaben ? Math.round((kz.gleich / kz.aufgaben) * 100) + " %" : "–", lhMinuten(kz.zeit), kz.tage]])}
+      ${h2("Verlauf (Ergebnis in % je Runde)")}<div style="max-width:420px;">${lhVerlaufSvg(z.fertig, true)}</div>
+      ${h2("Je Fach")}${tabelle(["Fach", "Runden", "Ø", "Trend", "Zeit"], z.jeFach.map((f) => [f.name, f.runden, f.mittel === null ? "–" : f.mittel + " %", f.trend === null ? "–" : (f.trend > 0 ? "+" : "") + f.trend, lhMinuten(f.zeit)]))}
+      ${h2("Oft falsch beim ersten Versuch")}${z.schwierig.length ? tabelle(["Aufgabe", "Übung", "1. Versuch falsch", "Zuletzt", "Richtig"], z.schwierig.map((x) => [x.a.frage, x.uebung, `${x.falsch1} von ${x.n}`, x.letzteFalsch, lhLoesungText(x.a)])) : "<p>–</p>"}
+      ${h2("Alle Runden")}${tabelle(["Datum", "Fach", "Übung", "Ergebnis", "Sterne", "gleich richtig", "Dauer"],
+        [...z.runden].sort((a, b) => String(a.gestartet_am).localeCompare(String(b.gestartet_am))).map((d) => d.beendet_am
+          ? [lhDatumZeit(d.beendet_am), d.fach_name, d.uebung_titel + (d.wiederholung ? " (Wdh.)" : ""), (Number(d.punkte_prozent) || 0) + " %", lhSterne(Number(d.sterne) || 0), `${d.richtig_erster}/${d.anzahl_aufgaben}`, lhMinuten(d.dauer_sek)]
+          : [lhDatumZeit(d.gestartet_am), d.fach_name, d.uebung_titel, "abgebrochen", "", "", ""]))}
+      <p style="font-size:8.5pt;color:#555;margin-top:14px;">Vertraulich – enthält Lerndaten eines Kindes (Pseudonym). Nur für die Beteiligten, nicht weitergeben und nach Gebrauch vernichten.</p>
+    </div>`;
+    htmlDrucken(html);
+  };
+
   window.lhErgebnisseGesehen = async function() {
     try {
       await api("lern_ergebnisse_gesehen", {});
@@ -25121,6 +25527,7 @@
         </div>
         <div class="lh-kind-knoepfe">
           <button type="button" class="btn-secondary" onclick="lhZugangErstellen('${kid}')">${ic("nfc")}QR-Code</button>
+          <button type="button" class="btn-secondary" onclick="lhAuswertungOeffnen('${kid}')">${ic("statistik")}Auswertung</button>
           ${k.hat_zugang ? `<button type="button" class="btn-secondary" onclick="lhZugangSperren('${kid}', ${k.zugang_gesperrt ? "false" : "true"})">${k.zugang_gesperrt ? "Freigeben" : "Sperren"}</button>` : ""}
           <button type="button" class="task-edit-btn" onclick="blattOeffnen('lhkind', '${kid}')" aria-label="${escapeAttr(k.pseudonym)} bearbeiten">${ic("stift")}</button>
         </div>
@@ -25223,6 +25630,8 @@
       <div class="anleitung-text">
         <div class="kz-bereich-liste">${zeilen || `<p class="empty-text">Noch keine Fächer.</p>`}</div>
         <button type="button" class="btn-secondary" onclick="blattNeu('lhfach', {})">${ic("plus")}Fach</button>
+        <p class="notiz-meta lh-aufraeumen-text">Aufräumen löscht abgebrochene Runden, die älter als 30 Tage sind, und hochgeladene Bilder, die keine Übung und kein Ergebnis mehr braucht.</p>
+        <button type="button" class="btn-secondary" onclick="lhAufraeumen(this)">${ic("werkzeug")}Aufräumen</button>
       </div>
     </details>`;
   }

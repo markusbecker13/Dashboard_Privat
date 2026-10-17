@@ -166,3 +166,58 @@ body.lh-qr-offen { overflow: hidden; }
 .lh-ergebnis-text { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .lh-ergebnis-text .notiz-meta { margin: 0.1rem 0 0; }
 .lh-neu .btn-secondary { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 44px; }
+
+/* Ergebnis-Zeilen als Knopf (seit Session 84) */
+.lh-ergebnisse > li { list-style: none; }
+button.lh-ergebnis {
+  width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--border);
+  color: var(--ink); font: inherit; cursor: pointer; padding: 0.55rem 0.2rem; min-height: 44px; align-items: center;
+}
+.lh-ergebnisse > li:first-child > button.lh-ergebnis { border-top: 0; }
+button.lh-ergebnis:hover { background: var(--bg); }
+button.lh-ergebnis:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: var(--r-klein); }
+.lh-ergebnis-text { flex: 1; }
+.lh-pfeil { flex: none; color: var(--ink-dim); align-self: center; }
+.lh-runde.abgebrochen { display: flex; gap: 0.6rem; padding: 0.55rem 0.2rem; border-top: 1px solid var(--border); opacity: 0.7; }
+
+/* Auswertung (seit Session 84) */
+.lh-aw-titel { margin-top: 0.2rem; }
+.lh-aw-chips { margin: 0.2rem 0 0.8rem; }
+.lh-aw-zahlen { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 1rem; }
+.lh-aw-block { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-karte); padding: 0.8rem 0.9rem; margin: 0 0 1rem; }
+.lh-aw-h3 { font-size: 1rem; margin: 0 0 0.5rem; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.5rem; }
+.lh-aw-h3 .notiz-meta { font-weight: 400; margin: 0; }
+.lh-verlauf { width: 100%; max-width: 560px; height: auto; display: block; }
+.lh-verlauf circle { cursor: default; }
+.lh-aw-tabelle td, .lh-aw-tabelle th { text-align: left; }
+.lh-schwer-liste { list-style: none; margin: 0; padding: 0; }
+.lh-schwer { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.5rem 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.lh-schwer:first-child { border-top: 0; }
+.lh-schwer .notiz-meta { margin: 0; }
+.lh-aw-aktionen { flex-wrap: wrap; margin-top: 0.4rem; }
+.lh-aw-aktionen .btn-secondary { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 44px; }
+.lh-loeschen { color: var(--overdue-text); border-color: var(--overdue-border); }
+.lh-aufraeumen-text { margin: 0.9rem 0 0.4rem; }
+.lh-gold { color: #c99700; letter-spacing: 0.04em; }
+@media (max-width: 420px) { .lh-aw-zahlen { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Ein Ergebnis im Detail */
+.lh-auf-liste { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem; }
+.lh-auf { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--r-mittel); padding: 0.7rem 0.8rem; overflow-wrap: anywhere; }
+.lh-auf.ok { border-left-color: var(--ok-stark); }
+.lh-auf.halb { border-left-color: var(--today-border); }
+.lh-auf.nein { border-left-color: var(--overdue-text); }
+.lh-auf-kopf { display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; }
+.lh-auf-status { font-size: var(--fs-klein); color: var(--ink-dim); font-weight: 600; }
+.lh-auf.ok .lh-auf-status { color: var(--ok-text); }
+.lh-auf.nein .lh-auf-status { color: var(--overdue-text); }
+.lh-auf-frage { margin: 0.3rem 0; font-weight: 600; white-space: pre-line; }
+.lh-auf-bild { display: block; max-width: 100%; max-height: 160px; border-radius: var(--r-klein); margin: 0.4rem 0; }
+.lh-versuche { list-style: none; margin: 0 0 0.3rem; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.lh-versuche li { display: flex; gap: 0.4rem; align-items: flex-start; }
+.lh-versuche .ic { flex: none; margin-top: 0.15rem; }
+.lh-v-ok .ic { color: var(--ok-text); }
+.lh-v-nein .ic { color: var(--overdue-text); }
+.lh-ergebnisse > li + li > button.lh-ergebnis { border-top: 1px solid var(--border); }
+.lh-aw-tabelle td, .lh-aw-tabelle th { white-space: nowrap; overflow-wrap: normal; word-break: normal; padding-left: 0.25rem; padding-right: 0.25rem; }
+.lh-aw-tabelle td:first-child, .lh-aw-tabelle th:first-child { white-space: normal; }
