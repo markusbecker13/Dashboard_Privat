@@ -155,3 +155,14 @@ body.lh-qr-offen { overflow: hidden; }
   input.lh-emoji { width: 3.4rem; font-size: 1.05rem; }
   .lh-kv-paare { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
 }
+
+/* Neue Ergebnisse (seit Session 83) */
+.lh-neu { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--r-karte); padding: 0.8rem 0.9rem; margin: 0 0 1.2rem; }
+.lh-neu .std-zwischen { display: flex; align-items: center; gap: 0.4rem; margin-top: 0; }
+.lh-ergebnisse { list-style: none; margin: 0 0 0.7rem; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+.lh-ergebnis { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.45rem 0; border-top: 1px solid var(--border); }
+.lh-ergebnis:first-child { border-top: 0; }
+.lh-ergebnis-sterne { flex: none; color: #c99700; font-size: 1.05rem; letter-spacing: 0.04em; line-height: 1.4; }
+.lh-ergebnis-text { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.lh-ergebnis-text .notiz-meta { margin: 0.1rem 0 0; }
+.lh-neu .btn-secondary { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 44px; }

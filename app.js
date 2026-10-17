@@ -9833,6 +9833,7 @@
         ${pushKzHtml(e)}
         ${pushGeburtstagHtml(e, chips)}
         ${pushZaehlerHtml(e, chips, bereiche)}
+        ${pushLernHtml(e, bereiche)}
         ${pushAwoHtml(e, chips, bereiche)}
         <label class="push-schalter"><input type="checkbox" id="push-termine"${e.termine_an ? " checked" : ""}> Vor Terminen und Aufgaben mit Uhrzeit</label>
         <div class="schnell-chips push-chips" role="group" aria-label="Vorlauf">${chips("vorlauf", PUSH_VORLAUF.map(([w, t]) => [String(w), t]), (w) => Number(w) === Number(e.vorlauf_min))}</div>
@@ -9863,6 +9864,8 @@
       if (zAn) push.einst.zaehler_an = zAn.checked;
       const kzAn = document.getElementById("push-kz");
       if (kzAn) push.einst.kz_morgen = kzAn.checked;
+      const lernAn = document.getElementById("push-lern");
+      if (lernAn) push.einst.lern_an = lernAn.checked;
       const sAn = document.getElementById("push-schluessel");
       if (sAn) push.einst.schluessel_an = sAn.checked;
       const vAn = document.getElementById("push-vermietung");
@@ -9876,7 +9879,7 @@
     };
     ["push-morgens", "push-morgens-zeit", "push-termine"].forEach((id) => document.getElementById(id).addEventListener("change", merk));
     // Geburtstage: Erklärung hängt an Morgen-Übersicht und Schalter
-    ["push-geburtstage", "push-zaehler", "push-schluessel", "push-vermietung", "push-morgens", "push-morgens-zeit", "push-kz"].forEach((id) => {
+    ["push-geburtstage", "push-zaehler", "push-schluessel", "push-vermietung", "push-morgens", "push-morgens-zeit", "push-kz", "push-lern"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", () => { merk(); pushRendern(); });
     });
@@ -9997,6 +10000,18 @@
         : "Aus."}</p>`;
   }
 
+  // ---- Lernhilfe-Ergebnisse (seit Session 83) ----
+  function pushLernHtml(e, bereiche) {
+    if (!Object.prototype.hasOwnProperty.call(e, "lern_an")) {
+      return `<p class="notiz-meta push-erklaerung">Für Benachrichtigungen über Lernergebnisse bitte zuerst <code>lernen_push_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    const ohnePrivat = !bereiche.includes("privat");
+    return `<label class="push-schalter"><input type="checkbox" id="push-lern"${e.lern_an ? " checked" : ""}> Lernhilfe: neue Ergebnisse</label>
+      <p class="notiz-meta push-erklaerung">${e.lern_an
+        ? `Kurz nach dem Üben „Neue Lernergebnisse – x Übungen fertig“ (gebündelt: sobald 10 Minuten nichts Neues fertig wurde, spätestens nach einer Stunde; nie mit Pseudonym, Übung oder Punkten). In der Morgen-Übersicht eine Zeile mit noch nicht angesehenen Ergebnissen und fälligen, nicht gemachten Übungen. Antippen öffnet die Lernhilfe.${ohnePrivat ? " <strong>Dafür unten bei „Bereiche“ auch Privat wählen.</strong>" : ""}`
+        : "Aus."}</p>`;
+  }
+
   // ---- Zähler ablesen (seit Session 69) ----
   const PUSH_ZAEHLER_TAG = [[1, "am 1."], [5, "am 5."], [15, "am 15."], [28, "am 28."]];
   function pushZaehlerHtml(e, chips, bereiche) {
@@ -10093,6 +10108,8 @@
           ? { geburtstage_an: !!e.geburtstage_an, geburtstage_vorlauf: Number(e.geburtstage_vorlauf ?? 3) } : {}),
         // Kommandozentrale (seit Session 76) nur, wenn der Server sie kennt
         ...(Object.prototype.hasOwnProperty.call(e, "kz_morgen") ? { kz_morgen: !!e.kz_morgen } : {}),
+        // Lernhilfe-Ergebnisse (seit Session 83) nur, wenn der Server sie kennt
+        ...(Object.prototype.hasOwnProperty.call(e, "lern_an") ? { lern_an: !!e.lern_an } : {}),
         // Zähler-Erinnerung (seit Session 69) nur, wenn der Server sie kennt
         ...(Object.prototype.hasOwnProperty.call(e, "zaehler_an")
           ? { zaehler_an: !!e.zaehler_an, zaehler_tag: Number(e.zaehler_tag) || 1 } : {}),
@@ -25040,8 +25057,51 @@
     if (lh.ansicht === "editor" && lh.ed) { el.innerHTML = lhEditorHtml(); return; }
     if (lh.ansicht === "paket") { el.innerHTML = lhPaketHtml(); return; }
     lh.ansicht = "liste";
-    el.innerHTML = lhKinderHtml() + lhUebungenHtml() + lhFaecherHtml();
+    el.innerHTML = lhNeueErgebnisseHtml() + lhKinderHtml() + lhUebungenHtml() + lhFaecherHtml();
   }
+
+  // ---- Neue Ergebnisse (seit Session 83): beendet, noch nicht angesehen ----
+  // Die ausführliche Auswertung je Aufgabe kommt mit Etappe 5.
+  function lhNeueErgebnisseHtml() {
+    const neu = lh.durchlaeufe.filter((d) => d.beendet_am && !d.gesehen_am)
+      .sort((a, b) => String(b.beendet_am).localeCompare(String(a.beendet_am)));
+    if (!neu.length) return "";
+    const zeilen = neu.slice(0, 10).map((d) => {
+      const k = lhKind(d.kind_id);
+      const sterne = Number(d.sterne) || 0;
+      const min = d.dauer_sek ? Math.max(1, Math.round(Number(d.dauer_sek) / 60)) : null;
+      const teile = [
+        `${d.richtig_erster}/${d.anzahl_aufgaben} gleich richtig`,
+        d.richtig_zweiter ? `${d.richtig_zweiter} im 2. Versuch` : "",
+        d.falsch ? `${d.falsch} falsch` : "",
+        min ? `${min} Min.` : "",
+        d.wiederholung ? "Wiederholung" : "",
+      ].filter(Boolean).join(" · ");
+      return `<li class="lh-ergebnis">
+        <span class="lh-ergebnis-sterne" aria-label="${sterne} von 3 Sternen">${"★".repeat(sterne)}${"☆".repeat(3 - sterne)}</span>
+        <span class="lh-ergebnis-text">
+          <strong>${escapeHtml(k ? (k.symbol || "") + " " + k.pseudonym : "Kind gelöscht")} · ${escapeHtml(d.uebung_titel || "")}</strong>
+          <span class="notiz-meta">${escapeHtml(d.fach_name || "")} · ${Number(d.punkte_prozent) || 0} % · ${escapeHtml(teile)} · ${escapeHtml(lhZeitpunkt(d.beendet_am))}</span>
+        </span>
+      </li>`;
+    }).join("");
+    return `<section class="lh-neu" aria-label="Neue Ergebnisse">
+      <h2 class="std-zwischen">${ic("pokal")} Neue Ergebnisse <span class="zl-gruppe-zahl">${neu.length}</span></h2>
+      <ul class="lh-ergebnisse">${zeilen}</ul>
+      ${neu.length > 10 ? `<p class="notiz-meta">… und ${neu.length - 10} weitere</p>` : ""}
+      <button type="button" class="btn-secondary" onclick="lhErgebnisseGesehen()">${ic("ok-kreis")}Alle gesehen</button>
+    </section>`;
+  }
+  window.lhErgebnisseGesehen = async function() {
+    try {
+      await api("lern_ergebnisse_gesehen", {});
+      const jetzt = new Date().toISOString();
+      lh.durchlaeufe.forEach((d) => { if (d.beendet_am && !d.gesehen_am) d.gesehen_am = jetzt; });
+      renderLernhilfe();
+    } catch (e) {
+      if (e.message !== "unauthorized") hinweisZeigen("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
 
   // ---- Kinder ----
   function lhKinderHtml() {

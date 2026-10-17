@@ -14,6 +14,7 @@
   const LAUF = "lern-lauf";       // sessionStorage: laufende Übung (Neu laden mitten drin)
   const FARBEN = { rot: "#d64545", orange: "#d9731f", gelb: "#c99700", gruen: "#2f9e6f",
     tuerkis: "#1a9aa0", blau: "#2a5bd7", lila: "#8b5fd9", pink: "#d6457f" };
+  const STERNE_JE_STICKER = 3;   // wie in lernen-api
   const LOB = ["Super!", "Klasse!", "Toll gemacht!", "Richtig!", "Prima!", "Stark!"];
   const app = document.getElementById("app");
 
@@ -161,17 +162,18 @@
       h("button", { type: "button", class: "lk-knopf", onclick: nochmal }, "Nochmal versuchen")));
   }
 
-  async function ladeUebersicht() {
+  async function ladeUebersicht(danach) {
     neuZeichnen = () => {};
     app.replaceChildren(h("p", { class: "lk-laden", text: "Einen Moment …" }));
     try {
       uebersicht = await api("uebersicht");
     } catch (e) {
-      zeigeFehler(e, ladeUebersicht);
+      zeigeFehler(e, () => ladeUebersicht(danach));
       return;
     }
     if (fachWahl && !fachVon(fachWahl)) fachWahl = null;
-    zeigeUebersicht();
+    if (typeof danach === "function") danach();
+    else zeigeUebersicht();
   }
 
   function uebungenVon(fachId) {
@@ -206,12 +208,12 @@
     const kopf = h("header", { class: "lk-kopf" },
       h("span", { class: "lk-kopf-symbol", "aria-hidden": "true" }, kind.symbol || "🙂"),
       h("h1", { text: `Hallo ${kind.pseudonym || ""}!`.replace(" !", "!") }),
-      h("span", { class: "lk-sterne-zahl", title: "Deine Sterne", "aria-label": `${uebersicht.sterne_gesamt || 0} Sterne` }, "⭐ ", String(uebersicht.sterne_gesamt || 0)));
+      sternKnopf());
     if (!faecher.length) {
       zeige(kopf, h("div", { class: "lk-leer" },
         h("span", { class: "lk-leer-symbol", "aria-hidden": "true" }, "🌈"),
         h("p", { text: "Gerade gibt es keine Übungen für dich. Schau später wieder vorbei!" }),
-        h("button", { type: "button", class: "lk-knopf leise", onclick: ladeUebersicht }, "🔄 Nachschauen")));
+        h("button", { type: "button", class: "lk-knopf leise", onclick: () => ladeUebersicht() }, "🔄 Nachschauen")));
       return;
     }
     const kacheln = faecher.map((f) => {
@@ -223,7 +225,57 @@
         h("span", { class: "lk-fach-name", text: f.name }),
         h("span", { class: "lk-fach-info", text: liste.length === 1 ? "1 Übung" : `${liste.length} Übungen` }));
     });
-    zeige(kopf, h("p", { class: "lk-text", text: "Was möchtest du üben?" }), h("div", { class: "lk-faecher" }, kacheln));
+    zeige(kopf, h("p", { class: "lk-text", text: "Was möchtest du üben?" }), h("div", { class: "lk-faecher" }, kacheln), albumKnopf());
+  }
+
+  // ---------- Sammelalbum (seit Session 83) ----------
+  function sternKnopf() {
+    const n = uebersicht.sterne_gesamt || 0;
+    const zurueck = neuZeichnen;
+    return h("button", { type: "button", class: "lk-sterne-zahl", title: "Mein Album", "aria-label": `${n} Sterne – Album öffnen`, onclick: () => zeigeAlbum(zurueck) }, "⭐ ", String(n));
+  }
+  function albumKnopf() {
+    const al = uebersicht.album;
+    if (!al) return null;
+    const zurueck = neuZeichnen;
+    return h("button", { type: "button", class: "lk-knopf leise breit lk-album-knopf", onclick: () => zeigeAlbum(zurueck) },
+      "📒 Mein Album", h("span", { class: "lk-leise", text: ` · ${al.sticker_gesamt} Sticker` }));
+  }
+  function zeigeAlbum(zurueck) {
+    neuZeichnen = () => zeigeAlbum(zurueck);
+    const al = uebersicht.album || { faecher: [], abzeichen: [], sticker_gesamt: 0 };
+    const zurueckZu = typeof zurueck === "function" ? zurueck : zeigeUebersicht;
+    const karten = al.faecher.map((f) => {
+      const aktuell = f.sets[f.sets.length - 1];
+      const voll = f.sets.slice(0, -1);
+      const punkte = STERNE_JE_STICKER - f.bis_naechster;
+      return h("section", { class: "lk-album-fach", farbe: fachFarbe(f) },
+        h("div", { class: "lk-album-kopf" },
+          h("h2", null, f.symbol ? f.symbol + " " : "", f.name),
+          h("span", { class: "lk-album-zahl", text: `⭐ ${f.sterne}` })),
+        h("p", { class: "lk-album-set", text: `Set „${aktuell.name}“ · ${aktuell.frei} von ${aktuell.sticker.length}` }),
+        h("div", { class: "lk-sticker-raster" }, aktuell.sticker.map((st, i) => i < aktuell.frei
+          ? h("span", { class: "lk-sticker", text: st })
+          : h("span", { class: "lk-sticker zu", "aria-label": "noch nicht gesammelt" }, "?"))),
+        h("div", { class: "lk-naechster" },
+          h("span", { class: "lk-punkte", "aria-hidden": "true" }, [0, 1, 2].map((i) => h("span", { class: i < punkte ? "an" : "" }))),
+          h("span", { text: f.bis_naechster === 1 ? "Noch 1 ⭐ bis zum nächsten Sticker" : `Noch ${f.bis_naechster} ⭐ bis zum nächsten Sticker` })),
+        voll.length ? h("details", { class: "lk-voll" },
+          h("summary", { text: voll.length === 1 ? "1 volles Set 🎉" : `${voll.length} volle Sets 🎉` }),
+          voll.map((v) => h("p", { class: "lk-voll-set" }, h("strong", { text: v.name + ": " }), v.sticker.join(" ")))) : null);
+    });
+    const erreicht = al.abzeichen.filter((a) => a.erreicht).length;
+    zeige(
+      h("div", { class: "lk-leiste" },
+        h("button", { type: "button", class: "lk-zurueck", onclick: zurueckZu }, "‹ Zurück"),
+        h("h1", null, "📒 Mein Album")),
+      h("p", { class: "lk-text", text: "Für je 3 Sterne in einem Fach bekommst du einen Sticker. Wenn du eine Übung wiederholst, zählt deine beste Runde." }),
+      karten.length ? karten : h("p", { class: "lk-leise", text: "Noch keine Fächer – sobald es Übungen gibt, geht’s los." }),
+      h("h2", { class: "lk-abz-titel", text: `Abzeichen · ${erreicht} von ${al.abzeichen.length}` }),
+      h("div", { class: "lk-abzeichen" }, al.abzeichen.map((a) => h("div", { class: "lk-abz" + (a.erreicht ? "" : " zu") },
+        h("span", { class: "lk-abz-symbol", "aria-hidden": "true", text: a.symbol }),
+        h("span", { class: "lk-abz-name", text: a.name }),
+        a.erreicht ? h("span", { class: "lk-nur-vorleser", text: "geschafft" }) : (a.hinweis ? h("span", { class: "lk-abz-hinweis", text: a.hinweis }) : null)))));
   }
 
   function zeigeFach(fachId, mitZurueck) {
@@ -246,9 +298,10 @@
       h("div", { class: "lk-leiste", farbe: fachFarbe(fach) },
         mitZurueck ? h("button", { type: "button", class: "lk-zurueck", onclick: () => { fachWahl = null; zeigeUebersicht(); } }, "‹ Fächer") : h("span", { class: "lk-kopf-symbol", "aria-hidden": "true" }, kind.symbol || "🙂"),
         h("h1", null, (fach && fach.symbol ? fach.symbol + " " : ""), (fach && fach.name) || "Übungen"),
-        h("span", { class: "lk-sterne-zahl", "aria-label": `${uebersicht.sterne_gesamt || 0} Sterne` }, "⭐ ", String(uebersicht.sterne_gesamt || 0))),
+        sternKnopf()),
       h("div", { class: "lk-uebungen" }, karten),
-      h("button", { type: "button", class: "lk-knopf leise breit lk-nachschauen", onclick: ladeUebersicht }, "🔄 Nachschauen, ob es Neues gibt"));
+      albumKnopf(),
+      h("button", { type: "button", class: "lk-knopf leise breit lk-nachschauen", onclick: () => ladeUebersicht() }, "🔄 Nachschauen, ob es Neues gibt"));
   }
 
   function zeigeStart(u, fehler) {
@@ -671,9 +724,22 @@
         [1, 2, 3].map((i) => h("span", { class: i <= r.sterne ? "" : "leer" }, "⭐"))),
       h("p", { text: `${r.richtig_erster} von ${r.anzahl} gleich beim ersten Mal richtig` + (r.richtig_zweiter ? `, ${r.richtig_zweiter} beim zweiten Mal.` : ".") }),
       h("div", { class: "lk-ende-sammlung" }, "⭐ ", `${r.sterne_gesamt} Sterne gesammelt`, dazu ? ` (+${dazu})` : ""),
+      neuesImAlbum(r),
       h("div", { class: "lk-ende-knoepfe" },
-        h("button", { type: "button", class: "lk-knopf breit", onclick: ladeUebersicht }, "Zu den Übungen"),
+        h("button", { type: "button", class: "lk-knopf breit", onclick: () => ladeUebersicht() }, "Zu den Übungen"),
+        (r.neue_sticker || []).length || (r.neue_abzeichen || []).length
+          ? h("button", { type: "button", class: "lk-knopf leise breit", onclick: () => ladeUebersicht(() => zeigeAlbum()) }, "📒 Zum Album") : null,
         r.sterne < 3 ? nochmal : null)));
+  }
+  function neuesImAlbum(r) {
+    const sticker = r.neue_sticker || [], abz = r.neue_abzeichen || [];
+    if (!sticker.length && !abz.length) return null;
+    const zeigen = sticker.slice(0, 6);
+    return h("div", { class: "lk-neu-album", role: "status" },
+      sticker.length ? h("p", { class: "lk-neu-titel", text: sticker.length === 1 ? "Neuer Sticker!" : `${sticker.length} neue Sticker!` }) : null,
+      sticker.length ? h("div", { class: "lk-neu-sticker" }, zeigen.map((x) => h("span", { text: x.emoji, title: x.fach })),
+        sticker.length > 6 ? h("span", { class: "lk-leise", text: `+${sticker.length - 6}` }) : null) : null,
+      abz.map((a) => h("p", { class: "lk-neu-abz" }, h("span", { "aria-hidden": "true", text: a.symbol + " " }), "Neues Abzeichen: ", h("strong", { text: a.name }))));
   }
 
   // ---------- Start ----------

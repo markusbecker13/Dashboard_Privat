@@ -245,3 +245,52 @@ button:disabled { cursor: default; }
    dafür keinen Rahmen zeigen */
 h1[tabindex="-1"]:focus, h2[tabindex="-1"]:focus { outline: none; }
 .lk-leiste h1 { font-size: 1.45rem; }
+
+/* ==========================================================
+   Sammelalbum (seit Session 83)
+   ========================================================== */
+button.lk-sterne-zahl { font: inherit; font-weight: 800; color: var(--ink); min-height: 44px; }
+.lk-album-knopf { margin-top: 1.2rem; gap: 0.3rem; }
+.lk-album-fach {
+  background: var(--karte); border: 2px solid var(--rand); border-top: 8px solid var(--fach);
+  border-radius: var(--r-gross); padding: 0.9rem 1rem 1rem; margin-bottom: 1rem;
+}
+.lk-album-kopf { display: flex; align-items: center; gap: 0.6rem; }
+.lk-album-kopf h2 { font-family: var(--titel); font-size: 1.45rem; margin: 0; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.lk-album-zahl { flex: none; font-weight: 800; }
+.lk-album-set { margin: 0.2rem 0 0.6rem; color: var(--ink-dim); font-size: 1rem; }
+.lk-sticker-raster { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
+.lk-sticker {
+  display: flex; align-items: center; justify-content: center; aspect-ratio: 1; border-radius: 16px;
+  font-size: clamp(1.8rem, 9vw, 2.8rem); line-height: 1;
+  background: color-mix(in srgb, var(--fach) 12%, #fff); border: 2px solid color-mix(in srgb, var(--fach) 40%, #fff);
+}
+.lk-sticker.zu { background: #f4ecdc; border: 2px dashed var(--rand); color: #c9b48f; font-size: 1.5rem; font-weight: 800; }
+.lk-naechster { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.8rem; font-size: 1rem; font-weight: 700; }
+.lk-punkte { display: inline-flex; gap: 0.25rem; flex: none; }
+.lk-punkte span { width: 14px; height: 14px; border-radius: 50%; background: #efe2c7; border: 2px solid var(--gelb); }
+.lk-punkte span.an { background: var(--gelb); }
+.lk-voll { margin-top: 0.8rem; }
+.lk-voll summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.lk-voll-set { margin: 0.3rem 0; font-size: 1.4rem; line-height: 1.5; overflow-wrap: anywhere; }
+.lk-voll-set strong { font-size: 1rem; }
+.lk-abz-titel { font-family: var(--titel); font-size: 1.45rem; margin: 1.6rem 0 0.7rem; }
+.lk-abzeichen { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr)); gap: 0.6rem; }
+.lk-abz {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.2rem;
+  padding: 0.8rem 0.5rem; border-radius: var(--r); background: var(--gelb-bg); border: 2px solid var(--gelb);
+}
+.lk-abz-symbol { font-size: 2.4rem; line-height: 1.1; }
+.lk-abz-name { font-weight: 800; font-size: 1rem; line-height: 1.25; }
+.lk-abz-hinweis { font-size: 0.85rem; color: var(--ink-dim); line-height: 1.3; }
+.lk-abz.zu { background: var(--karte); border: 2px dashed var(--rand); }
+.lk-abz.zu .lk-abz-symbol { filter: grayscale(1); opacity: 0.35; }
+
+/* Neu im Album – am Ende einer Übung */
+.lk-neu-album { margin: 0.4rem 0 1.4rem; padding: 1rem; border-radius: var(--r-gross); background: var(--karte); border: 3px solid var(--gelb); }
+.lk-neu-titel { font-family: var(--titel); font-weight: 800; font-size: 1.5rem; margin: 0 0 0.3rem; }
+.lk-neu-sticker { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.4rem; font-size: 3rem; line-height: 1.2; }
+.lk-neu-abz { margin: 0.5rem 0 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .lk-neu-sticker span { display: inline-block; animation: lk-hops 0.6s 0.7s cubic-bezier(.3, 1.6, .5, 1) both; }
+}
