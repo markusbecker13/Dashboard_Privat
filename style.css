@@ -1,4 +1,4 @@
-/* ==========================================================
+  /* ==========================================================
      Schriften – selbst gehostet (fonts/), keine Verbindung zu Google.
      Lizenz: SIL Open Font License 1.1 (siehe fonts/OFL-*.txt)
      ========================================================== */
@@ -2439,3 +2439,8 @@
 .kz-ueb-ergebnis { background: var(--ok-bg); border: 1px solid var(--ok-rand); border-radius: var(--r-mittel); padding: 0.6rem 0.8rem; margin: 0 0 0.8rem; }
 .kz-ueb-ergebnis ul { margin: 0 0 0.5rem; }
 section.kz-ueb { margin: 0 0 0.8rem; }
+
+/* Kommandozentrale in der Morgen-Übersicht (seit Session 76): Unterpunkt eingerückt */
+.push-schalter.push-unterpunkt { padding-left: 1.75rem; min-height: 36px; }
+.push-schalter.push-unterpunkt:has(input:disabled) { color: var(--ink-dim); }
+.push-schalter.push-unterpunkt + .push-erklaerung { padding-left: 1.75rem; }

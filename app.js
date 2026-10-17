@@ -9533,7 +9533,8 @@
         <h3>Was soll kommen? <span class="notiz-meta push-fuer-alle">gilt für alle Geräte</span></h3>
         <label class="push-schalter"><input type="checkbox" id="push-morgens"${e.morgens_an ? " checked" : ""}> Morgen-Übersicht um
           <input type="time" id="push-morgens-zeit" value="${escapeAttr(String(e.morgens_uhrzeit || "07:00").slice(0, 5))}" aria-label="Uhrzeit der Morgen-Übersicht"></label>
-        <p class="notiz-meta push-erklaerung">Termine, fällige Aufgaben, Einheiten und Weiterbildung des Tages – an leeren Tagen kommt nichts.</p>
+        <p class="notiz-meta push-erklaerung">Termine, fällige Aufgaben, Einheiten und Weiterbildung des Tages – an leeren Tagen kommt nichts (mit Kommandozentrale kommt sie jeden Tag).</p>
+        ${pushKzHtml(e)}
         ${pushGeburtstagHtml(e, chips)}
         ${pushZaehlerHtml(e, chips, bereiche)}
         ${pushAwoHtml(e, chips, bereiche)}
@@ -9564,6 +9565,8 @@
       if (gebAn) push.einst.geburtstage_an = gebAn.checked;
       const zAn = document.getElementById("push-zaehler");
       if (zAn) push.einst.zaehler_an = zAn.checked;
+      const kzAn = document.getElementById("push-kz");
+      if (kzAn) push.einst.kz_morgen = kzAn.checked;
       const sAn = document.getElementById("push-schluessel");
       if (sAn) push.einst.schluessel_an = sAn.checked;
       const vAn = document.getElementById("push-vermietung");
@@ -9577,7 +9580,7 @@
     };
     ["push-morgens", "push-morgens-zeit", "push-termine"].forEach((id) => document.getElementById(id).addEventListener("change", merk));
     // Geburtstage: Erklärung hängt an Morgen-Übersicht und Schalter
-    ["push-geburtstage", "push-zaehler", "push-schluessel", "push-vermietung", "push-morgens", "push-morgens-zeit"].forEach((id) => {
+    ["push-geburtstage", "push-zaehler", "push-schluessel", "push-vermietung", "push-morgens", "push-morgens-zeit", "push-kz"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", () => { merk(); pushRendern(); });
     });
@@ -9687,6 +9690,17 @@
         : "Aus."}</p>`;
   }
 
+  // ---- Kommandozentrale in der Morgen-Übersicht (seit Session 76) ----
+  function pushKzHtml(e) {
+    if (!Object.prototype.hasOwnProperty.call(e, "kz_morgen")) {
+      return `<p class="notiz-meta push-erklaerung">Für die Kommandozentrale in der Morgen-Übersicht bitte zuerst <code>kommandozentrale_push_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    return `<label class="push-schalter push-unterpunkt"><input type="checkbox" id="push-kz"${e.kz_morgen ? " checked" : ""}${e.morgens_an ? "" : " disabled"}> dazu die Kommandozentrale</label>
+      <p class="notiz-meta push-erklaerung">${!e.morgens_an ? "Gehört zur Morgen-Übersicht – erst die einschalten."
+        : e.kz_morgen ? "Top 3 (oder „noch nicht festgelegt“), gestern nicht Geschafftes, heute Fälliges und Überfälliges – unabhängig von „Bereiche“ unten. Dienstliche Bereiche nur als Anzahl, z. B. „2 Aufgaben (Jugendwerk)“, nie mit Titel. Damit kommt die Morgen-Übersicht jeden Tag."
+        : "Aus."}</p>`;
+  }
+
   // ---- Zähler ablesen (seit Session 69) ----
   const PUSH_ZAEHLER_TAG = [[1, "am 1."], [5, "am 5."], [15, "am 15."], [28, "am 28."]];
   function pushZaehlerHtml(e, chips, bereiche) {
@@ -9781,6 +9795,8 @@
         // Geburtstage (seit Session 47) nur, wenn der Server sie kennt
         ...(Object.prototype.hasOwnProperty.call(e, "geburtstage_an")
           ? { geburtstage_an: !!e.geburtstage_an, geburtstage_vorlauf: Number(e.geburtstage_vorlauf ?? 3) } : {}),
+        // Kommandozentrale (seit Session 76) nur, wenn der Server sie kennt
+        ...(Object.prototype.hasOwnProperty.call(e, "kz_morgen") ? { kz_morgen: !!e.kz_morgen } : {}),
         // Zähler-Erinnerung (seit Session 69) nur, wenn der Server sie kennt
         ...(Object.prototype.hasOwnProperty.call(e, "zaehler_an")
           ? { zaehler_an: !!e.zaehler_an, zaehler_tag: Number(e.zaehler_tag) || 1 } : {}),
