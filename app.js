@@ -122,7 +122,7 @@
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
     rezepte: "view-rezepte", ernaehrung: "view-ernaehrung", schluessel: "view-schluessel",
     bibliothek: "view-bibliothek", lernen: "view-lernen", stunden: "view-stunden", zaehler: "view-zaehler",
-    kommando: "view-kommando",
+    kommando: "view-kommando", lernhilfe: "view-lernhilfe",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -137,10 +137,11 @@
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
     ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"], ["bibliothek", "Bibliothek"], ["lernen", "Lernen"],
     ["stunden", "Stunden"], ["zaehler", "Zähler"], ["kommando", "Kommandozentrale"],
+    ["lernhilfe", "Lernhilfe"],
   ];
   // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
-  const NUR_PRIVAT_REITER = ["ernaehrung", "zaehler"]; // Zähler seit Session 66 (Haushaltsdaten)
+  const NUR_PRIVAT_REITER = ["ernaehrung", "zaehler", "lernhilfe"]; // Zähler seit Session 66 (Haushaltsdaten), Lernhilfe seit Session 81 (privat, Kinddaten)
   // Reiter nur für EP (seit Session 50): Bibliothek der Ausbildungsunterlagen,
   // seit Session 52 dazu Lernen (Fragenkatalog)
   const NUR_EP_REITER = ["bibliothek", "lernen"];
@@ -157,7 +158,7 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden", "zaehler", "kommando"],
+      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden", "zaehler", "kommando", "lernhilfe"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten", "stunden", "kommando"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel", "stunden", "kommando"],
@@ -185,7 +186,7 @@
     // In EP (seit Session 49) stehen Methoden/Weiterbildung, Spiele und
     // Einheiten in der eigenen Gruppe „EP“ statt unter „Sammeln“
     const epTabs = aktiverBereich === "ep" ? ["bibliothek", "lernen", "methoden", "spiele", "einheiten"] : [];
-    const sammeln = ["notizen", "links", "reflexion", "spiele", "methoden", "einheiten", "einkauf", "rezepte", "training", "ernaehrung"]
+    const sammeln = ["notizen", "links", "reflexion", "spiele", "methoden", "einheiten", "einkauf", "rezepte", "training", "ernaehrung", "lernhilfe"]
       .filter((k) => !epTabs.includes(k));
     return [
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
@@ -10302,6 +10303,7 @@
     if (aktiv === "lernen") renderLernen();
     if (aktiv === "stunden") renderStunden();
     if (aktiv === "zaehler") renderZaehler();
+    if (aktiv === "lernhilfe") renderLernhilfe();
     if (aktiv === "kommando") renderKommando();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
@@ -24845,3 +24847,1102 @@
     document.getElementById("ern-scanner").classList.add("hidden");
     if (!ausPopstate && ernScanHistorie) { ernScanHistorie = false; history.back(); }
   }
+
+  // ==========================================================
+  // Lernhilfe (seit Session 81, Lernbereich Etappe 2): Übungen für ein
+  // Kind, das von zu Hause über lernen.html übt (eigener QR-Zugang,
+  // eigene Edge Function lernen-api). Nur Privat. Hier: Kinder (nur
+  // Pseudonym) mit QR-Zugang, Fächer, Übungen mit vier Aufgabenarten,
+  // Claude-Paket, Freigaben. Daten: lern_* (lernen_setup.sql), geladen
+  // erst beim Öffnen. Nicht verwechseln mit „Lernen“ in EP (lern-*,
+  // Fragenkatalog) – hier heißt alles lh-*.
+  // Die Prüfregeln der Aufgaben stehen auch in index.ts (lernAufgabePruefen)
+  // und lernen-api (bewerten) – bei Änderungen alle drei anpassen.
+  // ==========================================================
+  const lh = {
+    geladen: false, laedt: false, fehlt: false, fehler: "",
+    kinder: [], faecher: [], uebungen: [], aufgaben: [], freigaben: [], durchlaeufe: [],
+    fach: "alle",       // Filter in der Übersicht
+    ansicht: "liste",   // liste | editor | paket
+    ed: null,           // Übung im Formular
+    speichert: false,
+    wunsch: "", wunschFach: "", paketText: "", paket: null, // Claude-Paket
+  };
+  const LH_TYPEN = {
+    auswahl: { name: "Auswahl", hilfe: "Frage mit 2–4 Antworten, eine ist richtig" },
+    eingabe: { name: "Lücken", hilfe: "Eintippen: Ergebnis oder Wort in eine Lücke" },
+    zuordnen: { name: "Zuordnen", hilfe: "Paare verbinden, z. B. Englisch – Deutsch" },
+    sortieren: { name: "Sortieren", hilfe: "In die richtige Reihenfolge bringen" },
+  };
+  const LH_TYP_REIHE = Object.keys(LH_TYPEN);
+  const LH_FARBEN = { rot: ["Rot", "#d64545"], orange: ["Orange", "#d9731f"], gelb: ["Gelb", "#c99700"], gruen: ["Grün", "#2f9e6f"],
+    tuerkis: ["Türkis", "#1a9aa0"], blau: ["Blau", "#2a5bd7"], lila: ["Lila", "#8b5fd9"], pink: ["Pink", "#d6457f"] };
+  const LH_KIND_SYMBOLE = ["🦊", "🐻", "🐼", "🐯", "🦁", "🐸", "🐧", "🦉", "🐢", "🐬", "🦄", "🐝"];
+  const LH_FACH_SYMBOLE = ["📖", "🔢", "🌍", "🔬", "🎨", "🎵", "⚽", "✏️", "🧩", "🌱"];
+  const LH_MAX_AUFGABEN = 30;
+  const LH_LUECKE = /\{\{([^{}]*)\}\}/g;
+
+  async function lhLaden() {
+    if (lh.laedt) return;
+    lh.laedt = true; lh.fehler = "";
+    if (aktiverTab === "lernhilfe" && lh.ansicht === "liste") renderLernhilfe();
+    try {
+      const r = await api("lern_laden");
+      lh.fehlt = !!r.fehlt;
+      lh.kinder = r.kinder || [];
+      lh.faecher = r.faecher || [];
+      lh.uebungen = r.uebungen || [];
+      lh.aufgaben = r.aufgaben || [];
+      lh.freigaben = r.freigaben || [];
+      lh.durchlaeufe = r.durchlaeufe || [];
+      lh.geladen = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") lh.fehler = e.message || "Fehler";
+    } finally {
+      lh.laedt = false;
+    }
+    if (aktiverTab === "lernhilfe" && lh.ansicht === "liste") renderLernhilfe();
+  }
+  window.lhNeuLaden = function() { lh.geladen = false; lh.fehler = ""; return lhLaden(); };
+
+  // ---- Nachschlagen ----
+  const lhKind = (id) => lh.kinder.find((k) => String(k.id) === String(id));
+  const lhFach = (id) => lh.faecher.find((f) => String(f.id) === String(id));
+  const lhUebung = (id) => lh.uebungen.find((u) => String(u.id) === String(id));
+  const lhAufgabenVon = (uid) => lh.aufgaben.filter((a) => String(a.uebung_id) === String(uid))
+    .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+  const lhFreigabe = (kid, uid) => lh.freigaben.find((f) => String(f.kind_id) === String(kid) && String(f.uebung_id) === String(uid));
+  const lhFarbe = (f) => (LH_FARBEN[f && f.farbe] || LH_FARBEN.blau)[1];
+  function lhFaecherSortiert(mitArchiv) {
+    return lh.faecher.filter((f) => mitArchiv || !f.archiviert)
+      .sort((a, b) => ((Number(a.sortierung) || 0) - (Number(b.sortierung) || 0)) || String(a.name).localeCompare(String(b.name), "de"));
+  }
+  // Fertige Durchläufe eines Kindes für eine Übung (neueste zuerst)
+  function lhErgebnisse(kid, uid) {
+    return lh.durchlaeufe.filter((d) => String(d.kind_id) === String(kid) && String(d.uebung_id) === String(uid) && d.beendet_am);
+  }
+  function lhZeitpunkt(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    return d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
+  function lhSterne(n) { return "★".repeat(Math.max(0, n)) + "☆".repeat(Math.max(0, 3 - n)); }
+
+  // ---- Prüfung im Browser (gleiche Regeln wie im Server, für sofortige Hinweise) ----
+  function lhLuecken(text) {
+    const luecken = [];
+    for (const m of String(text || "").matchAll(LH_LUECKE)) luecken.push(m[1].split("|").map((x) => x.trim()).filter(Boolean));
+    return luecken;
+  }
+  function lhAufgabeFehler(a) {
+    if (!a || !LH_TYPEN[a.typ]) return "Unbekannte Art";
+    if (!String(a.frage || "").trim()) return "Aufgabenstellung fehlt";
+    const i = a.inhalt || {};
+    if (a.typ === "auswahl") {
+      const o = (i.optionen || []).filter((x) => String(x.text || "").trim() || String(x.emoji || "").trim());
+      if (o.length < 2 || o.length > 4) return "2 bis 4 Antworten nötig";
+      const r = Number(i.richtig);
+      const roh = i.optionen || [];
+      if (!roh[r] || !(String(roh[r].text || "").trim() || String(roh[r].emoji || "").trim())) return "Richtige Antwort wählen (Kreis antippen)";
+      const keys = o.map((x) => `${String(x.text || "").trim().toLowerCase()}|${String(x.emoji || "").trim()}`);
+      if (new Set(keys).size !== keys.length) return "Zwei Antworten sind gleich";
+      return "";
+    }
+    if (a.typ === "eingabe") {
+      const t = String(i.text || "");
+      const rest = t.replace(LH_LUECKE, "");
+      if (rest.includes("{{") || rest.includes("}}")) return "Eine Lücke ist nicht richtig geschlossen – {{Lösung}}";
+      const l = lhLuecken(t);
+      if (!l.length) return "Mindestens eine Lücke {{…}} nötig";
+      if (l.length > 10) return "Höchstens 10 Lücken";
+      if (l.some((x) => !x.length)) return "Eine Lücke ist leer";
+      if (l.some((x) => x.some((y) => y.length > 60))) return "Eine Lösung ist zu lang (höchstens 60 Zeichen)";
+      return "";
+    }
+    if (a.typ === "zuordnen") {
+      const p = (i.paare || []).filter((x) => String(x.links || "").trim() || String(x.rechts || "").trim());
+      if (p.length < 2 || p.length > 6) return "2 bis 6 Paare nötig";
+      if (p.some((x) => !String(x.links || "").trim() || !String(x.rechts || "").trim())) return "Ein Paar ist unvollständig";
+      const li = p.map((x) => String(x.links).trim().toLowerCase()), re = p.map((x) => String(x.rechts).trim().toLowerCase());
+      if (new Set(li).size !== li.length) return "Links steht etwas doppelt";
+      if (new Set(re).size !== re.length) return "Rechts steht etwas doppelt";
+      return "";
+    }
+    const t = (i.teile || []).map((x) => String(x || "").trim()).filter(Boolean);
+    if (t.length < 2 || t.length > 8) return "2 bis 8 Teile nötig";
+    if (new Set(t).size === 1) return "Alle Teile sind gleich";
+    return "";
+  }
+  // Leere Zeilen weg, Texte getrimmt – so geht die Aufgabe an den Server
+  function lhAufgabeBereinigt(a) {
+    const t = (v) => String(v ?? "").trim();
+    const i = a.inhalt || {};
+    let inhalt;
+    if (a.typ === "auswahl") {
+      const roh = (i.optionen || []).map((o, nr) => ({ nr, text: t(o.text), emoji: t(o.emoji) }));
+      const voll = roh.filter((o) => o.text || o.emoji);
+      const richtig = Math.max(0, voll.findIndex((o) => o.nr === Number(i.richtig)));
+      inhalt = { optionen: voll.map((o) => (o.emoji ? { text: o.text, emoji: o.emoji } : { text: o.text })), richtig };
+    } else if (a.typ === "eingabe") {
+      inhalt = { text: t(i.text), gross_klein: i.gross_klein !== false };
+    } else if (a.typ === "zuordnen") {
+      inhalt = { paare: (i.paare || []).map((p) => ({ links: t(p.links), rechts: t(p.rechts) })).filter((p) => p.links || p.rechts) };
+    } else {
+      inhalt = { teile: (i.teile || []).map(t).filter(Boolean) };
+    }
+    const aus = { typ: a.typ, frage: t(a.frage), emoji: t(a.emoji) || null, bild_pfad: a.bild_pfad || null, erklaerung: t(a.erklaerung) || null, inhalt };
+    if (a.id) aus.id = a.id;
+    return aus;
+  }
+  function lhLeereAufgabe(typ) {
+    if (!LH_TYPEN[typ]) typ = "auswahl";
+    const inhalt = {
+      auswahl: { optionen: [{ text: "", emoji: "" }, { text: "", emoji: "" }, { text: "", emoji: "" }], richtig: 0 },
+      eingabe: { text: "", gross_klein: true },
+      zuordnen: { paare: [{ links: "", rechts: "" }, { links: "", rechts: "" }, { links: "", rechts: "" }] },
+      sortieren: { teile: ["", "", ""] },
+    }[typ];
+    return { typ, frage: "", emoji: "", bild_pfad: null, bild_url: null, erklaerung: "", inhalt };
+  }
+  // Aufgabe aus DB oder Paket ins Formular übernehmen (tiefe Kopie, fehlende Felder ergänzt)
+  function lhAufgabeFuerFormular(a) {
+    const k = JSON.parse(JSON.stringify(a || {}));
+    const leer = lhLeereAufgabe(LH_TYPEN[k.typ] ? k.typ : "auswahl");
+    const i = k.inhalt && typeof k.inhalt === "object" ? k.inhalt : {};
+    if (leer.typ === "auswahl") {
+      leer.inhalt.optionen = (Array.isArray(i.optionen) ? i.optionen : []).map((o) => (typeof o === "string" ? { text: o, emoji: "" } : { text: o.text || "", emoji: o.emoji || "" }));
+      while (leer.inhalt.optionen.length < 2) leer.inhalt.optionen.push({ text: "", emoji: "" });
+      leer.inhalt.richtig = Number.isInteger(Number(i.richtig)) ? Number(i.richtig) : 0;
+    } else if (leer.typ === "eingabe") {
+      leer.inhalt = { text: String(i.text || ""), gross_klein: i.gross_klein !== false };
+    } else if (leer.typ === "zuordnen") {
+      leer.inhalt.paare = (Array.isArray(i.paare) ? i.paare : []).map((p) => ({ links: String(p.links || ""), rechts: String(p.rechts || "") }));
+      while (leer.inhalt.paare.length < 2) leer.inhalt.paare.push({ links: "", rechts: "" });
+    } else {
+      leer.inhalt.teile = (Array.isArray(i.teile) ? i.teile : []).map((x) => String(x || ""));
+      while (leer.inhalt.teile.length < 2) leer.inhalt.teile.push("");
+    }
+    return { ...leer, id: k.id || undefined, frage: String(k.frage || ""), emoji: String(k.emoji || ""), bild_pfad: k.bild_pfad || null, bild_url: null, erklaerung: String(k.erklaerung || "") };
+  }
+
+  // ==========================================================
+  // Anzeige
+  // ==========================================================
+  function renderLernhilfe() {
+    const el = document.getElementById("lernhilfe-inhalt");
+    if (!el) return;
+    lhEingabenVerbinden(el);
+    if (!lh.geladen && !lh.laedt && !lh.fehler && !lh.fehlt) lhLaden();
+    if (lh.fehlt) { el.innerHTML = `<p class="empty-text">Für die Lernhilfe bitte zuerst <code>lernen_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`; return; }
+    if (lh.fehler) { el.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(lh.fehler)} <button class="link-btn" onclick="lhNeuLaden()">Nochmal versuchen</button></p>`; return; }
+    if (!lh.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
+    if (lh.ansicht === "editor" && lh.ed) { el.innerHTML = lhEditorHtml(); return; }
+    if (lh.ansicht === "paket") { el.innerHTML = lhPaketHtml(); return; }
+    lh.ansicht = "liste";
+    el.innerHTML = lhKinderHtml() + lhUebungenHtml() + lhFaecherHtml();
+  }
+
+  // ---- Kinder ----
+  function lhKinderHtml() {
+    const karten = lh.kinder.map((k) => {
+      const kid = escapeAttr(String(k.id));
+      const frei = lh.freigaben.filter((f) => String(f.kind_id) === String(k.id)).length;
+      let status;
+      if (!k.hat_zugang) status = "Noch kein Zugang – „QR-Code“ antippen";
+      else if (k.zugang_gesperrt) status = `<span class="lh-rot">${ic("warnung")} Zugang gesperrt</span>`;
+      else status = `QR-Zugang seit ${lhZeitpunkt(k.zugang_erstellt_am)} · ${k.zugang_zuletzt_am ? "zuletzt benutzt " + lhZeitpunkt(k.zugang_zuletzt_am) : "noch nicht benutzt"}`;
+      return `<div class="lh-kind">
+        <span class="lh-kind-symbol" aria-hidden="true">${escapeHtml(k.symbol || "🦊")}</span>
+        <div class="lh-kind-info">
+          <strong>${escapeHtml(k.pseudonym)}</strong>
+          <span class="notiz-meta">${status}</span>
+          <span class="notiz-meta">${frei} ${frei === 1 ? "Übung" : "Übungen"} freigegeben</span>
+        </div>
+        <div class="lh-kind-knoepfe">
+          <button type="button" class="btn-secondary" onclick="lhZugangErstellen('${kid}')">${ic("nfc")}QR-Code</button>
+          ${k.hat_zugang ? `<button type="button" class="btn-secondary" onclick="lhZugangSperren('${kid}', ${k.zugang_gesperrt ? "false" : "true"})">${k.zugang_gesperrt ? "Freigeben" : "Sperren"}</button>` : ""}
+          <button type="button" class="task-edit-btn" onclick="blattOeffnen('lhkind', '${kid}')" aria-label="${escapeAttr(k.pseudonym)} bearbeiten">${ic("stift")}</button>
+        </div>
+      </div>`;
+    }).join("");
+    return `<section class="lh-kinder" aria-label="Kinder">
+      <h2 class="std-zwischen">Kinder</h2>
+      ${karten || `<p class="empty-text">Noch kein Kind angelegt.</p>`}
+      <div class="reiter-aktionen bib-aktionen">
+        <button type="button" class="btn-secondary" onclick="blattNeu('lhkind', {})">${ic("plus")}Kind</button>
+      </div>
+      <p class="notiz-meta">Nur ein Pseudonym (z. B. „Fuchs“), kein echter Name, keine Schule, nichts zum Förderbedarf.</p>
+    </section>`;
+  }
+
+  // ---- Übungen ----
+  function lhUebungenHtml() {
+    const faecher = lhFaecherSortiert(false);
+    const aktiv = lh.uebungen.filter((u) => !u.archiviert);
+    const archiv = lh.uebungen.filter((u) => u.archiviert);
+    if (lh.fach !== "alle" && !faecher.some((f) => String(f.id) === lh.fach)) lh.fach = "alle";
+    const chips = [`<button type="button" class="schnell-chip${lh.fach === "alle" ? " aktiv" : ""}" aria-pressed="${lh.fach === "alle"}" onclick="lhFachFilter('alle')">Alle <span class="lern-chip-zahl">${aktiv.length}</span></button>`]
+      .concat(faecher.map((f) => {
+        const n = aktiv.filter((u) => String(u.fach_id) === String(f.id)).length;
+        const an = lh.fach === String(f.id);
+        return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lhFachFilter('${escapeAttr(String(f.id))}')">${escapeHtml(f.symbol)} ${escapeHtml(f.name)} <span class="lern-chip-zahl">${n}</span></button>`;
+      })).join("");
+    const gruppen = faecher.filter((f) => lh.fach === "alle" || String(f.id) === lh.fach).map((f) => {
+      const liste = aktiv.filter((u) => String(u.fach_id) === String(f.id));
+      if (!liste.length) return lh.fach === "alle" ? "" : `<p class="empty-text">In ${escapeHtml(f.name)} gibt es noch keine Übung.</p>`;
+      return `<h3 class="lh-fach-titel" style="--lh-farbe:${lhFarbe(f)}">${escapeHtml(f.symbol)} ${escapeHtml(f.name)}</h3>
+        <div class="lh-uebung-liste">${liste.map(lhUebungKarte).join("")}</div>`;
+    }).join("");
+    // Übungen in archivierten Fächern: unten mit anzeigen, damit nichts verschwindet
+    const ohneFach = aktiv.filter((u) => { const f = lhFach(u.fach_id); return !f || f.archiviert; });
+    return `<section class="lh-uebungen" aria-label="Übungen">
+      <h2 class="std-zwischen">Übungen</h2>
+      <div class="reiter-aktionen bib-aktionen">
+        <button type="button" class="btn-primary" onclick="lhNeueUebung()">${ic("plus")}Übung</button>
+        <button type="button" class="btn-secondary" onclick="lhPaketOeffnen()">${ic("funkeln")}Mit Claude erstellen</button>
+      </div>
+      ${faecher.length ? `<div class="schnell-chips lh-fachfilter" role="group" aria-label="Fach">${chips}</div>` : ""}
+      ${aktiv.length ? "" : `<p class="empty-text">Noch keine Übung. Lege eine im Formular an oder lass Claude welche erstellen.</p>`}
+      ${gruppen}
+      ${ohneFach.length && lh.fach === "alle" ? `<h3 class="lh-fach-titel">Fach archiviert</h3><div class="lh-uebung-liste">${ohneFach.map(lhUebungKarte).join("")}</div>` : ""}
+      ${!lh.kinder.length && aktiv.length ? `<p class="notiz-meta">Zum Freigeben oben erst ein Kind anlegen.</p>` : ""}
+      ${archiv.length ? `<details class="anleitung-abschnitt std-block">
+        <summary>Archivierte Übungen (${archiv.length})</summary>
+        <div class="anleitung-text"><div class="lh-uebung-liste">${archiv.map(lhUebungKarte).join("")}</div></div>
+      </details>` : ""}
+    </section>`;
+  }
+
+  function lhUebungKarte(u) {
+    const f = lhFach(u.fach_id);
+    const aufg = lhAufgabenVon(u.id);
+    const typen = [...new Set(aufg.map((a) => LH_TYPEN[a.typ] ? LH_TYPEN[a.typ].name : a.typ))].join(", ");
+    const uid = escapeAttr(String(u.id));
+    const freigaben = u.archiviert ? "" : lh.kinder.map((k) => {
+      const fr = lhFreigabe(k.id, u.id);
+      const kid = escapeAttr(String(k.id));
+      const erg = lhErgebnisse(k.id, u.id);
+      const beste = erg.reduce((m, d) => Math.max(m, Number(d.sterne) || 0), 0);
+      const stand = !fr ? "" : erg.length
+        ? `<span class="lh-stand" title="beste Sterne">${lhSterne(beste)} · ${erg.length}× gemacht</span>`
+        : `<span class="badge reminder">neu</span>`;
+      return `<div class="lh-freigabe-zeile">
+        <button type="button" class="schnell-chip${fr ? " aktiv" : ""}" aria-pressed="${!!fr}" onclick="lhFreigabeUmschalten('${kid}','${uid}')">
+          ${escapeHtml(k.symbol || "")} ${escapeHtml(k.pseudonym)} ${fr ? "· freigegeben" : "· freigeben"}</button>
+        ${fr ? `<label class="lh-faellig">fällig <input type="date" value="${escapeAttr(fr.faellig_am || "")}" onchange="lhFaelligSetzen('${kid}','${uid}', this.value)" aria-label="Fällig bis für ${escapeAttr(k.pseudonym)}"></label>` : ""}
+        ${stand}
+      </div>`;
+    }).join("");
+    return `<article class="lh-uebung" style="--lh-farbe:${lhFarbe(f)}">
+      <div class="lh-uebung-kopf">
+        <span class="lh-fach-symbol" aria-hidden="true">${escapeHtml(f ? f.symbol : "📘")}</span>
+        <button type="button" class="lh-uebung-text" onclick="lhBearbeiten('${uid}')">
+          <strong>${escapeHtml(u.titel)}</strong>
+          <span class="notiz-meta">${[u.thema ? escapeHtml(u.thema) : "", `${aufg.length} ${aufg.length === 1 ? "Aufgabe" : "Aufgaben"}`, escapeHtml(typen), u.quelle === "paket" ? "von Claude" : ""].filter(Boolean).join(" · ")}</span>
+        </button>
+        <button type="button" class="task-edit-btn" onclick="lhBearbeiten('${uid}')" aria-label="${escapeAttr(u.titel)} bearbeiten">${ic("stift")}</button>
+      </div>
+      ${freigaben ? `<div class="lh-freigaben">${freigaben}</div>` : ""}
+    </article>`;
+  }
+
+  // ---- Fächer verwalten ----
+  function lhFaecherHtml() {
+    const alle = lhFaecherSortiert(true);
+    const zeilen = alle.map((f) => {
+      const n = lh.uebungen.filter((u) => String(u.fach_id) === String(f.id)).length;
+      return `<div class="kz-bereich-zeile${f.archiviert ? " archiviert" : ""}">
+        <span class="lh-farbpunkt" style="background:${lhFarbe(f)}" aria-hidden="true"></span>
+        <span class="kz-bereich-zeile-name">${escapeHtml(f.symbol)} ${escapeHtml(f.name)} <span class="notiz-meta">${n} ${n === 1 ? "Übung" : "Übungen"}${f.archiviert ? " · archiviert" : ""}</span></span>
+        <button type="button" class="task-edit-btn" onclick="blattOeffnen('lhfach', '${escapeAttr(String(f.id))}')" aria-label="${escapeAttr(f.name)} bearbeiten">${ic("stift")}</button>
+      </div>`;
+    }).join("");
+    return `<details class="anleitung-abschnitt std-block kz-verwalten">
+      <summary>${ic("zahnrad")} Fächer verwalten</summary>
+      <div class="anleitung-text">
+        <div class="kz-bereich-liste">${zeilen || `<p class="empty-text">Noch keine Fächer.</p>`}</div>
+        <button type="button" class="btn-secondary" onclick="blattNeu('lhfach', {})">${ic("plus")}Fach</button>
+      </div>
+    </details>`;
+  }
+
+  window.lhFachFilter = function(f) { lh.fach = f; renderLernhilfe(); };
+
+  // ---- Freigaben ----
+  window.lhFreigabeUmschalten = async function(kid, uid) {
+    const an = !!lhFreigabe(kid, uid);
+    const u = lhUebung(uid);
+    if (!an && u && !lhAufgabenVon(uid).length) { hinweisZeigen("Die Übung hat noch keine Aufgaben"); return; }
+    try {
+      await api("lern_freigabe_setzen", { kind_id: kid, uebung_ids: [uid], freigegeben: !an });
+      if (an) lh.freigaben = lh.freigaben.filter((f) => !(String(f.kind_id) === String(kid) && String(f.uebung_id) === String(uid)));
+      else lh.freigaben.push({ id: "neu-" + Date.now(), kind_id: kid, uebung_id: uid, faellig_am: null, freigegeben_am: new Date().toISOString() });
+      const k = lhKind(kid);
+      hinweisZeigen(an ? "Freigabe zurückgenommen" : `Für ${k ? k.pseudonym : "das Kind"} freigegeben`);
+      renderLernhilfe();
+    } catch (e) {
+      if (e.message !== "unauthorized") hinweisZeigen("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
+  window.lhFaelligSetzen = async function(kid, uid, wert) {
+    try {
+      await api("lern_freigabe_setzen", { kind_id: kid, uebung_ids: [uid], freigegeben: true, faellig_am: wert || null });
+      const fr = lhFreigabe(kid, uid);
+      if (fr) fr.faellig_am = wert || null;
+      hinweisZeigen(wert ? `Fällig bis ${datumDe(wert)}` : "Ohne Fälligkeit");
+    } catch (e) {
+      if (e.message !== "unauthorized") hinweisZeigen("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
+
+  // ---- QR-Zugang ----
+  window.lhZugangErstellen = async function(kid) {
+    const k = lhKind(kid);
+    if (!k) return;
+    if (k.hat_zugang && !confirm(`Neuen QR-Code für ${k.pseudonym} erstellen?\n\nDer bisherige Code funktioniert danach nicht mehr – auch auf Geräten, auf denen er schon eingerichtet ist.`)) return;
+    let r;
+    try { r = await api("lern_zugang_erstellen", { kind_id: kid }); }
+    catch (e) { if (e.message !== "unauthorized") hinweisZeigen("Nicht erstellt: " + (e.message || "Fehler")); return; }
+    // Schlüssel steht im #-Teil: der geht beim Aufruf nicht an den Webserver
+    const link = new URL("lernen.html", location.href).href.split("#")[0].split("?")[0] + "#z=" + r.schluessel;
+    lhQrZeigen(k, link);
+    window.lhNeuLaden();
+  };
+  window.lhZugangSperren = async function(kid, sperren) {
+    const k = lhKind(kid);
+    if (sperren && !confirm(`Zugang von ${k ? k.pseudonym : "diesem Kind"} sperren?\n\nDie Kinderseite zeigt dann nur noch „Zugang gilt nicht“. Mit „Freigeben“ geht derselbe QR-Code wieder.`)) return;
+    try {
+      await api("lern_zugang_sperren", { kind_id: kid, gesperrt: sperren });
+      hinweisZeigen(sperren ? "Zugang gesperrt" : "Zugang wieder freigegeben");
+      window.lhNeuLaden();
+    } catch (e) {
+      if (e.message !== "unauthorized") hinweisZeigen("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
+
+  function lhQrSvg(text) {
+    if (typeof qrcode !== "function") return "";
+    try {
+      const q = qrcode(0, "M");
+      q.addData(text);
+      q.make();
+      return q.createSvgTag({ cellSize: 4, margin: 4, scalable: true });
+    } catch (_e) { return ""; }
+  }
+  function lhQrZeigen(k, link) {
+    window.lhQrZu();
+    const svg = lhQrSvg(link);
+    const box = document.createElement("div");
+    box.className = "session-fokus-overlay lh-qr-overlay";
+    box.id = "lh-qr-overlay";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-labelledby", "lh-qr-titel");
+    box.innerHTML = `
+      <div class="session-fokus-kopf">
+        <span class="session-fokus-titel" id="lh-qr-titel">Zugang für ${escapeHtml(k.symbol || "")} ${escapeHtml(k.pseudonym)}</span>
+        <button type="button" class="session-fokus-schliessen" onclick="lhQrZu()" aria-label="Schließen">${ic("x")}</button>
+      </div>
+      <div class="session-fokus-inhalt lh-qr-inhalt">
+        ${svg ? `<div class="lh-qr-bild" role="img" aria-label="QR-Code mit dem Zugangslink">${svg}</div>` : `<p class="empty-text">QR-Code konnte nicht erzeugt werden – bitte den Link nutzen.</p>`}
+        <p>Auf dem Gerät des Kindes mit der Kamera scannen (oder den Link dort öffnen). Das Gerät merkt sich den Zugang – danach reicht ein Lesezeichen oder „Zum Startbildschirm“.</p>
+        <p class="kz-warnung">${ic("warnung")}<span>Dieser Code wird <strong>nur jetzt</strong> angezeigt. Wer ihn hat, kann die freigegebenen Übungen machen. Nicht in Gruppen-Chats oder öffentlich teilen. Verloren? Einfach einen neuen erstellen – der alte gilt dann nicht mehr.</span></p>
+        <details class="lh-qr-link"><summary>Link anzeigen</summary><p class="nfc-link">${escapeHtml(link)}</p></details>
+        <div class="reiter-aktionen bib-aktionen lh-qr-knoepfe">
+          <button type="button" class="btn-secondary" id="lh-qr-kopieren">${ic("kopieren")}Link kopieren</button>
+          <button type="button" class="btn-secondary" onclick="window.print()">${ic("drucken")}Drucken</button>
+          <button type="button" class="btn-primary" onclick="lhQrZu()">Fertig</button>
+        </div>
+        <p class="notiz-meta">Die Kinderseite kommt mit Etappe 3 – bis dahin führt der Link noch ins Leere.</p>
+      </div>`;
+    document.body.appendChild(box);
+    document.body.classList.add("lh-qr-offen");
+    box.querySelector("#lh-qr-kopieren").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(link); hinweisZeigen("Link kopiert"); }
+      catch (_e) { prompt("Link zum Kopieren:", link); }
+    });
+    box.addEventListener("keydown", (e) => { if (e.key === "Escape") window.lhQrZu(); });
+    const zu = box.querySelector(".session-fokus-schliessen");
+    if (zu) zu.focus();
+  }
+  // Schließen räumt den Link aus der Seite – er steht dann nirgends mehr
+  window.lhQrZu = function() {
+    const box = document.getElementById("lh-qr-overlay");
+    if (box) box.remove();
+    document.body.classList.remove("lh-qr-offen");
+  };
+
+  // ==========================================================
+  // Übungsformular
+  // ==========================================================
+  window.lhNeueUebung = function(vorlage) {
+    const faecher = lhFaecherSortiert(false);
+    if (!faecher.length) { hinweisZeigen("Bitte zuerst unter „Fächer verwalten“ ein Fach anlegen"); return; }
+    const v = vorlage || {};
+    lh.ed = {
+      id: null,
+      fach_id: v.fach_id || (lh.fach !== "alle" ? lh.fach : String(faecher[0].id)),
+      titel: v.titel || "", thema: v.thema || "", einleitung: v.einleitung || "",
+      archiviert: false, quelle: v.quelle || "formular",
+      aufgaben: (v.aufgaben && v.aufgaben.length ? v.aufgaben.map(lhAufgabeFuerFormular) : [lhLeereAufgabe("auswahl")]),
+      geaendert: !!v.aufgaben,
+    };
+    lh.ansicht = "editor";
+    renderLernhilfe();
+    window.scrollTo(0, 0);
+  };
+
+  window.lhBearbeiten = async function(uid) {
+    const u = lhUebung(uid);
+    if (!u) return;
+    lh.ed = {
+      id: u.id, fach_id: String(u.fach_id), titel: u.titel || "", thema: u.thema || "", einleitung: u.einleitung || "",
+      archiviert: !!u.archiviert, quelle: u.quelle,
+      aufgaben: lhAufgabenVon(uid).map(lhAufgabeFuerFormular),
+      geaendert: false,
+    };
+    if (!lh.ed.aufgaben.length) lh.ed.aufgaben.push(lhLeereAufgabe("auswahl"));
+    lh.ansicht = "editor";
+    renderLernhilfe();
+    window.scrollTo(0, 0);
+    // Gespeicherte Bilder: signierte Adressen nachladen
+    const pfade = lh.ed.aufgaben.map((a) => a.bild_pfad).filter(Boolean);
+    if (pfade.length) {
+      try {
+        const r = await api("lern_bild_urls", { pfade });
+        if (lh.ed && String(lh.ed.id) === String(uid)) {
+          lh.ed.aufgaben.forEach((a) => { if (a.bild_pfad && r.urls && r.urls[a.bild_pfad]) a.bild_url = r.urls[a.bild_pfad]; });
+          lhEditorNeu();
+        }
+      } catch (_e) { /* Vorschaubilder fehlen dann – Speichern geht trotzdem */ }
+    }
+  };
+
+  window.lhEditorZu = function() {
+    if (lh.ed && lh.ed.geaendert && !confirm("Änderungen verwerfen?")) return;
+    lh.ed = null;
+    lh.ansicht = "liste";
+    renderLernhilfe();
+  };
+
+  // Formular neu zeichnen, Scrollposition behalten
+  function lhEditorNeu() {
+    const y = window.scrollY;
+    renderLernhilfe();
+    window.scrollTo(0, y);
+  }
+
+  function lhEditorHtml() {
+    const e = lh.ed;
+    const faecher = lhFaecherSortiert(true).filter((f) => !f.archiviert || String(f.id) === String(e.fach_id));
+    const aufg = e.aufgaben.map(lhAufgabeHtml).join("");
+    const neuKnoepfe = LH_TYP_REIHE.map((t) => `<button type="button" class="schnell-chip" onclick="lhAufgabeNeu('${t}')" title="${escapeAttr(LH_TYPEN[t].hilfe)}">${ic("plus")}${LH_TYPEN[t].name}</button>`).join("");
+    return `<div class="lh-editor">
+      <button type="button" class="link-btn einheit-zurueck" onclick="lhEditorZu()">${ic("zurueck")}Zur Übersicht</button>
+      <h2 class="lh-editor-titel">${e.id ? "Übung bearbeiten" : "Neue Übung"}</h2>
+      <div class="blatt-felder">
+        <label class="blatt-feld halb" for="lh-f-fach"><span class="schnell-label blatt-label">Fach</span>
+          <select id="lh-f-fach" data-lh="fach_id">${faecher.map((f) => `<option value="${escapeAttr(String(f.id))}"${String(f.id) === String(e.fach_id) ? " selected" : ""}>${escapeHtml(f.symbol)} ${escapeHtml(f.name)}</option>`).join("")}</select></label>
+        <label class="blatt-feld halb" for="lh-f-thema"><span class="schnell-label blatt-label">Thema</span>
+          <input type="text" id="lh-f-thema" data-lh="thema" maxlength="80" value="${escapeAttr(e.thema)}" placeholder="optional, z. B. Einmaleins" autocomplete="off"></label>
+        <label class="blatt-feld" for="lh-f-titel"><span class="schnell-label blatt-label">Titel</span>
+          <input type="text" id="lh-f-titel" data-lh="titel" maxlength="120" value="${escapeAttr(e.titel)}" placeholder="z. B. 7er-Reihe" autocomplete="off"></label>
+        <label class="blatt-feld" for="lh-f-einl"><span class="schnell-label blatt-label">Einleitung</span>
+          <input type="text" id="lh-f-einl" data-lh="einleitung" maxlength="500" value="${escapeAttr(e.einleitung)}" placeholder="optional, z. B. Lies jede Aufgabe genau." autocomplete="off"></label>
+      </div>
+      <h3 class="std-zwischen">Aufgaben (${e.aufgaben.length})</h3>
+      ${aufg}
+      ${e.aufgaben.length < LH_MAX_AUFGABEN ? `<div class="lh-neu-aufgabe"><span class="schnell-label">Neue Aufgabe</span><div class="schnell-chips">${neuKnoepfe}</div></div>` : `<p class="notiz-meta">Höchstens ${LH_MAX_AUFGABEN} Aufgaben je Übung.</p>`}
+      ${e.id ? `<label class="fin-prognose-haken"><input type="checkbox" data-lh-check="archiviert"${e.archiviert ? " checked" : ""}> Archiviert (beim Kind ausgeblendet, Ergebnisse bleiben)</label>` : ""}
+      <p class="schnell-status" id="lh-ed-status" aria-live="polite"></p>
+      <div class="reiter-aktionen bib-aktionen lh-editor-fuss">
+        <button type="button" class="btn-primary" id="lh-ed-speichern" onclick="lhSpeichern()"${lh.speichert ? " disabled" : ""}>${ic("ok-kreis")}Speichern</button>
+        <button type="button" class="btn-secondary" onclick="lhEditorZu()">Abbrechen</button>
+        ${e.id ? `<button type="button" class="link-btn lh-rot" onclick="lhUebungLoeschen()">${ic("x")}Übung löschen</button>` : ""}
+      </div>
+    </div>`;
+  }
+
+  function lhAufgabeHtml(a, i) {
+    const p = `aufgaben.${i}`;
+    const n = lh.ed.aufgaben.length;
+    const fehler = lhAufgabeFehler(a);
+    const typKnoepfe = LH_TYP_REIHE.map((t) => `<button type="button" class="schnell-chip${a.typ === t ? " aktiv" : ""}" aria-pressed="${a.typ === t}" onclick="lhTypWechseln(${i}, '${t}')">${LH_TYPEN[t].name}</button>`).join("");
+    const platzhalter = { auswahl: "z. B. Welches Tier bellt?", eingabe: "z. B. Rechne aus.", zuordnen: "z. B. Verbinde das englische Wort mit dem deutschen.", sortieren: "z. B. Bilde den richtigen Satz." }[a.typ];
+    return `<article class="lh-aufgabe" id="lh-a-${i}">
+      <div class="lh-aufgabe-kopf">
+        <strong>${i + 1}. ${LH_TYPEN[a.typ].name}</strong>
+        <span class="lh-aufgabe-knoepfe">
+          <button type="button" class="task-edit-btn" onclick="lhAufgabeSchieben(${i}, -1)"${i === 0 ? " disabled" : ""} aria-label="Nach oben">↑</button>
+          <button type="button" class="task-edit-btn" onclick="lhAufgabeSchieben(${i}, 1)"${i === n - 1 ? " disabled" : ""} aria-label="Nach unten">↓</button>
+          <button type="button" class="task-edit-btn" onclick="lhAufgabeKopieren(${i})"${n >= LH_MAX_AUFGABEN ? " disabled" : ""} aria-label="Aufgabe kopieren">${ic("kopieren")}</button>
+          <button type="button" class="task-delete" onclick="lhAufgabeEntfernen(${i})"${n <= 1 ? " disabled" : ""} aria-label="Aufgabe entfernen">${ic("x")}</button>
+        </span>
+      </div>
+      <div class="schnell-chips lh-typwahl" role="group" aria-label="Art der Aufgabe">${typKnoepfe}</div>
+      <label class="blatt-feld"><span class="schnell-label blatt-label">Aufgabenstellung</span>
+        <textarea class="schnell-notiz" rows="2" maxlength="500" data-lh="${p}.frage" placeholder="${escapeAttr(platzhalter)}">${escapeHtml(a.frage)}</textarea></label>
+      <div class="lh-zeile">
+        <label class="lh-emoji-feld"><span class="schnell-label blatt-label">Emoji</span>
+          <input type="text" class="lh-emoji" maxlength="16" data-lh="${p}.emoji" value="${escapeAttr(a.emoji)}" placeholder="🐶" autocomplete="off"></label>
+        <div class="lh-bild-feld"><span class="schnell-label blatt-label">Bild</span>
+          <div class="lh-bild-zeile">
+            ${a.bild_pfad ? (a.bild_url ? `<img class="lh-bild-klein" src="${escapeAttr(a.bild_url)}" alt="Bild der Aufgabe">` : `<span class="notiz-meta">Bild gespeichert</span>`) : ""}
+            <label class="btn-secondary bib-datei-knopf">${ic("kamera")}${a.bild_pfad ? "Ändern" : "Wählen"}<input type="file" accept="image/jpeg,image/png,image/webp" class="bib-unsichtbar" onchange="lhBildGewaehlt(${i}, this)"></label>
+            ${a.bild_pfad ? `<button type="button" class="link-btn" onclick="lhBildEntfernen(${i})">Entfernen</button>` : ""}
+          </div>
+        </div>
+      </div>
+      ${lhInhaltHtml(a, i)}
+      <label class="blatt-feld"><span class="schnell-label blatt-label">Erklärung</span>
+        <input type="text" maxlength="500" data-lh="${p}.erklaerung" value="${escapeAttr(a.erklaerung)}" placeholder="optional – wird nach der Antwort gezeigt" autocomplete="off"></label>
+      <p class="lh-fehler notiz-meta" id="lh-fehler-${i}" aria-live="polite">${fehler ? `${ic("warnung")} ${escapeHtml(fehler)}` : ""}</p>
+      <details class="lh-vorschau"><summary>Vorschau</summary><div id="lh-vorschau-${i}">${lhVorschauHtml(a)}</div></details>
+    </article>`;
+  }
+
+  function lhInhaltHtml(a, i) {
+    const p = `aufgaben.${i}.inhalt`;
+    const inh = a.inhalt;
+    if (a.typ === "auswahl") {
+      const zeilen = inh.optionen.map((o, j) => `<div class="lh-option">
+        <input type="radio" name="lh-richtig-${i}" class="lh-radio" ${Number(inh.richtig) === j ? "checked" : ""} onchange="lhRichtigSetzen(${i}, ${j})" aria-label="Antwort ${j + 1} ist richtig">
+        <input type="text" class="lh-emoji" maxlength="16" data-lh="${p}.optionen.${j}.emoji" value="${escapeAttr(o.emoji)}" placeholder="🙂" aria-label="Emoji Antwort ${j + 1}" autocomplete="off">
+        <input type="text" maxlength="120" data-lh="${p}.optionen.${j}.text" value="${escapeAttr(o.text)}" placeholder="Antwort ${j + 1}" aria-label="Antwort ${j + 1}" autocomplete="off">
+        <button type="button" class="task-delete" onclick="lhZeileEntfernen(${i}, 'optionen', ${j})"${inh.optionen.length <= 2 ? " disabled" : ""} aria-label="Antwort ${j + 1} entfernen">${ic("x")}</button>
+      </div>`).join("");
+      return `<div class="lh-inhalt"><span class="schnell-label blatt-label">Antworten – Kreis = richtig</span>${zeilen}
+        ${inh.optionen.length < 4 ? `<button type="button" class="link-btn" onclick="lhZeileNeu(${i}, 'optionen')">${ic("plus")}Antwort</button>` : ""}</div>`;
+    }
+    if (a.typ === "eingabe") {
+      const l = lhLuecken(inh.text);
+      return `<div class="lh-inhalt">
+        <label class="blatt-feld"><span class="schnell-label blatt-label">Text mit Lücken</span>
+          <textarea class="schnell-notiz" rows="2" maxlength="500" id="lh-luecken-${i}" data-lh="${p}.text" placeholder="z. B. 7 · 8 = {{56}}  oder  Der {{Hund}} bellt.">${escapeHtml(inh.text)}</textarea></label>
+        <div class="lh-zeile lh-luecken-knoepfe">
+          <button type="button" class="btn-secondary" onclick="lhLueckeEinfuegen(${i})">{{ }} Lücke einfügen</button>
+          <span class="notiz-meta" id="lh-lzahl-${i}">${l.length} ${l.length === 1 ? "Lücke" : "Lücken"}</span>
+        </div>
+        <span class="blatt-hinweis">Lösung in doppelte geschweifte Klammern. Mehrere richtige Antworten mit |, z. B. {{Hund|Dackel}}. Wort markieren und „Lücke einfügen“ – dann wird es zur Lücke.</span>
+        <label class="fin-prognose-haken"><input type="checkbox" data-lh-check="${p}.gross_klein"${inh.gross_klein !== false ? " checked" : ""}> Groß-/Kleinschreibung zählt</label>
+      </div>`;
+    }
+    if (a.typ === "zuordnen") {
+      const zeilen = inh.paare.map((x, j) => `<div class="lh-paar">
+        <input type="text" maxlength="60" data-lh="${p}.paare.${j}.links" value="${escapeAttr(x.links)}" placeholder="links, z. B. dog 🐶" aria-label="Paar ${j + 1} links" autocomplete="off">
+        <span aria-hidden="true">↔</span>
+        <input type="text" maxlength="60" data-lh="${p}.paare.${j}.rechts" value="${escapeAttr(x.rechts)}" placeholder="rechts, z. B. Hund" aria-label="Paar ${j + 1} rechts" autocomplete="off">
+        <button type="button" class="task-delete" onclick="lhZeileEntfernen(${i}, 'paare', ${j})"${inh.paare.length <= 2 ? " disabled" : ""} aria-label="Paar ${j + 1} entfernen">${ic("x")}</button>
+      </div>`).join("");
+      return `<div class="lh-inhalt"><span class="schnell-label blatt-label">Paare – links bleibt stehen, rechts wird gemischt</span>${zeilen}
+        ${inh.paare.length < 6 ? `<button type="button" class="link-btn" onclick="lhZeileNeu(${i}, 'paare')">${ic("plus")}Paar</button>` : ""}</div>`;
+    }
+    const zeilen = inh.teile.map((t, j) => `<div class="lh-teil">
+      <span class="lh-teil-nr">${j + 1}.</span>
+      <input type="text" maxlength="60" data-lh="${p}.teile.${j}" value="${escapeAttr(t)}" placeholder="Teil ${j + 1}" aria-label="Teil ${j + 1}" autocomplete="off">
+      <button type="button" class="task-edit-btn" onclick="lhTeilSchieben(${i}, ${j}, -1)"${j === 0 ? " disabled" : ""} aria-label="Teil ${j + 1} nach oben">↑</button>
+      <button type="button" class="task-delete" onclick="lhZeileEntfernen(${i}, 'teile', ${j})"${inh.teile.length <= 2 ? " disabled" : ""} aria-label="Teil ${j + 1} entfernen">${ic("x")}</button>
+    </div>`).join("");
+    return `<div class="lh-inhalt"><span class="schnell-label blatt-label">Teile in der richtigen Reihenfolge – das Kind bekommt sie gemischt</span>${zeilen}
+      ${inh.teile.length < 8 ? `<button type="button" class="link-btn" onclick="lhZeileNeu(${i}, 'teile')">${ic("plus")}Teil</button>` : ""}</div>`;
+  }
+
+  // Vorschau ungefähr so, wie das Kind die Aufgabe sieht (Lösung klein markiert)
+  function lhVorschauHtml(a) {
+    const i = a.inhalt;
+    const kopf = `<p class="lh-kv-frage">${a.emoji ? `<span class="lh-kv-emoji">${escapeHtml(a.emoji)}</span> ` : ""}${escapeHtml(a.frage || "…")}</p>
+      ${a.bild_url ? `<img class="lh-kv-bild" src="${escapeAttr(a.bild_url)}" alt="">` : ""}`;
+    let koerper = "";
+    if (a.typ === "auswahl") {
+      koerper = `<div class="lh-kv-optionen">${i.optionen.filter((o) => o.text || o.emoji).map((o, j) =>
+        `<span class="lh-kv-option${j === Number(i.richtig) ? " richtig" : ""}">${o.emoji ? escapeHtml(o.emoji) + " " : ""}${escapeHtml(o.text)}</span>`).join("")}</div>`;
+    } else if (a.typ === "eingabe") {
+      let pos = 0;
+      const text = String(i.text || "");
+      for (const m of text.matchAll(LH_LUECKE)) {
+        koerper += escapeHtml(text.slice(pos, m.index));
+        const alt = m[1].split("|").map((x) => x.trim()).filter(Boolean);
+        koerper += `<span class="lh-kv-luecke" title="Lösung: ${escapeAttr(alt.join(" oder "))}">${escapeHtml(alt[0] || "?")}</span>`;
+        pos = m.index + m[0].length;
+      }
+      koerper = `<p class="lh-kv-text">${koerper + escapeHtml(text.slice(pos)) || "…"}</p>`;
+    } else if (a.typ === "zuordnen") {
+      koerper = `<div class="lh-kv-paare">${i.paare.filter((x) => x.links || x.rechts).map((x) =>
+        `<span class="lh-kv-option">${escapeHtml(x.links)}</span><span aria-hidden="true">↔</span><span class="lh-kv-option">${escapeHtml(x.rechts)}</span>`).join("")}</div>`;
+    } else {
+      koerper = `<div class="lh-kv-optionen">${i.teile.filter(Boolean).map((t) => `<span class="lh-kv-option">${escapeHtml(t)}</span>`).join("")}</div>`;
+    }
+    return `<div class="lh-kindvorschau">${kopf}${koerper}<p class="notiz-meta">${a.typ === "eingabe" ? "Lücken sind hier mit der Lösung gefüllt, das Kind sieht leere Felder." : a.typ === "auswahl" ? "Grün = richtig. Das Kind bekommt die Antworten gemischt." : "Das Kind bekommt die Reihenfolge gemischt."}</p></div>`;
+  }
+
+  // ---- Eingaben ins Formular-Objekt schreiben (ohne Neuzeichnen) ----
+  function lhPfadSetzen(obj, pfad, wert) {
+    const teile = pfad.split(".");
+    let o = obj;
+    for (let k = 0; k < teile.length - 1; k++) {
+      o = o[/^\d+$/.test(teile[k]) ? Number(teile[k]) : teile[k]];
+      if (o === undefined || o === null) return;
+    }
+    const letzter = teile[teile.length - 1];
+    o[/^\d+$/.test(letzter) ? Number(letzter) : letzter] = wert;
+  }
+  // Nach einer Eingabe: Vorschau, Fehlerhinweis und Lückenzahl der Aufgabe auffrischen
+  function lhAufgabeAuffrischen(i) {
+    const a = lh.ed && lh.ed.aufgaben[i];
+    if (!a) return;
+    const v = document.getElementById("lh-vorschau-" + i);
+    if (v) v.innerHTML = lhVorschauHtml(a);
+    const f = document.getElementById("lh-fehler-" + i);
+    if (f) { const t = lhAufgabeFehler(a); f.innerHTML = t ? `${ic("warnung")} ${escapeHtml(t)}` : ""; }
+    const z = document.getElementById("lh-lzahl-" + i);
+    if (z) { const n = lhLuecken(a.inhalt.text).length; z.textContent = `${n} ${n === 1 ? "Lücke" : "Lücken"}`; }
+  }
+  // Einmal je Container: ein Zuhörer für alle Felder (data-lh / data-lh-check / Paket-Felder)
+  function lhEingabenVerbinden(el) {
+    if (el.dataset.lhVerbunden) return;
+    el.dataset.lhVerbunden = "1";
+    const verarbeiten = (e) => {
+      const t = e.target;
+      if (t.id === "lh-wunsch") { lh.wunsch = t.value; return; }
+      if (t.id === "lh-wunsch-fach") { lh.wunschFach = t.value; return; }
+      if (t.id === "lh-paket-text") { lh.paketText = t.value; return; }
+      if (!lh.ed) return;
+      if (t.dataset.lh) { lhPfadSetzen(lh.ed, t.dataset.lh, t.value); }
+      else if (t.dataset.lhCheck && e.type === "change") { lhPfadSetzen(lh.ed, t.dataset.lhCheck, t.checked); }
+      else return;
+      lh.ed.geaendert = true;
+      const m = /^aufgaben\.(\d+)\./.exec(t.dataset.lh || t.dataset.lhCheck || "");
+      if (m) lhAufgabeAuffrischen(Number(m[1]));
+    };
+    el.addEventListener("input", verarbeiten);
+    el.addEventListener("change", verarbeiten);
+  }
+
+  // ---- Aufgaben bearbeiten (mit Neuzeichnen) ----
+  window.lhAufgabeNeu = function(typ) {
+    if (!lh.ed || lh.ed.aufgaben.length >= LH_MAX_AUFGABEN) return;
+    // Neue Aufgabe übernimmt Art und Emoji-freie Aufgabenstellung nicht – nur die Art
+    lh.ed.aufgaben.push(lhLeereAufgabe(typ));
+    lh.ed.geaendert = true;
+    lhEditorNeu();
+    const neu = document.getElementById("lh-a-" + (lh.ed.aufgaben.length - 1));
+    if (neu) { neu.scrollIntoView({ block: "start", behavior: "smooth" }); const f = neu.querySelector("textarea"); if (f) f.focus({ preventScroll: true }); }
+  };
+  window.lhTypWechseln = function(i, typ) {
+    const a = lh.ed && lh.ed.aufgaben[i];
+    if (!a || a.typ === typ) return;
+    // Steht irgendwo in den Antworten schon Text?
+    const texte = [];
+    const sammeln = (v) => { if (typeof v === "string") texte.push(v); else if (v && typeof v === "object") Object.values(v).forEach(sammeln); };
+    sammeln(a.inhalt);
+    const hatInhalt = texte.some((t) => t.trim());
+    if (hatInhalt && !confirm("Art wechseln? Die Antworten dieser Aufgabe gehen dabei verloren (Aufgabenstellung, Emoji, Bild und Erklärung bleiben).")) return;
+    const neu = lhLeereAufgabe(typ);
+    lh.ed.aufgaben[i] = { ...a, typ, inhalt: neu.inhalt };
+    lh.ed.geaendert = true;
+    lhEditorNeu();
+  };
+  window.lhAufgabeSchieben = function(i, r) {
+    const l = lh.ed.aufgaben, j = i + r;
+    if (j < 0 || j >= l.length) return;
+    [l[i], l[j]] = [l[j], l[i]];
+    lh.ed.geaendert = true;
+    lhEditorNeu();
+  };
+  window.lhAufgabeKopieren = function(i) {
+    if (lh.ed.aufgaben.length >= LH_MAX_AUFGABEN) return;
+    const k = JSON.parse(JSON.stringify(lh.ed.aufgaben[i]));
+    delete k.id;
+    lh.ed.aufgaben.splice(i + 1, 0, k);
+    lh.ed.geaendert = true;
+    lhEditorNeu();
+  };
+  window.lhAufgabeEntfernen = function(i) {
+    if (lh.ed.aufgaben.length <= 1) return;
+    const a = lh.ed.aufgaben[i];
+    if ((a.frage || "").trim() && !confirm(`Aufgabe ${i + 1} entfernen?`)) return;
+    lh.ed.aufgaben.splice(i, 1);
+    lh.ed.geaendert = true;
+    lhEditorNeu();
+  };
+  window.lhRichtigSetzen = function(i, j) {
+    lh.ed.aufgaben[i].inhalt.richtig = j;
+    lh.ed.geaendert = true;
+    lhAufgabeAuffrischen(i);
+  };
+  window.lhZeileNeu = function(i, liste) {
+    const inh = lh.ed.aufgaben[i].inhalt;
+    if (liste === "optionen" && inh.optionen.length < 4) inh.optionen.push({ text: "", emoji: "" });
+    if (liste === "paare" && inh.paare.length < 6) inh.paare.push({ links: "", rechts: "" });
+    if (liste === "teile" && inh.teile.length < 8) inh.teile.push("");
+    lh.ed.geaendert = true;
+    lhEditorNeu();
+  };
+  window.lhZeileEntfernen = function(i, liste, j) {
+    const inh = lh.ed.aufgaben[i].inhalt;
+    if (!inh[liste] || inh[liste].length <= 2) return;
+    inh[liste].splice(j, 1);
+    if (liste === "optionen") {
+      const r = Number(inh.richtig);
+      if (r === j) inh.richtig = 0; else if (r > j) inh.richtig = r - 1;
+    }
+    lh.ed.geaendert = true;
+    lhEditorNeu();
+  };
+  window.lhTeilSchieben = function(i, j, r) {
+    const t = lh.ed.aufgaben[i].inhalt.teile, k = j + r;
+    if (k < 0 || k >= t.length) return;
+    [t[j], t[k]] = [t[k], t[j]];
+    lh.ed.geaendert = true;
+    lhEditorNeu();
+  };
+  // Markierten Text in {{ }} setzen bzw. {{}} an der Schreibmarke einfügen
+  window.lhLueckeEinfuegen = function(i) {
+    const f = document.getElementById("lh-luecken-" + i);
+    if (!f) return;
+    const a = f.selectionStart ?? f.value.length, b = f.selectionEnd ?? f.value.length;
+    const markiert = f.value.slice(a, b);
+    f.value = f.value.slice(0, a) + "{{" + markiert + "}}" + f.value.slice(b);
+    const pos = markiert ? a + markiert.length + 4 : a + 2;
+    f.focus();
+    f.setSelectionRange(pos, pos);
+    f.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+
+  // ---- Bilder ----
+  window.lhBildGewaehlt = async function(i, input) {
+    const datei = input.files && input.files[0];
+    input.value = "";
+    if (!datei || !lh.ed) return;
+    const status = document.getElementById("lh-ed-status");
+    if (status) { status.textContent = "Bild wird hochgeladen …"; status.classList.remove("fehler"); }
+    try {
+      const klein = await fotoVerkleinern(datei); // auch: Ortsdaten (EXIF) fallen dabei weg
+      const r = await api("lern_bild_hochladen", { base64: klein.base64, typ: klein.typ });
+      const a = lh.ed && lh.ed.aufgaben[i];
+      if (!a) return;
+      a.bild_pfad = r.pfad;
+      a.bild_url = r.url || klein.vorschau;
+      lh.ed.geaendert = true;
+      lhEditorNeu();
+      const s = document.getElementById("lh-ed-status");
+      if (s) s.textContent = "Bild hochgeladen – wird mit „Speichern“ übernommen.";
+    } catch (e) {
+      if (e.message === "unauthorized") return;
+      const s = document.getElementById("lh-ed-status");
+      if (s) { s.textContent = "Bild nicht hochgeladen: " + (e.message || "Fehler"); s.classList.add("fehler"); }
+    }
+  };
+  window.lhBildEntfernen = function(i) {
+    const a = lh.ed && lh.ed.aufgaben[i];
+    if (!a) return;
+    a.bild_pfad = null; a.bild_url = null;
+    lh.ed.geaendert = true;
+    lhEditorNeu();
+  };
+
+  // ---- Speichern / Löschen ----
+  window.lhSpeichern = async function() {
+    const e = lh.ed;
+    if (!e || lh.speichert) return;
+    const status = document.getElementById("lh-ed-status");
+    const melden = (t, fehler) => { if (status) { status.textContent = t; status.classList.toggle("fehler", !!fehler); } };
+    if (!String(e.titel).trim()) { melden("Bitte einen Titel eingeben.", true); document.getElementById("lh-f-titel")?.focus(); return; }
+    for (let i = 0; i < e.aufgaben.length; i++) {
+      const f = lhAufgabeFehler(e.aufgaben[i]);
+      if (f) {
+        melden(`Aufgabe ${i + 1}: ${f}`, true);
+        document.getElementById("lh-a-" + i)?.scrollIntoView({ block: "start", behavior: "smooth" });
+        return;
+      }
+    }
+    lh.speichert = true;
+    const knopf = document.getElementById("lh-ed-speichern");
+    if (knopf) knopf.disabled = true;
+    melden("Speichere …", false);
+    try {
+      const r = await api("lern_uebung_speichern", {
+        id: e.id || undefined, fach_id: e.fach_id, titel: e.titel, thema: e.thema, einleitung: e.einleitung,
+        archiviert: e.id ? !!e.archiviert : undefined, quelle: e.quelle,
+        aufgaben: e.aufgaben.map(lhAufgabeBereinigt),
+      });
+      hinweisZeigen(e.id ? "Übung gespeichert" : "Übung angelegt – jetzt beim Kind freigeben");
+      lh.ed = null;
+      lh.ansicht = "liste";
+      lh.fach = "alle";
+      await window.lhNeuLaden();
+      const neu = r && r.id && document.querySelector(`[onclick="lhBearbeiten('${String(r.id)}')"]`);
+      if (neu) neu.scrollIntoView({ block: "center" });
+    } catch (err) {
+      if (err.message !== "unauthorized") melden("Nicht gespeichert: " + (err.message || "Fehler"), true);
+    } finally {
+      lh.speichert = false;
+      const k = document.getElementById("lh-ed-speichern");
+      if (k) k.disabled = false;
+    }
+  };
+  window.lhUebungLoeschen = async function() {
+    const e = lh.ed;
+    if (!e || !e.id) return;
+    if (!confirm(`Übung „${e.titel}“ löschen?\n\nFreigaben verschwinden, bisherige Ergebnisse bleiben in der Auswertung erhalten. Lieber nur ausblenden? Dann „Archiviert“ anhaken.`)) return;
+    try {
+      await api("lern_uebung_loeschen", { id: e.id });
+      hinweisZeigen("Übung gelöscht");
+      lh.ed = null;
+      lh.ansicht = "liste";
+      await window.lhNeuLaden();
+    } catch (err) {
+      if (err.message !== "unauthorized") hinweisZeigen("Nicht gelöscht: " + (err.message || "Fehler"));
+    }
+  };
+
+  // ==========================================================
+  // Claude-Paket: Auftrag kopieren, Antwort einfügen, prüfen, übernehmen
+  // ==========================================================
+  window.lhPaketOeffnen = function() {
+    lh.ansicht = "paket";
+    renderLernhilfe();
+    window.scrollTo(0, 0);
+  };
+  window.lhPaketZu = function() {
+    lh.ansicht = "liste";
+    lh.paket = null;
+    renderLernhilfe();
+  };
+
+  function lhPaketHtml() {
+    const faecher = lhFaecherSortiert(false);
+    const fachOpt = [`<option value="">Passend wählen lassen</option>`].concat(faecher.map((f) =>
+      `<option value="${escapeAttr(f.name)}"${lh.wunschFach === f.name ? " selected" : ""}>${escapeHtml(f.symbol)} ${escapeHtml(f.name)}</option>`)).join("");
+    return `<div class="lh-paket">
+      <button type="button" class="link-btn einheit-zurueck" onclick="lhPaketZu()">${ic("zurueck")}Zur Übersicht</button>
+      <h2 class="lh-editor-titel">Übungen mit Claude erstellen</h2>
+      <ol class="lh-schritte">
+        <li>Wunsch eintragen und „Für Claude kopieren“.</li>
+        <li>Im Claude-Chat einfügen und abschicken.</li>
+        <li>Claudes Antwort unten einfügen, „Prüfen“ – dann übernehmen oder im Formular nacharbeiten.</li>
+      </ol>
+      <section class="kz-ta-paket">
+        <label class="blatt-feld" for="lh-wunsch"><span class="schnell-label blatt-label">Was soll Claude erstellen?</span>
+          <textarea id="lh-wunsch" class="schnell-notiz" rows="3" maxlength="2000" placeholder="z. B. 10 Aufgaben zum Einmaleins mit 7, gemischt Lücken und Auswahl">${escapeHtml(lh.wunsch)}</textarea></label>
+        <label class="blatt-feld" for="lh-wunsch-fach"><span class="schnell-label blatt-label">Fach</span>
+          <select id="lh-wunsch-fach">${fachOpt}</select></label>
+        <button type="button" class="btn-primary" onclick="lhFuerClaudeKopieren()">${ic("kopieren")}Für Claude kopieren</button>
+        <p class="notiz-meta">Es gehen keine Angaben über das Kind mit – nur dein Wunsch, die Klassenstufe, die Fächer und das Format.</p>
+      </section>
+      <section class="kz-ta-paket">
+        <label class="blatt-feld" for="lh-paket-text"><span class="schnell-label blatt-label">Antwort von Claude</span>
+          <textarea id="lh-paket-text" class="schnell-notiz" rows="7" placeholder='{"typ":"lern_uebungen", …}'>${escapeHtml(lh.paketText)}</textarea></label>
+        <div class="reiter-aktionen bib-aktionen">
+          <button type="button" class="btn-primary" onclick="lhPaketPruefen()">${ic("ok-kreis")}Prüfen</button>
+          <label class="btn-secondary bib-datei-knopf">${ic("import")}Datei<input type="file" accept=".json,.txt,application/json,text/plain" class="bib-unsichtbar" onchange="lhPaketDatei(this)"></label>
+        </div>
+      </section>
+      ${lh.paket ? lhPaketVorschauHtml() : ""}
+    </div>`;
+  }
+
+  function lhAuftragText() {
+    const faecher = lhFaecherSortiert(false).map((f) => f.name);
+    const wunsch = String(lh.wunsch || "").trim() || "(bitte hier deinen Wunsch eintragen)";
+    const fach = lh.wunschFach || `passend aus: ${faecher.join(", ") || "Deutsch, Mathe, Englisch"}`;
+    return [
+      "Bitte erstelle Lernübungen für ein Kind der 3./4. Klasse, das gut, aber noch nicht ganz sicher liest.",
+      "",
+      `Mein Wunsch: ${wunsch}`,
+      `Fach: ${fach}`,
+      "",
+      "Regeln:",
+      "- Kurze, einfache Sätze und bekannte Wörter, eine Sache pro Aufgabe.",
+      "- Gern ein passendes Emoji je Aufgabe (Feld \"emoji\") oder je Antwort.",
+      "- Lieber mehrere kleine Übungen mit 8–12 Aufgaben als eine große (höchstens 30).",
+      "- Optional je Aufgabe eine \"erklaerung\" in einem kurzen Satz – wird nach der Antwort gezeigt.",
+      "- Keine Namen echter Personen.",
+      "",
+      "Antworte NUR mit JSON in genau diesem Format, ohne weiteren Text:",
+      "{\"typ\":\"lern_uebungen\",\"version\":1,\"uebungen\":[{\"fach\":\"Mathe\",\"titel\":\"…\",\"thema\":\"…\",\"einleitung\":\"…\",\"aufgaben\":[…]}]}",
+      "",
+      "Aufgabenarten:",
+      "1. Auswahl: {\"typ\":\"auswahl\",\"frage\":\"Welches Tier bellt?\",\"emoji\":\"🐾\",\"inhalt\":{\"optionen\":[{\"text\":\"Hund\",\"emoji\":\"🐶\"},{\"text\":\"Katze\",\"emoji\":\"🐱\"}],\"richtig\":0}}",
+      "   2 bis 4 Antworten; \"richtig\" = Nummer der richtigen Antwort, gezählt ab 0.",
+      "2. Lücken/Eingabe: {\"typ\":\"eingabe\",\"frage\":\"Rechne aus.\",\"inhalt\":{\"text\":\"7 · 8 = {{56}}\",\"gross_klein\":true}}",
+      "   1 bis 10 Lücken in {{ }}; mehrere richtige Schreibweisen mit |, z. B. {{Hund|Dackel}}; \"gross_klein\": false, wenn Groß/klein egal ist.",
+      "3. Zuordnen: {\"typ\":\"zuordnen\",\"frage\":\"Verbinde.\",\"inhalt\":{\"paare\":[{\"links\":\"dog\",\"rechts\":\"Hund\"},{\"links\":\"cat\",\"rechts\":\"Katze\"}]}}",
+      "   2 bis 6 Paare, links und rechts jeweils ohne Doppelte.",
+      "4. Sortieren: {\"typ\":\"sortieren\",\"frage\":\"Bilde den Satz.\",\"inhalt\":{\"teile\":[\"Der\",\"Hund\",\"bellt.\"]}}",
+      "   2 bis 8 Teile in der RICHTIGEN Reihenfolge – die App mischt sie.",
+      "",
+      "Längen: Aufgabenstellung höchstens 500 Zeichen, Antworten 120, Paare, Teile und Lücken 60.",
+    ].join("\n");
+  }
+  window.lhFuerClaudeKopieren = async function() {
+    const w = document.getElementById("lh-wunsch");
+    if (w) lh.wunsch = w.value;
+    if (!String(lh.wunsch).trim()) { hinweisZeigen("Bitte zuerst den Wunsch eintragen"); if (w) w.focus(); return; }
+    const text = lhAuftragText();
+    try {
+      await navigator.clipboard.writeText(text);
+      hinweisZeigen("Kopiert – jetzt im Chat mit Claude einfügen");
+    } catch (_e) {
+      downloadDatei(`lernhilfe-auftrag-${heuteISO()}.txt`, text, "text/plain;charset=utf-8");
+      hinweisZeigen("Kopieren ging nicht – als Textdatei heruntergeladen");
+    }
+  };
+  window.lhPaketDatei = async function(input) {
+    const d = input.files && input.files[0];
+    input.value = "";
+    if (!d) return;
+    if (d.size > 500000) { hinweisZeigen("Datei ist zu groß"); return; }
+    lh.paketText = await d.text();
+    window.lhPaketPruefen();
+  };
+
+  // Liest Claudes Antwort: JSON auch mit ```-Rahmen oder Text drumherum
+  function lhPaketLesen(text) {
+    const t = String(text || "");
+    // Kandidaten: {…} und […]; der zuerst beginnende wird zuerst versucht
+    const kandidaten = [[t.indexOf("{"), t.lastIndexOf("}")], [t.indexOf("["), t.lastIndexOf("]")]]
+      .filter(([x, y]) => x >= 0 && y > x).sort((p, q) => p[0] - q[0]);
+    if (!kandidaten.length) throw new Error("Kein JSON gefunden – bitte die ganze Antwort von Claude einfügen.");
+    let d;
+    for (const [x, y] of kandidaten) {
+      try { d = JSON.parse(t.slice(x, y + 1)); break; } catch (_e) { /* nächsten Kandidaten versuchen */ }
+    }
+    if (d === undefined || d === null || typeof d !== "object") throw new Error("Das JSON ist nicht vollständig oder fehlerhaft – Claude bitten, es noch einmal komplett zu schicken.");
+    const liste = Array.isArray(d) ? d : Array.isArray(d.uebungen) ? d.uebungen : (d.aufgaben ? [d] : null);
+    if (!liste || !liste.length) throw new Error("Im Paket stehen keine Übungen.");
+    if (liste.length > 20) throw new Error("Höchstens 20 Übungen auf einmal.");
+    return liste;
+  }
+  window.lhPaketPruefen = function() {
+    const t = document.getElementById("lh-paket-text");
+    if (t) lh.paketText = t.value;
+    try {
+      const liste = lhPaketLesen(lh.paketText);
+      const faecher = lhFaecherSortiert(false);
+      lh.paket = liste.map((u) => {
+        const passend = faecher.find((f) => f.name.toLowerCase() === String(u.fach || lh.wunschFach || "").trim().toLowerCase());
+        const aufgaben = (Array.isArray(u.aufgaben) ? u.aufgaben : []).map(lhAufgabeFuerFormular);
+        const fehler = [];
+        if (!String(u.titel || "").trim()) fehler.push("Titel fehlt");
+        if (!aufgaben.length) fehler.push("keine Aufgaben");
+        if (aufgaben.length > LH_MAX_AUFGABEN) fehler.push(`mehr als ${LH_MAX_AUFGABEN} Aufgaben`);
+        aufgaben.forEach((a, i) => { const f = lhAufgabeFehler(a); if (f) fehler.push(`Aufgabe ${i + 1}: ${f}`); });
+        return {
+          titel: String(u.titel || "").slice(0, 120), thema: String(u.thema || "").slice(0, 80), einleitung: String(u.einleitung || "").slice(0, 500),
+          fachName: String(u.fach || ""), fach_id: passend ? String(passend.id) : (faecher[0] ? String(faecher[0].id) : ""),
+          aufgaben, fehler, gespeichert: false,
+        };
+      });
+    } catch (e) {
+      lh.paket = null;
+      renderLernhilfe();
+      hinweisZeigen(e.message);
+      return;
+    }
+    renderLernhilfe();
+    document.getElementById("lh-paket-vorschau")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+
+  function lhPaketVorschauHtml() {
+    const faecher = lhFaecherSortiert(false);
+    const ok = lh.paket.filter((u) => !u.fehler.length && !u.gespeichert).length;
+    const karten = lh.paket.map((u, k) => {
+      const fachOpt = faecher.map((f) => `<option value="${escapeAttr(String(f.id))}"${String(f.id) === u.fach_id ? " selected" : ""}>${escapeHtml(f.symbol)} ${escapeHtml(f.name)}</option>`).join("");
+      const typen = LH_TYP_REIHE.map((t) => [t, u.aufgaben.filter((a) => a.typ === t).length]).filter(([, n]) => n).map(([t, n]) => `${n}× ${LH_TYPEN[t].name}`).join(", ");
+      return `<article class="lh-uebung">
+        <div class="lh-uebung-kopf"><div class="lh-uebung-text">
+          <strong>${escapeHtml(u.titel || "(ohne Titel)")}</strong>
+          <span class="notiz-meta">${[u.thema ? escapeHtml(u.thema) : "", `${u.aufgaben.length} Aufgaben`, typen].filter(Boolean).join(" · ")}${u.fachName && !faecher.some((f) => f.name.toLowerCase() === u.fachName.toLowerCase()) ? ` · Fach „${escapeHtml(u.fachName)}“ gibt es nicht – bitte wählen` : ""}</span>
+        </div></div>
+        <label class="blatt-feld"><span class="schnell-label blatt-label">Fach</span>
+          <select onchange="lhPaketFach(${k}, this.value)">${fachOpt}</select></label>
+        <details class="lh-vorschau"><summary>Aufgaben ansehen</summary>${u.aufgaben.map((a, i) => `<div class="lh-paket-aufgabe"><span class="notiz-meta">${i + 1}. ${LH_TYPEN[a.typ].name}</span>${lhVorschauHtml(a)}</div>`).join("")}</details>
+        ${u.fehler.length ? `<div class="kz-warnung">${ic("warnung")}<span>${u.fehler.slice(0, 5).map(escapeHtml).join("<br>")}${u.fehler.length > 5 ? `<br>… und ${u.fehler.length - 5} weitere` : ""}</span></div>` : ""}
+        <div class="reiter-aktionen bib-aktionen">
+          ${u.gespeichert ? `<span class="push-an">${ic("ok-kreis")} gespeichert</span>` : `<button type="button" class="btn-secondary" onclick="lhPaketInsFormular(${k})">${ic("stift")}Im Formular öffnen</button>`}
+        </div>
+      </article>`;
+    }).join("");
+    return `<section class="kz-ta-vorschau" id="lh-paket-vorschau">
+      <h3 class="std-zwischen">Vorschau: ${lh.paket.length} ${lh.paket.length === 1 ? "Übung" : "Übungen"}</h3>
+      ${karten}
+      ${ok ? `<button type="button" class="btn-primary" id="lh-paket-speichern" onclick="lhPaketSpeichern()">${ic("ok-kreis")}${ok === 1 ? "Übung" : `${ok} Übungen`} speichern</button>` : ""}
+      <p class="notiz-meta">Übungen mit Hinweisen bitte im Formular nacharbeiten oder Claude um Korrektur bitten. Freigeben kannst du danach in der Übersicht.</p>
+    </section>`;
+  }
+  window.lhPaketFach = function(k, id) { if (lh.paket && lh.paket[k]) lh.paket[k].fach_id = id; };
+  window.lhPaketInsFormular = function(k) {
+    const u = lh.paket && lh.paket[k];
+    if (!u) return;
+    window.lhNeueUebung({ fach_id: u.fach_id, titel: u.titel, thema: u.thema, einleitung: u.einleitung, aufgaben: u.aufgaben.map(lhAufgabeBereinigt), quelle: "paket" });
+  };
+  window.lhPaketSpeichern = async function() {
+    if (!lh.paket || lh.speichert) return;
+    lh.speichert = true;
+    const knopf = document.getElementById("lh-paket-speichern");
+    if (knopf) knopf.disabled = true;
+    let ok = 0;
+    const fehler = [];
+    for (const u of lh.paket) {
+      if (u.fehler.length || u.gespeichert) continue;
+      try {
+        await api("lern_uebung_speichern", { fach_id: u.fach_id, titel: u.titel, thema: u.thema, einleitung: u.einleitung, quelle: "paket", aufgaben: u.aufgaben.map(lhAufgabeBereinigt) });
+        u.gespeichert = true; ok++;
+      } catch (e) {
+        if (e.message === "unauthorized") { lh.speichert = false; return; }
+        u.fehler.push(e.message || "Fehler");
+        fehler.push(u.titel);
+      }
+    }
+    lh.speichert = false;
+    await window.lhNeuLaden();
+    if (!fehler.length) {
+      hinweisZeigen(`${ok} ${ok === 1 ? "Übung" : "Übungen"} gespeichert – jetzt beim Kind freigeben`);
+      lh.paket = null; lh.paketText = ""; lh.wunsch = "";
+      lh.ansicht = "liste";
+    } else {
+      hinweisZeigen(`${ok} gespeichert, ${fehler.length} nicht – siehe Hinweise`);
+    }
+    renderLernhilfe();
+  };
+
+  // ==========================================================
+  // Bearbeiten-Blätter: Kind und Fach
+  // ==========================================================
+  BLATT_ARTEN.lhkind = {
+    titel: "Kind bearbeiten",
+    titelNeu: "Neues Kind",
+    finden: (id) => lhKind(id),
+    laden: (k) => ({ id: k.id || "", pseudonym: k.pseudonym || "", symbol: k.symbol || LH_KIND_SYMBOLE[0] }),
+    felder: [
+      { key: "pseudonym", label: "Pseudonym", typ: "text", pflicht: true, platzhalter: "z. B. Fuchs",
+        hinweis: "Kein echter Name. Das Kind sieht ihn auf seiner Seite." },
+      { key: "symbol", label: "Symbol", typ: "chips", optionen: LH_KIND_SYMBOLE.map((s) => [s, s]) },
+    ],
+    speichern: (id, w) => api("lern_kind_speichern", { id: id || undefined, pseudonym: w.pseudonym, symbol: w.symbol }),
+    loeschen: (id) => api("lern_kind_loeschen", { id }),
+    loeschText: "Kind mit allen Ergebnissen löschen",
+    loeschFrage: (k) => `${k.pseudonym || "Kind"} wirklich löschen?\n\nGelöscht werden auch alle Freigaben und ALLE Ergebnisse dieses Kindes – endgültig. Der QR-Code funktioniert danach nicht mehr.\n\nVorher exportieren, falls du etwas aufheben musst.`,
+    gespeichert: "Gespeichert",
+    geloescht: "Kind und alle Ergebnisse gelöscht",
+    danach: () => { window.lhNeuLaden(); },
+  };
+  BLATT_ARTEN.lhfach = {
+    titel: "Fach bearbeiten",
+    titelNeu: "Neues Fach",
+    finden: (id) => lhFach(id),
+    laden: (f) => ({ id: f.id || "", name: f.name || "", symbol: f.symbol || LH_FACH_SYMBOLE[0], farbe: f.farbe || "blau", archiviert: f.archiviert ? "ja" : "nein" }),
+    felder: [
+      { key: "name", label: "Name", typ: "text", pflicht: true, platzhalter: "z. B. Sachunterricht" },
+      { key: "symbol", label: "Symbol", typ: "chips", optionen: LH_FACH_SYMBOLE.map((s) => [s, s]) },
+      { key: "farbe", label: "Farbe", typ: "chips", optionen: Object.entries(LH_FARBEN).map(([k, [n]]) => [k, n]) },
+      { key: "archiviert", label: "Archiviert", typ: "chips", optionen: [["nein", "Nein"], ["ja", "Ja – beim Kind ausblenden"]], wenn: (w) => !!w.id },
+    ],
+    speichern: (id, w) => api("lern_fach_speichern", { id: id || undefined, name: w.name, symbol: w.symbol, farbe: w.farbe, archiviert: w.archiviert === "ja" }),
+    loeschen: (id) => api("lern_fach_loeschen", { id }),
+    loeschFrage: (f) => `Fach „${f.name || ""}“ löschen? Geht nur, wenn es keine Übungen hat – sonst archivieren.`,
+    gespeichert: "Fach gespeichert",
+    danach: () => { window.lhNeuLaden(); },
+  };

@@ -11,6 +11,7 @@
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <link rel="stylesheet" href="style.css?v=80">
+<link rel="stylesheet" href="lernhilfe.css?v=81">
 </head>
 <body>
   <!-- Linien-Icons (seit Session 35, Icons Etappe A). Eigene Zeichnungen, 24er-Raster,
@@ -1048,6 +1049,28 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
+            <summary>Lernhilfe <span class="anleitung-nur">(seit Session 80/81; nur Privat, unter „Sammeln“)</span></summary>
+            <div class="anleitung-text">
+              <p>Übungen für ein Kind, das von zu Hause auf einer eigenen Seite übt (Kinderseite ab Etappe 3). Läuft privat; echte Nutzung erst nach schriftlicher Einwilligung beider Sorgeberechtigten.</p>
+              <ul>
+                <li><strong>Kind anlegen:</strong> „+ Kind“, nur ein Pseudonym (z. B. „Fuchs“) und ein Symbol – kein echter Name, keine Schule, nichts zum Förderbedarf</li>
+                <li><strong>QR-Code:</strong> erstellt den Zugang. Auf dem Gerät des Kindes scannen oder den Link öffnen – das Gerät merkt sich den Zugang. Der Code wird <em>nur einmal</em> angezeigt; gespeichert ist nur ein Prüfwert (Hash). Ein neuer Code macht den alten sofort ungültig. „Sperren“ hält den Zugang an, „Freigeben“ lässt denselben Code wieder zu. Der Schlüssel steht im Link hinter „#“ und geht deshalb nicht an den Webserver. Nicht in Gruppen-Chats teilen</li>
+                <li><strong>Fächer:</strong> Deutsch, Mathe, Englisch sind angelegt; unten „Fächer verwalten“ für weitere (Name, Symbol, Farbe). Fächer mit Übungen lassen sich nur archivieren</li>
+                <li><strong>Übung anlegen:</strong> „+ Übung“ – Fach, Titel, optional Thema und Einleitung, dann Aufgaben (höchstens 30). Je Aufgabe: Art, Aufgabenstellung, optional Emoji, Bild (wird verkleinert, Ortsdaten fallen weg) und eine Erklärung, die nach der Antwort erscheint. „Vorschau“ zeigt ungefähr, was das Kind sieht. Pfeile ändern die Reihenfolge, das Kopier-Symbol verdoppelt eine Aufgabe</li>
+                <li><strong>Auswahl:</strong> 2–4 Antworten, Kreis = richtig. Das Kind bekommt sie gemischt</li>
+                <li><strong>Lücken:</strong> Lösung in doppelte geschweifte Klammern, z. B. <code>7 · 8 = {{56}}</code> oder <code>Der {{Hund}} bellt.</code> Mehrere richtige Antworten mit |: <code>{{Hund|Dackel}}</code>. Wort markieren und „Lücke einfügen“ macht es zur Lücke. Leerzeichen sind egal, Zahlen mit Komma oder Punkt gleich (7,5 = 7.5); Groß-/Kleinschreibung zählt, außer der Haken ist aus</li>
+                <li><strong>Zuordnen:</strong> 2–6 Paare; links bleibt stehen, rechts wird gemischt</li>
+                <li><strong>Sortieren:</strong> 2–8 Teile in der richtigen Reihenfolge eintragen; das Kind bekommt sie gemischt. Gleiche Wörter dürfen vorkommen</li>
+                <li><strong>Mit Claude erstellen:</strong> Wunsch und Fach eintragen, „Für Claude kopieren“, im Claude-Chat einfügen. Claudes Antwort (JSON, gern mit Text drumherum) hier einfügen oder als Datei wählen, „Prüfen“. Die Vorschau zeigt jede Übung mit Hinweisen; „speichern“ übernimmt alle fehlerfreien, „Im Formular öffnen“ zum Nacharbeiten. Über das Kind geht nichts an Claude</li>
+                <li><strong>Freigeben:</strong> unter jeder Übung den Namen des Kindes antippen – erst dann sieht es die Übung. Optional „fällig“. Nochmal antippen nimmt die Freigabe zurück. Bei freigegebenen Übungen steht „neu“ oder die besten Sterne und wie oft gemacht</li>
+                <li><strong>Ändern und löschen:</strong> Übung antippen. Ergebnisse bleiben, auch wenn du die Übung später änderst oder löschst – jeder Durchgang speichert eine Kopie der Aufgaben. „Archiviert“ blendet sie beim Kind aus</li>
+                <li><strong>Kind löschen</strong> (Bearbeiten-Blatt): löscht auch alle Freigaben und Ergebnisse – so ist alles weg, wenn die Begleitung endet</li>
+                <li>Bewusst <em>nicht</em> im Komplett-Backup, damit beim Löschen nichts in alten Sicherungen übrig bleibt</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
             <summary>Zähler <span class="anleitung-nur">(seit Session 66–69; nur Privat, unter „Planen“)</span></summary>
             <div class="anleitung-text">
               <p>Zählerstände für Strom-Bezug, Strom-Einspeisung, PV-Erzeugung und Wasser erfassen. Die App rechnet daraus den Verbrauch zwischen zwei Ablesungen – die Abstände dürfen unregelmäßig sein.</p>
@@ -1782,6 +1805,12 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <div id="zaehler-inhalt"></div>
       </div>
 
+      <div id="view-lernhilfe" class="hidden">
+        <h1>Lernhilfe <button class="hilfe-icon" data-hilfe="Übungen für ein Kind, das von zu Hause übt – nur Privat. Oben die Kinder: nur ein Pseudonym, kein echter Name. „QR-Code“ erstellt den Zugang für das Gerät des Kindes; er wird nur einmal angezeigt, ein neuer macht den alten ungültig, „Sperren“ hält ihn an. Darunter die Übungen je Fach: „+ Übung“ öffnet das Formular mit vier Arten (Auswahl, Lücken, Zuordnen, Sortieren), Emoji oder Bild, Erklärung und Vorschau. „Mit Claude erstellen“: Wunsch eintragen, „Für Claude kopieren“, im Claude-Chat einfügen, die Antwort hier einfügen und prüfen. Unter jeder Übung den Namen des Kindes antippen = freigeben (optional mit Fälligkeit); erst dann sieht das Kind die Übung. Ganz unten: Fächer verwalten.">?</button></h1>
+        <p class="hero-text">Übungen anlegen und freigeben – das Kind übt zu Hause mit eigenem Zugang.</p>
+        <div id="lernhilfe-inhalt"></div>
+      </div>
+
       <div id="view-kommando" class="hidden">
         <h1>Kommandozentrale <button class="hilfe-icon" data-hilfe="Alle Projekte und Aufgaben aller Lebensbereiche an einem Ort – in jedem App-Bereich dieselben Daten. Oben „Schnell notieren“: tippen oder diktieren, Enter – landet im Eingang. Einen Eingang-Eintrag antippen, um ihn einem Bereich (und optional Projekt) zuzuordnen. Darunter die Bereiche, aufklappbar: Projekte nach Status (aktiv, wartet, Hintergrund, Idee), je Projekt der nächste Schritt, das Zieldatum und die offenen Aufgaben. Aktive Projekte ohne nächsten Schritt sind rot. Kreis = erledigt, Stern ☆ = in die Top 3 für heute (höchstens 3), Antippen = bearbeiten (Status „wartet“ mit „wartet auf“ und Wiedervorlage, Fälligkeit). Oben umschalten: „Heute“ zeigt „Gestern nicht geschafft – behalten oder zurücklegen?“, die Top 3, Überfälliges, heute Fälliges und Wartendes; „Alle Projekte“ die Bereiche. Unten „Bereiche verwalten“: Reihenfolge, dienstlich, archivieren.">?</button></h1>
         <p class="hero-text">Alles Offene aus allen Bereichen – Projekte mit nächstem Schritt, Aufgaben und ein Eingang für schnelle Gedanken.</p>
@@ -2158,6 +2187,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
     </dialog>
   </div>
 
-<script src="app.js?v=80"></script>
+<script src="qrcode.js?v=1"></script>
+<script src="app.js?v=81"></script>
 </body>
 </html>

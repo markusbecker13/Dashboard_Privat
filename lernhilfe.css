@@ -1,0 +1,157 @@
+/* ==========================================================
+   Lernhilfe (seit Session 81, Lernbereich Etappe 2) – Reiter in Privat.
+   Eigene Datei, damit style.css unverändert bleibt. Präfix lh-
+   (nicht lern-: das ist der EP-Fragenkatalog).
+   ========================================================== */
+
+/* Kinder */
+.lh-kinder { margin: 0 0 1.2rem; }
+.lh-kind {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 0.8rem;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-karte);
+  padding: 0.75rem 0.9rem; margin: 0 0 0.6rem;
+}
+.lh-kind-symbol { font-size: 2rem; line-height: 1; flex: none; }
+.lh-kind-info { flex: 1 1 12rem; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.lh-kind-info strong { font-family: var(--font-display); font-size: 1.1rem; overflow-wrap: anywhere; }
+.lh-kind-info .notiz-meta { margin: 0; }
+.lh-kind-knoepfe { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.lh-kind-knoepfe .btn-secondary { min-height: 44px; display: inline-flex; align-items: center; gap: 0.3rem; }
+.lh-kind-knoepfe .task-edit-btn { min-width: 44px; min-height: 44px; }
+.lh-rot { color: var(--overdue-text); font-weight: 600; }
+.lh-rot .ic { vertical-align: -0.15em; }
+
+/* Übungen */
+.lh-fachfilter { margin: 0 0 0.8rem; }
+.lh-fach-titel {
+  display: flex; align-items: center; gap: 0.4rem; margin: 1rem 0 0.5rem;
+  font-family: var(--font-display); font-size: 1rem; padding-left: 0.6rem;
+  border-left: 4px solid var(--lh-farbe, var(--accent));
+}
+.lh-uebung-liste { display: flex; flex-direction: column; gap: 0.5rem; }
+.lh-uebung {
+  background: var(--panel); border: 1px solid var(--border); border-left: 5px solid var(--lh-farbe, var(--accent));
+  border-radius: var(--r-mittel); padding: 0.55rem 0.7rem;
+}
+.lh-uebung-kopf { display: flex; align-items: center; gap: 0.55rem; }
+.lh-fach-symbol { font-size: 1.5rem; line-height: 1; flex: none; }
+.lh-uebung-text {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem;
+  background: none; border: none; padding: 0.2rem 0; text-align: left; font: inherit; color: var(--ink); cursor: pointer; min-height: 44px;
+}
+.lh-uebung-text strong { font-size: 0.98rem; overflow-wrap: anywhere; }
+.lh-uebung-text .notiz-meta { margin: 0; }
+.lh-uebung-text:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: var(--r-klein); }
+.lh-uebung .task-edit-btn { min-width: 44px; min-height: 44px; }
+.lh-freigaben { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.45rem; padding-top: 0.45rem; border-top: 1px dashed var(--border); }
+.lh-freigabe-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+.lh-freigabe-zeile .schnell-chip { min-height: 2.5rem; font-size: 0.85rem; }
+.lh-faellig { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: var(--ink-dim); }
+.lh-faellig input { min-height: 2.5rem; padding: 0.35rem 0.5rem; width: auto; }
+.lh-stand { font-size: 0.82rem; color: var(--ink-dim); white-space: nowrap; }
+.lh-farbpunkt { width: 0.8rem; height: 0.8rem; border-radius: 50%; flex: none; margin-right: 0.35rem; }
+
+/* Formular */
+.lh-editor-titel { font-family: var(--font-display); font-size: 1.35rem; margin: 0 0 0.3rem; }
+.lh-aufgabe {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-karte);
+  padding: 0.75rem 0.85rem 0.5rem; margin: 0 0 0.8rem; scroll-margin-top: 5rem;
+}
+.lh-aufgabe-kopf { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.lh-aufgabe-kopf strong { font-family: var(--font-display); font-size: 1rem; }
+.lh-aufgabe-knoepfe { display: inline-flex; align-items: center; gap: 0.1rem; }
+.lh-aufgabe-knoepfe button { min-width: 40px; min-height: 40px; opacity: 0.85; font-size: 1.05rem; }
+.lh-aufgabe-knoepfe button:disabled { opacity: 0.25; cursor: default; }
+.lh-typwahl { margin: 0.5rem 0 0.1rem; }
+.lh-typwahl .schnell-chip { min-height: 2.4rem; padding: 0 0.75rem; font-size: 0.85rem; }
+.lh-zeile { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.4rem 0.9rem; }
+.lh-emoji-feld { display: flex; flex-direction: column; flex: none; }
+.lh-emoji-feld .blatt-label, .lh-bild-feld .blatt-label { margin: 0.8rem 0 0.35rem; }
+input.lh-emoji { flex: none; width: 4.2rem; min-height: 2.75rem; text-align: center; font-size: 1.2rem; padding: 0.4rem; }
+.lh-bild-feld { display: flex; flex-direction: column; flex: 1 1 12rem; min-width: 0; }
+.lh-bild-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; min-height: 2.75rem; }
+.lh-bild-klein { width: 3.2rem; height: 3.2rem; object-fit: cover; border-radius: var(--r-klein); border: 1px solid var(--border); }
+.lh-inhalt { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.2rem; }
+.lh-inhalt > .blatt-label { margin: 0.8rem 0 0.15rem; }
+.lh-inhalt > .link-btn { align-self: flex-start; min-height: 40px; display: inline-flex; align-items: center; }
+.lh-option, .lh-paar, .lh-teil { display: flex; align-items: center; gap: 0.4rem; }
+.lh-option input[type="text"]:not(.lh-emoji), .lh-paar input, .lh-teil input { flex: 1 1 auto; min-width: 0; min-height: 2.75rem; }
+.lh-option .task-delete, .lh-paar .task-delete, .lh-teil .task-delete, .lh-teil .task-edit-btn { min-width: 40px; min-height: 40px; }
+.lh-option .task-delete:disabled, .lh-paar .task-delete:disabled, .lh-teil .task-delete:disabled, .lh-teil .task-edit-btn:disabled { opacity: 0.25; cursor: default; }
+.lh-radio { width: 1.5rem; height: 1.5rem; flex: none; accent-color: var(--ok-stark); margin: 0 0.15rem; }
+.lh-paar > span { color: var(--ink-dim); flex: none; }
+.lh-teil-nr { flex: none; width: 1.6rem; text-align: right; font-weight: 700; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.lh-luecken-knoepfe { align-items: center; margin-top: 0.1rem; }
+.lh-luecken-knoepfe .btn-secondary { min-height: 40px; }
+.lh-fehler { min-height: 1.1em; color: var(--overdue-text); font-weight: 600; margin: 0.4rem 0 0; }
+.lh-fehler:empty { display: none; }
+.lh-vorschau { margin: 0.35rem 0 0.2rem; }
+.lh-vorschau > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; font-size: 0.85rem; color: var(--ink-dim); font-weight: 600; }
+.lh-neu-aufgabe { margin: 0.2rem 0 0.8rem; }
+.lh-neu-aufgabe .schnell-label { display: block; margin-top: 0.2rem; }
+.lh-neu-aufgabe .schnell-chip .ic { width: 1rem; height: 1rem; }
+.lh-editor-fuss { margin-top: 0.2rem; }
+.lh-editor-fuss .btn-primary { min-height: 48px; display: inline-flex; align-items: center; }
+.lh-editor-fuss .btn-secondary { min-height: 48px; }
+.lh-editor-fuss .link-btn { min-height: 44px; margin-left: auto; display: inline-flex; align-items: center; }
+
+/* Vorschau wie beim Kind: groß, ruhig, gut lesbar */
+.lh-kindvorschau {
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-mittel);
+  padding: 0.8rem 0.9rem; display: flex; flex-direction: column; gap: 0.6rem;
+}
+.lh-kv-frage { margin: 0; font-size: 1.2rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.lh-kv-emoji { font-size: 1.6rem; vertical-align: -0.15em; }
+.lh-kv-bild { max-width: 100%; max-height: 10rem; object-fit: contain; border-radius: var(--r-klein); align-self: flex-start; }
+.lh-kv-optionen { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.lh-kv-option {
+  display: inline-flex; align-items: center; gap: 0.3rem; min-height: 2.6rem; padding: 0.3rem 0.8rem;
+  border: 2px solid var(--border); border-radius: var(--r-mittel); background: var(--panel); font-size: 1.05rem; font-weight: 600;
+}
+.lh-kv-option.richtig { border-color: var(--ok-stark); background: var(--ok-bg); color: var(--ok-text); }
+.lh-kv-text { margin: 0; font-size: 1.15rem; line-height: 2.1; overflow-wrap: anywhere; }
+.lh-kv-luecke {
+  display: inline-block; min-width: 2.5rem; padding: 0 0.4rem; margin: 0 0.15rem; line-height: 1.6;
+  border-bottom: 3px solid var(--accent); color: var(--ok-text); font-weight: 700; text-align: center;
+}
+.lh-kv-paare { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.4rem; align-items: center; }
+.lh-kv-paare > span[aria-hidden] { color: var(--ink-dim); }
+.lh-kindvorschau .notiz-meta { margin: 0; }
+
+/* Claude-Paket */
+.lh-paket { display: flex; flex-direction: column; gap: 0.9rem; }
+.lh-paket .einheit-zurueck { align-self: flex-start; margin-bottom: 0; }
+.lh-schritte { margin: 0; padding-left: 1.3rem; line-height: 1.55; font-size: 0.92rem; }
+.lh-paket-aufgabe { margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.lh-paket .lh-uebung { border-left-color: var(--accent); }
+.lh-paket .kz-warnung { margin: 0.5rem 0 0; }
+#lh-paket-speichern { min-height: 48px; display: inline-flex; align-items: center; align-self: flex-start; }
+
+/* QR-Code */
+body.lh-qr-offen { overflow: hidden; }
+.lh-qr-overlay { z-index: 250; }
+.lh-qr-inhalt { max-width: 30rem; width: 100%; margin: 0 auto; }
+.lh-qr-bild {
+  width: min(78vw, 300px); align-self: center; background: #ffffff; padding: 0.4rem;
+  border-radius: var(--r-mittel); border: 1px solid var(--border);
+}
+.lh-qr-bild svg { display: block; width: 100%; height: auto; }
+.lh-qr-inhalt > p { margin: 0; line-height: 1.5; }
+.lh-qr-link > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--ink-dim); font-size: 0.88rem; }
+.lh-qr-knoepfe { margin: 0; }
+.lh-qr-knoepfe button { min-height: 48px; display: inline-flex; align-items: center; }
+/* Drucken: nur der QR-Code mit Überschrift und Hinweis */
+@media print {
+  body.lh-qr-offen > *:not(.lh-qr-overlay) { display: none !important; }
+  body.lh-qr-offen .lh-qr-overlay { position: static; background: #ffffff; color: #000000; }
+  body.lh-qr-offen .lh-qr-knoepfe, body.lh-qr-offen .lh-qr-link, body.lh-qr-offen .session-fokus-schliessen,
+  body.lh-qr-offen .lh-qr-inhalt > .notiz-meta { display: none !important; }
+  body.lh-qr-offen .lh-qr-bild { width: 7cm; border: none; }
+}
+
+@media (max-width: 400px) {
+  .lh-kind-knoepfe .btn-secondary { padding: 0.5rem 0.8rem; }
+  .lh-option { gap: 0.25rem; }
+  input.lh-emoji { width: 3.4rem; font-size: 1.05rem; }
+  .lh-kv-paare { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+}
