@@ -7792,6 +7792,7 @@
       ${unbekannt.length ? `<h2 class="std-zwischen">Sonstige</h2><div class="nf-liste nf-liste--karte">${unbekannt.map((p) => nfZeileHtml(p, false)).join("")}</div>` : ""}
       <div class="reiter-aktionen bib-aktionen">
         <button type="button" class="btn-secondary" onclick="blattNeu('nfpunkt', {})">${ic("plus")}Punkt</button>
+        <button type="button" class="btn-secondary" onclick="nfInKz()">In die Kommandozentrale eintragen</button>
         <button type="button" class="btn-secondary" onclick="nfDrucken('checkliste')">Checkliste drucken</button>
         <button type="button" class="btn-secondary" onclick="tabWechseln('verlauf')">Änderungen ansehen (Verlauf)</button>
       </div>
@@ -7817,6 +7818,19 @@
       nf.laufend.delete(String(p.id));
     }
     renderNotfallordner();
+  };
+
+  // Fristen und Jahresprüfung als Aufgaben in die Kommandozentrale (seit Session 88)
+  window.nfInKz = async function() {
+    try {
+      const r = await api("notfall_kz_eintragen", {});
+      if (r.hinweis) hinweisZeigen(r.hinweis);
+      else if (!r.angelegt) hinweisZeigen("Schon alles in der Kommandozentrale eingetragen");
+      else hinweisZeigen(`${r.angelegt} Aufgabe${r.angelegt === 1 ? "" : "n"} im Projekt „Notfallordner“ angelegt${r.uebersprungen ? `, ${r.uebersprungen} gab es schon` : ""}`);
+      kz.geladen = false;
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht eingetragen: " + (e.message || "Fehler"));
+    }
   };
 
   window.nfKapitelGeprueft = async function(k) {
