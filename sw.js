@@ -6,7 +6,7 @@
 // eine Kopie im Gerätespeicher ab (siehe app.js, „Notfallordner“).
 
 const CACHE = "dashboard-app-v1";
-const VORAB = ["index.html", "app.js?v=85", "style.css?v=82", "lernhilfe.css?v=84", "qrcode.js?v=1", "farbschema.js", "manifest.json", "icons/icon-192.png"];
+const VORAB = ["index.html", "app.js?v=86", "style.css?v=83", "lernhilfe.css?v=84", "qrcode.js?v=1", "farbschema.js", "manifest.json", "icons/icon-192.png"];
 // Nach so vielen Millisekunden ohne Antwort gilt die Zwischenkopie (nur wenn es eine gibt)
 const NETZ_GEDULD_MS = 5000;
 

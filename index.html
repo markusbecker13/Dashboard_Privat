@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="style.css?v=82">
+<link rel="stylesheet" href="style.css?v=83">
 <link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
@@ -1120,6 +1120,9 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Notfallkarte:</strong> Notrufnummern (112, 110, 116 117, 116 116, Telefonseelsorge) zum Antippen, Sofortmaßnahmen, Hinweis für Einsatzkräfte zur PV-Anlage, Standorte von Wasser, Gas, Strom, PV-Trennern, Heizungsnotaus. „+ Standort“ und „+ Nummer“ ergänzen eigene Einträge (z. B. Giftnotruf der zuständigen Zentrale – die trägst du selbst ein)</li>
                 <li><strong>Ohne Netz:</strong> Die Karte wird als Kopie im Gerätespeicher abgelegt (beim Öffnen des Reiters und beim App-Start, wenn die Kopie älter als 12 Stunden ist). Ist beim Start kein Netz da, zeigt die App statt des Logins diese Karte. Voraussetzung: einmal mit Netz angemeldet und der Reiter einmal geöffnet. Beim Abmelden wird die Kopie gelöscht. Seit Session 86 speichert der Service Worker außerdem die App-Dateien zwischen, damit die App ohne Netz überhaupt startet – nach dem Update die App zweimal mit Netz öffnen</li>
                 <li><strong>Änderungsprotokoll:</strong> Anlegen, Ändern und Löschen von Punkten und Karteneinträgen stehen im Verlauf (Kategorie „Notfallordner“). Das Weiterschalten des Status wird dort nicht einzeln eingetragen</li>
+                <li><strong>Erinnerung an Fristen</strong> (seit Session 87): ⋮ → „Benachrichtigungen &amp; Vorlesen“ → „Notfallordner: Fristen“ (vorher <code>notfall_push_setup.sql</code> ausführen). Meldet 14 und 3 Tage vorher, am Tag selbst und danach wöchentlich, solange eine Frist überschritten ist; am 1. des Monats außerdem Punkte, die länger als ein Jahr nicht geprüft wurden. Mit Morgen-Übersicht als Zeile darin, sonst als eigene Nachricht zur selben Uhrzeit. Bei „Nur Uhrzeit“ nur Zahlen. Bei „Bereiche“ muss Privat gewählt sein</li>
+                <li><strong>Shortcut „Notfallkarte“</strong> (seit Session 87): Langes Drücken auf das App-Symbol zeigt „Notfallkarte“ und öffnet direkt die Karte. Android übernimmt neue Shortcuts erst nach einiger Zeit; schneller geht es, die App einmal zu deinstallieren und neu zu installieren</li>
+                <li><strong>Drucken</strong> (seit Session 87): „Checkliste drucken“ (Überblick) und „Karte drucken“ (Notfallkarte) öffnen die Druckansicht des Browsers – Papier oder PDF. Gedacht als aktueller Einleger für den Ordner zu Hause; es steht nur drin, was auch in der App steht</li>
                 <li>Gesichert über Export → Backup wie alle anderen Daten</li>
               </ul>
             </div>
@@ -2223,6 +2226,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=85"></script>
+<script src="app.js?v=86"></script>
 </body>
 </html>

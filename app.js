@@ -7792,6 +7792,7 @@
       ${unbekannt.length ? `<h2 class="std-zwischen">Sonstige</h2><div class="nf-liste nf-liste--karte">${unbekannt.map((p) => nfZeileHtml(p, false)).join("")}</div>` : ""}
       <div class="reiter-aktionen bib-aktionen">
         <button type="button" class="btn-secondary" onclick="blattNeu('nfpunkt', {})">${ic("plus")}Punkt</button>
+        <button type="button" class="btn-secondary" onclick="nfDrucken('checkliste')">Checkliste drucken</button>
         <button type="button" class="btn-secondary" onclick="tabWechseln('verlauf')">Änderungen ansehen (Verlauf)</button>
       </div>
       ${nfHinweisBoxHtml()}`;
@@ -7885,11 +7886,50 @@
       <div class="reiter-aktionen bib-aktionen">
         <button type="button" class="btn-secondary" onclick="blattNeu('nfort', {})">${ic("plus")}Standort</button>
         <button type="button" class="btn-secondary" onclick="blattNeu('nfnummer', {})">${ic("plus")}Nummer</button>
+        <button type="button" class="btn-secondary" onclick="nfDrucken('karte')">Karte drucken</button>
       </div>
       <p class="notiz-meta nf-hinweis">${kopie
         ? `Kopie dieser Karte auf diesem Gerät: Stand ${escapeHtml(stand)}. Fällt das Netz aus, zeigt die App sie beim Start von selbst.`
         : "Auf diesem Gerät ist noch keine Kopie gespeichert."} Nur Orte und Notdienste eintragen, keine privaten Daten.</p>`;
   }
+
+  // ---- Drucken (seit Session 87): Checkliste bzw. Karte als Papier-Beilage für den Ordner ----
+  window.nfDrucken = function(was) {
+    const heute = datumDe(nfHeute());
+    let inhalt;
+    if (was === "karte") {
+      inhalt = `<h1>Notfallkarte</h1><p class="nf-druck-stand">Stand ${escapeHtml(heute)}</p>${nfKarteHtml(nf.karte, false)}`;
+    } else {
+      const kapitel = NF_KAPITEL.map(([k, name]) => {
+        const liste = nf.punkte.filter((p) => p.kapitel === k);
+        if (!liste.length) return "";
+        const zeilen = liste.map((p) => {
+          const s = NF_STATUS[p.status] || NF_STATUS.offen;
+          const box = p.status === "entfaellt" ? "–" : nfErledigt(p) ? "☑" : "☐";
+          const teile = [];
+          if (p.ort) teile.push(escapeHtml(p.ort));
+          if (p.geprueft_am && nfErledigt(p)) teile.push("geprüft " + datumDe(p.geprueft_am));
+          if (p.faellig_am) teile.push("Frist " + datumDe(p.faellig_am));
+          return `<tr><td class="nf-d-box">${box}</td><td>${escapeHtml(p.titel)}</td><td>${escapeHtml(s.label)}</td><td>${teile.join(" · ")}</td></tr>`;
+        }).join("");
+        return `<h2>${escapeHtml(name)}</h2><table class="nf-druck-tabelle">${zeilen}</table>`;
+      }).join("");
+      const z = nfZahlen(nf.punkte);
+      inhalt = `<h1>Notfallordner – Checkliste</h1><p class="nf-druck-stand">Stand ${escapeHtml(heute)} · ${z.fertig} von ${z.gesamt} Punkten erledigt</p>${kapitel}`;
+    }
+    const box = document.createElement("div");
+    box.id = "nf-druck";
+    box.innerHTML = inhalt;
+    document.body.appendChild(box);
+    document.body.classList.add("nf-druckt");
+    const aufraeumen = () => {
+      document.body.classList.remove("nf-druckt");
+      box.remove();
+      window.removeEventListener("afterprint", aufraeumen);
+    };
+    window.addEventListener("afterprint", aufraeumen);
+    setTimeout(() => window.print(), 50);
+  };
 
   // ---- Start ohne Netz: Notfallkarte aus der Kopie zeigen ----
   function nfIstNetzfehler(e) {
@@ -9971,6 +10011,8 @@
           }
           // „Schnell notieren“ (seit Session 74): gleich ins Eingabefeld
           if (gewuenschterTab === "kommando" && urlParams.get("fokus") === "schnell") { kz.fokusSchnell = true; kz.ansicht = "heute"; }
+          // „Notfallkarte“ (seit Session 87): direkt die Karte statt der Checkliste
+          if (gewuenschterTab === "notfallordner" && urlParams.get("ansicht") === "karte") nf.ansicht = "karte";
           tabWechseln(gewuenschterTab);
         }
         geteiltenInhaltVerarbeiten();
@@ -10245,6 +10287,7 @@
         ${pushGeburtstagHtml(e, chips)}
         ${pushZaehlerHtml(e, chips, bereiche)}
         ${pushLernHtml(e, bereiche)}
+        ${pushNotfallHtml(e, bereiche)}
         ${pushAwoHtml(e, chips, bereiche)}
         <label class="push-schalter"><input type="checkbox" id="push-termine"${e.termine_an ? " checked" : ""}> Vor Terminen und Aufgaben mit Uhrzeit</label>
         <div class="schnell-chips push-chips" role="group" aria-label="Vorlauf">${chips("vorlauf", PUSH_VORLAUF.map(([w, t]) => [String(w), t]), (w) => Number(w) === Number(e.vorlauf_min))}</div>
@@ -10277,6 +10320,8 @@
       if (kzAn) push.einst.kz_morgen = kzAn.checked;
       const lernAn = document.getElementById("push-lern");
       if (lernAn) push.einst.lern_an = lernAn.checked;
+      const nfAn = document.getElementById("push-notfall");
+      if (nfAn) push.einst.notfall_an = nfAn.checked;
       const sAn = document.getElementById("push-schluessel");
       if (sAn) push.einst.schluessel_an = sAn.checked;
       const vAn = document.getElementById("push-vermietung");
@@ -10290,7 +10335,7 @@
     };
     ["push-morgens", "push-morgens-zeit", "push-termine"].forEach((id) => document.getElementById(id).addEventListener("change", merk));
     // Geburtstage: Erklärung hängt an Morgen-Übersicht und Schalter
-    ["push-geburtstage", "push-zaehler", "push-schluessel", "push-vermietung", "push-morgens", "push-morgens-zeit", "push-kz", "push-lern"].forEach((id) => {
+    ["push-geburtstage", "push-zaehler", "push-schluessel", "push-vermietung", "push-morgens", "push-morgens-zeit", "push-kz", "push-lern", "push-notfall"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", () => { merk(); pushRendern(); });
     });
@@ -10423,6 +10468,18 @@
         : "Aus."}</p>`;
   }
 
+  // ---- Notfallordner: Fristen (seit Session 87) ----
+  function pushNotfallHtml(e, bereiche) {
+    if (!Object.prototype.hasOwnProperty.call(e, "notfall_an")) {
+      return `<p class="notiz-meta push-erklaerung">Für Notfallordner-Erinnerungen bitte zuerst <code>notfall_push_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    const ohnePrivat = !bereiche.includes("privat");
+    return `<label class="push-schalter"><input type="checkbox" id="push-notfall"${e.notfall_an ? " checked" : ""}> Notfallordner: Fristen</label>
+      <p class="notiz-meta push-erklaerung">${e.notfall_an
+        ? `Erinnert an Fristen aus dem Notfallordner: 14 und 3 Tage vorher, am Tag selbst, danach wöchentlich, solange überschritten – und am 1. des Monats an Punkte, die länger als ein Jahr nicht geprüft wurden. ${e.morgens_an ? "Als Zeile in der Morgen-Übersicht." : "Als eigene Nachricht zur Uhrzeit der Morgen-Übersicht."} Antippen öffnet den Notfallordner.${ohnePrivat ? " <strong>Dafür unten bei „Bereiche“ auch Privat wählen.</strong>" : ""}`
+        : "Aus."}</p>`;
+  }
+
   // ---- Zähler ablesen (seit Session 69) ----
   const PUSH_ZAEHLER_TAG = [[1, "am 1."], [5, "am 5."], [15, "am 15."], [28, "am 28."]];
   function pushZaehlerHtml(e, chips, bereiche) {
@@ -10521,6 +10578,8 @@
         ...(Object.prototype.hasOwnProperty.call(e, "kz_morgen") ? { kz_morgen: !!e.kz_morgen } : {}),
         // Lernhilfe-Ergebnisse (seit Session 83) nur, wenn der Server sie kennt
         ...(Object.prototype.hasOwnProperty.call(e, "lern_an") ? { lern_an: !!e.lern_an } : {}),
+        // Notfallordner-Fristen (seit Session 87) nur, wenn der Server sie kennt
+        ...(Object.prototype.hasOwnProperty.call(e, "notfall_an") ? { notfall_an: !!e.notfall_an } : {}),
         // Zähler-Erinnerung (seit Session 69) nur, wenn der Server sie kennt
         ...(Object.prototype.hasOwnProperty.call(e, "zaehler_an")
           ? { zaehler_an: !!e.zaehler_an, zaehler_tag: Number(e.zaehler_tag) || 1 } : {}),

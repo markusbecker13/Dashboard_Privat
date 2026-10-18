@@ -2528,3 +2528,21 @@ button.nf-ort { cursor: pointer; }
 .nf-offline-innen { max-width: 40rem; margin: 0 auto; padding-bottom: 2rem; }
 .nf-offline h1 { font-family: var(--font-display); margin: 0.4rem 0 0.6rem; }
 .nf-offline-hinweis { border: 1px solid var(--today-border); background: var(--today-bg); color: var(--today-text); border-radius: 12px; padding: 0.6rem 0.8rem; margin: 0 0 1rem; font-weight: 600; }
+
+/* Notfallordner drucken (seit Session 87): nur #nf-druck kommt aufs Papier */
+#nf-druck { display: none; }
+@media print {
+  body.nf-druckt > *:not(#nf-druck) { display: none !important; }
+  body.nf-druckt #nf-druck { display: block; color: #000; background: #fff; font-family: var(--font-text, sans-serif); font-size: 11pt; }
+  #nf-druck h1 { font-size: 18pt; margin: 0 0 0.2rem; }
+  #nf-druck h2 { font-size: 13pt; margin: 1rem 0 0.3rem; break-after: avoid; }
+  .nf-druck-stand { margin: 0 0 0.8rem; color: #444; }
+  .nf-druck-tabelle { width: 100%; border-collapse: collapse; }
+  .nf-druck-tabelle td { padding: 0.25rem 0.4rem; border-bottom: 1px solid #bbb; vertical-align: top; }
+  .nf-druck-tabelle tr { break-inside: avoid; }
+  .nf-d-box { width: 1.6rem; font-size: 13pt; }
+  #nf-druck .nf-nummern { display: block; }
+  #nf-druck .nf-nummern li { margin: 0 0 0.3rem; }
+  #nf-druck .nf-tel, #nf-druck .nf-pv { border: 1px solid #000; background: #fff; color: #000; }
+  #nf-druck .nf-ort { border-top: 1px solid #bbb; }
+}

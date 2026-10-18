@@ -36,6 +36,12 @@
       "short_name": "Zähler",
       "url": "./index.html?tab=zaehler",
       "description": "Strom- und Wasserzähler ablesen"
+    },
+    {
+      "name": "Notfallkarte",
+      "short_name": "Notfall",
+      "url": "./index.html?tab=notfallordner&ansicht=karte",
+      "description": "Notrufnummern, Sofortmaßnahmen und Absperrstellen"
     }
   ],
   "share_target": {
