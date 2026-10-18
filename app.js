@@ -122,7 +122,7 @@
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
     rezepte: "view-rezepte", ernaehrung: "view-ernaehrung", schluessel: "view-schluessel",
     bibliothek: "view-bibliothek", lernen: "view-lernen", stunden: "view-stunden", zaehler: "view-zaehler",
-    kommando: "view-kommando", lernhilfe: "view-lernhilfe",
+    kommando: "view-kommando", lernhilfe: "view-lernhilfe", notfallordner: "view-notfallordner",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -137,11 +137,11 @@
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
     ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"], ["bibliothek", "Bibliothek"], ["lernen", "Lernen"],
     ["stunden", "Stunden"], ["zaehler", "Zähler"], ["kommando", "Kommandozentrale"],
-    ["lernhilfe", "Lernhilfe"],
+    ["lernhilfe", "Lernhilfe"], ["notfallordner", "Notfallordner"],
   ];
   // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
-  const NUR_PRIVAT_REITER = ["ernaehrung", "zaehler", "lernhilfe"]; // Zähler seit Session 66 (Haushaltsdaten), Lernhilfe seit Session 81 (privat, Kinddaten)
+  const NUR_PRIVAT_REITER = ["ernaehrung", "zaehler", "lernhilfe", "notfallordner"]; // Zähler seit Session 66 (Haushaltsdaten), Lernhilfe seit Session 81 (privat, Kinddaten)
   // Reiter nur für EP (seit Session 50): Bibliothek der Ausbildungsunterlagen,
   // seit Session 52 dazu Lernen (Fragenkatalog)
   const NUR_EP_REITER = ["bibliothek", "lernen"];
@@ -158,7 +158,7 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden", "zaehler", "kommando", "lernhilfe"],
+      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden", "zaehler", "kommando", "lernhilfe", "notfallordner"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
       "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten", "stunden", "kommando"],
     awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel", "stunden", "kommando"],
@@ -186,7 +186,7 @@
     // In EP (seit Session 49) stehen Methoden/Weiterbildung, Spiele und
     // Einheiten in der eigenen Gruppe „EP“ statt unter „Sammeln“
     const epTabs = aktiverBereich === "ep" ? ["bibliothek", "lernen", "methoden", "spiele", "einheiten"] : [];
-    const sammeln = ["notizen", "links", "reflexion", "spiele", "methoden", "einheiten", "einkauf", "rezepte", "training", "ernaehrung", "lernhilfe"]
+    const sammeln = ["notizen", "links", "reflexion", "spiele", "methoden", "einheiten", "einkauf", "rezepte", "training", "ernaehrung", "lernhilfe", "notfallordner"]
       .filter((k) => !epTabs.includes(k));
     return [
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
@@ -7571,6 +7571,413 @@
     danach: () => { zlNeuLaden(); },
   };
 
+  // ==========================================================
+  // Notfallordner (seit Session 86, Etappe 1): Checkliste zum analogen
+  // Notfallordner (Status, grober Ort, Prüfdatum, Frist) und Notfallkarte
+  // (Standorte von Absperr-/Schaltstellen, eigene Nummern). Die Karte liegt
+  // zusätzlich als Kopie im Gerätespeicher und erscheint beim Start ohne
+  // Netz. Bewusst nur HINWEISE, wo etwas liegt – keine Inhalte. Nur Privat.
+  // Tabellen: notfall_punkte, notfall_karte – geladen erst beim Öffnen.
+  // ==========================================================
+  const NF_KOPIE_SCHLUESSEL = "notfall-karte-kopie";
+  const NF_ANSICHT_SCHLUESSEL = "notfall-ansicht";
+  const NF_KAPITEL = [
+    ["ordner", "Der Ordner selbst"], ["dokumente", "Wichtige Dokumente"], ["kontakte", "Kontakte und persönliche Daten"],
+    ["gesundheit", "Gesundheit"], ["familie", "Familie, Kinder und Tiere"], ["finanzen", "Finanzüberblick"],
+    ["wohnen", "Wohnen und Haus"], ["fahrzeuge", "Fahrzeuge und Mobilität"], ["beruf", "Beruf, Ehrenämter, Gewerbe"],
+    ["digitales", "Digitales und Zugänge"], ["vorsorge", "Vorsorge"], ["vorrat", "Notfallvorsorge zu Hause"],
+  ];
+  const NF_STATUS = {
+    offen: { label: "Offen" }, ausgefuellt: { label: "Ausgefüllt" }, aktuell: { label: "Aktuell" }, entfaellt: { label: "Entfällt" },
+  };
+  // Antippen schaltet weiter; „Entfällt“ gibt es nur im Bearbeiten-Blatt
+  const NF_WEITER = { offen: "ausgefuellt", ausgefuellt: "aktuell", aktuell: "offen", entfaellt: "offen" };
+  // Feste Notrufnummern (aus dem Ordner): Name, Anzeige, Wählziel
+  const NF_NUMMERN = [
+    ["Feuerwehr / Rettungsdienst", "112", "112"],
+    ["Polizei", "110", "110"],
+    ["Ärztlicher Bereitschaftsdienst", "116 117", "116117"],
+    ["Sperr-Notruf (Karten, Online-Zugänge)", "116 116", "116116"],
+    ["Telefonseelsorge", "0800 111 0 111", "08001110111"],
+  ];
+  const NF_SOFORT = [
+    "Eigene Sicherheit prüfen, Gefahrenstelle sichern.",
+    "Notruf 112: Wo? Was ist passiert? Wie viele Betroffene? Welche Verletzungen? Auf Rückfragen warten.",
+    "Erste Hilfe leisten, bis die Rettungskräfte eintreffen.",
+    "Bei Brand: Menschen retten, Tür schließen, Haus verlassen, 112 anrufen, erst dann löschen, wenn es ungefährlich ist.",
+    "Bei Stromausfall: Kerzen vermeiden, Taschenlampen nutzen, Kühlschrank geschlossen halten, Nachbarn prüfen.",
+    "Bei Hochwasser oder Starkregen: Strom im Keller abschalten lassen, Wertsachen nach oben bringen, Warnmeldungen beachten.",
+  ];
+  const nf = {
+    geladen: false, laedt: false, fehlt: false, fehler: "",
+    punkte: [], karte: [], heute: null,
+    ansicht: "ueberblick",     // "ueberblick" | "karte"
+    offen: new Set(),          // aufgeklappte Kapitel (bleibt beim Neuzeichnen)
+    laufend: new Set(),        // Punkte, deren Status gerade gespeichert wird
+  };
+  try { if (localStorage.getItem(NF_ANSICHT_SCHLUESSEL) === "karte") nf.ansicht = "karte"; } catch (_e) { /* egal */ }
+
+  async function nfLaden() {
+    if (nf.laedt) return;
+    nf.laedt = true; nf.fehler = "";
+    if (aktiverTab === "notfallordner") renderNotfallordner();
+    try {
+      const r = await api("notfall_laden");
+      nf.fehlt = !!r.fehlt;
+      nf.punkte = r.punkte || [];
+      nf.karte = r.karte || [];
+      nf.heute = r.heute || null;
+      nf.geladen = true;
+      if (!nf.fehlt) nfKopieSpeichern();
+    } catch (e) {
+      if (e.message !== "unauthorized") nf.fehler = e.message || "Fehler";
+    } finally {
+      nf.laedt = false;
+    }
+    if (aktiverTab === "notfallordner") renderNotfallordner();
+  }
+  window.nfNeuLaden = function() { nf.geladen = false; nf.fehler = ""; nfLaden(); };
+
+  // ---- Kopie der Notfallkarte auf dem Gerät (für den Start ohne Netz) ----
+  function nfKopieSpeichern() {
+    try {
+      localStorage.setItem(NF_KOPIE_SCHLUESSEL, JSON.stringify({
+        stand: new Date().toISOString(),
+        karte: nf.karte.map((k) => ({ gruppe: k.gruppe, was: k.was, wert: k.wert || "", sortierung: Number(k.sortierung) || 0 })),
+      }));
+    } catch (_e) { /* Speicher gesperrt oder voll – dann gibt es keine Offline-Kopie */ }
+  }
+  function nfKopieLesen() {
+    try {
+      const t = localStorage.getItem(NF_KOPIE_SCHLUESSEL);
+      const o = t ? JSON.parse(t) : null;
+      return o && Array.isArray(o.karte) ? o : null;
+    } catch (_e) { return null; }
+  }
+  function nfKopieLoeschen() { try { localStorage.removeItem(NF_KOPIE_SCHLUESSEL); } catch (_e) { /* egal */ } }
+  function nfStandText(iso) {
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? "" : d.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+  }
+  // Beim App-Start still auffrischen, wenn die Kopie älter als 12 Stunden ist (oder fehlt)
+  function nfKopieAuffrischen() {
+    if (!reiterIstSichtbar("privat", "notfallordner")) return;
+    const k = nfKopieLesen();
+    if (k && Date.now() - Date.parse(k.stand) < 12 * 3600 * 1000) return;
+    if (!nf.geladen && !nf.laedt) nfLaden();
+  }
+
+  // ---- Rechnen ----
+  function nfHeute() { return nf.heute || heuteISO(); }
+  function nfTage(von, bis) { return Math.round((Date.parse(bis + "T12:00:00Z") - Date.parse(von + "T12:00:00Z")) / 86400000); }
+  function nfKapitelName(k) { const e = NF_KAPITEL.find((x) => x[0] === k); return e ? e[1] : k; }
+
+  // Frist oder fällige Jahresprüfung: { art: "faellig" | "bald" | "alt", text } oder null
+  function nfHinweis(p) {
+    if (p.status === "entfaellt") return null;
+    const heute = nfHeute();
+    if (p.faellig_am) {
+      const t = nfTage(heute, p.faellig_am);
+      if (t < 0) return { art: "faellig", text: `Frist seit ${datumDe(p.faellig_am)} überschritten` };
+      if (t === 0) return { art: "faellig", text: "Frist heute" };
+      if (t <= 30) return { art: "bald", text: `Frist am ${datumDe(p.faellig_am)} (in ${t} Tag${t === 1 ? "" : "en"})` };
+    }
+    if ((p.status === "ausgefuellt" || p.status === "aktuell") && p.geprueft_am && nfTage(p.geprueft_am, heute) > 365) {
+      return { art: "alt", text: `zuletzt geprüft ${datumDe(p.geprueft_am)} – Jahresprüfung fällig` };
+    }
+    return null;
+  }
+  function nfErledigt(p) { return p.status === "ausgefuellt" || p.status === "aktuell"; }
+  function nfZahlen(liste) {
+    const gueltig = liste.filter((p) => p.status !== "entfaellt");
+    return { gesamt: gueltig.length, fertig: gueltig.filter(nfErledigt).length };
+  }
+  // Warnt vor versehentlich eingetragenen Nummern (IBAN, lange Ziffernfolgen) – gleiche Regel wie auf dem Server
+  function nfNummernMeldung(text) {
+    const t = String(text || "");
+    if (/\b[A-Za-z]{2}\d{2} ?(?:[A-Za-z0-9]{4} ?){3,}/.test(t) || /\d(?:[ .\-/]?\d){8,}/.test(t)) {
+      return "Bitte nur den Ort eintragen – keine Nummern oder Zugangsdaten. Die gehören in den Ordner zu Hause bzw. in den Passwortmanager.";
+    }
+    return "";
+  }
+
+  // ---- Anzeige ----
+  function renderNotfallordner() {
+    const el = document.getElementById("notfallordner-inhalt");
+    if (!el) return;
+    if (!nf.geladen && !nf.laedt && !nf.fehler && !nf.fehlt) nfLaden();
+    if (nf.fehlt) { el.innerHTML = `<p class="empty-text">Für den Notfallordner bitte zuerst <code>notfall_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`; return; }
+    if (nf.fehler) { el.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(nf.fehler)} <button class="link-btn" onclick="nfNeuLaden()">Nochmal versuchen</button></p>`; return; }
+    if (!nf.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
+    const schalter = `<div class="schnell-chips nf-ansicht" role="group" aria-label="Ansicht">` +
+      [["ueberblick", "Überblick"], ["karte", "Notfallkarte"]].map(([k, t]) =>
+        `<button type="button" class="schnell-chip${nf.ansicht === k ? " aktiv" : ""}" aria-pressed="${nf.ansicht === k}" onclick="nfAnsicht('${k}')">${t}</button>`).join("") + `</div>`;
+    el.innerHTML = schalter + (nf.ansicht === "karte" ? nfKarteSeiteHtml() : nfUeberblickHtml());
+    el.querySelectorAll("details[data-kapitel]").forEach((d) => {
+      d.addEventListener("toggle", () => { if (d.open) nf.offen.add(d.dataset.kapitel); else nf.offen.delete(d.dataset.kapitel); });
+    });
+  }
+  window.nfAnsicht = function(a) {
+    nf.ansicht = a === "karte" ? "karte" : "ueberblick";
+    try { localStorage.setItem(NF_ANSICHT_SCHLUESSEL, nf.ansicht); } catch (_e) { /* egal */ }
+    renderNotfallordner();
+  };
+
+  function nfHinweisBoxHtml() {
+    return `<p class="notiz-meta nf-hinweis">Hier stehen nur Hinweise, wo etwas liegt – keine Nummern, Diagnosen, Beträge oder Zugangsdaten. Die Inhalte bleiben im Ordner zu Hause.</p>`;
+  }
+
+  function nfZeileHtml(p, mitKapitel) {
+    const id = escapeAttr(String(p.id));
+    const s = NF_STATUS[p.status] || NF_STATUS.offen;
+    const h = nfHinweis(p);
+    const teile = [];
+    if (mitKapitel) teile.push(escapeHtml(nfKapitelName(p.kapitel)));
+    if (p.ort) teile.push(escapeHtml(p.ort));
+    if (p.geprueft_am && nfErledigt(p)) teile.push("geprüft " + datumDe(p.geprueft_am));
+    if (p.faellig_am && !h) teile.push("Frist " + datumDe(p.faellig_am));
+    const meta = teile.length ? `<span class="notiz-meta">${teile.join(" · ")}</span>` : "";
+    const warn = h ? `<span class="nf-warn nf-warn--${h.art}">${escapeHtml(h.text)}</span>` : "";
+    return `<div class="nf-zeile${p.status === "entfaellt" ? " nf-zeile--aus" : ""}">
+      <button type="button" class="nf-status nf-status--${escapeAttr(p.status)}" onclick="nfStatusWeiter('${id}')"
+        aria-label="${escapeAttr(p.titel)}: Status ${escapeAttr(s.label)}. Antippen zum Weiterschalten">${escapeHtml(s.label)}</button>
+      <button type="button" class="nf-text" onclick="blattOeffnen('nfpunkt','${id}')">
+        <span class="nf-titel">${escapeHtml(p.titel)}</span>${meta}${warn}
+      </button>
+    </div>`;
+  }
+
+  function nfUeberblickHtml() {
+    if (!nf.punkte.length) {
+      return `<p class="empty-text">Noch keine Punkte. Die Vorlage legt alle Punkte aus deinem Notfallordner als Checkliste an (Dokumente, Kontakte, Gesundheit, Finanzen, Wohnen, Fahrzeuge, Beruf, Digitales, Vorsorge, Notfallvorsorge) – ohne Inhalte.</p>
+        <div class="reiter-aktionen bib-aktionen">
+          <button type="button" class="btn-primary" onclick="nfVorlageAnlegen()">${ic("plus")}Vorlage aus dem Ordner anlegen</button>
+          <button type="button" class="btn-secondary" onclick="blattNeu('nfpunkt', {})">${ic("plus")}Einzeln anlegen</button>
+        </div>
+        ${nfHinweisBoxHtml()}`;
+    }
+    const z = nfZahlen(nf.punkte);
+    const prozent = z.gesamt ? Math.round((z.fertig / z.gesamt) * 100) : 0;
+    const rang = { faellig: 0, alt: 1, bald: 2 };
+    const dran = nf.punkte.filter((p) => !!nfHinweis(p))
+      .sort((a, b) => rang[nfHinweis(a).art] - rang[nfHinweis(b).art]);
+    const dranHtml = dran.length
+      ? `<h2 class="std-zwischen">Jetzt dran (${dran.length})</h2><div class="nf-liste nf-liste--karte">${dran.map((p) => nfZeileHtml(p, true)).join("")}</div>`
+      : "";
+    const kapitel = NF_KAPITEL.map(([k, name]) => {
+      const liste = nf.punkte.filter((p) => p.kapitel === k);
+      if (!liste.length) return "";
+      const kz = nfZahlen(liste);
+      const kp = kz.gesamt ? Math.round((kz.fertig / kz.gesamt) * 100) : 100;
+      return `<details class="nf-kapitel" data-kapitel="${k}"${nf.offen.has(k) ? " open" : ""}>
+        <summary><span class="nf-k-name">${escapeHtml(name)}</span><span class="nf-k-zahl">${kz.fertig}/${kz.gesamt}</span>
+          <span class="nf-balken nf-balken--klein" aria-hidden="true"><span style="width:${kp}%"></span></span></summary>
+        <div class="nf-liste">${liste.map((p) => nfZeileHtml(p, false)).join("")}</div>
+        <div class="reiter-aktionen bib-aktionen">
+          <button type="button" class="btn-secondary" onclick="blattNeu('nfpunkt', { kapitel: '${k}' })">${ic("plus")}Punkt</button>
+          <button type="button" class="btn-secondary" onclick="nfKapitelGeprueft('${k}')">Kapitel als geprüft markieren</button>
+        </div>
+      </details>`;
+    }).join("");
+    // Punkte in Kapiteln, die es in der Liste nicht gibt, sollen nicht verschwinden
+    const unbekannt = nf.punkte.filter((p) => !NF_KAPITEL.some(([k]) => k === p.kapitel));
+    return `<div class="nf-summe">
+        <div class="nf-summe-kopf"><span><strong>${z.fertig} von ${z.gesamt}</strong> Punkten erledigt</span><span class="nf-prozent">${prozent} %</span></div>
+        <div class="nf-balken" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${prozent}" aria-label="Fortschritt"><span style="width:${prozent}%"></span></div>
+        <p class="notiz-meta">Antippen des Status schaltet weiter: Offen → Ausgefüllt → Aktuell. Den Punkt selbst antippen zum Bearbeiten.</p>
+      </div>
+      ${dranHtml}
+      <h2 class="std-zwischen">Kapitel</h2>
+      ${kapitel}
+      ${unbekannt.length ? `<h2 class="std-zwischen">Sonstige</h2><div class="nf-liste nf-liste--karte">${unbekannt.map((p) => nfZeileHtml(p, false)).join("")}</div>` : ""}
+      <div class="reiter-aktionen bib-aktionen">
+        <button type="button" class="btn-secondary" onclick="blattNeu('nfpunkt', {})">${ic("plus")}Punkt</button>
+        <button type="button" class="btn-secondary" onclick="tabWechseln('verlauf')">Änderungen ansehen (Verlauf)</button>
+      </div>
+      ${nfHinweisBoxHtml()}`;
+  }
+
+  // Status per Antippen weiterschalten (sofort sichtbar, bei Fehler zurück)
+  window.nfStatusWeiter = async function(id) {
+    const p = nf.punkte.find((x) => String(x.id) === String(id));
+    if (!p || nf.laufend.has(String(p.id))) return;
+    const alt = { status: p.status, geprueft_am: p.geprueft_am };
+    const neu = NF_WEITER[p.status] || "offen";
+    p.status = neu;
+    if (neu === "aktuell") p.geprueft_am = nfHeute();
+    nf.laufend.add(String(p.id));
+    renderNotfallordner();
+    try {
+      await api("notfall_status_setzen", { id: p.id, status: neu });
+    } catch (e) {
+      p.status = alt.status; p.geprueft_am = alt.geprueft_am;
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    } finally {
+      nf.laufend.delete(String(p.id));
+    }
+    renderNotfallordner();
+  };
+
+  window.nfKapitelGeprueft = async function(k) {
+    try {
+      const r = await api("notfall_kapitel_geprueft", { kapitel: k });
+      hinweisZeigen(r.anzahl ? `${r.anzahl} Punkt${r.anzahl === 1 ? "" : "e"} als geprüft markiert` : "Nichts zu markieren – erst Punkte auf „Ausgefüllt“ setzen");
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+    nfNeuLaden();
+  };
+
+  window.nfVorlageAnlegen = async function() {
+    try {
+      const r = await api("notfall_vorlage_anlegen");
+      hinweisZeigen(`${r.punkte} Punkte angelegt`);
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht angelegt: " + (e.message || "Fehler"));
+    }
+    nfNeuLaden();
+  };
+
+  // ---- Notfallkarte ----
+  // Wählbar nur, wenn die Nummer wie eine Telefonnummer aussieht
+  function nfTelLink(wert) {
+    const t = String(wert || "").trim();
+    return /^[+\d][\d\s\-/()]{2,}$/.test(t) ? "tel:" + t.replace(/[^\d+]/g, "") : "";
+  }
+  function nfSortiert(karte, gruppe) {
+    return karte.filter((k) => k.gruppe === gruppe)
+      .sort((a, b) => (Number(a.sortierung) || 0) - (Number(b.sortierung) || 0) || String(a.was).localeCompare(String(b.was), "de"));
+  }
+
+  // Karte als HTML. bearbeiten = true → Einträge sind antippbar (nur online); sonst reine Anzeige (Offline-Kopie)
+  function nfKarteHtml(karte, bearbeiten) {
+    const fest = NF_NUMMERN.map(([name, anzeige, tel]) =>
+      `<li><a class="nf-tel" href="tel:${tel}"><strong>${anzeige}</strong><span>${escapeHtml(name)}</span></a></li>`).join("");
+    const eigene = nfSortiert(karte, "nummer").map((k) => {
+      const tel = nfTelLink(k.wert);
+      const inhalt = `<strong>${k.wert ? escapeHtml(k.wert) : "–"}</strong><span>${escapeHtml(k.was)}${k.wert ? "" : " – noch nicht eingetragen"}</span>`;
+      if (bearbeiten && k.id !== undefined) {
+        return `<li><button type="button" class="nf-tel nf-tel--knopf" onclick="blattOeffnen('nfnummer','${escapeAttr(String(k.id))}')">${inhalt}</button></li>`;
+      }
+      return tel ? `<li><a class="nf-tel" href="${escapeAttr(tel)}">${inhalt}</a></li>` : `<li><div class="nf-tel">${inhalt}</div></li>`;
+    }).join("");
+    const orte = nfSortiert(karte, "ort").map((k) => {
+      const inhalt = `<span class="nf-ort-was">${escapeHtml(k.was)}</span><span class="nf-ort-wo${k.wert ? "" : " nf-ort-leer"}">${k.wert ? escapeHtml(k.wert) : "noch nicht eingetragen"}</span>`;
+      return bearbeiten && k.id !== undefined
+        ? `<li><button type="button" class="nf-ort" onclick="blattOeffnen('nfort','${escapeAttr(String(k.id))}')">${inhalt}</button></li>`
+        : `<li><div class="nf-ort">${inhalt}</div></li>`;
+    }).join("");
+    return `<section class="nf-karte">
+      <h2 class="std-zwischen">Notruf</h2>
+      <ul class="nf-nummern">${fest}${eigene}</ul>
+      <h2 class="std-zwischen">Sofortmaßnahmen</h2>
+      <ol class="nf-sofort">${NF_SOFORT.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ol>
+      <h2 class="std-zwischen">Absperr- und Schaltstellen</h2>
+      <p class="nf-pv"><strong>Hinweis für Einsatzkräfte:</strong> Die PV-Anlage steht auch bei Netzabschaltung unter Spannung, solange Licht auf die Module fällt.</p>
+      ${orte ? `<ul class="nf-orte">${orte}</ul>` : `<p class="empty-text">Noch keine Standorte eingetragen.</p>`}
+    </section>`;
+  }
+
+  function nfKarteSeiteHtml() {
+    const kopie = nfKopieLesen();
+    const stand = kopie ? nfStandText(kopie.stand) : "";
+    return `${nfKarteHtml(nf.karte, true)}
+      <div class="reiter-aktionen bib-aktionen">
+        <button type="button" class="btn-secondary" onclick="blattNeu('nfort', {})">${ic("plus")}Standort</button>
+        <button type="button" class="btn-secondary" onclick="blattNeu('nfnummer', {})">${ic("plus")}Nummer</button>
+      </div>
+      <p class="notiz-meta nf-hinweis">${kopie
+        ? `Kopie dieser Karte auf diesem Gerät: Stand ${escapeHtml(stand)}. Fällt das Netz aus, zeigt die App sie beim Start von selbst.`
+        : "Auf diesem Gerät ist noch keine Kopie gespeichert."} Nur Orte und Notdienste eintragen, keine privaten Daten.</p>`;
+  }
+
+  // ---- Start ohne Netz: Notfallkarte aus der Kopie zeigen ----
+  function nfIstNetzfehler(e) {
+    const m = String((e && e.message) || "");
+    return navigator.onLine === false || /failed to fetch|networkerror|load failed|network request failed/i.test(m);
+  }
+  function notfallOfflineZeigen() {
+    const kopie = nfKopieLesen();
+    if (!kopie) return false;
+    let box = document.getElementById("nf-offline");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "nf-offline";
+      box.className = "nf-offline";
+      document.body.appendChild(box);
+    }
+    const stand = nfStandText(kopie.stand);
+    box.innerHTML = `<div class="nf-offline-innen">
+        <h1>Notfallkarte</h1>
+        <p class="nf-offline-hinweis">Keine Verbindung zum Dashboard – das ist die Kopie auf diesem Gerät${stand ? " (Stand " + escapeHtml(stand) + ")" : ""}.</p>
+        ${nfKarteHtml(kopie.karte, false)}
+        <div class="reiter-aktionen bib-aktionen"><button type="button" class="btn-primary" onclick="location.reload()">Erneut verbinden</button></div>
+      </div>`;
+    window.addEventListener("online", () => location.reload(), { once: true });
+    return true;
+  }
+
+  // ---- Bearbeiten-Blätter ----
+  BLATT_ARTEN.nfpunkt = {
+    titel: "Punkt bearbeiten",
+    titelNeu: "Neuer Punkt",
+    finden: (id) => nf.punkte.find((p) => String(p.id) === String(id)),
+    laden: (p) => ({
+      id: p.id || "", kapitel: p.kapitel || "dokumente", titel: p.titel || "", status: p.status || "offen",
+      ort: p.ort || "", geprueft_am: p.geprueft_am || "", faellig_am: p.faellig_am || "", notiz: p.notiz || "",
+    }),
+    felder: [
+      { key: "kapitel", label: "Kapitel", typ: "auswahl", optionen: NF_KAPITEL.map(([k, n]) => [k, n]) },
+      { key: "titel", label: "Punkt", typ: "text", pflicht: true, platzhalter: "z. B. Vorsorgevollmacht" },
+      { key: "status", label: "Status", typ: "chips", optionen: Object.keys(NF_STATUS).map((k) => [k, NF_STATUS[k].label]),
+        hinweis: "Aktuell = geprüft und auf dem neuesten Stand. Entfällt = trifft auf mich nicht zu." },
+      { key: "ort", label: "Wo liegt es?", typ: "text", platzhalter: "z. B. Ordner zu Hause, Reiter 4",
+        hinweis: "Nur den Ort – keine Nummern, Diagnosen, Beträge oder Zugangsdaten." },
+      { key: "geprueft_am", label: "Zuletzt geprüft", typ: "datum" },
+      { key: "faellig_am", label: "Frist (optional)", typ: "datum", hinweis: "z. B. Ablauf Verbandskasten, HU/TÜV oder Prüfdatum Vorrat. Die App meldet 30 Tage vorher." },
+      { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional, auch nur Hinweise" },
+    ],
+    pruefen: (w) => {
+      if (w.geprueft_am && w.geprueft_am > heuteISO()) return "„Zuletzt geprüft“ liegt in der Zukunft.";
+      return nfNummernMeldung(w.ort) || nfNummernMeldung(w.notiz);
+    },
+    speichern: (id, w) => api("notfall_punkt_speichern", {
+      id, kapitel: w.kapitel, titel: w.titel, status: w.status, ort: w.ort,
+      geprueft_am: w.geprueft_am || null, faellig_am: w.faellig_am || null, notiz: w.notiz,
+    }),
+    loeschen: (id) => api("notfall_punkt_loeschen", { id }),
+    loeschFrage: (p) => `Punkt „${p.titel || ""}“ aus dem Notfallordner löschen?`,
+    gespeichert: "Punkt gespeichert",
+    danach: () => { nfNeuLaden(); },
+  };
+
+  function nfKarteBlatt(gruppe, cfg) {
+    return {
+      titel: cfg.titel, titelNeu: cfg.titelNeu,
+      finden: (id) => nf.karte.find((k) => String(k.id) === String(id)),
+      laden: (k) => ({ id: k.id || "", was: k.was || "", wert: k.wert || "" }),
+      felder: [
+        { key: "was", label: cfg.labelWas, typ: "text", pflicht: true, platzhalter: cfg.phWas },
+        { key: "wert", label: cfg.labelWert, typ: "text", platzhalter: cfg.phWert, hinweis: cfg.hinweis },
+      ],
+      speichern: (id, w) => api("notfall_karte_speichern", { id, gruppe, was: w.was, wert: w.wert }),
+      loeschen: (id) => api("notfall_karte_loeschen", { id }),
+      loeschFrage: (k) => `„${k.was || ""}“ von der Notfallkarte löschen?`,
+      gespeichert: "Notfallkarte gespeichert",
+      danach: () => { nfNeuLaden(); },
+    };
+  }
+  BLATT_ARTEN.nfort = nfKarteBlatt("ort", {
+    titel: "Standort bearbeiten", titelNeu: "Neuer Standort", labelWas: "Was", phWas: "z. B. Hauptwasserhahn",
+    labelWert: "Wo?", phWert: "z. B. Keller, links neben der Treppe",
+    hinweis: "Nur der Ort – so beschrieben, dass ihn auch eine fremde Person findet.",
+  });
+  BLATT_ARTEN.nfnummer = nfKarteBlatt("nummer", {
+    titel: "Nummer bearbeiten", titelNeu: "Neue Nummer", labelWas: "Wofür", phWas: "z. B. Giftnotruf",
+    labelWert: "Telefonnummer", phWert: "z. B. 0228 …",
+    hinweis: "Nur Notdienste und Stellen, keine privaten Nummern von Personen.",
+  });
+
   let blatt = null; // { art, id, werte }
 
   // Öffnet das Bearbeiten-Blatt für einen Eintrag
@@ -8634,6 +9041,7 @@
       // Logout soll auch funktionieren, wenn die Session schon ungültig war
     }
     localStorage.removeItem("aufgaben-token");
+    nfKopieLoeschen(); // Notfallkarte-Kopie nicht auf einem abgemeldeten Gerät lassen
     token = "";
     document.getElementById("login-pass").value = "";
     zeigeLogin();
@@ -9540,6 +9948,7 @@
           appImLetztenBereichOeffnen();
         }
         pushStillAuffrischen();
+        nfKopieAuffrischen();
         vorlesenBeimStartVorbereiten();
 
         if (googleCode) {
@@ -9568,6 +9977,8 @@
         await nfcVerarbeiten();
         return;
       } catch (e) {
+        // Kein Netz: Notfallkarte aus der Kopie auf dem Gerät zeigen (seit Session 86)
+        if (nfIstNetzfehler(e) && notfallOfflineZeigen()) return;
         // Passwort ungültig geworden -> Login zeigen
       }
     }
@@ -10321,6 +10732,7 @@
     if (aktiv === "stunden") renderStunden();
     if (aktiv === "zaehler") renderZaehler();
     if (aktiv === "lernhilfe") renderLernhilfe();
+    if (aktiv === "notfallordner") renderNotfallordner();
     if (aktiv === "kommando") renderKommando();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
@@ -17235,6 +17647,16 @@
       luecken.push("Zähler: " + e.message);
     }
 
+    // Notfallordner (seit Session 86): nur Hinweise, wo etwas liegt
+    meldung("Lade Notfallordner …");
+    try {
+      const r = await api("notfall_laden");
+      if (!r.fehlt) { liste.notfall_punkte = r.punkte || []; liste.notfall_karte = r.karte || []; }
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Notfallordner: " + e.message);
+    }
+
     // Lernhilfe (seit Session 84): nur Fächer, Übungen und Aufgaben – keine
     // Kinder, Zugänge, Freigaben oder Ergebnisse (Löschen soll vollständig sein)
     meldung("Lade Lernhilfe-Übungen …");
@@ -17419,6 +17841,8 @@
     { k: "zaehler", t: "zaehler", name: "Zähler", gruppe: "Zähler" },
     { k: "zaehler_ablesungen", t: "zaehler_ablesungen", name: "Zähler: Ablesungen", gruppe: "Zähler" },
     { k: "zaehler_tarife", t: "zaehler_tarife", name: "Zähler: Tarife", gruppe: "Zähler" },
+    { k: "notfall_punkte", t: "notfall_punkte", name: "Notfallordner: Punkte", gruppe: "Notfallordner" },
+    { k: "notfall_karte", t: "notfall_karte", name: "Notfallordner: Notfallkarte", gruppe: "Notfallordner" },
     { k: "kz_bereiche", t: "kz_bereiche", name: "Kommandozentrale: Bereiche", gruppe: "Kommandozentrale" },
     { k: "kz_projekte", t: "kz_projekte", name: "Kommandozentrale: Projekte", gruppe: "Kommandozentrale" },
     { k: "kz_tageslog", t: "kz_tageslog", name: "Kommandozentrale: Tageslog", gruppe: "Kommandozentrale" },
@@ -17428,7 +17852,7 @@
     { k: "lern_aufgaben", t: "lern_aufgaben", name: "Lernhilfe: Aufgaben (ohne Bilder)", gruppe: "Lernhilfe" },
     { k: "verlauf", t: "verlauf", name: "Verlauf (letzte 50 je Bereich)", gruppe: "Sonstiges", nurErg: true },
   ];
-  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Stunden", "Zähler", "Kommandozentrale", "Lernhilfe", "Sonstiges"];
+  const WH_GRUPPEN = ["Planen", "Sammeln", "Finanzen", "Spiele, Methoden, Einheiten", "Bereichsblock", "Training", "Ernährung", "EP", "Stunden", "Zähler", "Notfallordner", "Kommandozentrale", "Lernhilfe", "Sonstiges"];
 
   // Zustand der Karte (bleibt beim Neuzeichnen von Export erhalten)
   const wh = {

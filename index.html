@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="style.css?v=81">
+<link rel="stylesheet" href="style.css?v=82">
 <link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
@@ -1109,6 +1109,23 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
+            <summary>Notfallordner <span class="anleitung-nur">(seit Session 86; nur Privat, unter „Sammeln“)</span></summary>
+            <div class="anleitung-text">
+              <p>Die Checkliste zu deinem ausgedruckten Notfallordner und eine Notfallkarte, die auch ohne Netz da ist. Die App ersetzt den Ordner nicht: Sie sagt dir, was fehlt, was zu prüfen ist und wo etwas liegt.</p>
+              <ul>
+                <li><strong>Was hier steht und was nicht:</strong> nur Hinweise – Punkt, Status, grober Ort („Ordner zu Hause, Reiter 4“), Prüfdatum, Frist. Keine Nummern, Diagnosen, Beträge, Namen Dritter oder Zugangsdaten; die bleiben im Ordner zu Hause bzw. im Passwortmanager. Lange Ziffernfolgen und IBANs im Ort- oder Notizfeld werden abgelehnt</li>
+                <li><strong>Vorlage:</strong> beim ersten Öffnen „Vorlage aus dem Ordner anlegen“. Das legt alle Punkte nach den Kapiteln des Ordners an (Der Ordner selbst, Dokumente, Kontakte, Gesundheit, Familie, Finanzen, Wohnen, Fahrzeuge, Beruf, Digitales, Vorsorge, Notfallvorsorge) und die Standorte der Notfallkarte. Die Vorlage geht nur in einen leeren Notfallordner</li>
+                <li><strong>Status:</strong> links am Punkt antippen schaltet weiter – Offen → Ausgefüllt → Aktuell. „Aktuell“ setzt das Prüfdatum auf heute. Punkt antippen = bearbeiten; dort auch „Entfällt“ (zählt nicht in den Fortschritt, z. B. Kinder oder Haustiere)</li>
+                <li><strong>Fortschritt und „Jetzt dran“:</strong> oben die Anzahl erledigter Punkte. „Jetzt dran“ zeigt Punkte mit Frist (30 Tage vorher, dann überschritten) und Punkte, die länger als ein Jahr nicht geprüft wurden. „Kapitel als geprüft markieren“ setzt alle ausgefüllten Punkte eines Kapitels auf Aktuell – gedacht für die Jahresprüfung im Oktober</li>
+                <li><strong>Notfallkarte:</strong> Notrufnummern (112, 110, 116 117, 116 116, Telefonseelsorge) zum Antippen, Sofortmaßnahmen, Hinweis für Einsatzkräfte zur PV-Anlage, Standorte von Wasser, Gas, Strom, PV-Trennern, Heizungsnotaus. „+ Standort“ und „+ Nummer“ ergänzen eigene Einträge (z. B. Giftnotruf der zuständigen Zentrale – die trägst du selbst ein)</li>
+                <li><strong>Ohne Netz:</strong> Die Karte wird als Kopie im Gerätespeicher abgelegt (beim Öffnen des Reiters und beim App-Start, wenn die Kopie älter als 12 Stunden ist). Ist beim Start kein Netz da, zeigt die App statt des Logins diese Karte. Voraussetzung: einmal mit Netz angemeldet und der Reiter einmal geöffnet. Beim Abmelden wird die Kopie gelöscht. Seit Session 86 speichert der Service Worker außerdem die App-Dateien zwischen, damit die App ohne Netz überhaupt startet – nach dem Update die App zweimal mit Netz öffnen</li>
+                <li><strong>Änderungsprotokoll:</strong> Anlegen, Ändern und Löschen von Punkten und Karteneinträgen stehen im Verlauf (Kategorie „Notfallordner“). Das Weiterschalten des Status wird dort nicht einzeln eingetragen</li>
+                <li>Gesichert über Export → Backup wie alle anderen Daten</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
             <summary>Ideen <span class="anleitung-nur">(Standard: OGS, AWO und Business, per Reiter-Verwaltung auch Privat)</span></summary>
             <div class="anleitung-text">
               <p>Sammlung für Angebots- und Projektideen, getrennt nach Bereich.</p>
@@ -1817,6 +1834,12 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <div id="zaehler-inhalt"></div>
       </div>
 
+      <div id="view-notfallordner" class="hidden">
+        <h1>Notfallordner <button class="hilfe-icon" data-hilfe="Die Checkliste zu deinem analogen Notfallordner und die Notfallkarte – nur in Privat. Hier stehen nur Hinweise, wo etwas liegt (grober Ort, Status, Prüfdatum, Frist) – keine Nummern, Diagnosen, Beträge oder Zugangsdaten; die bleiben im Ordner zu Hause. Oben umschalten: „Überblick“ und „Notfallkarte“. Überblick: beim ersten Öffnen „Vorlage aus dem Ordner anlegen“ – dann stehen alle Punkte nach Kapiteln da. Oben der Fortschritt, darunter „Jetzt dran“ (Fristen und Punkte, die länger als ein Jahr nicht geprüft wurden). Den Status links antippen schaltet weiter: Offen → Ausgefüllt → Aktuell (setzt das Prüfdatum auf heute). Den Punkt antippen = bearbeiten (Kapitel, Ort, Prüfdatum, Frist, „Entfällt“ für Unzutreffendes). „Kapitel als geprüft markieren“ setzt alle ausgefüllten Punkte eines Kapitels auf Aktuell. Notfallkarte: Notrufnummern zum Antippen (auf dem Handy wählt das Telefon), Sofortmaßnahmen, Hinweis für Einsatzkräfte zur PV-Anlage und die Standorte von Absperr- und Schaltstellen; eigene Standorte und Nummern (z. B. Giftnotruf) mit „+ Standort“ und „+ Nummer“. Die Karte liegt zusätzlich als Kopie auf dem Gerät – ohne Netz zeigt die App sie beim Start von selbst. Änderungen stehen im Verlauf.">?</button></h1>
+        <p class="hero-text">Checkliste zum Notfallordner und die Notfallkarte – nur Hinweise, wo etwas liegt.</p>
+        <div id="notfallordner-inhalt"></div>
+      </div>
+
       <div id="view-lernhilfe" class="hidden">
         <h1>Lernhilfe <button class="hilfe-icon" data-hilfe="Übungen für ein Kind, das von zu Hause übt – nur Privat. Oben die Kinder: nur ein Pseudonym, kein echter Name. „QR-Code“ erstellt den Zugang für das Gerät des Kindes; er wird nur einmal angezeigt, ein neuer macht den alten ungültig, „Sperren“ hält ihn an. Darunter die Übungen je Fach: „+ Übung“ öffnet das Formular mit vier Arten (Auswahl, Lücken, Zuordnen, Sortieren), Emoji oder Bild, Erklärung und Vorschau. „Mit Claude erstellen“: Wunsch eintragen, „Für Claude kopieren“, im Claude-Chat einfügen, die Antwort hier einfügen und prüfen. Unter jeder Übung den Namen des Kindes antippen = freigeben (optional mit Fälligkeit); erst dann sieht das Kind die Übung. Ganz unten: Fächer verwalten.">?</button></h1>
         <p class="hero-text">Übungen anlegen und freigeben – das Kind übt zu Hause mit eigenem Zugang.</p>
@@ -2200,6 +2223,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=84"></script>
+<script src="app.js?v=85"></script>
 </body>
 </html>
