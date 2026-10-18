@@ -2546,3 +2546,12 @@ button.nf-ort { cursor: pointer; }
   #nf-druck .nf-tel, #nf-druck .nf-pv { border: 1px solid #000; background: #fff; color: #000; }
   #nf-druck .nf-ort { border-top: 1px solid #bbb; }
 }
+
+/* Notvorrat (seit Session 89) */
+.nf-vstatus--fehlt { background: var(--overdue-bg); border-color: var(--overdue-border); color: var(--overdue-text); }
+.nf-vstatus--teils { background: var(--today-bg); border-color: var(--today-border); color: var(--today-text); }
+.nf-vstatus--da { background: var(--ok-bg); border-color: var(--ok-rand); color: var(--ok-text); }
+.nf-personen { display: flex; align-items: center; gap: 0.6rem; margin: 0.6rem 0 0.3rem; flex-wrap: wrap; }
+.nf-personen > span { flex: 1 1 auto; }
+.nf-pm { min-width: 44px; min-height: 44px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: inherit; font: inherit; font-size: 1.2rem; cursor: pointer; }
+.nf-pm:disabled { opacity: 0.4; cursor: default; }

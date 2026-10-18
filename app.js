@@ -7608,14 +7608,24 @@
     "Bei Stromausfall: Kerzen vermeiden, Taschenlampen nutzen, Kühlschrank geschlossen halten, Nachbarn prüfen.",
     "Bei Hochwasser oder Starkregen: Strom im Keller abschalten lassen, Wertsachen nach oben bringen, Warnmeldungen beachten.",
   ];
+  // Notvorrat (seit Session 89)
+  const NF_VORRAT_GRUPPEN = [
+    ["getraenke", "Getränke"], ["lebensmittel", "Lebensmittel"], ["apotheke", "Hausapotheke"], ["hygiene", "Hygiene"],
+    ["energie", "Licht, Kochen, Wärme"], ["dokumente", "Dokumente"], ["weiteres", "Weiteres"],
+  ];
+  const NF_VORRAT_STATUS = { fehlt: { label: "Fehlt" }, teils: { label: "Teils" }, da: { label: "Da" } };
+  // Antippen: Fehlt ↔ Da; „Teils“ wählt man im Bearbeiten-Blatt, Antippen macht daraus „Da“
+  const NF_VORRAT_WEITER = { fehlt: "da", da: "fehlt", teils: "da" };
   const nf = {
     geladen: false, laedt: false, fehlt: false, fehler: "",
     punkte: [], karte: [], heute: null,
-    ansicht: "ueberblick",     // "ueberblick" | "karte"
+    vorrat: [], personen: 1, vorratFehlt: false,
+    vorratZu: new Set(),       // eingeklappte Vorrats-Gruppen
+    ansicht: "ueberblick",     // "ueberblick" | "karte" | "vorrat"
     offen: new Set(),          // aufgeklappte Kapitel (bleibt beim Neuzeichnen)
     laufend: new Set(),        // Punkte, deren Status gerade gespeichert wird
   };
-  try { if (localStorage.getItem(NF_ANSICHT_SCHLUESSEL) === "karte") nf.ansicht = "karte"; } catch (_e) { /* egal */ }
+  try { const v = localStorage.getItem(NF_ANSICHT_SCHLUESSEL); if (v === "karte" || v === "vorrat") nf.ansicht = v; } catch (_e) { /* egal */ }
 
   async function nfLaden() {
     if (nf.laedt) return;
@@ -7626,6 +7636,9 @@
       nf.fehlt = !!r.fehlt;
       nf.punkte = r.punkte || [];
       nf.karte = r.karte || [];
+      nf.vorrat = r.vorrat || [];
+      nf.personen = Number(r.personen) || 1;
+      nf.vorratFehlt = !!r.vorrat_fehlt;
       nf.heute = r.heute || null;
       nf.geladen = true;
       if (!nf.fehlt) nfKopieSpeichern();
@@ -7701,6 +7714,138 @@
     return "";
   }
 
+  // ---- Notvorrat (seit Session 89) ----
+  function nfZahlDe(n) { return Number(n).toLocaleString("de-DE", { maximumFractionDigits: 2 }); }
+  function nfVorratSoll(p) {
+    if (p.soll_je_person === null || p.soll_je_person === undefined || p.soll_je_person === "") return "";
+    const je = Number(p.soll_je_person);
+    if (!Number.isFinite(je)) return "";
+    const einheit = p.einheit ? " " + p.einheit : "";
+    return nf.personen > 1
+      ? `Soll ${nfZahlDe(je * nf.personen)}${einheit} (${nfZahlDe(je)}${einheit} × ${nf.personen} Personen)`
+      : `Soll ${nfZahlDe(je)}${einheit}`;
+  }
+  // Haltbarkeit: abgelaufen oder in den nächsten 60 Tagen
+  function nfVorratHinweis(p) {
+    if (!p.haltbar_bis || p.status === "fehlt") return null;
+    const t = nfTage(nfHeute(), p.haltbar_bis);
+    if (t < 0) return { art: "faellig", text: `Haltbarkeit seit ${datumDe(p.haltbar_bis)} abgelaufen` };
+    if (t <= 60) return { art: "bald", text: `Haltbar bis ${datumDe(p.haltbar_bis)} (in ${t} Tag${t === 1 ? "" : "en"})` };
+    return null;
+  }
+  function nfVorratZeileHtml(p) {
+    const id = escapeAttr(String(p.id));
+    const s = NF_VORRAT_STATUS[p.status] || NF_VORRAT_STATUS.fehlt;
+    const h = nfVorratHinweis(p);
+    const teile = [];
+    const soll = nfVorratSoll(p);
+    if (soll) teile.push(escapeHtml(soll));
+    if (p.haltbar_bis && !h) teile.push("haltbar bis " + datumDe(p.haltbar_bis));
+    if (p.notiz) teile.push(escapeHtml(p.notiz));
+    const meta = teile.length ? `<span class="notiz-meta">${teile.join(" · ")}</span>` : "";
+    const warn = h ? `<span class="nf-warn nf-warn--${h.art}">${escapeHtml(h.text)}</span>` : "";
+    return `<div class="nf-zeile">
+      <button type="button" class="nf-status nf-vstatus--${escapeAttr(p.status)}" onclick="nfVorratWeiter('${id}')"
+        aria-label="${escapeAttr(p.name)}: ${escapeAttr(s.label)}. Antippen zum Umschalten">${escapeHtml(s.label)}</button>
+      <button type="button" class="nf-text" onclick="blattOeffnen('nfvorrat','${id}')">
+        <span class="nf-titel">${escapeHtml(p.name)}</span>${meta}${warn}
+      </button>
+    </div>`;
+  }
+  function nfVorratHtml() {
+    if (nf.vorratFehlt) {
+      return `<p class="empty-text">Für den Notvorrat bitte zuerst <code>notfall_vorrat_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    if (!nf.vorrat.length) {
+      return `<p class="empty-text">Noch keine Posten. Die Vorlage legt die Liste des Bundesamts für Bevölkerungsschutz (BBK) für 10 Tage an – Getränke, Lebensmittel, Hausapotheke, Hygiene, Licht und Wärme. Du setzt dann nur noch „Da“ oder „Fehlt“. Eigene Posten kannst du jederzeit ergänzen.</p>
+        <div class="reiter-aktionen bib-aktionen">
+          <button type="button" class="btn-primary" onclick="nfVorratVorlage()">${ic("plus")}BBK-Vorlage anlegen</button>
+          <button type="button" class="btn-secondary" onclick="blattNeu('nfvorrat', {})">${ic("plus")}Einzeln anlegen</button>
+        </div>`;
+    }
+    const gesamt = nf.vorrat.length;
+    const da = nf.vorrat.filter((p) => p.status === "da").length;
+    const teils = nf.vorrat.filter((p) => p.status === "teils").length;
+    const prozent = gesamt ? Math.round((da / gesamt) * 100) : 0;
+    const dran = nf.vorrat.filter((p) => !!nfVorratHinweis(p));
+    const dranHtml = dran.length
+      ? `<h2 class="std-zwischen">Haltbarkeit prüfen (${dran.length})</h2><div class="nf-liste nf-liste--karte">${dran.map(nfVorratZeileHtml).join("")}</div>` : "";
+    const gruppen = NF_VORRAT_GRUPPEN.map(([k, name]) => {
+      const liste = nf.vorrat.filter((p) => p.gruppe === k);
+      if (!liste.length) return "";
+      const gd = liste.filter((p) => p.status === "da").length;
+      return `<details class="nf-kapitel" data-vgruppe="${k}"${nf.vorratZu.has(k) ? "" : " open"}>
+        <summary><span class="nf-k-name">${escapeHtml(name)}</span><span class="nf-k-zahl">${gd}/${liste.length}</span>
+          <span class="nf-balken nf-balken--klein" aria-hidden="true"><span style="width:${Math.round((gd / liste.length) * 100)}%"></span></span></summary>
+        <div class="nf-liste">${liste.map(nfVorratZeileHtml).join("")}</div>
+        <div class="reiter-aktionen bib-aktionen">
+          <button type="button" class="btn-secondary" onclick="blattNeu('nfvorrat', { gruppe: '${k}' })">${ic("plus")}Posten</button>
+        </div>
+      </details>`;
+    }).join("");
+    const unbekannt = nf.vorrat.filter((p) => !NF_VORRAT_GRUPPEN.some(([k]) => k === p.gruppe));
+    return `<div class="nf-summe">
+        <div class="nf-summe-kopf"><span><strong>${da} von ${gesamt}</strong> Posten da${teils ? `, ${teils} teils` : ""}</span><span class="nf-prozent">${prozent} %</span></div>
+        <div class="nf-balken" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${prozent}" aria-label="Vorrat vorhanden"><span style="width:${prozent}%"></span></div>
+        <div class="nf-personen">
+          <span>Personen im Haushalt</span>
+          <button type="button" class="nf-pm" onclick="nfVorratPersonen(${nf.personen - 1})" aria-label="Eine Person weniger"${nf.personen <= 1 ? " disabled" : ""}>−</button>
+          <strong>${nf.personen}</strong>
+          <button type="button" class="nf-pm" onclick="nfVorratPersonen(${nf.personen + 1})" aria-label="Eine Person mehr"${nf.personen >= 20 ? " disabled" : ""}>+</button>
+        </div>
+        <p class="notiz-meta">Den Status links antippen: Fehlt ↔ Da. „Teils“ und Haltbarkeit stellst du beim Bearbeiten ein.</p>
+      </div>
+      ${dranHtml}
+      ${gruppen}
+      ${unbekannt.length ? `<h2 class="std-zwischen">Sonstige</h2><div class="nf-liste nf-liste--karte">${unbekannt.map(nfVorratZeileHtml).join("")}</div>` : ""}
+      <div class="reiter-aktionen bib-aktionen">
+        <button type="button" class="btn-secondary" onclick="blattNeu('nfvorrat', {})">${ic("plus")}Posten</button>
+        <button type="button" class="btn-secondary" onclick="nfDrucken('vorrat')">Vorratsliste drucken</button>
+      </div>
+      <p class="notiz-meta nf-hinweis">Vorlage nach dem Ratgeber des BBK für 10 Tage je Person (Stand der Recherche: Oktober 2026). Die Mengen können sich ändern – die aktuelle Fassung steht auf bbk.bund.de. Hier nur ja/nein, keine Nummern oder Beträge.</p>`;
+  }
+  window.nfVorratWeiter = async function(id) {
+    const p = nf.vorrat.find((x) => String(x.id) === String(id));
+    if (!p || nf.laufend.has("v" + p.id)) return;
+    const alt = p.status;
+    const neu = NF_VORRAT_WEITER[p.status] || "da";
+    p.status = neu;
+    nf.laufend.add("v" + p.id);
+    renderNotfallordner();
+    try {
+      await api("notfall_vorrat_status", { id: p.id, status: neu });
+    } catch (e) {
+      p.status = alt;
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    } finally {
+      nf.laufend.delete("v" + p.id);
+    }
+    renderNotfallordner();
+  };
+  window.nfVorratPersonen = async function(n) {
+    n = Math.min(20, Math.max(1, Math.round(Number(n) || 1)));
+    if (n === nf.personen) return;
+    const alt = nf.personen;
+    nf.personen = n;
+    renderNotfallordner();
+    try {
+      await api("notfall_vorrat_personen", { personen: n });
+    } catch (e) {
+      nf.personen = alt;
+      renderNotfallordner();
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+  };
+  window.nfVorratVorlage = async function() {
+    try {
+      const r = await api("notfall_vorrat_vorlage", {});
+      hinweisZeigen(`${r.posten} Posten angelegt`);
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht angelegt: " + (e.message || "Fehler"));
+    }
+    nfNeuLaden();
+  };
+
   // ---- Anzeige ----
   function renderNotfallordner() {
     const el = document.getElementById("notfallordner-inhalt");
@@ -7710,15 +7855,18 @@
     if (nf.fehler) { el.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(nf.fehler)} <button class="link-btn" onclick="nfNeuLaden()">Nochmal versuchen</button></p>`; return; }
     if (!nf.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
     const schalter = `<div class="schnell-chips nf-ansicht" role="group" aria-label="Ansicht">` +
-      [["ueberblick", "Überblick"], ["karte", "Notfallkarte"]].map(([k, t]) =>
+      [["ueberblick", "Überblick"], ["karte", "Notfallkarte"], ["vorrat", "Notvorrat"]].map(([k, t]) =>
         `<button type="button" class="schnell-chip${nf.ansicht === k ? " aktiv" : ""}" aria-pressed="${nf.ansicht === k}" onclick="nfAnsicht('${k}')">${t}</button>`).join("") + `</div>`;
-    el.innerHTML = schalter + (nf.ansicht === "karte" ? nfKarteSeiteHtml() : nfUeberblickHtml());
+    el.innerHTML = schalter + (nf.ansicht === "karte" ? nfKarteSeiteHtml() : nf.ansicht === "vorrat" ? nfVorratHtml() : nfUeberblickHtml());
+    el.querySelectorAll("details[data-vgruppe]").forEach((d) => {
+      d.addEventListener("toggle", () => { if (d.open) nf.vorratZu.delete(d.dataset.vgruppe); else nf.vorratZu.add(d.dataset.vgruppe); });
+    });
     el.querySelectorAll("details[data-kapitel]").forEach((d) => {
       d.addEventListener("toggle", () => { if (d.open) nf.offen.add(d.dataset.kapitel); else nf.offen.delete(d.dataset.kapitel); });
     });
   }
   window.nfAnsicht = function(a) {
-    nf.ansicht = a === "karte" ? "karte" : "ueberblick";
+    nf.ansicht = a === "karte" || a === "vorrat" ? a : "ueberblick";
     try { localStorage.setItem(NF_ANSICHT_SCHLUESSEL, nf.ansicht); } catch (_e) { /* egal */ }
     renderNotfallordner();
   };
@@ -7911,7 +8059,24 @@
   window.nfDrucken = function(was) {
     const heute = datumDe(nfHeute());
     let inhalt;
-    if (was === "karte") {
+    if (was === "vorrat") {
+      const gruppen = NF_VORRAT_GRUPPEN.map(([k, name]) => {
+        const liste = nf.vorrat.filter((p) => p.gruppe === k);
+        if (!liste.length) return "";
+        const zeilen = liste.map((p) => {
+          const box = p.status === "da" ? "☑" : p.status === "teils" ? "◐" : "☐";
+          const teile = [];
+          const soll = nfVorratSoll(p);
+          if (soll) teile.push(escapeHtml(soll));
+          if (p.haltbar_bis) teile.push("haltbar bis " + datumDe(p.haltbar_bis));
+          if (p.notiz) teile.push(escapeHtml(p.notiz));
+          return `<tr><td class="nf-d-box">${box}</td><td>${escapeHtml(p.name)}</td><td>${teile.join(" · ")}</td></tr>`;
+        }).join("");
+        return `<h2>${escapeHtml(name)}</h2><table class="nf-druck-tabelle">${zeilen}</table>`;
+      }).join("");
+      const da = nf.vorrat.filter((p) => p.status === "da").length;
+      inhalt = `<h1>Notvorrat</h1><p class="nf-druck-stand">Stand ${escapeHtml(heute)} · ${da} von ${nf.vorrat.length} Posten da · ${nf.personen} ${nf.personen === 1 ? "Person" : "Personen"}</p>${gruppen}`;
+    } else if (was === "karte") {
       inhalt = `<h1>Notfallkarte</h1><p class="nf-druck-stand">Stand ${escapeHtml(heute)}</p>${nfKarteHtml(nf.karte, false)}`;
     } else {
       const kapitel = NF_KAPITEL.map(([k, name]) => {
@@ -8002,6 +8167,37 @@
     loeschen: (id) => api("notfall_punkt_loeschen", { id }),
     loeschFrage: (p) => `Punkt „${p.titel || ""}“ aus dem Notfallordner löschen?`,
     gespeichert: "Punkt gespeichert",
+    danach: () => { nfNeuLaden(); },
+  };
+
+  BLATT_ARTEN.nfvorrat = {
+    titel: "Posten bearbeiten",
+    titelNeu: "Neuer Posten",
+    finden: (id) => nf.vorrat.find((p) => String(p.id) === String(id)),
+    laden: (p) => ({
+      id: p.id || "", gruppe: p.gruppe || "lebensmittel", name: p.name || "", status: p.status || "fehlt",
+      soll_je_person: p.soll_je_person === null || p.soll_je_person === undefined ? "" : String(p.soll_je_person),
+      einheit: p.einheit || "", haltbar_bis: p.haltbar_bis || "", notiz: p.notiz || "",
+    }),
+    felder: [
+      { key: "gruppe", label: "Gruppe", typ: "auswahl", optionen: NF_VORRAT_GRUPPEN.map(([k, n]) => [k, n]) },
+      { key: "name", label: "Posten", typ: "text", pflicht: true, platzhalter: "z. B. Nudeln, Reis" },
+      { key: "status", label: "Vorhanden?", typ: "chips", optionen: Object.keys(NF_VORRAT_STATUS).map((k) => [k, NF_VORRAT_STATUS[k].label]),
+        hinweis: "Da = Soll erreicht, Teils = etwas da, aber noch nicht genug." },
+      { key: "soll_je_person", label: "Soll je Person (optional)", typ: "zahl", schritt: "0.01", min: 0, platzhalter: "z. B. 3,5",
+        hinweis: "Die App rechnet mit den Personen im Haushalt hoch." },
+      { key: "einheit", label: "Einheit", typ: "text", platzhalter: "z. B. kg, Liter, Stück" },
+      { key: "haltbar_bis", label: "Früheste Haltbarkeit (optional)", typ: "datum", hinweis: "Die App zeigt den Posten 60 Tage vorher unter „Haltbarkeit prüfen“." },
+      { key: "notiz", label: "Notiz", typ: "text", platzhalter: "optional – keine Nummern oder Beträge" },
+    ],
+    pruefen: (w) => nfNummernMeldung(w.notiz),
+    speichern: (id, w) => api("notfall_vorrat_speichern", {
+      id, gruppe: w.gruppe, name: w.name, status: w.status, soll_je_person: w.soll_je_person === "" ? null : w.soll_je_person,
+      einheit: w.einheit, haltbar_bis: w.haltbar_bis || null, notiz: w.notiz,
+    }),
+    loeschen: (id) => api("notfall_vorrat_loeschen", { id }),
+    loeschFrage: (p) => `Posten „${p.name || ""}“ aus dem Notvorrat löschen?`,
+    gespeichert: "Posten gespeichert",
     danach: () => { nfNeuLaden(); },
   };
 
@@ -16800,6 +16996,8 @@
   const SPIEL_OHNE_KATEGORIE = "__ohne__";
   // Bewertungs-Filter: "alle" | "5" | "4" | "3" (= mindestens so viele Sterne) | "ohne"
   let spielBewertungFilter = "alle";
+  // Suchtext der Spielekartei (seit Session 89); wird nicht gespeichert
+  let spielSuche = "";
   // Sortierung innerhalb einer Kategorie: "az" | "beste"
   let spielSortierung = "az";
   try { spielSortierung = localStorage.getItem("spiel-sortierung") === "beste" ? "beste" : "az"; } catch (_e) { /* Standard */ }
@@ -16839,8 +17037,22 @@
 
   // Filter aktiv = Kategorien werden automatisch aufgeklappt
   function spielFilterAktiv() {
-    return spielBewertungFilter !== "alle" || spielAktiveKategorie !== "alle";
+    return spielBewertungFilter !== "alle" || spielAktiveKategorie !== "alle" || spielSucheWoerter().length > 0;
   }
+
+  // Suchwörter ohne Groß-/Kleinschreibung und Umlaute (ä = a, ß = ss); alle müssen vorkommen
+  function spielSucheWoerter() {
+    return suchNorm(spielSuche).split(/\s+/).filter(Boolean);
+  }
+  function spielPasstZurSuche(s, woerter) {
+    if (!woerter.length) return true;
+    const heu = suchNorm([s.titel, s.kategorie, s.beschreibung, s.material, s.teilnehmerzahl, s.altersgruppe, s.dauer].filter(Boolean).join(" "));
+    return woerter.every((w) => heu.includes(w));
+  }
+  window.spielSucheGetippt = function(wert) {
+    spielSuche = String(wert || "");
+    renderSpiele();
+  };
 
   // Rendert Filterleiste und Spielekartei, gruppiert nach Kategorie, mit Bewertung, Dateien und Bearbeiten
   function renderSpiele() {
@@ -16889,10 +17101,14 @@
     if (spielAktiveKategorie === SPIEL_OHNE_KATEGORIE) gefiltert = gefiltert.filter((s) => !s.kategorie);
     else if (spielAktiveKategorie !== "alle") gefiltert = gefiltert.filter((s) => s.kategorie === spielAktiveKategorie);
     gefiltert = gefiltert.filter(spielPasstZuBewertung);
+    const sucheWoerter = spielSucheWoerter();
+    if (sucheWoerter.length) gefiltert = gefiltert.filter((s) => spielPasstZurSuche(s, sucheWoerter));
+    const stand = filterBereich.querySelector(".spiel-stand");
+    if (stand && sucheWoerter.length) stand.textContent = `${gefiltert.length} Treffer von ${spiele.length} Spielen`;
 
     if (gefiltert.length === 0) {
       listeBereich.innerHTML = spiele.length
-        ? '<p class="empty-text">Keine Spiele für diesen Filter.</p>'
+        ? `<p class="empty-text">${sucheWoerter.length ? "Nichts gefunden – andere Wörter probieren oder die Filter lockern." : "Keine Spiele für diesen Filter."}</p>`
         : '<p class="empty-text">Noch keine Spiele hinterlegt.</p>';
       return;
     }
@@ -17724,7 +17940,8 @@
     meldung("Lade Notfallordner …");
     try {
       const r = await api("notfall_laden");
-      if (!r.fehlt) { liste.notfall_punkte = r.punkte || []; liste.notfall_karte = r.karte || []; }
+      if (!r.fehlt) { liste.notfall_punkte = r.punkte || []; liste.notfall_karte = r.karte || [];
+        if (!r.vorrat_fehlt) { liste.notfall_vorrat = r.vorrat || []; liste.notfall_einstellungen = [{ id: 1, personen: Number(r.personen) || 1 }]; } }
     } catch (e) {
       if (e.message === "unauthorized") throw e;
       luecken.push("Notfallordner: " + e.message);
@@ -17916,6 +18133,8 @@
     { k: "zaehler_tarife", t: "zaehler_tarife", name: "Zähler: Tarife", gruppe: "Zähler" },
     { k: "notfall_punkte", t: "notfall_punkte", name: "Notfallordner: Punkte", gruppe: "Notfallordner" },
     { k: "notfall_karte", t: "notfall_karte", name: "Notfallordner: Notfallkarte", gruppe: "Notfallordner" },
+    { k: "notfall_vorrat", t: "notfall_vorrat", name: "Notfallordner: Notvorrat", gruppe: "Notfallordner" },
+    { k: "notfall_einstellungen", t: "notfall_einstellungen", name: "Notfallordner: Personen im Haushalt", gruppe: "Notfallordner" },
     { k: "kz_bereiche", t: "kz_bereiche", name: "Kommandozentrale: Bereiche", gruppe: "Kommandozentrale" },
     { k: "kz_projekte", t: "kz_projekte", name: "Kommandozentrale: Projekte", gruppe: "Kommandozentrale" },
     { k: "kz_tageslog", t: "kz_tageslog", name: "Kommandozentrale: Tageslog", gruppe: "Kommandozentrale" },

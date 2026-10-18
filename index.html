@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="style.css?v=83">
+<link rel="stylesheet" href="style.css?v=84">
 <link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
@@ -377,7 +377,7 @@
       </div>
 
       <div id="view-spiele" class="hidden">
-        <h1>Spiele <button class="hilfe-icon" data-hilfe="Deine Spielekartei für die Jugendarbeit – eine gemeinsame Kartei, griffbereit egal ob OGS, Jugendwerk oder unterwegs. Die Kategorien lassen sich auf- und zuklappen. Mit den Sternen bewertest du ein Spiel (1–5, denselben Stern nochmal antippen entfernt die Bewertung). Oben nach Kategorie und Bewertung filtern, „Beste zuerst“ sortiert nach Sternen. Der Stift bearbeitet, das X löscht.">?</button></h1>
+        <h1>Spiele <button class="hilfe-icon" data-hilfe="Deine Spielekartei für die Jugendarbeit – eine gemeinsame Kartei, griffbereit egal ob OGS, Jugendwerk oder unterwegs. Die Kategorien lassen sich auf- und zuklappen. Mit den Sternen bewertest du ein Spiel (1–5, denselben Stern nochmal antippen entfernt die Bewertung). Oben suchen (Titel, Kategorie, Beschreibung, Material – mehrere Wörter müssen alle vorkommen) und nach Kategorie und Bewertung filtern, „Beste zuerst“ sortiert nach Sternen. Der Stift bearbeitet, das X löscht.">?</button></h1>
         <p class="hero-text">Spielbeschreibungen für die Jugendarbeit – nach Kategorie aufklappbar, mit Sternen bewertet.</p>
         <div class="reiter-aktionen"><button type="button" class="reiter-neu" data-formular="form-spiele" aria-expanded="false" aria-controls="form-spiele"><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-plus"></use></svg>Neues Spiel</button></div>
 
@@ -404,7 +404,10 @@
         <p class="empty-text" style="margin-top:0.3rem;">PDF oder Word (.docx), max. 5 MB. Datei ist optional.</p>
         </div>
 
-        <div id="spiel-filter-bereich" style="margin-top:0.8rem;"></div>
+        <div class="row spiel-suche-zeile" style="margin-top:0.8rem;">
+          <input type="search" id="spiel-suche" placeholder="Spiele suchen, z. B. Kennenlern oder Ball" autocomplete="off" aria-label="Spiele durchsuchen" oninput="spielSucheGetippt(this.value)">
+        </div>
+        <div id="spiel-filter-bereich" style="margin-top:0.4rem;"></div>
         <div id="spiel-liste-bereich"></div>
       </div>
 
@@ -1121,6 +1124,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Ohne Netz:</strong> Die Karte wird als Kopie im Gerätespeicher abgelegt (beim Öffnen des Reiters und beim App-Start, wenn die Kopie älter als 12 Stunden ist). Ist beim Start kein Netz da, zeigt die App statt des Logins diese Karte. Voraussetzung: einmal mit Netz angemeldet und der Reiter einmal geöffnet. Beim Abmelden wird die Kopie gelöscht. Seit Session 86 speichert der Service Worker außerdem die App-Dateien zwischen, damit die App ohne Netz überhaupt startet – nach dem Update die App zweimal mit Netz öffnen</li>
                 <li><strong>Änderungsprotokoll:</strong> Anlegen, Ändern und Löschen von Punkten und Karteneinträgen stehen im Verlauf (Kategorie „Notfallordner“). Das Weiterschalten des Status wird dort nicht einzeln eingetragen</li>
                 <li><strong>Erinnerung an Fristen</strong> (seit Session 87): ⋮ → „Benachrichtigungen &amp; Vorlesen“ → „Notfallordner: Fristen“ (vorher <code>notfall_push_setup.sql</code> ausführen). Meldet 14 und 3 Tage vorher, am Tag selbst und danach wöchentlich, solange eine Frist überschritten ist; am 1. des Monats außerdem Punkte, die länger als ein Jahr nicht geprüft wurden. Mit Morgen-Übersicht als Zeile darin, sonst als eigene Nachricht zur selben Uhrzeit. Bei „Nur Uhrzeit“ nur Zahlen. Bei „Bereiche“ muss Privat gewählt sein</li>
+                <li><strong>Notvorrat</strong> (seit Session 89): dritter Umschalter oben neben „Überblick“ und „Notfallkarte“. Beim ersten Öffnen „BBK-Vorlage anlegen“ – das legt die Liste des Bundesamts für Bevölkerungsschutz für 10 Tage an (Getränke 20 Liter, Getreide 3,5 kg, Gemüse 4 kg, Obst/Nüsse 2,5 kg, Milch 2,6 kg, Fisch/Fleisch/Eier 1,5 kg, Fette 0,35 kg je Person, dazu Hausapotheke, Hygiene, Licht/Kochen/Wärme, Dokumente und einige Ergänzungen). Den Status links antippen schaltet zwischen „Fehlt“ und „Da“; „Teils“ und die früheste Haltbarkeit stellst du beim Bearbeiten ein (Haltbarkeit unter 60 Tagen oder abgelaufen erscheint oben unter „Haltbarkeit prüfen“). Oben die „Personen im Haushalt“ mit − und +: Das Soll wird damit hochgerechnet. Eigene Posten mit „+ Posten“, Stift/Antippen bearbeitet, im Blatt kann gelöscht werden. „Vorratsliste drucken“ macht eine Papierliste. Vorher <code>notfall_vorrat_setup.sql</code> ausführen. Die Mengen stammen aus dem BBK-Ratgeber; die aktuelle Fassung steht auf bbk.bund.de. Keine Nummern oder Beträge eintragen</li>
                 <li><strong>Kommandozentrale</strong> (seit Session 88): „In die Kommandozentrale eintragen“ (Überblick) legt für jede Frist eine Aufgabe im Projekt „Notfallordner“ an (Bereich „Haus“, sonst „Privat“; Projektstatus „Hintergrund“) – dazu eine Sammelaufgabe, wenn Punkte länger als ein Jahr nicht geprüft wurden. Nichts wird doppelt angelegt, du kannst den Knopf jederzeit wieder drücken, z. B. nach neuen Fristen. In der Aufgabe stehen nur Titel und Datum. Setzt du den Punkt im Notfallordner auf „Aktuell“ (auch über „Kapitel als geprüft markieren“), hakt die App die offene Aufgabe von selbst ab. Ändert sich eine Frist danach, bleibt die alte Aufgabe stehen – dann dort von Hand anpassen oder löschen. Dafür muss die Kommandozentrale eingerichtet sein</li>
                 <li><strong>Shortcut „Notfallkarte“</strong> (seit Session 87): Langes Drücken auf das App-Symbol zeigt „Notfallkarte“ und öffnet direkt die Karte. Android übernimmt neue Shortcuts erst nach einiger Zeit; schneller geht es, die App einmal zu deinstallieren und neu zu installieren</li>
                 <li><strong>Drucken</strong> (seit Session 87): „Checkliste drucken“ (Überblick) und „Karte drucken“ (Notfallkarte) öffnen die Druckansicht des Browsers – Papier oder PDF. Gedacht als aktueller Einleger für den Ordner zu Hause; es steht nur drin, was auch in der App steht</li>
@@ -1285,6 +1289,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Aufklappbare Kategorien:</strong> jede Kategorie ist ein eigener Block. Im Kopf stehen Anzahl, wie viele davon bewertet sind, und der Sterne-Schnitt. Antippen klappt auf und zu; welche offen sind, merkt sich das Gerät. Ist ein Filter aktiv, sind alle passenden Kategorien automatisch offen</li>
                 <li><strong>Beschreibung</strong> ist pro Spiel eingeklappt („▸ Beschreibung“), damit die Liste kurz bleibt</li>
                 <li><strong>Bewertung:</strong> fünf Sterne direkt unter dem Titel. Antippen setzt die Bewertung sofort, ohne Bearbeiten-Modus. Denselben Stern nochmal antippen entfernt sie. Oben steht, wie viele Spiele schon bewertet sind</li>
+                <li><strong>Suche</strong> (seit Session 89): das Feld über den Filtern durchsucht Titel, Kategorie, Beschreibung, Material, Teilnehmerzahl, Altersgruppe und Dauer. Mehrere Wörter müssen alle vorkommen, Groß-/Kleinschreibung und Umlaute (ä/ae) sind egal. Treffer klappen ihre Kategorien automatisch auf; die Suche lässt sich mit Kategorie- und Bewertungsfilter kombinieren. Das × im Feld oder leeren stellt alles wieder her</li>
                 <li><strong>Filter:</strong> Kategorie und Bewertung (★★★★★, ab ★★★★, ab ★★★, noch nicht bewertet) sind kombinierbar, jeweils mit Anzahl. „Noch nicht bewertet“ eignet sich zum Durcharbeiten nach und nach</li>
                 <li><strong>Sortierung:</strong> „A–Z“ oder „Beste zuerst“ (innerhalb jeder Kategorie, unbewertete am Ende). Die Wahl merkt sich das Gerät</li>
                 <li><strong><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-stift"></use></svg></strong> öffnet das Bearbeiten-Blatt mit allen Feldern, <strong><svg class="ic" aria-hidden="true" focusable="false"><use href="#ic-x"></use></svg></strong> löscht mit Sicherheitsabfrage (inklusive hinterlegter Dateien)</li>
@@ -1839,7 +1844,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
       </div>
 
       <div id="view-notfallordner" class="hidden">
-        <h1>Notfallordner <button class="hilfe-icon" data-hilfe="Die Checkliste zu deinem analogen Notfallordner und die Notfallkarte – nur in Privat. Hier stehen nur Hinweise, wo etwas liegt (grober Ort, Status, Prüfdatum, Frist) – keine Nummern, Diagnosen, Beträge oder Zugangsdaten; die bleiben im Ordner zu Hause. Oben umschalten: „Überblick“ und „Notfallkarte“. Überblick: beim ersten Öffnen „Vorlage aus dem Ordner anlegen“ – dann stehen alle Punkte nach Kapiteln da. Oben der Fortschritt, darunter „Jetzt dran“ (Fristen und Punkte, die länger als ein Jahr nicht geprüft wurden). Den Status links antippen schaltet weiter: Offen → Ausgefüllt → Aktuell (setzt das Prüfdatum auf heute). Den Punkt antippen = bearbeiten (Kapitel, Ort, Prüfdatum, Frist, „Entfällt“ für Unzutreffendes). „Kapitel als geprüft markieren“ setzt alle ausgefüllten Punkte eines Kapitels auf Aktuell. Notfallkarte: Notrufnummern zum Antippen (auf dem Handy wählt das Telefon), Sofortmaßnahmen, Hinweis für Einsatzkräfte zur PV-Anlage und die Standorte von Absperr- und Schaltstellen; eigene Standorte und Nummern (z. B. Giftnotruf) mit „+ Standort“ und „+ Nummer“. Die Karte liegt zusätzlich als Kopie auf dem Gerät – ohne Netz zeigt die App sie beim Start von selbst. Änderungen stehen im Verlauf.">?</button></h1>
+        <h1>Notfallordner <button class="hilfe-icon" data-hilfe="Die Checkliste zu deinem analogen Notfallordner und die Notfallkarte – nur in Privat. Hier stehen nur Hinweise, wo etwas liegt (grober Ort, Status, Prüfdatum, Frist) – keine Nummern, Diagnosen, Beträge oder Zugangsdaten; die bleiben im Ordner zu Hause. Oben umschalten: „Überblick“, „Notfallkarte“ und „Notvorrat“ (Vorratsliste nach BBK mit Da/Fehlt, Personenzahl und Haltbarkeit). Überblick: beim ersten Öffnen „Vorlage aus dem Ordner anlegen“ – dann stehen alle Punkte nach Kapiteln da. Oben der Fortschritt, darunter „Jetzt dran“ (Fristen und Punkte, die länger als ein Jahr nicht geprüft wurden). Den Status links antippen schaltet weiter: Offen → Ausgefüllt → Aktuell (setzt das Prüfdatum auf heute). Den Punkt antippen = bearbeiten (Kapitel, Ort, Prüfdatum, Frist, „Entfällt“ für Unzutreffendes). „Kapitel als geprüft markieren“ setzt alle ausgefüllten Punkte eines Kapitels auf Aktuell. Notfallkarte: Notrufnummern zum Antippen (auf dem Handy wählt das Telefon), Sofortmaßnahmen, Hinweis für Einsatzkräfte zur PV-Anlage und die Standorte von Absperr- und Schaltstellen; eigene Standorte und Nummern (z. B. Giftnotruf) mit „+ Standort“ und „+ Nummer“. Die Karte liegt zusätzlich als Kopie auf dem Gerät – ohne Netz zeigt die App sie beim Start von selbst. Änderungen stehen im Verlauf.">?</button></h1>
         <p class="hero-text">Checkliste zum Notfallordner und die Notfallkarte – nur Hinweise, wo etwas liegt.</p>
         <div id="notfallordner-inhalt"></div>
       </div>
@@ -2227,6 +2232,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=87"></script>
+<script src="app.js?v=88"></script>
 </body>
 </html>
