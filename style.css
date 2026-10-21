@@ -2555,3 +2555,11 @@ button.nf-ort { cursor: pointer; }
 .nf-personen > span { flex: 1 1 auto; }
 .nf-pm { min-width: 44px; min-height: 44px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: inherit; font: inherit; font-size: 1.2rem; cursor: pointer; }
 .nf-pm:disabled { opacity: 0.4; cursor: default; }
+
+/* Fristen (seit Session 90) */
+.fr-haken { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--border); background: var(--panel); color: var(--ok-text); font: inherit; font-size: 1.1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.fr-haken:hover { border-color: var(--ok-rand); }
+.fr-haken--an { background: var(--ok-bg); border-color: var(--ok-rand); }
+.fr-notiz { white-space: pre-line; }
+.fr-ueberf { margin: 0.4rem 0 0; }
+.nf-warn--ok { color: var(--ink-dim); font-weight: 500; }

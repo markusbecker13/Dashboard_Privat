@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="style.css?v=84">
+<link rel="stylesheet" href="style.css?v=85">
 <link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
@@ -1112,6 +1112,22 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
           </details>
 
           <details class="anleitung-abschnitt">
+            <summary>Fristen <span class="anleitung-nur">(seit Session 90; in jedem Bereich, unter „Planen“)</span></summary>
+            <div class="anleitung-text">
+              <p>Eigener Reiter für Fristen jeglicher Art – je Bereich eine eigene Liste (Privat, OGS, AWO, Business, EP). Beispiele: Vertrag kündigen, Versicherung prüfen, Antrag oder Verwendungsnachweis einreichen, Steuererklärung, Zahlung, Bericht, TÜV.</p>
+              <ul>
+                <li><strong>Neue Frist:</strong> Titel, Fällig am, Art (Vertrag, Versicherung, Steuer, Antrag, Prüfung, Zahlung, Bericht, Sonstiges), Wiederholung, Erinnerungsstufen, Bereich und Notiz. Der Bereich lässt sich später ändern, wenn eine Frist im falschen gelandet ist</li>
+                <li><strong>Liste:</strong> nach Datum, gruppiert in „Überfällig“, „In den nächsten 7 Tagen“, „In den nächsten 30 Tagen“ und „Später“. Der Kreis links hakt ab, die Frist selbst antippen bearbeitet. „Erledigt“ zeigt Abgehaktes; ein Haken dort öffnet die Frist wieder</li>
+                <li><strong>Wiederholung:</strong> bei „Einmalig“ wandert die Frist nach dem Abhaken nach „Erledigt“ (mit „Rückgängig“ im Hinweis). Bei monatlich, alle 3 Monate, alle 6 Monate und jährlich springt sie auf den nächsten Termin und bleibt offen. Ist eine Frist schon länger überfällig, springt sie auf den ersten Termin nach heute. Monatsende wird gekappt (31.1. + 1 Monat = 28.2.)</li>
+                <li><strong>Erinnerung:</strong> je Frist mehrere Stufen wählbar (2 Monate, 1 Monat, 2 Wochen, 1 Woche, 3, 2, 1 Tag vorher, am Tag selbst); Standard: 1 Woche, 1 Tag, am Tag selbst. Ist keine Stufe gewählt, gibt es keine Erinnerung. Überfällige Fristen mit Erinnerung melden sich am Tag danach und dann wöchentlich</li>
+                <li><strong>Benachrichtigung:</strong> ⋮ → „Benachrichtigungen &amp; Vorlesen“ → „Fristen“ (vorher <code>fristen_setup.sql</code> ausführen; der Schalter ist danach standardmäßig an). Die Nachricht kommt zur Uhrzeit der Morgen-Übersicht – als Zeilen darin, wenn die Morgen-Übersicht an ist, sonst als eigene Nachricht. Es zählen die Bereiche, die in den Benachrichtigungen unter „Bereiche“ gewählt sind; bei anderen Bereichen steht der Name in Klammern dahinter, z. B. „Frist morgen: Antrag (OGS)“. Bei „Nur Uhrzeit“ nur die Anzahl. Antippen öffnet den Reiter „Fristen“</li>
+                <li><strong>Reiter ein- oder ausblenden:</strong> wie alle Reiter über die Reiter-Verwaltung (je Bereich). Die Erinnerung läuft unabhängig davon, solange der Bereich in den Benachrichtigungen gewählt ist</li>
+                <li><strong>Datenschutz:</strong> Im Push-Text steht nur der Titel. Keine Namen Dritter oder Aktenzeichen in den Titel schreiben; Details gehören in die Notiz. Gesichert über Export → Backup</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
             <summary>Notfallordner <span class="anleitung-nur">(seit Session 86; nur Privat, unter „Sammeln“)</span></summary>
             <div class="anleitung-text">
               <p>Die Checkliste zu deinem ausgedruckten Notfallordner und eine Notfallkarte, die auch ohne Netz da ist. Die App ersetzt den Ordner nicht: Sie sagt dir, was fehlt, was zu prüfen ist und wo etwas liegt.</p>
@@ -1843,6 +1859,12 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
         <div id="zaehler-inhalt"></div>
       </div>
 
+      <div id="view-fristen" class="hidden">
+        <h1>Fristen <button class="hilfe-icon" data-hilfe="Fristen jeglicher Art für diesen Bereich: Verträge kündigen, Anträge und Nachweise abgeben, Versicherungen, Steuer, Zahlungen, Prüfungen. Mit „Neue Frist“ legst du eine an (Titel, Datum, Art). Wiederholung: bei einmalig bleibt sie nach dem Abhaken unter „Erledigt“; bei monatlich, alle 3 oder 6 Monate und jährlich springt sie beim Abhaken auf den nächsten Termin. Erinnern: mehrere Stufen möglich (2 Monate bis am Tag selbst); die Nachricht kommt als Benachrichtigung zur Uhrzeit der Morgen-Übersicht, bei überfälligen Fristen am Tag danach und dann wöchentlich. Den Schalter findest du unter ⋮ → Benachrichtigungen &amp; Vorlesen → „Fristen“; dort wählst du auch, aus welchen Bereichen Erinnerungen kommen. Den Kreis links antippen = erledigt, die Frist selbst antippen = bearbeiten (auch Bereich wechseln oder löschen).">?</button></h1>
+        <p class="hero-text">Fristen jeglicher Art – mit Erinnerung per Benachrichtigung.</p>
+        <div id="fristen-inhalt"></div>
+      </div>
+
       <div id="view-notfallordner" class="hidden">
         <h1>Notfallordner <button class="hilfe-icon" data-hilfe="Die Checkliste zu deinem analogen Notfallordner und die Notfallkarte – nur in Privat. Hier stehen nur Hinweise, wo etwas liegt (grober Ort, Status, Prüfdatum, Frist) – keine Nummern, Diagnosen, Beträge oder Zugangsdaten; die bleiben im Ordner zu Hause. Oben umschalten: „Überblick“, „Notfallkarte“ und „Notvorrat“ (Vorratsliste nach BBK mit Da/Fehlt, Personenzahl und Haltbarkeit). Überblick: beim ersten Öffnen „Vorlage aus dem Ordner anlegen“ – dann stehen alle Punkte nach Kapiteln da. Oben der Fortschritt, darunter „Jetzt dran“ (Fristen und Punkte, die länger als ein Jahr nicht geprüft wurden). Den Status links antippen schaltet weiter: Offen → Ausgefüllt → Aktuell (setzt das Prüfdatum auf heute). Den Punkt antippen = bearbeiten (Kapitel, Ort, Prüfdatum, Frist, „Entfällt“ für Unzutreffendes). „Kapitel als geprüft markieren“ setzt alle ausgefüllten Punkte eines Kapitels auf Aktuell. Notfallkarte: Notrufnummern zum Antippen (auf dem Handy wählt das Telefon), Sofortmaßnahmen, Hinweis für Einsatzkräfte zur PV-Anlage und die Standorte von Absperr- und Schaltstellen; eigene Standorte und Nummern (z. B. Giftnotruf) mit „+ Standort“ und „+ Nummer“. Die Karte liegt zusätzlich als Kopie auf dem Gerät – ohne Netz zeigt die App sie beim Start von selbst. Änderungen stehen im Verlauf.">?</button></h1>
         <p class="hero-text">Checkliste zum Notfallordner und die Notfallkarte – nur Hinweise, wo etwas liegt.</p>
@@ -2232,6 +2254,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=88"></script>
+<script src="app.js?v=89"></script>
 </body>
 </html>

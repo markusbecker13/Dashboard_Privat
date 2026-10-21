@@ -122,7 +122,7 @@
     reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
     rezepte: "view-rezepte", ernaehrung: "view-ernaehrung", schluessel: "view-schluessel",
     bibliothek: "view-bibliothek", lernen: "view-lernen", stunden: "view-stunden", zaehler: "view-zaehler",
-    kommando: "view-kommando", lernhilfe: "view-lernhilfe", notfallordner: "view-notfallordner",
+    kommando: "view-kommando", lernhilfe: "view-lernhilfe", notfallordner: "view-notfallordner", fristen: "view-fristen",
   };
 
   // Welche Reiter es grundsätzlich gibt – jetzt in allen drei Bereichen
@@ -137,7 +137,7 @@
     ["training", "Training"], ["rezepte", "Rezepte"], ["ernaehrung", "Ernährung"],
     ["raumplanung", "Raumplanung"], ["schluessel", "Schlüssel"], ["bibliothek", "Bibliothek"], ["lernen", "Lernen"],
     ["stunden", "Stunden"], ["zaehler", "Zähler"], ["kommando", "Kommandozentrale"],
-    ["lernhilfe", "Lernhilfe"], ["notfallordner", "Notfallordner"],
+    ["lernhilfe", "Lernhilfe"], ["notfallordner", "Notfallordner"], ["fristen", "Fristen"],
   ];
   // Reiter mit persönlichen Gesundheitsdaten gibt es nur in Privat – sie
   // tauchen in der Reiter-Verwaltung der anderen Bereiche gar nicht auf.
@@ -158,13 +158,13 @@
   // ohne aktives Umschalten nichts an der gewohnten Ansicht ändert.
   const STANDARD_SICHTBAR = {
     privat: ["heute", "frei", "aufgaben", "kalender", "planung", "finanzen", "notizen", "links",
-      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden", "zaehler", "kommando", "lernhilfe", "notfallordner"],
+      "reflexion", "spiele", "einheiten", "einkauf", "export", "verlauf", "anleitung", "training", "rezepte", "ernaehrung", "stunden", "zaehler", "kommando", "lernhilfe", "notfallordner", "fristen"],
     ogs: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung",
-      "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten", "stunden", "kommando"],
-    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel", "stunden", "kommando"],
-    business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen", "stunden", "kommando"],
+      "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "einheiten", "stunden", "kommando", "fristen"],
+    awo: ["heute", "aufgaben", "kalender", "notizen", "verlauf", "anleitung", "ogsideen", "raumplanung", "schluessel", "stunden", "kommando", "fristen"],
+    business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen", "stunden", "kommando", "fristen"],
     // Erlebnispädagogik (seit Session 49): Methodenkartei + Weiterbildung zogen aus Privat hierher
-    ep: ["heute", "aufgaben", "kalender", "notizen", "links", "bibliothek", "lernen", "methoden", "spiele", "verlauf", "anleitung", "kommando"],
+    ep: ["heute", "aufgaben", "kalender", "notizen", "links", "bibliothek", "lernen", "methoden", "spiele", "verlauf", "anleitung", "kommando", "fristen"],
   };
   // Kommandozentrale (seit Session 73) ist in allen Bereichen standardmäßig an –
   // dieselben Daten überall, je Bereich in der Reiter-Verwaltung ausblendbar
@@ -192,7 +192,7 @@
       { schluessel: "heute", label: "Heute", tabs: ["heute"] },
       // Seit Session 73: eigener Punkt in der Leiste unten
       { schluessel: "kommando", label: "Zentrale", tabs: ["kommando"] },
-      { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "frei", "planung", "finanzen", "stunden", "zaehler"] },
+      { schluessel: "planen", label: "Planen", tabs: ["aufgaben", "kalender", "fristen", "frei", "planung", "finanzen", "stunden", "zaehler"] },
       { schluessel: "sammeln", label: "Sammeln", tabs: sammeln },
       { schluessel: "arbeit", label: BEREICH_NAME[aktiverBereich] || "Weitere", tabs: [...new Set([...epTabs, "bibliothek", "lernen"]), "ogsideen", "ogsinventar", "ogsprojekte", "verleih", "raumplanung", "schluessel"] },
       { schluessel: "verwalten", label: "Verwalten", tabs: ["export", "verlauf", "anleitung"] },
@@ -8228,6 +8228,196 @@
     hinweis: "Nur Notdienste und Stellen, keine privaten Nummern von Personen.",
   });
 
+  // ==========================================================
+  // Fristen (seit Session 90): Reiter in jedem Bereich, Fristen jeglicher Art
+  // mit Art, Wiederholung und Erinnerungsstufen. Tabelle: fristen (je Bereich).
+  // Die Erinnerung läuft serverseitig (Push, zur Uhrzeit der Morgen-Übersicht).
+  // ==========================================================
+  const FR_ARTEN = [
+    ["vertrag", "Vertrag / Kündigung"], ["versicherung", "Versicherung"], ["steuer", "Steuer / Finanzamt"], ["antrag", "Antrag / Förderung"],
+    ["pruefung", "Prüfung / Termin / TÜV"], ["zahlung", "Zahlung"], ["bericht", "Bericht / Nachweis"], ["sonstiges", "Sonstiges"],
+  ];
+  const FR_WIEDERHOLUNG = [
+    ["keine", "Einmalig"], ["monatlich", "Jeden Monat"], ["vierteljaehrlich", "Alle 3 Monate"], ["halbjaehrlich", "Alle 6 Monate"], ["jaehrlich", "Jedes Jahr"],
+  ];
+  // Erinnerungsstufen: Tage vor der Frist
+  const FR_STUFEN = [[60, "2 Monate vorher"], [30, "1 Monat vorher"], [14, "2 Wochen vorher"], [7, "1 Woche vorher"], [3, "3 Tage vorher"], [2, "2 Tage vorher"], [1, "1 Tag vorher"], [0, "Am Tag selbst"]];
+  const FR_STUFEN_KURZ = { 0: "am Tag selbst", 1: "1 Tag", 2: "2 Tage", 3: "3 Tage", 7: "1 Woche", 14: "2 Wochen", 30: "1 Monat", 60: "2 Monate" };
+  const FR_BEREICH_NAMEN = { privat: "Privat", ogs: "OGS Rapunzel", awo: "AWO OV Liblar", business: "Business", ep: "Erlebnispädagogik" };
+  const fr = {
+    geladen: false, laedt: false, fehlt: false, fehler: "",
+    fristen: [], heute: null, bereich: null,
+    ansicht: "offen", // "offen" | "erledigt"
+    laufend: new Set(),
+  };
+
+  async function frLaden() {
+    if (fr.laedt) return;
+    fr.laedt = true; fr.fehler = "";
+    const fuer = aktiverBereich;
+    if (aktiverTab === "fristen") renderFristen();
+    try {
+      const r = await api("fristen_laden");
+      if (fuer !== aktiverBereich) { fr.laedt = false; fr.geladen = false; if (aktiverTab === "fristen") renderFristen(); return; }
+      fr.fehlt = !!r.fehlt;
+      fr.fristen = r.fristen || [];
+      fr.heute = r.heute || null;
+      fr.bereich = fuer;
+      fr.geladen = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") fr.fehler = e.message || "Fehler";
+    } finally {
+      fr.laedt = false;
+    }
+    if (aktiverTab === "fristen") renderFristen();
+  }
+  window.frNeuLaden = function() { fr.geladen = false; fr.fehler = ""; frLaden(); };
+
+  function frHeute() { return fr.heute || heuteISO(); }
+  function frArtName(k) { const e = FR_ARTEN.find((x) => x[0] === k); return e ? e[1] : "Sonstiges"; }
+  function frWiederholungName(k) { const e = FR_WIEDERHOLUNG.find((x) => x[0] === k); return e ? e[1] : ""; }
+  function frErinnerungText(f) {
+    const st = (Array.isArray(f.erinnern_tage) ? f.erinnern_tage : []).slice().sort((a, b) => b - a);
+    return st.length ? "Erinnerung: " + st.map((t) => FR_STUFEN_KURZ[t] || (t + " Tage")).join(", ") : "keine Erinnerung";
+  }
+  // Wie weit weg ist die Frist? { tage, text, art }
+  function frAbstand(f) {
+    const t = nfTage(frHeute(), f.faellig_am);
+    if (t < 0) return { tage: t, text: t === -1 ? "gestern fällig" : `seit ${-t} Tagen überfällig`, art: "faellig" };
+    if (t === 0) return { tage: t, text: "heute", art: "faellig" };
+    if (t === 1) return { tage: t, text: "morgen", art: "bald" };
+    return { tage: t, text: `in ${t} Tagen`, art: t <= 7 ? "bald" : "" };
+  }
+  function frDatumText(iso) {
+    const d = new Date(iso + "T12:00:00");
+    return isNaN(d.getTime()) ? datumDe(iso) : `${d.toLocaleDateString("de-DE", { weekday: "short" })}, ${datumDe(iso)}`;
+  }
+
+  function frZeileHtml(f, erledigtListe) {
+    const id = escapeAttr(String(f.id));
+    const ab = frAbstand(f);
+    const meta = [escapeHtml(frArtName(f.art))];
+    if (f.wiederholung && f.wiederholung !== "keine") meta.push("↻ " + escapeHtml(frWiederholungName(f.wiederholung)));
+    meta.push(escapeHtml(frErinnerungText(f)));
+    const notiz = f.notiz ? `<span class="notiz-meta fr-notiz">${escapeHtml(f.notiz)}</span>` : "";
+    if (erledigtListe) {
+      const wann = f.erledigt_am ? "erledigt am " + datumDe(String(f.erledigt_am).slice(0, 10)) : "erledigt";
+      return `<div class="nf-zeile nf-zeile--aus">
+        <button type="button" class="fr-haken fr-haken--an" onclick="frWiederOeffnen('${id}')" aria-label="${escapeAttr(f.titel)}: wieder öffnen" title="Wieder öffnen">✓</button>
+        <button type="button" class="nf-text" onclick="blattOeffnen('frist','${id}')">
+          <span class="nf-titel">${escapeHtml(f.titel)}</span><span class="notiz-meta">${frDatumText(f.faellig_am)} · ${wann}</span>
+        </button></div>`;
+    }
+    const warn = `<span class="nf-warn nf-warn--${ab.art || "ok"}">${escapeHtml(frDatumText(f.faellig_am))} · ${escapeHtml(ab.text)}</span>`;
+    return `<div class="nf-zeile">
+      <button type="button" class="fr-haken" onclick="frErledigen('${id}')" aria-label="${escapeAttr(f.titel)}: als erledigt abhaken" title="Erledigt"></button>
+      <button type="button" class="nf-text" onclick="blattOeffnen('frist','${id}')">
+        <span class="nf-titel">${escapeHtml(f.titel)}</span>${warn}
+        <span class="notiz-meta">${meta.join(" · ")}</span>${notiz}
+      </button></div>`;
+  }
+
+  function renderFristen() {
+    const el = document.getElementById("fristen-inhalt");
+    if (!el) return;
+    if (fr.bereich !== null && fr.bereich !== aktiverBereich) { fr.geladen = false; fr.fehler = ""; fr.fristen = []; }
+    if (!fr.geladen && !fr.laedt && !fr.fehler && !fr.fehlt) frLaden();
+    if (fr.fehlt) { el.innerHTML = `<p class="empty-text">Für die Fristen bitte zuerst <code>fristen_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`; return; }
+    if (fr.fehler) { el.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(fr.fehler)} <button class="link-btn" onclick="frNeuLaden()">Nochmal versuchen</button></p>`; return; }
+    if (!fr.geladen) { el.innerHTML = `<p class="empty-text">Lädt …</p>`; return; }
+    const offen = fr.fristen.filter((f) => !f.erledigt).sort((a, b) => String(a.faellig_am).localeCompare(String(b.faellig_am)) || a.titel.localeCompare(b.titel));
+    const erledigt = fr.fristen.filter((f) => f.erledigt).sort((a, b) => String(b.erledigt_am || "").localeCompare(String(a.erledigt_am || "")));
+    const ueberf = offen.filter((f) => frAbstand(f).tage < 0).length;
+    const schalter = `<div class="schnell-chips nf-ansicht" role="group" aria-label="Ansicht">` +
+      [["offen", `Offen (${offen.length})`], ["erledigt", `Erledigt (${erledigt.length})`]].map(([k, t]) =>
+        `<button type="button" class="schnell-chip${fr.ansicht === k ? " aktiv" : ""}" aria-pressed="${fr.ansicht === k}" onclick="frAnsicht('${k}')">${t}</button>`).join("") + `</div>`;
+    const neu = `<div class="reiter-aktionen bib-aktionen"><button type="button" class="btn-primary" onclick="blattNeu('frist', {})">${ic("plus")}Neue Frist</button></div>`;
+    let inhalt;
+    if (fr.ansicht === "erledigt") {
+      inhalt = erledigt.length
+        ? `<div class="nf-liste nf-liste--karte">${erledigt.map((f) => frZeileHtml(f, true)).join("")}</div>`
+        : `<p class="empty-text">Noch nichts erledigt.</p>`;
+    } else if (!offen.length) {
+      inhalt = `<p class="empty-text">Keine offenen Fristen in diesem Bereich. Mit „Neue Frist“ legst du eine an – z. B. Vertrag kündigen, Antrag einreichen, Nachweis abgeben.</p>`;
+    } else {
+      const gruppen = [
+        ["Überfällig", (f) => frAbstand(f).tage < 0],
+        ["In den nächsten 7 Tagen", (f) => { const t = frAbstand(f).tage; return t >= 0 && t <= 7; }],
+        ["In den nächsten 30 Tagen", (f) => { const t = frAbstand(f).tage; return t > 7 && t <= 30; }],
+        ["Später", (f) => frAbstand(f).tage > 30],
+      ];
+      inhalt = gruppen.map(([name, test]) => {
+        const liste = offen.filter(test);
+        return liste.length ? `<h2 class="std-zwischen">${name} (${liste.length})</h2><div class="nf-liste nf-liste--karte">${liste.map((f) => frZeileHtml(f, false)).join("")}</div>` : "";
+      }).join("");
+    }
+    el.innerHTML = `${schalter}${fr.ansicht === "offen" && ueberf ? `<p class="nf-warn nf-warn--faellig fr-ueberf">${ueberf} überfällig</p>` : ""}${inhalt}${neu}
+      <p class="notiz-meta nf-hinweis">Erinnerungen kommen als Benachrichtigung (⋮ → „Benachrichtigungen &amp; Vorlesen“ → „Fristen“). Die Fristen gehören zum Bereich ${escapeHtml(FR_BEREICH_NAMEN[aktiverBereich] || "")}; im Bearbeiten-Blatt lässt sich der Bereich ändern.</p>`;
+  }
+  window.frAnsicht = function(a) { fr.ansicht = a === "erledigt" ? "erledigt" : "offen"; renderFristen(); };
+
+  window.frErledigen = async function(id) {
+    const f = fr.fristen.find((x) => String(x.id) === String(id));
+    if (!f || fr.laufend.has(String(f.id))) return;
+    fr.laufend.add(String(f.id));
+    try {
+      const r = await api("fristen_erledigen", { id: f.id });
+      if (r.naechste) {
+        f.faellig_am = r.naechste;
+        hinweisZeigen(`Erledigt – nächster Termin ${datumDe(r.naechste)}`);
+      } else {
+        f.erledigt = true; f.erledigt_am = new Date().toISOString();
+        hinweisZeigen("Frist erledigt", async () => { await api("fristen_erledigen", { id: f.id, erledigt: false }); f.erledigt = false; f.erledigt_am = null; renderFristen(); });
+      }
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    } finally {
+      fr.laufend.delete(String(f.id));
+    }
+    renderFristen();
+  };
+  window.frWiederOeffnen = async function(id) {
+    const f = fr.fristen.find((x) => String(x.id) === String(id));
+    if (!f) return;
+    try {
+      await api("fristen_erledigen", { id: f.id, erledigt: false });
+      f.erledigt = false; f.erledigt_am = null;
+    } catch (e) {
+      if (e.message !== "unauthorized") alert("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+    renderFristen();
+  };
+
+  BLATT_ARTEN.frist = {
+    titel: "Frist bearbeiten",
+    titelNeu: "Neue Frist",
+    finden: (id) => fr.fristen.find((f) => String(f.id) === String(id)),
+    laden: (f) => ({
+      id: f.id || "", titel: f.titel || "", faellig_am: f.faellig_am || "", art: f.art || "sonstiges",
+      wiederholung: f.wiederholung || "keine", bereich: f.bereich || aktiverBereich,
+      erinnern: (Array.isArray(f.erinnern_tage) ? f.erinnern_tage : [7, 1, 0]).map(String), notiz: f.notiz || "",
+    }),
+    felder: [
+      { key: "titel", label: "Frist", typ: "text", pflicht: true, platzhalter: "z. B. Versicherung kündigen" },
+      { key: "faellig_am", label: "Fällig am", typ: "datum", pflicht: true },
+      { key: "art", label: "Art", typ: "auswahl", optionen: FR_ARTEN },
+      { key: "wiederholung", label: "Wiederholung", typ: "auswahl", optionen: FR_WIEDERHOLUNG,
+        hinweis: "Wiederkehrende Fristen springen beim Abhaken auf den nächsten Termin." },
+      { key: "erinnern", label: "Erinnern", typ: "mehrfach", optionen: FR_STUFEN.map(([t, n]) => [String(t), n]),
+        hinweis: "Mehrere möglich, keine = ohne Erinnerung. Die Nachricht kommt zur Uhrzeit der Morgen-Übersicht; Schalter unter ⋮ → Benachrichtigungen → Fristen." },
+      { key: "bereich", label: "Bereich", typ: "auswahl", optionen: Object.keys(FR_BEREICH_NAMEN).map((k) => [k, FR_BEREICH_NAMEN[k]]) },
+      { key: "notiz", label: "Notiz", typ: "text-lang", zeilen: 3, platzhalter: "optional" },
+    ],
+    speichern: (id, w) => api("fristen_speichern", {
+      id, titel: w.titel, faellig_am: w.faellig_am, art: w.art, wiederholung: w.wiederholung, bereich: w.bereich,
+      erinnern_tage: w.erinnern.map(Number), notiz: w.notiz,
+    }),
+    loeschen: (id) => api("fristen_loeschen", { id }),
+    loeschFrage: (f) => `Frist „${f.titel || ""}“ löschen?`,
+    gespeichert: "Frist gespeichert",
+    danach: () => { frNeuLaden(); },
+  };
+
   let blatt = null; // { art, id, werte }
 
   // Öffnet das Bearbeiten-Blatt für einen Eintrag
@@ -10497,6 +10687,7 @@
         ${pushGeburtstagHtml(e, chips)}
         ${pushZaehlerHtml(e, chips, bereiche)}
         ${pushLernHtml(e, bereiche)}
+        ${pushFristenHtml(e, bereiche)}
         ${pushNotfallHtml(e, bereiche)}
         ${pushAwoHtml(e, chips, bereiche)}
         <label class="push-schalter"><input type="checkbox" id="push-termine"${e.termine_an ? " checked" : ""}> Vor Terminen und Aufgaben mit Uhrzeit</label>
@@ -10530,6 +10721,8 @@
       if (kzAn) push.einst.kz_morgen = kzAn.checked;
       const lernAn = document.getElementById("push-lern");
       if (lernAn) push.einst.lern_an = lernAn.checked;
+      const frAn = document.getElementById("push-fristen");
+      if (frAn) push.einst.fristen_an = frAn.checked;
       const nfAn = document.getElementById("push-notfall");
       if (nfAn) push.einst.notfall_an = nfAn.checked;
       const sAn = document.getElementById("push-schluessel");
@@ -10545,7 +10738,7 @@
     };
     ["push-morgens", "push-morgens-zeit", "push-termine"].forEach((id) => document.getElementById(id).addEventListener("change", merk));
     // Geburtstage: Erklärung hängt an Morgen-Übersicht und Schalter
-    ["push-geburtstage", "push-zaehler", "push-schluessel", "push-vermietung", "push-morgens", "push-morgens-zeit", "push-kz", "push-lern", "push-notfall"].forEach((id) => {
+    ["push-geburtstage", "push-zaehler", "push-schluessel", "push-vermietung", "push-morgens", "push-morgens-zeit", "push-kz", "push-lern", "push-fristen", "push-notfall"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", () => { merk(); pushRendern(); });
     });
@@ -10678,6 +10871,17 @@
         : "Aus."}</p>`;
   }
 
+  // ---- Fristen (seit Session 90) ----
+  function pushFristenHtml(e, bereiche) {
+    if (!Object.prototype.hasOwnProperty.call(e, "fristen_an")) {
+      return `<p class="notiz-meta push-erklaerung">Für Fristen-Erinnerungen bitte zuerst <code>fristen_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    return `<label class="push-schalter"><input type="checkbox" id="push-fristen"${e.fristen_an ? " checked" : ""}> Fristen (Reiter „Fristen“)</label>
+      <p class="notiz-meta push-erklaerung">${e.fristen_an
+        ? `Erinnert an die Fristen aus den gewählten Bereichen – zu den Stufen, die du je Frist einstellst (z. B. 1 Woche, 1 Tag, am Tag selbst), danach einen Tag nach Ablauf und dann wöchentlich, solange sie nicht erledigt ist. ${e.morgens_an ? "Als Zeilen in der Morgen-Übersicht." : "Als eigene Nachricht zur Uhrzeit der Morgen-Übersicht."} Bei „Nur Uhrzeit“ nur die Anzahl. Antippen öffnet die Fristen.`
+        : "Aus."}</p>`;
+  }
+
   // ---- Notfallordner: Fristen (seit Session 87) ----
   function pushNotfallHtml(e, bereiche) {
     if (!Object.prototype.hasOwnProperty.call(e, "notfall_an")) {
@@ -10788,6 +10992,8 @@
         ...(Object.prototype.hasOwnProperty.call(e, "kz_morgen") ? { kz_morgen: !!e.kz_morgen } : {}),
         // Lernhilfe-Ergebnisse (seit Session 83) nur, wenn der Server sie kennt
         ...(Object.prototype.hasOwnProperty.call(e, "lern_an") ? { lern_an: !!e.lern_an } : {}),
+        // Fristen (seit Session 90) nur, wenn der Server sie kennt
+        ...(Object.prototype.hasOwnProperty.call(e, "fristen_an") ? { fristen_an: !!e.fristen_an } : {}),
         // Notfallordner-Fristen (seit Session 87) nur, wenn der Server sie kennt
         ...(Object.prototype.hasOwnProperty.call(e, "notfall_an") ? { notfall_an: !!e.notfall_an } : {}),
         // Zähler-Erinnerung (seit Session 69) nur, wenn der Server sie kennt
@@ -11002,6 +11208,7 @@
     if (aktiv === "zaehler") renderZaehler();
     if (aktiv === "lernhilfe") renderLernhilfe();
     if (aktiv === "notfallordner") renderNotfallordner();
+    if (aktiv === "fristen") renderFristen();
     if (aktiv === "kommando") renderKommando();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
@@ -17936,6 +18143,16 @@
       luecken.push("Zähler: " + e.message);
     }
 
+    // Fristen (seit Session 90): alle Bereiche
+    meldung("Lade Fristen …");
+    try {
+      const r = await api("fristen_laden", { alle: true });
+      if (!r.fehlt) liste.fristen = r.fristen || [];
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Fristen: " + e.message);
+    }
+
     // Notfallordner (seit Session 86): nur Hinweise, wo etwas liegt
     meldung("Lade Notfallordner …");
     try {
@@ -18131,6 +18348,7 @@
     { k: "zaehler", t: "zaehler", name: "Zähler", gruppe: "Zähler" },
     { k: "zaehler_ablesungen", t: "zaehler_ablesungen", name: "Zähler: Ablesungen", gruppe: "Zähler" },
     { k: "zaehler_tarife", t: "zaehler_tarife", name: "Zähler: Tarife", gruppe: "Zähler" },
+    { k: "fristen", t: "fristen", name: "Fristen (alle Bereiche)", gruppe: "Planen" },
     { k: "notfall_punkte", t: "notfall_punkte", name: "Notfallordner: Punkte", gruppe: "Notfallordner" },
     { k: "notfall_karte", t: "notfall_karte", name: "Notfallordner: Notfallkarte", gruppe: "Notfallordner" },
     { k: "notfall_vorrat", t: "notfall_vorrat", name: "Notfallordner: Notvorrat", gruppe: "Notfallordner" },
