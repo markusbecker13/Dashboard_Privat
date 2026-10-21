@@ -165,6 +165,8 @@
     business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen", "stunden", "kommando", "fristen"],
     // Erlebnispädagogik (seit Session 49): Methodenkartei + Weiterbildung zogen aus Privat hierher
     ep: ["heute", "aufgaben", "kalender", "notizen", "links", "bibliothek", "lernen", "methoden", "spiele", "verlauf", "anleitung", "kommando", "fristen"],
+    // Zentrale (seit Session 91): Tagesübersicht über alle Bereiche + Kommandozentrale
+    zentrale: ["heute", "kommando", "anleitung"],
   };
   // Kommandozentrale (seit Session 73) ist in allen Bereichen standardmäßig an –
   // dieselben Daten überall, je Bereich in der Reiter-Verwaltung ausblendbar
@@ -391,7 +393,7 @@
     arbeit: `<svg ${SVG_ATTR}><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>`,
     verwalten: `<svg ${SVG_ATTR}><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>`,
   };
-  const BEREICH_KNOPF_TEXT = { privat: "Privat", ogs: "OGS", awo: "AWO", business: "Business", ep: "EP", verwaltung: "Verwaltung" };
+  const BEREICH_KNOPF_TEXT = { privat: "Privat", ogs: "OGS", awo: "AWO", business: "Business", ep: "EP", verwaltung: "Verwaltung", zentrale: "Zentrale" };
 
   // Liefert die Themengruppen, die im aktiven Bereich mindestens einen sichtbaren Reiter haben
   function sichtbareGruppen() {
@@ -436,11 +438,25 @@
     { bereich: "ep", name: "EP", lang: "Erlebnispädagogik", farbe: "#2d6a43", ring: "#2d6a43" },
   ];
 
+  // Zentrale (seit Session 91): eigener Punkt vorn, aber kein echter Bereich (nicht in BEREICH_UMSCHALTER, damit er nicht beim Erfassen auswählbar ist)
+  const ZENTRALE_UMSCHALTER = { bereich: "zentrale", name: "Zentrale", lang: "Zentrale (alle Bereiche)", farbe: "#5b4b8a", ring: "#5b4b8a" };
+  // Führt kurz im Kontext eines anderen Bereichs aus (für Berechnungen, die vom aktiven Bereich abhängen)
+  function inBereich(b, fn) {
+    const alt = aktiverBereich;
+    aktiverBereich = b;
+    try { return fn(); } finally { aktiverBereich = alt; }
+  }
+  // Öffnet einen Reiter in einem bestimmten Bereich (aus der Zentrale heraus)
+  window.zentraleOeffnen = function(bereich, tab) {
+    window.bereichAuswaehlen(bereich);
+    if (tab && reiterIstSichtbar(bereich, tab)) tabWechseln(tab);
+  };
+
   // Zeichnet den Bereichsumschalter in der Kopfzeile neu (aktiver Bereich mit Namen)
   function renderBereichUmschalter() {
     const el = document.getElementById("bereich-umschalter");
     if (!el) return;
-    el.innerHTML = BEREICH_UMSCHALTER.map((b) => {
+    el.innerHTML = [ZENTRALE_UMSCHALTER, ...BEREICH_UMSCHALTER].map((b) => {
       const aktiv = b.bereich === aktiverBereich;
       const titel = aktiv ? `${b.lang} – zum Start` : `Zu ${b.lang} wechseln`;
       return `<button type="button" class="bu-knopf${aktiv ? " aktiv" : ""}" style="--bu-farbe:${b.farbe}; --bu-ring:${b.ring};"
@@ -461,10 +477,9 @@
 
   // Öffnet die App direkt im zuletzt genutzten Bereich (Verwaltung zählt nicht, dann Privat)
   function appImLetztenBereichOeffnen() {
-    const gemerkt = localStorage.getItem("aktiver-bereich");
-    const bereich = BEREICH_FARBWELT.includes(gemerkt) ? gemerkt : "privat";
+    // Seit Session 91 startet die App immer in der Zentrale; der zuletzt genutzte echte Bereich bleibt für Links und Benachrichtigungen gemerkt
     zeigeApp();
-    window.bereichAuswaehlen(bereich);
+    window.bereichAuswaehlen("zentrale");
   }
 
   // Rendert untere Themenleiste und obere Reiter-Leiste; in der Verwaltung ohne Navigation
@@ -521,7 +536,7 @@
   // Wechselt den aktiven Bereich, schließt offene Rezept-Zustände und rendert alles neu
   window.bereichAuswaehlen = function(bereich) {
     aktiverBereich = bereich;
-    localStorage.setItem("aktiver-bereich", bereich);
+    if (bereich !== "zentrale") localStorage.setItem("aktiver-bereich", bereich);
     farbweltAnwenden(bereich);
     // Offenes Rezept-Formular gehört zum alten Bereich – schließen
     rezeptFormId = null;
@@ -3376,7 +3391,7 @@
 
   // Karte auf dem Start-Screen (Fr–Mo, bis „Später“ für diese Woche)
   function heuteRueckblickHtml() {
-    if (aktiverBereich === "verwaltung") return "";
+    if (aktiverBereich === "verwaltung" || aktiverBereich === "zentrale") return "";
     const tag = new Date().getDay();
     if (![5, 6, 0, 1].includes(tag)) return "";
     const mo = rueckStandardWoche();
@@ -5584,6 +5599,7 @@
       kz.laedt = false;
     }
     if (aktiverTab === "kommando") renderKommando();
+    if (aktiverTab === "heute" && aktiverBereich === "zentrale") renderHeute();
     kzKarteRendern();
   }
   window.kzNeuLaden = function() { kz.geladen = false; kz.fehler = ""; kzLaden(); };
@@ -8252,14 +8268,16 @@
     laufend: new Set(),
   };
 
+  // Zentrale lädt die Fristen aller Bereiche ("alle"), jeder echte Bereich nur seine
+  function frSchluessel() { return aktiverBereich === "zentrale" ? "alle" : aktiverBereich; }
   async function frLaden() {
     if (fr.laedt) return;
     fr.laedt = true; fr.fehler = "";
-    const fuer = aktiverBereich;
+    const fuer = frSchluessel();
     if (aktiverTab === "fristen") renderFristen();
     try {
-      const r = await api("fristen_laden");
-      if (fuer !== aktiverBereich) { fr.laedt = false; fr.geladen = false; if (aktiverTab === "fristen") renderFristen(); if (aktiverTab === "heute") renderHeute(); return; }
+      const r = await api("fristen_laden", fuer === "alle" ? { alle: true } : {});
+      if (fuer !== frSchluessel()) { fr.laedt = false; fr.geladen = false; if (aktiverTab === "fristen") renderFristen(); if (aktiverTab === "heute") renderHeute(); return; }
       fr.fehlt = !!r.fehlt;
       fr.fristen = r.fristen || [];
       fr.heute = r.heute || null;
@@ -8273,28 +8291,31 @@
     if (aktiverTab === "fristen") renderFristen();
     if (aktiverTab === "heute") renderHeute();
   }
-  // Karte auf der Startseite: überfällige und bald fällige Fristen (bis 14 Tage), max. 4
+  // Karte auf der Startseite: überfällige und bald fällige Fristen (bis 14 Tage), max. 5;
+  // in der Zentrale aus allen Bereichen mit Bereichsname
   function heuteFristenHtml() {
-    if (aktiverBereich === "verwaltung" || !BEREICHE_MIT_FRISTEN.includes(aktiverBereich)) return "";
-    if (typeof reiterIstSichtbar === "function" && !reiterIstSichtbar(aktiverBereich, "fristen")) return "";
-    if (fr.bereich !== null && fr.bereich !== aktiverBereich) { fr.geladen = false; fr.fehler = ""; fr.fehlt = false; fr.fristen = []; }
+    const zentrale = aktiverBereich === "zentrale";
+    if (!zentrale && !BEREICHE_MIT_FRISTEN.includes(aktiverBereich)) return "";
+    if (!zentrale && !reiterIstSichtbar(aktiverBereich, "fristen")) return "";
+    if (fr.bereich !== null && fr.bereich !== frSchluessel()) { fr.geladen = false; fr.fehler = ""; fr.fehlt = false; fr.fristen = []; }
     if (!fr.geladen && !fr.laedt && !fr.fehler && !fr.fehlt) { frLaden(); return ""; }
     if (!fr.geladen || fr.fehlt) return "";
     const bald = fr.fristen.filter((f) => !f.erledigt && frAbstand(f).tage <= 14)
       .sort((a, b) => String(a.faellig_am).localeCompare(String(b.faellig_am)));
     if (!bald.length) return "";
     const ueberf = bald.filter((f) => frAbstand(f).tage < 0).length;
-    const zeilen = bald.slice(0, 4).map((f) => {
+    const zeilen = bald.slice(0, 5).map((f) => {
       const ab = frAbstand(f);
-      return `<span class="heute-fr-zeile"><span class="heute-fr-titel">${escapeHtml(f.titel)}</span><span class="nf-warn nf-warn--${ab.art || "ok"}">${escapeHtml(ab.text)}</span></span>`;
+      const ziel = zentrale ? `zentraleOeffnen('${escapeAttr(f.bereich)}','fristen')` : "tabWechseln('fristen')";
+      return `<button type="button" class="heute-fr-zeile" onclick="${ziel}">
+        <span class="heute-fr-titel">${escapeHtml(f.titel)}${zentrale ? ` <span class="notiz-meta">· ${escapeHtml(BEREICH_KNOPF_TEXT[f.bereich] || f.bereich)}</span>` : ""}</span>
+        <span class="nf-warn nf-warn--${ab.art || "ok"}">${escapeHtml(ab.text)}</span></button>`;
     }).join("");
-    const mehr = bald.length > 4 ? `<span class="notiz-meta">… und ${bald.length - 4} weitere</span>` : "";
+    const mehr = bald.length > 5 ? `<span class="notiz-meta heute-fr-mehr">… und ${bald.length - 5} weitere</span>` : "";
     return `
       <section class="heute-block rueck-karte heute-fr">
-        <button type="button" class="rueck-karte-knopf" onclick="tabWechseln('fristen')" aria-label="Fristen öffnen">
-          <span class="rueck-karte-titel">${ic("kalender")} Fristen${ueberf ? ` · <span class="heute-warn">${ueberf} überfällig</span>` : ""}</span>
-          ${zeilen}${mehr}
-        </button>
+        <span class="rueck-karte-titel">${ic("kalender")} Fristen${ueberf ? ` · <span class="heute-warn">${ueberf} überfällig</span>` : ""}</span>
+        ${zeilen}${mehr}
       </section>`;
   }
   window.frNeuLaden = function() { fr.geladen = false; fr.fehler = ""; frLaden(); };
@@ -8346,7 +8367,7 @@
   function renderFristen() {
     const el = document.getElementById("fristen-inhalt");
     if (!el) return;
-    if (fr.bereich !== null && fr.bereich !== aktiverBereich) { fr.geladen = false; fr.fehler = ""; fr.fristen = []; }
+    if (fr.bereich !== null && fr.bereich !== frSchluessel()) { fr.geladen = false; fr.fehler = ""; fr.fristen = []; }
     if (!fr.geladen && !fr.laedt && !fr.fehler && !fr.fehlt) frLaden();
     if (fr.fehlt) { el.innerHTML = `<p class="empty-text">Für die Fristen bitte zuerst <code>fristen_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`; return; }
     if (fr.fehler) { el.innerHTML = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(fr.fehler)} <button class="link-btn" onclick="frNeuLaden()">Nochmal versuchen</button></p>`; return; }
@@ -8443,6 +8464,49 @@
     gespeichert: "Frist gespeichert",
     danach: () => { frNeuLaden(); },
   };
+
+  // ---- Zentrale (seit Session 91): Karten über alle Bereiche ----
+  // Kommandozentrale in Kürze: Top 3 heute, Überfälliges, Eingang, Wiedervorlage
+  function zentraleKzHtml() {
+    if (!kz.geladen && !kz.laedt && !kz.fehler && !kz.fehlt) { kzLaden(); return ""; }
+    if (!kz.geladen || kz.fehlt) return "";
+    const top = kzAufgabenSortiert(kz.aufgaben.filter((a) => a.heute && a.status !== "erledigt"));
+    const ueber = kzUeberfaellig().length;
+    const nicht = kzNichtGeschafft().length;
+    const eingang = kzEingang().length;
+    const wv = kzWartendeAlle().filter(({ x }) => kzWiedervorlageFaellig(x)).length;
+    const zusatz = [
+      ueber ? `<span class="kz-karte-rot">${ueber} überfällig</span>` : "",
+      nicht ? `<span>${nicht} gestern nicht geschafft</span>` : "",
+      wv ? `<span>${wv} Wiedervorlage</span>` : "",
+      eingang ? `<span>Eingang ${eingang}</span>` : "",
+    ].filter(Boolean).join(" · ");
+    return `<div class="kz-heute-karte zentrale-kz"><button type="button" class="kz-karte" onclick="tabWechseln('kommando')">
+        <span class="kz-karte-kopf">${ic("pokal")} Top 3 heute <span class="notiz-meta">${top.length}/${KZ_HEUTE_MAX}</span></span>
+        ${top.length ? `<ol class="kz-karte-liste">${top.map((a) => `<li>${escapeHtml(a.titel)}</li>`).join("")}</ol>`
+          : `<span class="kz-karte-leer">Noch keine Top 3 für heute festgelegt.</span>`}
+        ${zusatz ? `<span class="kz-karte-zusatz">${zusatz}</span>` : ""}
+        <span class="kz-karte-weiter">Zur Kommandozentrale ${ic("weiter")}</span>
+      </button></div>`;
+  }
+  // Kennzahlen: kcal (Privat), Einkauf offen (alle Bereiche), verliehen (OGS), Stunden (Privat)
+  function zentraleKennzahlenHtml() {
+    const k = [];
+    const kcal = inBereich("privat", () => ernStartKachelHtml());
+    if (kcal) k.push(kcal);
+    const stunden = inBereich("privat", () => stdStartKachelHtml());
+    if (stunden) k.push(stunden);
+    const einkauf = BEREICH_FARBWELT.map((b) => ({ b, n: einkaufsliste.filter((e) => bereichVon(e) === b && !e.erledigt).length }))
+      .filter((x) => x.n && reiterIstSichtbar(x.b, "einkauf"));
+    if (einkauf.length) {
+      const summe = einkauf.reduce((s, x) => s + x.n, 0);
+      k.push(kennzahlHtml(summe, "Einkauf offen", `zentraleOeffnen('${einkauf[0].b}','einkauf')`));
+    }
+    const verliehen = inBereich("ogs", () => reiterIstSichtbar("ogs", "verleih")
+      ? verleihAktuell().filter((v) => !v.rueckgabe_am).reduce((s, v) => s + (Number(v.menge) || 1), 0) : 0);
+    if (verliehen) k.push(kennzahlHtml(verliehen, "verliehen (OGS)", "zentraleOeffnen('ogs','verleih')"));
+    return k.length ? `<div class="heute-kennzahlen">${k.join("")}</div>` : "";
+  }
 
   let blatt = null; // { art, id, werte }
 
@@ -9246,6 +9310,15 @@
     const saetze = [];
     saetze.push(h < 11 ? "Guten Morgen." : h < 18 ? "Hallo." : "Guten Abend.");
     saetze.push(`Heute ist ${jetzt.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}.`);
+    if (b === "zentrale") {
+      let irgendwas = false;
+      BEREICH_UMSCHALTER.forEach((u) => {
+        const t = inBereich(u.bereich, () => tagesText(jetzt)).slice(2).filter((x) => x !== "Heute steht nichts an. Freie Bahn.");
+        if (t.length) { irgendwas = true; saetze.push(`${u.lang}:`, ...t); }
+      });
+      if (!irgendwas) saetze.push("Heute steht nichts an. Freie Bahn.");
+      return saetze;
+    }
     const offen = aufgaben.filter((a) => bereichVon(a) === b && !a.erledigt).map(enrich);
     const eintraege = heuteEintraegeSammeln(heute, offen).filter((e) => !e.erledigt);
     const mitZeit = eintraege.filter((e) => e.typ === "termin" && e.start);
@@ -11710,13 +11783,29 @@
     const heuteIso = heuteISO();
     const jetztDate = new Date();
     const jetztMinuten = jetztDate.getHours() * 60 + jetztDate.getMinutes();
-    const offenEnriched = aufgaben
-      .filter((a) => bereichVon(a) === aktiverBereich && !a.erledigt)
-      .map(enrich);
-    const eintraege = heuteEintraegeSammeln(heuteIso, offenEnriched);
-    const ueberfaellig = offenEnriched
-      .filter((a) => a.status === "ueberfaellig")
-      .sort((a, b) => (a.faellig_am || "").localeCompare(b.faellig_am || "") || (a.uhrzeit || "99").localeCompare(b.uhrzeit || "99"));
+    const zentrale = aktiverBereich === "zentrale";
+    let eintraege;
+    let ueberfaellig;
+    if (zentrale) {
+      // Zentrale (seit Session 91): alle Bereiche gebündelt, jede Zeile mit Bereichsname
+      eintraege = [];
+      ueberfaellig = [];
+      BEREICH_FARBWELT.forEach((b) => inBereich(b, () => {
+        const oe = aufgaben.filter((a) => bereichVon(a) === b && !a.erledigt).map(enrich);
+        heuteEintraegeSammeln(heuteIso, oe).forEach((e) => { e.meta += " · " + BEREICH_KNOPF_TEXT[b]; e.bereich = b; eintraege.push(e); });
+        oe.filter((a) => a.status === "ueberfaellig").forEach((a) => { a._bereich = b; ueberfaellig.push(a); });
+      }));
+      eintraege.sort((x, y) => x.sort - y.sort);
+      ueberfaellig.sort((a, b) => (a.faellig_am || "").localeCompare(b.faellig_am || "") || (a.uhrzeit || "99").localeCompare(b.uhrzeit || "99"));
+    } else {
+      const offenEnriched = aufgaben
+        .filter((a) => bereichVon(a) === aktiverBereich && !a.erledigt)
+        .map(enrich);
+      eintraege = heuteEintraegeSammeln(heuteIso, offenEnriched);
+      ueberfaellig = offenEnriched
+        .filter((a) => a.status === "ueberfaellig")
+        .sort((a, b) => (a.faellig_am || "").localeCompare(b.faellig_am || "") || (a.uhrzeit || "99").localeCompare(b.uhrzeit || "99"));
+    }
 
     // ---- Kopf ----
     const datumEl = document.getElementById("heute-datum");
@@ -11743,6 +11832,12 @@
       return ziele.filter((z) => z.zeitraum_typ === typ && z.zeitraum_start === startIso);
     }) : [];
 
+    if (zentrale) {
+      document.getElementById("heute-bereich").innerHTML =
+        heuteNaechstesHtml(eintraege, jetztMinuten) + heuteFristenHtml() + zentraleKzHtml()
+        + heuteListeHtml(eintraege, jetztMinuten) + heuteUeberfaelligHtml(ueberfaellig, heuteIso) + zentraleKennzahlenHtml();
+      return;
+    }
     let html = "";
     html += heuteDeinTagHtml(heuteIso, jetztDate, jetztMinuten);
     html += heuteNaechstesHtml(eintraege, jetztMinuten);
@@ -12144,7 +12239,7 @@
       const t = tageSeitIso(a.faellig_am, heuteIso);
       return heuteZeileHtml({
         id: a.id, typ: "aufgabe", zeit: formatDatumKurz(a.faellig_am), titel: a.titel, tab: "aufgaben", ueberfaellig: true,
-        meta: "fällig " + (t === 1 ? "gestern" : t === 2 ? "vorgestern" : `vor ${t} Tagen`),
+        meta: "fällig " + (t === 1 ? "gestern" : t === 2 ? "vorgestern" : `vor ${t} Tagen`) + (a._bereich ? " · " + BEREICH_KNOPF_TEXT[a._bereich] : ""),
       }, -1);
     }).join("");
     return `
@@ -12160,7 +12255,7 @@
   // Verschiebt alle überfälligen Aufgaben des aktiven Bereichs auf heute (Uhrzeit, Projekt und Wiederholung bleiben)
   window.ueberfaelligAufHeute = async function(knopf) {
     const heute = heuteISO();
-    const liste = aufgaben.filter((a) => bereichVon(a) === aktiverBereich && !a.erledigt && a.faellig_am && a.faellig_am < heute);
+    const liste = aufgaben.filter((a) => (aktiverBereich === "zentrale" || bereichVon(a) === aktiverBereich) && !a.erledigt && a.faellig_am && a.faellig_am < heute);
     if (!liste.length) return;
     if (knopf) { knopf.disabled = true; knopf.textContent = "Verschiebe …"; }
     let fehler = 0;

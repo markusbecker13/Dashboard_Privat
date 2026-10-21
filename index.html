@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="style.css?v=86">
+<link rel="stylesheet" href="style.css?v=87">
 <link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
@@ -1107,6 +1107,25 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Schnellstart</strong> (seit Session 72): App-Symbol lange drücken → „Zähler ablesen“ öffnet direkt den Reiter. Android übernimmt neue Verknüpfungen erst beim nächsten Update der installierten App, das kann ein paar Tage dauern</li>
                 <li><strong>Erinnerung zum Ablesen</strong> (seit Session 69): ⋮-Menü → Benachrichtigungen → „Zähler ablesen (monatlich)“ und den Tag wählen (1., 5., 15. oder 28.). Die Nachricht kommt an dem Tag zur Uhrzeit der Morgen-Übersicht – aber nur, wenn ein aktiver Zähler seit Monatsanfang noch nicht abgelesen ist (Ablesungen aus den letzten 3 Tagen des Vormonats zählen mit). Ist 3 Tage später immer noch etwas offen, kommt sie einmal erneut. Antippen öffnet den Reiter Zähler. Bei „Bereiche“ muss Privat gewählt sein; die Ruhezeit gilt auch hier</li>
                 <li>Gesichert über Export → Backup wie alle anderen Daten</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Zentrale <span class="anleitung-nur">(seit Session 91; Startseite über alle Bereiche)</span></summary>
+            <div class="anleitung-text">
+              <p>Die App startet immer in der <strong>Zentrale</strong> (erster Punkt oben links, violett). Sie bündelt den Tag aus <strong>allen Bereichen</strong>; jede Zeile trägt den Bereichsnamen. Für Details wechselst du über die Punkte oben in den einzelnen Bereich – dort ist alles wie gewohnt.</p>
+              <ul>
+                <li><strong>Als Nächstes:</strong> der laufende oder nächste Termin bzw. die nächste Aufgabe mit Uhrzeit, bereichsübergreifend</li>
+                <li><strong>Fristen:</strong> überfällige und in den nächsten 14 Tagen fällige Fristen aller Bereiche (max. 5); Antippen öffnet den Reiter „Fristen“ im passenden Bereich</li>
+                <li><strong>Top 3 heute:</strong> Kurzfassung der Kommandozentrale (Top 3, Überfälliges, Eingang, Wiedervorlage); Antippen öffnet sie. Unten in der Leiste: „Zentrale“ = Kommandozentrale</li>
+                <li><strong>Heute:</strong> alle Termine und Aufgaben des Tages, abhakbar und wischbar wie im Bereich; Antippen bearbeitet. Überfälliges steht gesammelt darunter, „Alle auf heute“ verschiebt Überfälliges aus allen Bereichen</li>
+                <li><strong>Kennzahlen:</strong> kcal und Stunden (Privat), Einkauf offen (Bereiche mit Einkauf), verliehen (OGS)</li>
+                <li><strong>Wetter, Datum, Vorlesen:</strong> oben wie bisher; das Vorlesen nennt den Tag bereichsweise</li>
+                <li><strong>Geburtstage</strong> erscheinen als Termine des Tages</li>
+                <li><strong>Schnell erfassen (+):</strong> in der Zentrale wählst du im Dialog den Bereich. Einträge landen im gewählten Bereich</li>
+                <li><strong>Links und Benachrichtigungen</strong> öffnen den Bereich, in dem du zuletzt warst</li>
+                <li>Hinweis: Abhaken in der Zentrale wird im Verlauf unter „Privat“ geführt</li>
               </ul>
             </div>
           </details>
@@ -2255,6 +2274,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=90"></script>
+<script src="app.js?v=91"></script>
 </body>
 </html>
