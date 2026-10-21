@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="style.css?v=85">
+<link rel="stylesheet" href="style.css?v=86">
 <link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
@@ -1121,6 +1121,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Wiederholung:</strong> bei „Einmalig“ wandert die Frist nach dem Abhaken nach „Erledigt“ (mit „Rückgängig“ im Hinweis). Bei monatlich, alle 3 Monate, alle 6 Monate und jährlich springt sie auf den nächsten Termin und bleibt offen. Ist eine Frist schon länger überfällig, springt sie auf den ersten Termin nach heute. Monatsende wird gekappt (31.1. + 1 Monat = 28.2.)</li>
                 <li><strong>Erinnerung:</strong> je Frist mehrere Stufen wählbar (2 Monate, 1 Monat, 2 Wochen, 1 Woche, 3, 2, 1 Tag vorher, am Tag selbst); Standard: 1 Woche, 1 Tag, am Tag selbst. Ist keine Stufe gewählt, gibt es keine Erinnerung. Überfällige Fristen mit Erinnerung melden sich am Tag danach und dann wöchentlich</li>
                 <li><strong>Benachrichtigung:</strong> ⋮ → „Benachrichtigungen &amp; Vorlesen“ → „Fristen“ (vorher <code>fristen_setup.sql</code> ausführen; der Schalter ist danach standardmäßig an). Die Nachricht kommt zur Uhrzeit der Morgen-Übersicht – als Zeilen darin, wenn die Morgen-Übersicht an ist, sonst als eigene Nachricht. Es zählen die Bereiche, die in den Benachrichtigungen unter „Bereiche“ gewählt sind; bei anderen Bereichen steht der Name in Klammern dahinter, z. B. „Frist morgen: Antrag (OGS)“. Bei „Nur Uhrzeit“ nur die Anzahl. Antippen öffnet den Reiter „Fristen“</li>
+                <li><strong>Startseite:</strong> Auf „Heute“ zeigt eine Karte „Fristen“ überfällige und bald fällige Fristen (bis 14 Tage, max. 4); antippen öffnet den Reiter. Ohne solche Fristen erscheint sie nicht</li>
                 <li><strong>Reiter ein- oder ausblenden:</strong> wie alle Reiter über die Reiter-Verwaltung (je Bereich). Die Erinnerung läuft unabhängig davon, solange der Bereich in den Benachrichtigungen gewählt ist</li>
                 <li><strong>Datenschutz:</strong> Im Push-Text steht nur der Titel. Keine Namen Dritter oder Aktenzeichen in den Titel schreiben; Details gehören in die Notiz. Gesichert über Export → Backup</li>
               </ul>
@@ -2254,6 +2255,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=89"></script>
+<script src="app.js?v=90"></script>
 </body>
 </html>

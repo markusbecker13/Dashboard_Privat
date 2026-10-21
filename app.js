@@ -8244,6 +8244,7 @@
   const FR_STUFEN = [[60, "2 Monate vorher"], [30, "1 Monat vorher"], [14, "2 Wochen vorher"], [7, "1 Woche vorher"], [3, "3 Tage vorher"], [2, "2 Tage vorher"], [1, "1 Tag vorher"], [0, "Am Tag selbst"]];
   const FR_STUFEN_KURZ = { 0: "am Tag selbst", 1: "1 Tag", 2: "2 Tage", 3: "3 Tage", 7: "1 Woche", 14: "2 Wochen", 30: "1 Monat", 60: "2 Monate" };
   const FR_BEREICH_NAMEN = { privat: "Privat", ogs: "OGS Rapunzel", awo: "AWO OV Liblar", business: "Business", ep: "Erlebnispädagogik" };
+  const BEREICHE_MIT_FRISTEN = ["privat", "ogs", "awo", "business", "ep"];
   const fr = {
     geladen: false, laedt: false, fehlt: false, fehler: "",
     fristen: [], heute: null, bereich: null,
@@ -8258,7 +8259,7 @@
     if (aktiverTab === "fristen") renderFristen();
     try {
       const r = await api("fristen_laden");
-      if (fuer !== aktiverBereich) { fr.laedt = false; fr.geladen = false; if (aktiverTab === "fristen") renderFristen(); return; }
+      if (fuer !== aktiverBereich) { fr.laedt = false; fr.geladen = false; if (aktiverTab === "fristen") renderFristen(); if (aktiverTab === "heute") renderHeute(); return; }
       fr.fehlt = !!r.fehlt;
       fr.fristen = r.fristen || [];
       fr.heute = r.heute || null;
@@ -8270,6 +8271,31 @@
       fr.laedt = false;
     }
     if (aktiverTab === "fristen") renderFristen();
+    if (aktiverTab === "heute") renderHeute();
+  }
+  // Karte auf der Startseite: überfällige und bald fällige Fristen (bis 14 Tage), max. 4
+  function heuteFristenHtml() {
+    if (aktiverBereich === "verwaltung" || !BEREICHE_MIT_FRISTEN.includes(aktiverBereich)) return "";
+    if (typeof reiterIstSichtbar === "function" && !reiterIstSichtbar(aktiverBereich, "fristen")) return "";
+    if (fr.bereich !== null && fr.bereich !== aktiverBereich) { fr.geladen = false; fr.fehler = ""; fr.fehlt = false; fr.fristen = []; }
+    if (!fr.geladen && !fr.laedt && !fr.fehler && !fr.fehlt) { frLaden(); return ""; }
+    if (!fr.geladen || fr.fehlt) return "";
+    const bald = fr.fristen.filter((f) => !f.erledigt && frAbstand(f).tage <= 14)
+      .sort((a, b) => String(a.faellig_am).localeCompare(String(b.faellig_am)));
+    if (!bald.length) return "";
+    const ueberf = bald.filter((f) => frAbstand(f).tage < 0).length;
+    const zeilen = bald.slice(0, 4).map((f) => {
+      const ab = frAbstand(f);
+      return `<span class="heute-fr-zeile"><span class="heute-fr-titel">${escapeHtml(f.titel)}</span><span class="nf-warn nf-warn--${ab.art || "ok"}">${escapeHtml(ab.text)}</span></span>`;
+    }).join("");
+    const mehr = bald.length > 4 ? `<span class="notiz-meta">… und ${bald.length - 4} weitere</span>` : "";
+    return `
+      <section class="heute-block rueck-karte heute-fr">
+        <button type="button" class="rueck-karte-knopf" onclick="tabWechseln('fristen')" aria-label="Fristen öffnen">
+          <span class="rueck-karte-titel">${ic("kalender")} Fristen${ueberf ? ` · <span class="heute-warn">${ueberf} überfällig</span>` : ""}</span>
+          ${zeilen}${mehr}
+        </button>
+      </section>`;
   }
   window.frNeuLaden = function() { fr.geladen = false; fr.fehler = ""; frLaden(); };
 
@@ -11721,6 +11747,7 @@
     html += heuteDeinTagHtml(heuteIso, jetztDate, jetztMinuten);
     html += heuteNaechstesHtml(eintraege, jetztMinuten);
     html += heuteRueckblickHtml();
+    html += heuteFristenHtml();
     html += heuteModuleHtml(heuteIso);
     html += heuteListeHtml(eintraege, jetztMinuten);
     html += heuteUeberfaelligHtml(ueberfaellig, heuteIso);
