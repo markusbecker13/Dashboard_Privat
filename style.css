@@ -2568,3 +2568,34 @@ button.nf-ort { cursor: pointer; }
 .heute-fr-zeile { display: flex; justify-content: space-between; gap: 0.75rem; align-items: baseline; width: 100%; background: none; border: 0; padding: 0.25rem 0; font: inherit; color: inherit; text-align: left; cursor: pointer; min-height: 2rem; }
 .heute-fr-mehr { padding-top: 0.2rem; }
 .heute-fr-titel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Tageszähler im Training (seit Session 92) */
+.rep-karte { margin: 0 0 1rem; padding: 0.8rem; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.rep-kopf { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+.rep-uebung { padding: 0.7rem 0; border-top: 1px solid var(--border); }
+.rep-uebung:first-of-type { border-top: 0; }
+.rep-kopfzeile { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; }
+.rep-name { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: inherit; cursor: pointer; text-align: left; min-height: 2rem; }
+.rep-summe { font-size: 1.8rem; font-weight: 800; line-height: 1; margin-left: auto; font-variant-numeric: tabular-nums; }
+.rep-uebung--ok .rep-summe { color: var(--ok-text); }
+.rep-fortschritt { height: 8px; border-radius: 4px; background: var(--border); margin: 0.4rem 0; overflow: hidden; }
+.rep-fortschritt span { display: block; height: 100%; background: var(--accent, #2a5bd7); border-radius: 4px; }
+.rep-uebung--ok .rep-fortschritt span { background: var(--ok-rand, #2d6a43); }
+.rep-eingabe { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.5rem 0; }
+.rep-eingabe input { width: 7rem; min-height: 44px; font-size: 1.1rem; }
+.rep-eingabe .btn-primary, .rep-eingabe .link-btn { min-height: 44px; }
+.rep-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.rep-chip { min-height: 36px; padding: 0 0.7rem; border-radius: 18px; border: 1px solid var(--border); background: var(--bg); font: inherit; cursor: pointer; font-variant-numeric: tabular-nums; }
+.rep-verlauf-knopf { margin-top: 0.4rem; min-height: 40px; }
+.rep-verlauf { margin-top: 0.4rem; }
+.rep-balken-feld { display: flex; align-items: flex-end; gap: 2px; height: 90px; margin: 0.6rem 0 0.2rem; }
+.rep-balken-spalte { flex: 1 1 0; height: 100%; display: flex; align-items: flex-end; min-width: 2px; }
+.rep-balken { display: block; width: 100%; background: var(--accent, #2a5bd7); border-radius: 2px 2px 0 0; }
+.rep-balken--ziel { background: var(--ok-rand, #2d6a43); }
+.rep-balken-achse { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--ink-dim); }
+.rep-statistik { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 0.8rem; margin: 0.6rem 0; font-size: 0.92rem; }
+.rep-liste { list-style: none; margin: 0.4rem 0; padding: 0; max-height: 18rem; overflow-y: auto; }
+.rep-liste li { display: flex; gap: 0.6rem; align-items: baseline; padding: 0.3rem 0; border-top: 1px solid var(--border); }
+.rep-liste-datum { flex: 0 0 8.5rem; }
+.rep-liste-summe { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 3rem; text-align: right; }
+.rep-nachtragen, .rep-archiv { margin-top: 0.5rem; }

@@ -8465,6 +8465,228 @@
     danach: () => { frNeuLaden(); },
   };
 
+  // ==========================================================
+  // Tageszähler im Training (seit Session 92): z. B. Liegestütze – über den
+  // Tag mehrfach Wiederholungen eintragen, die Tagessumme wird gebildet,
+  // dazu Verlauf (Balken, Summe, Ø, bester Tag, Serie). Tabellen:
+  // rep_uebungen, rep_eintraege (je Bereich).
+  // ==========================================================
+  const rep = {
+    geladen: false, laedt: false, fehlt: false, fehler: "",
+    uebungen: [], eintraege: [], heute: null, bereich: null,
+    offen: new Set(),            // Übungen mit aufgeklapptem Verlauf
+    tage: 14,                    // Zeitraum im Verlauf
+    letzte: {},                  // je Übung: zuletzt eingetragene Zahl (nur diese Sitzung)
+    laufend: false,
+  };
+  async function repLaden() {
+    if (rep.laedt) return;
+    rep.laedt = true; rep.fehler = "";
+    const fuer = aktiverBereich;
+    try {
+      const r = await api("rep_laden");
+      if (fuer !== aktiverBereich) { rep.laedt = false; rep.geladen = false; if (aktiverTab === "training") renderRep(); return; }
+      rep.fehlt = !!r.fehlt;
+      rep.uebungen = r.uebungen || [];
+      rep.eintraege = r.eintraege || [];
+      rep.heute = r.heute || null;
+      rep.bereich = fuer;
+      rep.geladen = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") rep.fehler = e.message || "Fehler";
+    } finally {
+      rep.laedt = false;
+    }
+    if (aktiverTab === "training") renderRep();
+  }
+  window.repNeuLaden = function() { rep.geladen = false; rep.fehler = ""; repLaden(); };
+  function repHeute() { return rep.heute || heuteISO(); }
+  function repTagesSummen(uebungId) {
+    const m = {};
+    rep.eintraege.forEach((e) => { if (e.uebung_id === uebungId) m[e.datum] = (m[e.datum] || 0) + e.anzahl; });
+    return m;
+  }
+  function repZahl(n) { return Number(n).toLocaleString("de-DE"); }
+  // Kennzahlen für den Verlauf
+  function repStatistik(uebungId, tage) {
+    const m = repTagesSummen(uebungId);
+    const heute = repHeute();
+    const von = addTage(heute, -(tage - 1));
+    const tageListe = [];
+    for (let i = 0; i < tage; i++) { const d = addTage(von, i); tageListe.push({ datum: d, summe: m[d] || 0 }); }
+    const aktiv = tageListe.filter((t) => t.summe > 0);
+    const gesamt = tageListe.reduce((s, t) => s + t.summe, 0);
+    const bester = aktiv.reduce((b, t) => (!b || t.summe > b.summe ? t : b), null);
+    // Serie: aufeinanderfolgende Tage mit Eintrag bis heute (oder bis gestern, wenn heute noch nichts steht)
+    let serie = 0;
+    let d = (m[heute] || 0) > 0 ? heute : addTage(heute, -1);
+    while ((m[d] || 0) > 0) { serie++; d = addTage(d, -1); }
+    return { tageListe, gesamt, aktiveTage: aktiv.length, schnitt: aktiv.length ? Math.round(gesamt / aktiv.length) : 0, bester, serie, max: Math.max(1, ...tageListe.map((t) => t.summe)) };
+  }
+  function repVerlaufHtml(u) {
+    const st = repStatistik(u.id, rep.tage);
+    const balken = st.tageListe.map((t) => {
+      const h = t.summe ? Math.max(4, Math.round((t.summe / st.max) * 100)) : 0;
+      const ziel = u.tagesziel && t.summe >= u.tagesziel ? " rep-balken--ziel" : "";
+      return `<span class="rep-balken-spalte" title="${escapeAttr(datumDe(t.datum))}: ${t.summe} ${escapeAttr(u.einheit)}"><span class="rep-balken${ziel}" style="height:${h}%"></span></span>`;
+    }).join("");
+    const chips = [[7, "7 Tage"], [14, "14 Tage"], [30, "30 Tage"], [90, "90 Tage"]].map(([t, n]) =>
+      `<button type="button" class="schnell-chip${rep.tage === t ? " aktiv" : ""}" aria-pressed="${rep.tage === t}" onclick="repZeitraum(${t})">${n}</button>`).join("");
+    const m = {};
+    rep.eintraege.filter((e) => e.uebung_id === u.id).forEach((e) => { (m[e.datum] = m[e.datum] || []).push(e); });
+    const tageMitEintrag = Object.keys(m).sort().reverse().slice(0, 60);
+    const liste = tageMitEintrag.map((d) => {
+      const teile = m[d].slice().sort((x, y) => String(x.erstellt_am).localeCompare(String(y.erstellt_am))).map((e) => e.anzahl);
+      const summe = teile.reduce((s, n) => s + n, 0);
+      return `<li><span class="rep-liste-datum">${escapeHtml(frDatumText(d))}</span><span class="rep-liste-summe">${repZahl(summe)}</span><span class="notiz-meta">${teile.length > 1 ? teile.join(" + ") : ""}</span></li>`;
+    }).join("");
+    return `<div class="rep-verlauf">
+      <div class="schnell-chips" role="group" aria-label="Zeitraum">${chips}</div>
+      <div class="rep-balken-feld" role="img" aria-label="Tagessummen der letzten ${rep.tage} Tage">${balken}</div>
+      <div class="rep-balken-achse"><span>${escapeHtml(datumDe(st.tageListe[0].datum))}</span><span>heute</span></div>
+      <div class="rep-statistik">
+        <span><strong>${repZahl(st.gesamt)}</strong> ${escapeHtml(u.einheit)} gesamt</span>
+        <span><strong>${st.aktiveTage}</strong> von ${rep.tage} Tagen</span>
+        <span>Ø <strong>${repZahl(st.schnitt)}</strong> pro aktivem Tag</span>
+        <span>Bester Tag: <strong>${st.bester ? repZahl(st.bester.summe) + "</strong> (" + escapeHtml(datumDe(st.bester.datum)) + ")" : "–</strong>"}</span>
+        <span>Serie: <strong>${st.serie}</strong> ${st.serie === 1 ? "Tag" : "Tage"}</span>
+      </div>
+      ${liste ? `<ul class="rep-liste">${liste}</ul>` : `<p class="empty-text">Noch keine Einträge.</p>`}
+      <details class="rep-nachtragen"><summary>Für einen anderen Tag eintragen</summary>
+        <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem;">
+          <input type="date" id="rep-datum-${escapeAttr(u.id)}" value="${escapeAttr(addTage(repHeute(), -1))}" max="${escapeAttr(repHeute())}" aria-label="Datum">
+          <input type="number" id="rep-nach-${escapeAttr(u.id)}" min="1" inputmode="numeric" placeholder="Anzahl" style="width:7rem;" aria-label="Anzahl">
+          <button type="button" class="link-btn" onclick="repNachtragen('${escapeAttr(u.id)}')">Eintragen</button>
+        </div></details>
+    </div>`;
+  }
+  function repUebungHtml(u) {
+    const id = escapeAttr(u.id);
+    const heute = repHeute();
+    const heutige = rep.eintraege.filter((e) => e.uebung_id === u.id && e.datum === heute)
+      .sort((x, y) => String(x.erstellt_am).localeCompare(String(y.erstellt_am)));
+    const summe = heutige.reduce((s, e) => s + e.anzahl, 0);
+    const ziel = u.tagesziel ? Math.min(100, Math.round((summe / u.tagesziel) * 100)) : null;
+    const geschafft = u.tagesziel && summe >= u.tagesziel;
+    const letzte = rep.letzte[u.id] || (heutige.length ? heutige[heutige.length - 1].anzahl : null);
+    const eintraege = heutige.length
+      ? heutige.map((e) => `<button type="button" class="rep-chip" onclick="repEintragLoeschen('${escapeAttr(e.id)}')" title="Eintrag löschen" aria-label="${e.anzahl} löschen">${repZahl(e.anzahl)} <span aria-hidden="true">×</span></button>`).join("")
+      : `<span class="notiz-meta">Heute noch nichts eingetragen.</span>`;
+    return `<div class="rep-uebung${geschafft ? " rep-uebung--ok" : ""}">
+      <div class="rep-kopfzeile">
+        <button type="button" class="rep-name" onclick="blattOeffnen('repuebung','${id}')" title="Übung bearbeiten">${escapeHtml(u.name)}</button>
+        <span class="rep-summe" aria-label="Heute ${summe} ${escapeAttr(u.einheit)}">${repZahl(summe)}</span>
+        <span class="notiz-meta">${escapeHtml(u.einheit)} heute${u.tagesziel ? ` · Ziel ${repZahl(u.tagesziel)}${geschafft ? " ✓" : ""}` : ""}</span>
+      </div>
+      ${ziel !== null ? `<div class="rep-fortschritt" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${ziel}"><span style="width:${ziel}%"></span></div>` : ""}
+      <div class="rep-eingabe">
+        <input type="number" id="rep-in-${id}" min="1" max="100000" inputmode="numeric" placeholder="Anzahl" aria-label="Anzahl für ${escapeAttr(u.name)}" onkeydown="if(event.key==='Enter'){repHinzufuegen('${id}')}">
+        <button type="button" class="btn-primary" onclick="repHinzufuegen('${id}')">+ Eintragen</button>
+        ${letzte ? `<button type="button" class="link-btn" onclick="repHinzufuegen('${id}', ${Number(letzte)})" title="Noch einmal dieselbe Zahl">+ ${repZahl(letzte)}</button>` : ""}
+      </div>
+      <div class="rep-chips">${eintraege}</div>
+      <button type="button" class="link-btn rep-verlauf-knopf" aria-expanded="${rep.offen.has(u.id)}" onclick="repVerlaufUmschalten('${id}')">${rep.offen.has(u.id) ? "Verlauf schließen" : "Verlauf ansehen"}</button>
+      ${rep.offen.has(u.id) ? repVerlaufHtml(u) : ""}
+    </div>`;
+  }
+  function renderRep() {
+    const el = document.getElementById("rep-bereich");
+    if (!el) return;
+    if (rep.bereich !== null && rep.bereich !== aktiverBereich) { rep.geladen = false; rep.fehler = ""; rep.fehlt = false; rep.uebungen = []; rep.eintraege = []; }
+    if (!rep.geladen && !rep.laedt && !rep.fehler && !rep.fehlt) repLaden();
+    // Eingaben beim Neuzeichnen erhalten
+    const merk = {};
+    el.querySelectorAll("input[id^='rep-in-']").forEach((i) => { if (i.value) merk[i.id] = i.value; });
+    const hatFokus = document.activeElement && el.contains(document.activeElement) ? document.activeElement.id : null;
+    let inhalt;
+    if (rep.fehlt) inhalt = `<p class="empty-text">Für den Tageszähler bitte zuerst <code>rep_zaehler_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    else if (rep.fehler) inhalt = `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(rep.fehler)} <button class="link-btn" onclick="repNeuLaden()">Nochmal versuchen</button></p>`;
+    else if (!rep.geladen) inhalt = `<p class="empty-text">Lädt …</p>`;
+    else {
+      const aktiv = rep.uebungen.filter((u) => !u.archiviert);
+      const archiv = rep.uebungen.filter((u) => u.archiviert);
+      inhalt = (aktiv.length ? aktiv.map(repUebungHtml).join("")
+        : `<p class="empty-text">Noch keine Zähl-Übung. Mit „+ Zähl-Übung“ legst du z. B. „Liegestütze“ an und trägst über den Tag Wiederholungen ein – die App addiert sie.</p>`)
+        + (archiv.length ? `<details class="rep-archiv"><summary>Archiviert (${archiv.length})</summary>${archiv.map((u) => `<button type="button" class="link-btn" onclick="blattOeffnen('repuebung','${escapeAttr(u.id)}')">${escapeHtml(u.name)}</button>`).join(" ")}</details>` : "");
+    }
+    el.innerHTML = `<section class="rep-karte" aria-label="Tageszähler">
+      <div class="rep-kopf"><h2 class="heute-label">Tageszähler</h2>
+        <button type="button" class="link-btn" onclick="blattNeu('repuebung', {})">${ic("plus")} Zähl-Übung</button></div>
+      ${inhalt}</section>`;
+    Object.keys(merk).forEach((k) => { const i = document.getElementById(k); if (i) i.value = merk[k]; });
+    if (hatFokus) { const f = document.getElementById(hatFokus); if (f) f.focus(); }
+  }
+  window.repVerlaufUmschalten = function(id) { if (rep.offen.has(id)) rep.offen.delete(id); else rep.offen.add(id); renderRep(); };
+  window.repZeitraum = function(t) { rep.tage = [7, 14, 30, 90].includes(t) ? t : 14; renderRep(); };
+
+  // Trägt Wiederholungen ein (Zahl aus dem Feld oder fest übergeben), mehrfach am Tag möglich
+  async function repEintragen(id, anzahl, datum) {
+    if (rep.laufend) return false;
+    const n = Math.round(Number(anzahl));
+    if (!Number.isFinite(n) || n < 1 || n > 100000) { hinweisZeigen("Bitte eine Zahl von 1 bis 100000 eingeben"); return false; }
+    rep.laufend = true;
+    try {
+      const r = await api("rep_eintrag_hinzufuegen", datum ? { uebung_id: id, anzahl: n, datum } : { uebung_id: id, anzahl: n });
+      rep.eintraege.unshift({ id: r.id, uebung_id: id, bereich: aktiverBereich, datum: r.datum || repHeute(), anzahl: n, erstellt_am: r.erstellt_am || new Date().toISOString() });
+      rep.letzte[id] = n;
+      return true;
+    } catch (e) {
+      if (e.message !== "unauthorized") hinweisZeigen("Nicht gespeichert: " + (e.message || "Fehler"));
+      return false;
+    } finally {
+      rep.laufend = false;
+    }
+  }
+  window.repHinzufuegen = async function(id, fest) {
+    const feld = document.getElementById("rep-in-" + id);
+    const wert = fest !== undefined ? fest : (feld ? feld.value : "");
+    const ok = await repEintragen(id, wert);
+    if (ok && feld) feld.value = "";
+    renderRep();
+    if (ok && feld) { const neu = document.getElementById("rep-in-" + id); if (neu) neu.focus(); }
+  };
+  window.repNachtragen = async function(id) {
+    const d = document.getElementById("rep-datum-" + id);
+    const z = document.getElementById("rep-nach-" + id);
+    if (!d || !d.value) { hinweisZeigen("Bitte ein Datum wählen"); return; }
+    const ok = await repEintragen(id, z ? z.value : "", d.value);
+    if (ok) hinweisZeigen("Eingetragen für " + datumDe(d.value));
+    renderRep();
+  };
+  window.repEintragLoeschen = async function(eid) {
+    const e = rep.eintraege.find((x) => x.id === eid);
+    if (!e) return;
+    try {
+      await api("rep_eintrag_loeschen", { id: eid });
+      rep.eintraege = rep.eintraege.filter((x) => x.id !== eid);
+      hinweisZeigen(`${e.anzahl} gelöscht`, async () => {
+        await repEintragen(e.uebung_id, e.anzahl, e.datum);
+        renderRep();
+      });
+    } catch (err) {
+      if (err.message !== "unauthorized") hinweisZeigen("Nicht gelöscht: " + (err.message || "Fehler"));
+    }
+    renderRep();
+  };
+
+  BLATT_ARTEN.repuebung = {
+    titel: "Zähl-Übung bearbeiten",
+    titelNeu: "Neue Zähl-Übung",
+    finden: (id) => rep.uebungen.find((u) => u.id === id),
+    laden: (u) => ({ id: u.id || "", name: u.name || "", einheit: u.einheit || "Wdh.", tagesziel: u.tagesziel || "", archiviert: u.archiviert ? "ja" : "nein" }),
+    felder: [
+      { key: "name", label: "Name", typ: "text", pflicht: true, platzhalter: "z. B. Liegestütze" },
+      { key: "einheit", label: "Einheit", typ: "text", platzhalter: "Wdh.", hinweis: "z. B. Wdh., Sekunden, Minuten, Meter" },
+      { key: "tagesziel", label: "Tagesziel", typ: "zahl", min: 1, platzhalter: "optional" },
+      { key: "archiviert", label: "Status", typ: "chips", optionen: [["nein", "Aktiv"], ["ja", "Archiviert"]], hinweis: "Archivierte Übungen verschwinden aus der Liste, der Verlauf bleibt erhalten." },
+    ],
+    speichern: (id, w) => api("rep_uebung_speichern", { id, name: w.name, einheit: w.einheit, tagesziel: w.tagesziel === "" ? null : w.tagesziel, archiviert: w.archiviert === "ja" }),
+    loeschen: (id) => api("rep_uebung_loeschen", { id }),
+    loeschFrage: (u) => `Zähl-Übung „${u.name || ""}“ mit allen Einträgen löschen?`,
+    gespeichert: "Zähl-Übung gespeichert",
+    danach: () => { repNeuLaden(); },
+  };
+
   // ---- Zentrale (seit Session 91): Karten über alle Bereiche ----
   // Kommandozentrale in Kürze: Top 3 heute, Überfälliges, Eingang, Wiedervorlage
   function zentraleKzHtml() {
@@ -15062,6 +15284,7 @@
 
   // Rendert den Trainingsbereich: Filter, Wochenziel/Serie, Unterbereiche und Wochenliste der Einträge
   function renderTraining() {
+    renderRep();
     // Für die kcal-Anzeige in Privat: Gewicht und MET-Werte einmal laden
     if (aktiverBereich === "privat" && !ernProfilGeladen && !ernProfilLaedt && !ernProfilFehlgeschlagen) ernProfilLaden();
     const bereichEl = document.getElementById("training-liste-bereich");
@@ -18275,6 +18498,16 @@
       luecken.push("Fristen: " + e.message);
     }
 
+    // Tageszähler (seit Session 92): alle Bereiche
+    meldung("Lade Tageszähler …");
+    try {
+      const r = await api("rep_laden", { alle: true });
+      if (!r.fehlt) { liste.rep_uebungen = r.uebungen || []; liste.rep_eintraege = r.eintraege || []; }
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Tageszähler: " + e.message);
+    }
+
     // Notfallordner (seit Session 86): nur Hinweise, wo etwas liegt
     meldung("Lade Notfallordner …");
     try {
@@ -18471,6 +18704,8 @@
     { k: "zaehler_ablesungen", t: "zaehler_ablesungen", name: "Zähler: Ablesungen", gruppe: "Zähler" },
     { k: "zaehler_tarife", t: "zaehler_tarife", name: "Zähler: Tarife", gruppe: "Zähler" },
     { k: "fristen", t: "fristen", name: "Fristen (alle Bereiche)", gruppe: "Planen" },
+    { k: "rep_uebungen", t: "rep_uebungen", name: "Tageszähler: Übungen", gruppe: "Training" },
+    { k: "rep_eintraege", t: "rep_eintraege", name: "Tageszähler: Einträge", gruppe: "Training" },
     { k: "notfall_punkte", t: "notfall_punkte", name: "Notfallordner: Punkte", gruppe: "Notfallordner" },
     { k: "notfall_karte", t: "notfall_karte", name: "Notfallordner: Notfallkarte", gruppe: "Notfallordner" },
     { k: "notfall_vorrat", t: "notfall_vorrat", name: "Notfallordner: Notvorrat", gruppe: "Notfallordner" },
