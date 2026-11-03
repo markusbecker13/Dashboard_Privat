@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="style.css?v=88">
+<link rel="stylesheet" href="style.css?v=89">
 <link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
@@ -321,6 +321,8 @@
         <h1>Notizen <button class="hilfe-icon" data-hilfe="Kurze, formlose Notizen – optional einem Projekt zugeordnet. Anders als bei Aufgaben gibt es kein Fälligkeitsdatum und keine Erledigt-Markierung.">?</button></h1>
         <p class="hero-text">Schnell rein, schnell wieder raus – für spontane Ideen und Gedanken.</p>
 
+        <div id="mappen-bereich"></div>
+        <div id="notizen-standard">
         <div class="row">
           <input type="text" id="neue-notiz" placeholder="Notiz eintragen …">
           <select id="notiz-projekt"><option value="">Ohne Projekt</option></select>
@@ -329,6 +331,7 @@
         </div>
 
         <div id="notizen-bereich"></div>
+        </div>
       </div>
 
       <div id="view-links" class="hidden">
@@ -1107,6 +1110,23 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Schnellstart</strong> (seit Session 72): App-Symbol lange drücken → „Zähler ablesen“ öffnet direkt den Reiter. Android übernimmt neue Verknüpfungen erst beim nächsten Update der installierten App, das kann ein paar Tage dauern</li>
                 <li><strong>Erinnerung zum Ablesen</strong> (seit Session 69): ⋮-Menü → Benachrichtigungen → „Zähler ablesen (monatlich)“ und den Tag wählen (1., 5., 15. oder 28.). Die Nachricht kommt an dem Tag zur Uhrzeit der Morgen-Übersicht – aber nur, wenn ein aktiver Zähler seit Monatsanfang noch nicht abgelesen ist (Ablesungen aus den letzten 3 Tagen des Vormonats zählen mit). Ist 3 Tage später immer noch etwas offen, kommt sie einmal erneut. Antippen öffnet den Reiter Zähler. Bei „Bereiche“ muss Privat gewählt sein; die Ruhezeit gilt auch hier</li>
                 <li>Gesichert über Export → Backup wie alle anderen Daten</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Mappen <span class="anleitung-nur">(seit Session 93; oben im Reiter Notizen)</span></summary>
+            <div class="anleitung-text">
+              <p>Eine <strong>Mappe</strong> sammelt mehrere Notizen, Ideen und Fragen zu einem Termin oder Thema – damit du vor dem Termin alles auf einmal öffnest.</p>
+              <ul>
+                <li><strong>Anlegen:</strong> Notizen → „Neue Mappe“ → Titel, optional einen Termin des Bereichs wählen (ohne Termin ist es eine Themenmappe). Danach öffnet sich die Mappe gleich</li>
+                <li><strong>Punkte:</strong> Art wählen (Notiz, Idee, Frage), Text schreiben, „+ Hinzufügen“. Beliebig viele, auch während des Termins. Antippen eines Punkts bearbeitet oder löscht ihn</li>
+                <li><strong>Besprochen:</strong> Der Kreis links hakt einen Punkt ab; „Besprochene ausblenden“ zeigt nur, was noch offen ist</li>
+                <li><strong>Mitnehmen:</strong> „Als Text kopieren“ legt die ganze Mappe als Liste in die Zwischenablage</li>
+                <li><strong>Am Termin:</strong> Ist eine Mappe mit einem Termin verknüpft, erscheint in „Heute“ (und in der Zentrale) unter dem Termin ein Chip mit dem Mappennamen und der Zahl der Punkte – ein Tipp öffnet sie. Bei Serienterminen erscheint er an jedem Vorkommen</li>
+                <li><strong>Verwalten:</strong> „Mappe bearbeiten“ → umbenennen, anderen Termin wählen, archivieren oder löschen (löscht auch alle Punkte). Archivierte stehen unter „Archiviert“</li>
+                <li>Je Bereich getrennt, gesichert über Export → Backup. Vorher einmal <code>mappen_setup.sql</code> ausführen</li>
+                <li>Datenschutz: Keine Namen Dritter oder Gesundheitsdaten eintragen, wenn es nicht sein muss – Kürzel reichen</li>
               </ul>
             </div>
           </details>
@@ -2293,6 +2313,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=92"></script>
+<script src="app.js?v=93"></script>
 </body>
 </html>

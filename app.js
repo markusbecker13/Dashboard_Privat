@@ -8687,6 +8687,234 @@
     danach: () => { repNeuLaden(); },
   };
 
+  // ==========================================================
+  // Mappen (seit Session 93): mehrere Notizen, Ideen und Fragen zu einem
+  // Termin oder Thema zusammenhängend notieren und auf einmal öffnen.
+  // Tabellen: mappen, mappe_punkte. Sitzt oben im Reiter Notizen; an
+  // Terminen in „Heute“ erscheint ein Chip zur verknüpften Mappe.
+  // ==========================================================
+  const MP_ARTEN = [["notiz", "Notiz"], ["idee", "Idee"], ["frage", "Frage"]];
+  const mp = {
+    geladen: false, laedt: false, fehlt: false, fehler: "",
+    mappen: [], punkte: [], bereich: null,
+    offenId: null,      // geöffnete Mappe
+    art: "notiz",       // Art für den nächsten neuen Punkt
+    zeigeBesprochen: true,
+  };
+  function mpSchluessel() { return aktiverBereich === "zentrale" ? "alle" : aktiverBereich; }
+  async function mpLaden() {
+    if (mp.laedt) return;
+    mp.laedt = true; mp.fehler = "";
+    const fuer = mpSchluessel();
+    try {
+      const r = await api("mappen_laden", fuer === "alle" ? { alle: true } : {});
+      if (fuer !== mpSchluessel()) { mp.laedt = false; mp.geladen = false; mpNeuZeichnen(); return; }
+      mp.fehlt = !!r.fehlt;
+      mp.mappen = r.mappen || [];
+      mp.punkte = r.punkte || [];
+      mp.bereich = fuer;
+      mp.geladen = true;
+    } catch (e) {
+      if (e.message !== "unauthorized") mp.fehler = e.message || "Fehler";
+    } finally {
+      mp.laedt = false;
+    }
+    mpNeuZeichnen();
+  }
+  window.mpNeuLaden = function() { mp.geladen = false; mp.fehler = ""; mpLaden(); };
+  function mpNeuZeichnen() {
+    if (aktiverTab === "notizen") renderMappen();
+    if (aktiverTab === "heute") renderHeute();
+  }
+  // Stellt sicher, dass die Daten zum aktuellen Bereich passen und geladen sind (true = bereit)
+  function mpBereit() {
+    if (mp.bereich !== null && mp.bereich !== mpSchluessel()) { mp.geladen = false; mp.fehler = ""; mp.fehlt = false; mp.mappen = []; mp.punkte = []; }
+    if (!mp.geladen && !mp.laedt && !mp.fehler && !mp.fehlt) mpLaden();
+    return mp.geladen && !mp.fehlt;
+  }
+  // Mappen, die zu einem Termin verknüpft sind (für Heute-Zeilen)
+  function mappenZuTermin(terminId) {
+    if (!mpBereit()) return [];
+    return mp.mappen.filter((m) => !m.archiviert && m.termin_id && String(m.termin_id) === String(terminId));
+  }
+  function mpTermin(m) { return m.termin_id ? termine.find((t) => String(t.id) === String(m.termin_id)) : null; }
+  function mpTerminText(m) {
+    if (!m.termin_id) return "Thema";
+    const t = mpTermin(m);
+    if (!t) return "Termin nicht mehr vorhanden";
+    return `${frDatumText(t.datum)}${t.uhrzeit ? " · " + String(t.uhrzeit).slice(0, 5) : ""}${t.wiederholung ? " · Serie" : ""}`;
+  }
+  function mpPunkteVon(id) { return mp.punkte.filter((p) => p.mappe_id === id); }
+
+  // Reihenfolge: Mappen mit kommendem Termin (nach Datum), dann Themen (zuletzt bearbeitet), dann vergangene Termine
+  function mpSortiert(liste) {
+    const heute = heuteISO();
+    const rang = (m) => { const t = mpTermin(m); return !m.termin_id ? 1 : !t ? 2 : (t.wiederholung || t.datum >= heute) ? 0 : 2; };
+    return liste.slice().sort((a, b) => rang(a) - rang(b)
+      || (rang(a) === 0 ? String((mpTermin(a) || {}).datum || "").localeCompare(String((mpTermin(b) || {}).datum || "")) : 0)
+      || String(b.aktualisiert_am).localeCompare(String(a.aktualisiert_am)));
+  }
+
+  function renderMappen() {
+    const el = document.getElementById("mappen-bereich");
+    const standard = document.getElementById("notizen-standard");
+    if (!el) return;
+    const bereit = mpBereit();
+    if (mp.fehlt) { if (standard) standard.classList.remove("hidden"); el.innerHTML = `<p class="empty-text">Für die Mappen bitte zuerst <code>mappen_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`; return; }
+    if (mp.fehler) { if (standard) standard.classList.remove("hidden"); el.innerHTML = `<p class="empty-text">Mappen konnten nicht geladen werden: ${escapeHtml(mp.fehler)} <button class="link-btn" onclick="mpNeuLaden()">Nochmal versuchen</button></p>`; return; }
+    if (!bereit) { el.innerHTML = ""; return; }
+    const offen = mp.offenId ? mp.mappen.find((m) => m.id === mp.offenId) : null;
+    if (mp.offenId && !offen) mp.offenId = null;
+    if (standard) standard.classList.toggle("hidden", !!offen);
+    el.innerHTML = offen ? mpMappeHtml(offen) : mpUebersichtHtml();
+  }
+
+  function mpUebersichtHtml() {
+    const aktiv = mpSortiert(mp.mappen.filter((m) => !m.archiviert));
+    const archiv = mp.mappen.filter((m) => m.archiviert);
+    const karte = (m) => {
+      const p = mpPunkteVon(m.id);
+      const offenN = p.filter((x) => !x.besprochen).length;
+      return `<button type="button" class="mp-karte" onclick="mappeOeffnenId('${escapeAttr(m.id)}')">
+        <span class="mp-karte-titel">${escapeHtml(m.titel)}</span>
+        <span class="notiz-meta">${escapeHtml(mpTerminText(m))} · ${p.length === 0 ? "leer" : `${p.length} ${p.length === 1 ? "Punkt" : "Punkte"}${offenN && offenN !== p.length ? `, ${offenN} offen` : ""}`}</span>
+      </button>`;
+    };
+    return `<section class="mp-bereich" aria-label="Mappen">
+      <div class="rep-kopf"><h2 class="heute-label">Mappen</h2>
+        <button type="button" class="link-btn" onclick="blattNeu('mappe', {})">${ic("plus")} Neue Mappe</button></div>
+      ${aktiv.length ? `<div class="mp-liste">${aktiv.map(karte).join("")}</div>`
+        : `<p class="empty-text">Eine Mappe sammelt Notizen, Ideen und Fragen zu einem Termin oder Thema – vor dem Termin alles auf einmal öffnen. Mit „Neue Mappe“ anlegen.</p>`}
+      ${archiv.length ? `<details class="rep-archiv"><summary>Archiviert (${archiv.length})</summary><div class="mp-liste">${archiv.map(karte).join("")}</div></details>` : ""}
+    </section>`;
+  }
+
+  function mpMappeHtml(m) {
+    const punkte = mpPunkteVon(m.id);
+    const sichtbar = mp.zeigeBesprochen ? punkte : punkte.filter((p) => !p.besprochen);
+    const besprochen = punkte.filter((p) => p.besprochen).length;
+    const zeilen = sichtbar.map((p) => {
+      const id = escapeAttr(p.id);
+      const artName = (MP_ARTEN.find((x) => x[0] === p.art) || ["", "Notiz"])[1];
+      return `<div class="mp-punkt${p.besprochen ? " mp-punkt--fertig" : ""}">
+        <button type="button" class="fr-haken${p.besprochen ? " fr-haken--an" : ""}" onclick="mpPunktUmschalten('${id}')" aria-pressed="${p.besprochen}" aria-label="${escapeAttr(artName)} als besprochen markieren" title="${p.besprochen ? "Wieder offen" : "Besprochen"}">${p.besprochen ? "✓" : ""}</button>
+        <button type="button" class="mp-punkt-text" onclick="blattOeffnen('mpunkt','${id}')" title="Bearbeiten">
+          <span class="mp-art mp-art--${escapeAttr(p.art)}">${escapeHtml(artName)}</span>
+          <span class="mp-text">${escapeHtml(p.text)}</span>
+        </button></div>`;
+    }).join("");
+    const artChips = MP_ARTEN.map(([k, n]) => `<button type="button" class="schnell-chip${mp.art === k ? " aktiv" : ""}" aria-pressed="${mp.art === k}" onclick="mpArt('${k}')">${n}</button>`).join("");
+    return `<section class="mp-offen" aria-label="Mappe ${escapeAttr(m.titel)}">
+      <div class="mp-kopf">
+        <button type="button" class="link-btn" onclick="mappeSchliessen()">← Alle Mappen</button>
+        <button type="button" class="link-btn" onclick="blattOeffnen('mappe','${escapeAttr(m.id)}')">${ic("stift")} Mappe bearbeiten</button>
+      </div>
+      <h2 class="mp-titel">${escapeHtml(m.titel)}</h2>
+      <p class="notiz-meta">${escapeHtml(mpTerminText(m))}</p>
+      <div class="mp-neu">
+        <div class="schnell-chips" role="group" aria-label="Art">${artChips}</div>
+        <textarea id="mp-neu-text" rows="2" maxlength="5000" placeholder="Neuer Punkt – Notiz, Idee oder Frage …" aria-label="Neuer Punkt"></textarea>
+        <button type="button" class="btn-primary" onclick="mpPunktHinzufuegen('${escapeAttr(m.id)}')">+ Hinzufügen</button>
+      </div>
+      <div class="mp-punkte">${zeilen || `<p class="empty-text">${punkte.length ? "Alles besprochen." : "Noch keine Punkte."}</p>`}</div>
+      <div class="mp-fuss">
+        ${besprochen ? `<button type="button" class="link-btn" onclick="mpBesprochenUmschalten()">${mp.zeigeBesprochen ? "Besprochene ausblenden" : `Besprochene zeigen (${besprochen})`}</button>` : ""}
+        ${punkte.length ? `<button type="button" class="link-btn" onclick="mpKopieren('${escapeAttr(m.id)}')">${ic("kopieren") || ""} Als Text kopieren</button>` : ""}
+      </div>
+    </section>`;
+  }
+
+  window.mappeOeffnenId = function(id) { mp.offenId = id; mp.zeigeBesprochen = true; renderMappen(); window.scrollTo({ top: 0 }); };
+  window.mappeSchliessen = function() { mp.offenId = null; renderMappen(); };
+  // Aus „Heute“ oder der Zentrale: in den Bereich der Mappe wechseln und sie öffnen
+  window.mappeVonStartOeffnen = function(bereich, id) {
+    if (BEREICH_FARBWELT.includes(bereich) && aktiverBereich !== bereich) window.bereichAuswaehlen(bereich);
+    tabWechseln("notizen");
+    mp.offenId = id; mp.zeigeBesprochen = true;
+    renderMappen();
+    window.scrollTo({ top: 0 });
+  };
+  window.mpArt = function(k) { mp.art = MP_ARTEN.some((x) => x[0] === k) ? k : "notiz"; const t = document.getElementById("mp-neu-text"); const v = t ? t.value : ""; renderMappen(); const n = document.getElementById("mp-neu-text"); if (n) { n.value = v; n.focus(); } };
+  window.mpBesprochenUmschalten = function() { mp.zeigeBesprochen = !mp.zeigeBesprochen; renderMappen(); };
+
+  window.mpPunktHinzufuegen = async function(mappeId) {
+    const feld = document.getElementById("mp-neu-text");
+    const text = feld ? feld.value.trim() : "";
+    if (!text) { hinweisZeigen("Bitte einen Text eingeben"); return; }
+    try {
+      const r = await api("mappe_punkt_speichern", { mappe_id: mappeId, text, art: mp.art });
+      mp.punkte.push({ id: r.id, mappe_id: mappeId, bereich: r.bereich, text, art: mp.art, besprochen: false, erstellt_am: r.erstellt_am || new Date().toISOString() });
+      if (feld) feld.value = "";
+    } catch (e) {
+      if (e.message !== "unauthorized") hinweisZeigen("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+    renderMappen();
+    const neu = document.getElementById("mp-neu-text"); if (neu) neu.focus();
+  };
+  window.mpPunktUmschalten = async function(id) {
+    const p = mp.punkte.find((x) => x.id === id);
+    if (!p) return;
+    const neu = !p.besprochen;
+    try {
+      await api("mappe_punkt_umschalten", { id, besprochen: neu });
+      p.besprochen = neu;
+    } catch (e) {
+      if (e.message !== "unauthorized") hinweisZeigen("Nicht gespeichert: " + (e.message || "Fehler"));
+    }
+    renderMappen();
+  };
+  window.mpKopieren = async function(mappeId) {
+    const m = mp.mappen.find((x) => x.id === mappeId);
+    if (!m) return;
+    const zeilen = [m.titel, mpTerminText(m), ""];
+    mpPunkteVon(mappeId).forEach((p) => zeilen.push(`${p.besprochen ? "[x]" : "[ ]"} ${(MP_ARTEN.find((x) => x[0] === p.art) || ["", "Notiz"])[1]}: ${p.text}`));
+    try { await navigator.clipboard.writeText(zeilen.join("\n")); hinweisZeigen("Kopiert"); }
+    catch (_e) { hinweisZeigen("Kopieren nicht möglich"); }
+  };
+
+  // Termin-Auswahl für das Mappen-Blatt: Termine des Bereichs ab einer Woche zurück
+  function mpTerminOptionen() {
+    const grenze = addTage(heuteISO(), -7);
+    const liste = termine.filter((t) => bereichVon(t) === aktiverBereich && (t.wiederholung || t.datum >= grenze))
+      .sort((a, b) => String(a.datum).localeCompare(String(b.datum)) || String(a.uhrzeit || "").localeCompare(String(b.uhrzeit || "")));
+    return [["", "Kein Termin (Thema)"], ...liste.map((t) => [String(t.id), `${frDatumText(t.datum)}${t.uhrzeit ? " " + String(t.uhrzeit).slice(0, 5) : ""} · ${t.titel}${t.wiederholung ? " (Serie)" : ""}`])];
+  }
+  BLATT_ARTEN.mappe = {
+    titel: "Mappe bearbeiten",
+    titelNeu: "Neue Mappe",
+    finden: (id) => mp.mappen.find((m) => m.id === id),
+    laden: (m) => ({ id: m.id || "", titel: m.titel || "", termin: m.termin_id || "", archiviert: m.archiviert ? "ja" : "nein" }),
+    felder: [
+      { key: "titel", label: "Titel", typ: "text", pflicht: true, platzhalter: "z. B. Elterngespräch Müller" },
+      { key: "termin", label: "Termin", typ: "auswahl", optionen: () => mpTerminOptionen(), hinweis: "Optional: Dann erscheint am Termin in „Heute“ ein Chip zur Mappe." },
+      { key: "archiviert", label: "Status", typ: "chips", optionen: [["nein", "Aktiv"], ["ja", "Archiviert"]] },
+    ],
+    speichern: async (id, w) => {
+      const r = await api("mappe_speichern", { id, titel: w.titel, termin_id: w.termin || null, archiviert: w.archiviert === "ja", bereich: aktiverBereich === "zentrale" ? "privat" : aktiverBereich });
+      if (!id && r && r.id) mp.offenId = r.id;
+      return r;
+    },
+    loeschen: (id) => { if (mp.offenId === id) mp.offenId = null; return api("mappe_loeschen", { id }); },
+    loeschFrage: (m) => `Mappe „${m.titel || ""}“ mit allen Punkten löschen?`,
+    gespeichert: "Mappe gespeichert",
+    danach: () => { mpNeuLaden(); },
+  };
+  BLATT_ARTEN.mpunkt = {
+    titel: "Punkt bearbeiten",
+    finden: (id) => mp.punkte.find((p) => p.id === id),
+    laden: (p) => ({ text: p.text || "", art: p.art || "notiz", besprochen: p.besprochen ? "ja" : "nein" }),
+    felder: [
+      { key: "text", label: "Text", typ: "text-lang", zeilen: 6, pflicht: true },
+      { key: "art", label: "Art", typ: "chips", optionen: MP_ARTEN },
+      { key: "besprochen", label: "Status", typ: "chips", optionen: [["nein", "Offen"], ["ja", "Besprochen"]] },
+    ],
+    speichern: (id, w) => api("mappe_punkt_speichern", { id, text: w.text, art: w.art, besprochen: w.besprochen === "ja" }),
+    loeschen: (id) => api("mappe_punkt_loeschen", { id }),
+    loeschFrage: () => "Diesen Punkt löschen?",
+    gespeichert: "Punkt gespeichert",
+    danach: () => { mpNeuLaden(); },
+  };
+
   // ---- Zentrale (seit Session 91): Karten über alle Bereiche ----
   // Kommandozentrale in Kürze: Top 3 heute, Überfälliges, Eingang, Wiedervorlage
   function zentraleKzHtml() {
@@ -12235,6 +12463,12 @@
 
   // Eine Zeile der Liste „Heute“ bzw. „Überfällig“: Abhak-Kreis, Zeit, Titel, Art.
   // Seit Session 35 wischbar: nach rechts = erledigt/wieder offen, nach links = verschieben.
+  // Chips „Mappe“ an einem Termin der Heute-Liste (Antippen öffnet die Mappe)
+  function mappenChipsHtml(e) {
+    const liste = mappenZuTermin(e.id);
+    if (!liste.length) return "";
+    return liste.map((m) => `<button type="button" class="mp-chip" onclick="mappeVonStartOeffnen('${escapeAttr(m.bereich || e.bereich || aktiverBereich)}','${escapeAttr(m.id)}')" title="Mappe öffnen">▤ ${escapeHtml(m.titel)} · ${mpPunkteVon(m.id).length}</button>`).join("");
+  }
   function heuteZeileHtml(e, jetztMinuten) {
     const laeuftJetzt = !e.erledigt && e.start && e.ende &&
       zeitZuMinuten(e.start) <= jetztMinuten && jetztMinuten < zeitZuMinuten(e.ende);
@@ -12254,6 +12488,7 @@
           <span class="heute-zeile-titel">${e.marke || ""}${escapeHtml(e.titel)}</span>
           <span class="heute-zeile-meta">${escapeHtml(e.meta)}</span>
         </button>
+        ${e.typ === "termin" ? mappenChipsHtml(e) : ""}
         </div>
       </div>`;
   }
@@ -13591,6 +13826,7 @@
   // Notizen
   // ==========================================================
   function renderNotizen() {
+    renderMappen();
     const select = document.getElementById("notiz-projekt");
     select.innerHTML = '<option value="">Ohne Projekt</option>' +
       projekteAktuell().map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
@@ -18498,6 +18734,16 @@
       luecken.push("Fristen: " + e.message);
     }
 
+    // Mappen (seit Session 93): alle Bereiche
+    meldung("Lade Mappen …");
+    try {
+      const r = await api("mappen_laden", { alle: true });
+      if (!r.fehlt) { liste.mappen = r.mappen || []; liste.mappe_punkte = r.punkte || []; }
+    } catch (e) {
+      if (e.message === "unauthorized") throw e;
+      luecken.push("Mappen: " + e.message);
+    }
+
     // Tageszähler (seit Session 92): alle Bereiche
     meldung("Lade Tageszähler …");
     try {
@@ -18704,6 +18950,8 @@
     { k: "zaehler_ablesungen", t: "zaehler_ablesungen", name: "Zähler: Ablesungen", gruppe: "Zähler" },
     { k: "zaehler_tarife", t: "zaehler_tarife", name: "Zähler: Tarife", gruppe: "Zähler" },
     { k: "fristen", t: "fristen", name: "Fristen (alle Bereiche)", gruppe: "Planen" },
+    { k: "mappen", t: "mappen", name: "Mappen (Termin-/Themen-Notizen)", gruppe: "Sammeln" },
+    { k: "mappe_punkte", t: "mappe_punkte", name: "Mappen: Punkte", gruppe: "Sammeln" },
     { k: "rep_uebungen", t: "rep_uebungen", name: "Tageszähler: Übungen", gruppe: "Training" },
     { k: "rep_eintraege", t: "rep_eintraege", name: "Tageszähler: Einträge", gruppe: "Training" },
     { k: "notfall_punkte", t: "notfall_punkte", name: "Notfallordner: Punkte", gruppe: "Notfallordner" },
