@@ -150,8 +150,9 @@
     privat: ALLE_REITER.filter(([k]) => !NUR_EP_REITER.includes(k)),
     ogs: REITER_OHNE_PRIVATE, awo: REITER_OHNE_PRIVATE, business: REITER_OHNE_PRIVATE,
     ep: ALLE_REITER.filter(([k]) => !NUR_PRIVAT_REITER.includes(k)),
+    jugendwerk: REITER_OHNE_PRIVATE, // seit Session 94
   };
-  const BEREICH_TITEL_VERWALTUNG = { privat: `${ic("haus")} Privat`, ogs: `${ic("schule")} OGS Rapunzel`, awo: `${ic("personen")} AWO OV Liblar`, business: `${ic("tasse")} Business`, ep: `${ic("sonnenaufgang")} Erlebnispädagogik` };
+  const BEREICH_TITEL_VERWALTUNG = { privat: `${ic("haus")} Privat`, ogs: `${ic("schule")} OGS Rapunzel`, awo: `${ic("personen")} AWO OV Liblar`, business: `${ic("tasse")} Business`, ep: `${ic("sonnenaufgang")} Erlebnispädagogik`, jugendwerk: `${ic("personen")} AWO Jugendwerk` };
 
   // Vorbelegung, solange in tab_einstellungen noch kein expliziter Eintrag
   // existiert – entspricht dem bisherigen Standardverhalten, damit sich
@@ -165,6 +166,8 @@
     business: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "ogsideen", "stunden", "kommando", "fristen"],
     // Erlebnispädagogik (seit Session 49): Methodenkartei + Weiterbildung zogen aus Privat hierher
     ep: ["heute", "aufgaben", "kalender", "notizen", "links", "bibliothek", "lernen", "methoden", "spiele", "verlauf", "anleitung", "kommando", "fristen"],
+    // Jugendwerk (seit Session 94): AWO Jugendwerk Erftstadt, Standard wie Business
+    jugendwerk: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "stunden", "kommando", "fristen"],
     // Zentrale (seit Session 91): Tagesübersicht über alle Bereiche + Kommandozentrale
     zentrale: ["heute", "kommando", "anleitung"],
   };
@@ -253,8 +256,8 @@
   // und ggf. das Bereichs-Logo in der Kopfzeile. Neues Logo = Datei
   // unter icons/ ablegen und hier eintragen.
   // ==========================================================
-  const BEREICH_FARBWELT = ["privat", "ogs", "awo", "business", "ep"];
-  const BEREICH_THEME_FARBE = { neutral: "#1b1b1b", privat: "#10233f", ogs: "#1e3a5c", awo: "#3b1215", business: "#1e3a5f", ep: "#13301f" };
+  const BEREICH_FARBWELT = ["privat", "ogs", "awo", "business", "ep", "jugendwerk"];
+  const BEREICH_THEME_FARBE = { neutral: "#1b1b1b", privat: "#10233f", ogs: "#1e3a5c", awo: "#3b1215", business: "#1e3a5f", ep: "#13301f", jugendwerk: "#0b3b38" };
   const BEREICH_LOGO = {
     privat: { src: "icons/privat.png", alt: "Privat" },
     ogs: { src: "icons/rapunzel.png", alt: "Rapunzel Kinderhaus e.V." },
@@ -393,7 +396,7 @@
     arbeit: `<svg ${SVG_ATTR}><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>`,
     verwalten: `<svg ${SVG_ATTR}><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>`,
   };
-  const BEREICH_KNOPF_TEXT = { privat: "Privat", ogs: "OGS", awo: "AWO", business: "Business", ep: "EP", verwaltung: "Verwaltung", zentrale: "Zentrale" };
+  const BEREICH_KNOPF_TEXT = { privat: "Privat", ogs: "OGS", awo: "AWO", business: "Business", ep: "EP", jugendwerk: "Jugendwerk", verwaltung: "Verwaltung", zentrale: "Zentrale" };
 
   // Liefert die Themengruppen, die im aktiven Bereich mindestens einen sichtbaren Reiter haben
   function sichtbareGruppen() {
@@ -436,6 +439,7 @@
     { bereich: "awo", name: "AWO", lang: "AWO OV Liblar", farbe: "#c8102e", ring: "#c8102e" },
     { bereich: "business", name: "Business", lang: "Business (zwischenkaffeeundchaos)", farbe: "#c2410c", ring: "#c2410c" },
     { bereich: "ep", name: "EP", lang: "Erlebnispädagogik", farbe: "#2d6a43", ring: "#2d6a43" },
+    { bereich: "jugendwerk", name: "Jugendwerk", lang: "AWO Jugendwerk Erftstadt", farbe: "#0f766e", ring: "#0f766e" },
   ];
 
   // Zentrale (seit Session 91): eigener Punkt vorn, aber kein echter Bereich (nicht in BEREICH_UMSCHALTER, damit er nicht beim Erfassen auswählbar ist)
@@ -4671,7 +4675,7 @@
     // seit Session 59: laufende Zeit (Start/Stopp), Zeitversatz Server − Gerät in ms
     laufend: null, laufendFehlt: false, versatz: 0,
   };
-  const STD_BEREICHE = [["privat", "Privat"], ["ogs", "OGS"], ["awo", "AWO"], ["business", "Business"], ["ep", "EP"]];
+  const STD_BEREICHE = [["privat", "Privat"], ["ogs", "OGS"], ["awo", "AWO"], ["business", "Business"], ["ep", "EP"], ["jugendwerk", "Jugendwerk"]];
   const STD_FARBEN = [
     ["#2f6fdf", "Blau"], ["#1f9d6b", "Grün"], ["#e07a1f", "Orange"], ["#c0392b", "Rot"],
     ["#8e44ad", "Lila"], ["#16a2b8", "Türkis"], ["#b8860b", "Ocker"], ["#6c757d", "Grau"],
@@ -5718,7 +5722,7 @@
   // Nur offene Aufgaben ohne Uhrzeit und ohne Wiederholung. Vorher lädt die
   // App ein Komplett-Backup herunter, danach löscht der Server die Originale.
   // Die alten Projekte bleiben (Notizen und Links hängen auch daran).
-  const KZ_UEB_STANDARD = { privat: "privat", ogs: "ogs rapunzel kinderhaus", awo: "awo ortsverein liblar/köttingen", business: "zwischenkaffeeundchaos", ep: "erlebnispädagogik" };
+  const KZ_UEB_STANDARD = { privat: "privat", ogs: "ogs rapunzel kinderhaus", awo: "awo ortsverein liblar/köttingen", business: "zwischenkaffeeundchaos", ep: "erlebnispädagogik", jugendwerk: "jugendwerk" };
   const kzUeb = { abgewaehlt: new Set(), ziel: {}, laeuft: false, status: "", ergebnis: null };
   function kzUebKandidaten() {
     return aufgaben.filter((a) => !a.erledigt && !a.uhrzeit && !(Number(a.erinnere_alle_tage) > 0) && !istTempId(a.id));
@@ -8259,8 +8263,8 @@
   // Erinnerungsstufen: Tage vor der Frist
   const FR_STUFEN = [[60, "2 Monate vorher"], [30, "1 Monat vorher"], [14, "2 Wochen vorher"], [7, "1 Woche vorher"], [3, "3 Tage vorher"], [2, "2 Tage vorher"], [1, "1 Tag vorher"], [0, "Am Tag selbst"]];
   const FR_STUFEN_KURZ = { 0: "am Tag selbst", 1: "1 Tag", 2: "2 Tage", 3: "3 Tage", 7: "1 Woche", 14: "2 Wochen", 30: "1 Monat", 60: "2 Monate" };
-  const FR_BEREICH_NAMEN = { privat: "Privat", ogs: "OGS Rapunzel", awo: "AWO OV Liblar", business: "Business", ep: "Erlebnispädagogik" };
-  const BEREICHE_MIT_FRISTEN = ["privat", "ogs", "awo", "business", "ep"];
+  const FR_BEREICH_NAMEN = { privat: "Privat", ogs: "OGS Rapunzel", awo: "AWO OV Liblar", business: "Business", ep: "Erlebnispädagogik", jugendwerk: "AWO Jugendwerk" };
+  const BEREICHE_MIT_FRISTEN = ["privat", "ogs", "awo", "business", "ep", "jugendwerk"];
   const fr = {
     geladen: false, laedt: false, fehlt: false, fehler: "",
     fristen: [], heute: null, bereich: null,
@@ -9604,6 +9608,7 @@
   ];
   const SPRACH_BEREICHE = [
     ["ogs", "ogs|rapunzel|kinderhaus"],
+    ["jugendwerk", "jugendwerk"], // vor awo, damit „AWO Jugendwerk“ hier landet
     ["awo", "awo|ortsverein|liblar"],
     ["business", "business|zwischen\\s*kaffee\\s*und\\s*chaos"],
     ["ep", "erlebnisp(?:ä|ae)dagogik"],
@@ -10701,7 +10706,7 @@
     // erst der aktuelle, sonst Privat, Business, OGS, AWO. Ist er
     // nirgends an, trotzdem Privat (Reiter öffnet sich, nur ohne Chip).
     if (aktiverBereich === "verwaltung" || !reiterIstSichtbar(aktiverBereich, "rezepte")) {
-      const ziel = ["privat", "business", "ogs", "awo", "ep"].find((b) => reiterIstSichtbar(b, "rezepte")) || "privat";
+      const ziel = ["privat", "business", "ogs", "awo", "ep", "jugendwerk"].find((b) => reiterIstSichtbar(b, "rezepte")) || "privat";
       window.bereichAuswaehlen(ziel);
     }
     tabWechseln("rezepte");
@@ -11708,7 +11713,7 @@
     return training.filter((t) => bereichVon(t) === aktiverBereich);
   }
 
-  const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar", business: "Business", ep: "EP" };
+  const BEREICH_NAME = { ogs: "OGS Rapunzel", awo: "AWO OV Liblar", business: "Business", ep: "EP", jugendwerk: "Jugendwerk" };
 
   // Aktualisiert Navigation sowie Titel und Untertitel des Ideen-Reiters für den aktiven Bereich
   function bereichAnwenden() {
