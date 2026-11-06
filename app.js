@@ -11758,6 +11758,7 @@
     if (aktiv === "lernhilfe") renderLernhilfe();
     if (aktiv === "notfallordner") renderNotfallordner();
     if (aktiv === "fristen") renderFristen();
+    if (aktiv === "notizen") renderMappen();
     if (aktiv === "kommando") renderKommando();
     if (aktiv === "verleih") renderVerleih();
     if (aktiv === "raumplanung") renderRaumplanung();
