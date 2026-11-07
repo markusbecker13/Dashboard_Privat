@@ -2675,3 +2675,13 @@ button.nf-ort { cursor: pointer; }
 .zo-titel { font-weight: 600; }
 .zo-ziel { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem; margin-top: 0.8rem; }
 .zo-ziel .btn-primary { min-height: 44px; }
+
+/* Alle Aufgaben (seit Session 97) */
+.zentrale-auf-chips { display: flex; flex-wrap: wrap; gap: 0.3rem 0.8rem; font-size: 0.88rem; }
+.zentrale-auf-chip { display: inline-flex; align-items: center; font-weight: 600; }
+.alle-auf-gruppe { border: 1px solid var(--border); border-radius: var(--r-karte); background: var(--panel); margin-bottom: 0.8rem; padding: 0 0.8rem 0.4rem; }
+.alle-auf-gruppe > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 0.2rem; font-weight: 700; list-style: none; }
+.alle-auf-gruppe > summary::-webkit-details-marker { display: none; }
+.alle-auf-zeile { display: flex; align-items: center; gap: 0.6rem; border-top: 1px solid var(--border); padding: 0.35rem 0; }
+.alle-auf-zeile .heute-zeile-inhalt { flex: 1; text-align: left; }
+.alle-auf-ueber { color: var(--overdue-text, #b3261e); font-weight: 600; }
