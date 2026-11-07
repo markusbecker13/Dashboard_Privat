@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="style.css?v=93">
+<link rel="stylesheet" href="style.css?v=94">
 <link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
@@ -236,6 +236,13 @@
       <div id="listen-bereich"></div>
 
       <div id="erledigt-bereich" style="margin-top:1.8rem;"></div>
+      </div>
+
+      <div id="view-alleaufgaben" class="hidden">
+        <button type="button" class="link-btn" onclick="tabWechseln('heute')">‹ Zentrale</button>
+        <h1>Alle Aufgaben</h1>
+        <p class="hero-text">Offene Aufgaben aus allen Bereichen, nach Bereich sortiert.</p>
+        <div id="alleaufgaben-inhalt"></div>
       </div>
 
       <div id="view-kalender" class="hidden">
@@ -1182,6 +1189,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Gemeinsamer Kalender:</strong> In der Zentrale gibt es unter „Planen“ den Reiter „Kalender“ mit den Terminen aller Bereiche. Im Monatsraster steht je Bereich ein Punkt in der Bereichsfarbe (höchstens vier), in der Liste „Nächste Termine“ und im Tagesfeld steht der Bereich vor dem Titel. Abhaken, Bearbeiten und Löschen gehen direkt dort. Neue Termine legst du mit dem „+“ an (Bereich wählen) oder im Kalender des Bereichs; Kategorien, Blockzeiten und Google-Abgleich gehören zu den Bereichen und fehlen in der Zentrale</li>
                 <li><strong>Einträge zuordnen:</strong> Verwaltung → Reiter → „Einträge einem Bereich zuordnen“. Aufgaben oder Termine wählen, „Liegt jetzt in“ (z. B. Privat) einstellen, optional nach einem Wort suchen, ankreuzen (oder „Alle auswählen“), unten den Zielbereich wählen und „verschieben“ tippen. „Rückgängig“ im Hinweis holt sie zurück. Standardmäßig nur offene Aufgaben bzw. kommende Termine und Serien; das Häkchen darüber zeigt auch Erledigtes und Vergangenes</li>
                 <li><strong>Google-Kalender:</strong> Termine außerhalb von Privat werden nicht mehr zu Google übertragen (wie beim Bereichswechsel im Bearbeiten-Blatt). Ein bereits in Google vorhandener Eintrag bleibt dort unverändert stehen; Änderungen danach gehen nicht mehr hin. Das bleibt auch nach „Rückgängig“ so</li>
+                <li><strong>Kachel „Alle Aufgaben“</strong> (seit Session 97): auf der Startseite der Zentrale unter der Kommandozentrale-Kachel. Sie zeigt, wie viele Aufgaben offen sind, je Bereich eine Zahl und wie viele überfällig sind. Ein Tipp öffnet die Übersicht: alle offenen Aufgaben, nach Bereich gruppiert (aufklappbar), je Bereich überfällige zuerst, dann nach Datum, zuletzt ohne Datum. Kreis links = erledigt, Aufgabe antippen = bearbeiten (auch den Bereich ändern). Oben „‹ Zentrale“ geht zurück</li>
                 <li><strong>Einzeln ändern:</strong> wie bisher im Bearbeiten-Blatt den Bereich wählen</li>
                 <li><strong>Server:</strong> neue Aktion <code>bereich_zuordnen</code> – <code>index.ts</code> neu bereitstellen, kein SQL nötig</li>
               </ul>
@@ -2333,6 +2341,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=97"></script>
+<script src="app.js?v=98"></script>
 </body>
 </html>
