@@ -2645,3 +2645,8 @@ button.nf-ort { cursor: pointer; }
   .bu-knopf.aktiv { padding: 0 0.45rem 0 0.4rem; gap: 0.25rem; font-size: 0.78rem; }
   .content-topbar { gap: 0.2rem; }
 }
+
+/* Jugendwerk-Logo ist quer und fein: auf schmalen Handys weglassen (der aktive Knopf nennt den Bereich schon) */
+@media (max-width: 420px) {
+  :root[data-bereich="jugendwerk"] .content-topbar .topbar-logo { display: none; }
+}
