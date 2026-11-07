@@ -264,6 +264,7 @@
     awo: { src: "icons/awo-liblar.png", alt: "AWO Ortsverein Liblar-Köttingen e.V." },
     business: { src: "icons/zwischenkaffeeundchaos-herz.png", alt: "zwischenkaffeeundchaos" },
     ep: { src: "icons/ep.png", alt: "Erlebnispädagogik" },
+    jugendwerk: { src: "icons/jugendwerk.png", alt: "Jugendwerk der AWO Erftstadt" },
   };
 
   // Setzt Farbwelt, Statusleisten-Farbe und Logo/Namen in der Kopfzeile passend zum Bereich
