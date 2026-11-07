@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="style.css?v=92">
+<link rel="stylesheet" href="style.css?v=93">
 <link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
@@ -814,6 +814,8 @@
         <p class="hero-text">Reiter je Bereich frei ein- oder ausblenden – die Daten dahinter bleiben immer erhalten.</p>
         <p class="empty-text" style="margin-top:-0.3rem;">Aufgaben, Notizen, Termine/Kalender, Ideen, Links, Reflexion, Einkaufsliste, Rezepte, Finanzen sowie OGS-Inventar, -Projekte und -Verleih sind bereichsgetrennt – auch wenn du sie zusätzlich woanders einblendest. Raumplanung und Schlüssel sind ebenfalls bereichsgetrennt (Standard: AWO), Einheiten auch (Standard: Privat und OGS; die Spiele darin kommen aus der gemeinsamen Kartei). Planung/Frei bleibt bewusst eine gemeinsame Tagesstruktur, Spiele und Methoden/Weiterbildung bewusst eine gemeinsame Kartei. Export hat keine eigenen Daten. Ernährung gibt es nur in Privat und taucht hier bei den anderen Bereichen deshalb nicht auf. Die Kommandozentrale ist bewusst überall dieselbe (eigene Lebensbereiche statt App-Bereiche) – ausblenden geht trotzdem je Bereich.</p>
 
+        <div id="zuordnen-bereich"></div>
+
         <div id="reiter-verwaltung-liste"></div>
       </div>
 
@@ -1169,6 +1171,19 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
                 <li><strong>Schnell erfassen (+):</strong> in der Zentrale wählst du im Dialog den Bereich. Einträge landen im gewählten Bereich</li>
                 <li><strong>Links und Benachrichtigungen</strong> öffnen den Bereich, in dem du zuletzt warst</li>
                 <li>Hinweis: Abhaken in der Zentrale wird im Verlauf unter „Privat“ geführt</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="anleitung-abschnitt">
+            <summary>Gemeinsamer Kalender &amp; Einträge zuordnen <span class="anleitung-nur">(seit Session 96)</span></summary>
+            <div class="anleitung-text">
+              <ul>
+                <li><strong>Gemeinsamer Kalender:</strong> In der Zentrale gibt es unter „Planen“ den Reiter „Kalender“ mit den Terminen aller Bereiche. Im Monatsraster steht je Bereich ein Punkt in der Bereichsfarbe (höchstens vier), in der Liste „Nächste Termine“ und im Tagesfeld steht der Bereich vor dem Titel. Abhaken, Bearbeiten und Löschen gehen direkt dort. Neue Termine legst du mit dem „+“ an (Bereich wählen) oder im Kalender des Bereichs; Kategorien, Blockzeiten und Google-Abgleich gehören zu den Bereichen und fehlen in der Zentrale</li>
+                <li><strong>Einträge zuordnen:</strong> Verwaltung → Reiter → „Einträge einem Bereich zuordnen“. Aufgaben oder Termine wählen, „Liegt jetzt in“ (z. B. Privat) einstellen, optional nach einem Wort suchen, ankreuzen (oder „Alle auswählen“), unten den Zielbereich wählen und „verschieben“ tippen. „Rückgängig“ im Hinweis holt sie zurück. Standardmäßig nur offene Aufgaben bzw. kommende Termine und Serien; das Häkchen darüber zeigt auch Erledigtes und Vergangenes</li>
+                <li><strong>Google-Kalender:</strong> Termine außerhalb von Privat werden nicht mehr zu Google übertragen (wie beim Bereichswechsel im Bearbeiten-Blatt). Ein bereits in Google vorhandener Eintrag bleibt dort unverändert stehen; Änderungen danach gehen nicht mehr hin. Das bleibt auch nach „Rückgängig“ so</li>
+                <li><strong>Einzeln ändern:</strong> wie bisher im Bearbeiten-Blatt den Bereich wählen</li>
+                <li><strong>Server:</strong> neue Aktion <code>bereich_zuordnen</code> – <code>index.ts</code> neu bereitstellen, kein SQL nötig</li>
               </ul>
             </div>
           </details>
@@ -2318,6 +2333,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=96"></script>
+<script src="app.js?v=97"></script>
 </body>
 </html>
