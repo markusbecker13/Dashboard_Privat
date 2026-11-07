@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="farbschema.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="style.css?v=91">
+<link rel="stylesheet" href="style.css?v=92">
 <link rel="stylesheet" href="lernhilfe.css?v=84">
 </head>
 <body>
@@ -140,7 +140,7 @@
         <span><span class="bereich-karte-name">EP</span><span class="bereich-karte-zusatz">Erlebnispädagogik</span></span>
       </button>
       <button class="bereich-karte bereich-karte--jugendwerk" onclick="bereichAuswaehlen('jugendwerk')">
-        <svg class="ic ic-karte" aria-hidden="true" focusable="false"><use href="#ic-personen"></use></svg>
+        <span class="bereich-karte-badge"><img src="icons/jugendwerk.png" alt=""></span>
         <span><span class="bereich-karte-name">Jugendwerk</span><span class="bereich-karte-zusatz">AWO Jugendwerk Erftstadt</span></span>
       </button>
       <button class="bereich-karte bereich-karte--verwaltung" onclick="bereichAuswaehlen('verwaltung')">
@@ -868,7 +868,7 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
               <p><strong>Google-Kalender-Sync:</strong> Nur Privat-Termine werden mit Google Kalender synchronisiert. Termine in OGS, AWO oder Business bleiben grundsätzlich rein lokal im Dashboard.</p>
               <p><strong>Business:</strong> startet mit Start, Aufgaben, Kalender, Notizen, Links, Ideen, Verlauf und Anleitung. Weitere Reiter (z.B. Finanzen, Projekte) lassen sich in der Reiter-Verwaltung einblenden – wie in den anderen Bereichen bereichsgetrennt.</p>
               <p><strong>EP – Erlebnispädagogik</strong> (seit Session 49): Bereich für die Ausbildung zum Erlebnispädagogen, grüne Farbwelt mit eigenem Logo (Berge und Sonne). Startet mit Start, Aufgaben, Kalender, Notizen, Links, Verlauf und Anleitung, dazu in der Leiste unten der Block <strong>EP</strong> mit <strong>Methoden &amp; Weiterbildung</strong> (zog aus Privat hierher) und <strong>Spiele</strong>; auf dem Start-Screen je eine Kachel mit Stand (z. B. „42 Methoden · 48/120 UE“). <strong>Einheiten</strong> lassen sich per Reiter-Verwaltung dazuschalten – sie sind wie Aufgaben je Bereich getrennt, bisherige Einheiten bleiben in Privat bzw. OGS. Methoden, Weiterbildung und Spiele sind eine gemeinsame Kartei – in EP und anderswo dieselben Einträge. Für Termine gibt es die Kategorie „Ausbildung“ (grün). Seit Session 50 steht im Block EP zuerst die <strong>Bibliothek</strong>, seit Session 52 daneben <strong>Lernen</strong> mit dem Fragenkatalog für die Prüfung (siehe jeweils dort).</p>
-              <p><strong>Jugendwerk</strong> (seit Session 94): sechster Bereich für das AWO Jugendwerk Erftstadt, in Petrol/Türkis. Aufbau wie bei Business: Start, Aufgaben, Kalender, Notizen, Links, Verlauf, Anleitung, Stunden, Kommandozentrale und Fristen; weitere Reiter in der Reiter-Verwaltung einblendbar. Aufgaben, Notizen, Termine, Fristen, Mappen und Zähler sind – wie überall – bereichsgetrennt; die Zentrale zeigt auch das Jugendwerk. Vorher einmal <code>jugendwerk_bereich_setup.sql</code> in Supabase ausführen und danach <code>index.ts</code> neu bereitstellen. Ein Logo ist noch nicht hinterlegt (in der Kopfzeile steht der Name); eine Datei <code>icons/jugendwerk.png</code> lässt sich später in <code>BEREICH_LOGO</code> eintragen. Sprachbefehl: „… Jugendwerk“ ordnet den Eintrag diesem Bereich zu.</p>
+              <p><strong>Jugendwerk</strong> (seit Session 94): sechster Bereich für das AWO Jugendwerk Erftstadt, in Petrol/Türkis. Aufbau wie bei Business: Start, Aufgaben, Kalender, Notizen, Links, Verlauf, Anleitung, Stunden, Kommandozentrale und Fristen; weitere Reiter in der Reiter-Verwaltung einblendbar. Aufgaben, Notizen, Termine, Fristen, Mappen und Zähler sind – wie überall – bereichsgetrennt; die Zentrale zeigt auch das Jugendwerk. Vorher einmal <code>jugendwerk_bereich_setup.sql</code> in Supabase ausführen und danach <code>index.ts</code> neu bereitstellen. Das Logo liegt unter <code>icons/jugendwerk.png</code>. Sprachbefehl: „… Jugendwerk“ ordnet den Eintrag diesem Bereich zu.</p>
               <p><strong>Farbwelt je Bereich:</strong> Jeder Bereich hat eigene Farben – Privat Blautöne, OGS Rapunzel Gelb/Blau aus dem Rapunzel-Logo, AWO OV Liblar Rottöne, Business Marineblau/Orange aus dem Markenkit von zwischenkaffeeundchaos, EP Grüntöne. In Privat, OGS, AWO, Business und EP steht oben in der Kopfzeile das jeweilige Logo statt des Dashboard-Namens. Login, Willkommensseite und Verwaltung sind neutral gehalten. So ist auf einen Blick klar, in welchem Bereich du gerade bist. In AWO sind überfällige Einträge orange statt rot markiert, damit sie sich vom AWO-Rot abheben.</p>
               <p><strong>Hell und Dunkel:</strong> im ⋮-Menü unter „Darstellung“ – <em>Auto</em> (Standard, folgt der Einstellung von Handy bzw. PC), <em>Hell</em> oder <em>Dunkel</em>. Gilt pro Gerät. Im Dunkeln hat jeder Bereich eigene, aufgehellte Akzente (Privat Hellblau, OGS Himmelblau mit Rapunzel-Gelb, AWO Hellrot, Business Markenorange), auf farbigen Flächen steht dunkle Schrift. Die Logos oben stehen dann auf einer hellen Plakette. Druck und PDF bleiben immer hell.</p>
               <p><strong>Icons</strong> (seit Session 35): Bedienknöpfe zeigen schlichte Linien-Icons statt Zeichen – Stift zum Bearbeiten, X zum Löschen oder Schließen, Pfeile zum Blättern, drei Punkte fürs Menü, Zahnrad für Einstellungen, Plus vor „Neue …“, Kreispfeil zum Verschieben einer Erinnerung. Auch das ⋮-Menü und das Wetter (oben und im 5-Tage-Ausblick) haben eigene Icons. Sie nehmen die Farbe des Bereichs an und passen zu Hell und Dunkel. Seit dem zweiten Schritt haben auch die Reiter selbst Linien-Icons statt Emojis – z. B. Schlüssel und Key, ausgegeben/im Bestand, Drucken, Mail und PDF bei den Schlüsseln, Kamera, Lupe und Taschenlampe in Ernährung, Kochmodus und Einkaufswagen bei Rezepten, Zustand im Inventar, Pokal für Bestleistungen im Training. In Auswahllisten stehen nur Wörter, dort sind keine Icons möglich. Häkchen ✓, Sterne ★ und die kleinen Pfeile ▸ ▾ bleiben als Schriftzeichen.</p>
@@ -2318,6 +2318,6 @@ Supabase-Datenbank (deine eigentlichen Daten)</pre>
   </div>
 
 <script src="qrcode.js?v=1"></script>
-<script src="app.js?v=95"></script>
+<script src="app.js?v=96"></script>
 </body>
 </html>
