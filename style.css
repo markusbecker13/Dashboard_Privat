@@ -2650,3 +2650,28 @@ button.nf-ort { cursor: pointer; }
 @media (max-width: 420px) {
   :root[data-bereich="jugendwerk"] .content-topbar .topbar-logo { display: none; }
 }
+
+/* Gemeinsamer Kalender in der Zentrale (seit Session 96): ein Punkt je Bereich */
+.cal-day .dots { display: flex; gap: 2px; justify-content: center; }
+.cal-day .dots .dot { width: 5px; height: 5px; }
+.cal-day.selected .dots .dot { box-shadow: 0 0 0 1px var(--on-accent); }
+.cal-bereich-punkt { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; margin-right: 0.25rem; vertical-align: 0.05rem; }
+.cal-bereich-marke { font-weight: 600; }
+
+/* Sammel-Zuordnung (seit Session 96) */
+.zo-block { margin-bottom: 1.2rem; }
+.zo-segment { display: flex; gap: 0.4rem; margin: 0.5rem 0; }
+.zo-seg { min-height: 44px; flex: 1; }
+.zo-seg.aktiv { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.zo-zeile { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.4rem; }
+.zo-feld { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; flex: 1 1 10rem; }
+.zo-feld select, .zo-feld input { min-height: 44px; }
+.zo-haken { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; margin: 0.3rem 0 0.5rem; min-height: 32px; }
+.zo-aktionen { display: flex; gap: 1rem; margin-bottom: 0.3rem; }
+.zo-liste { max-height: 22rem; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r-klein); background: var(--panel); }
+.zo-zeile-eintrag { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--border); cursor: pointer; min-height: 44px; }
+.zo-zeile-eintrag:last-child { border-bottom: none; }
+.zo-zeile-eintrag input { margin-top: 0.2rem; width: 1.15rem; height: 1.15rem; flex: none; }
+.zo-titel { font-weight: 600; }
+.zo-ziel { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem; margin-top: 0.8rem; }
+.zo-ziel .btn-primary { min-height: 44px; }
