@@ -119,7 +119,7 @@
     reflexion: "view-reflexion", spiele: "view-spiele", methoden: "view-methoden", einheiten: "view-einheiten", einkauf: "view-einkauf", export: "view-export",
     verlauf: "view-verlauf", anleitung: "view-anleitung", ogsideen: "view-ogs-ideen",
     ogsinventar: "view-ogs-inventar", ogsprojekte: "view-ogs-projekte", verleih: "view-verleih",
-    reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
+    alleaufgaben: "view-alleaufgaben", reiterverwaltung: "view-reiter-verwaltung", training: "view-training", raumplanung: "view-raumplanung",
     rezepte: "view-rezepte", ernaehrung: "view-ernaehrung", schluessel: "view-schluessel",
     bibliothek: "view-bibliothek", lernen: "view-lernen", stunden: "view-stunden", zaehler: "view-zaehler",
     kommando: "view-kommando", lernhilfe: "view-lernhilfe", notfallordner: "view-notfallordner", fristen: "view-fristen",
@@ -8944,6 +8944,57 @@
         <span class="kz-karte-weiter">Zur Kommandozentrale ${ic("weiter")}</span>
       </button></div>`;
   }
+  // ==========================================================
+  // Alle Aufgaben (seit Session 97): Kachel in der Zentrale + Übersicht aller
+  // offenen Aufgaben, nach Bereich gruppiert
+  // ==========================================================
+  function alleOffeneAufgaben() {
+    return aufgaben.filter((a) => !a.erledigt && !istTempId(a.id));
+  }
+  function aufgabenNachBereich() {
+    const heute = heuteISO();
+    const sortiert = alleOffeneAufgaben().sort((a, b) => {
+      const ua = a.faellig_am && a.faellig_am < heute ? 0 : a.faellig_am ? 1 : 2;
+      const ub = b.faellig_am && b.faellig_am < heute ? 0 : b.faellig_am ? 1 : 2;
+      return ua - ub || String(a.faellig_am || "").localeCompare(String(b.faellig_am || "")) || String(a.uhrzeit || "").localeCompare(String(b.uhrzeit || "")) || String(a.titel).localeCompare(String(b.titel), "de");
+    });
+    return BEREICH_FARBWELT.map((b) => ({ bereich: b, liste: sortiert.filter((a) => bereichVon(a) === b) })).filter((g) => g.liste.length);
+  }
+  function zentraleAufgabenKachelHtml() {
+    const heute = heuteISO();
+    const gruppen = aufgabenNachBereich();
+    const gesamt = gruppen.reduce((n, g) => n + g.liste.length, 0);
+    const ueber = alleOffeneAufgaben().filter((a) => a.faellig_am && a.faellig_am < heute).length;
+    const chips = gruppen.map((g) => `<span class="zentrale-auf-chip"><span class="cal-bereich-punkt" aria-hidden="true" style="background:${bereichFarbeVon({ bereich: g.bereich })}"></span>${escapeHtml(BEREICH_KNOPF_TEXT[g.bereich] || g.bereich)} ${g.liste.length}</span>`).join("");
+    return `<div class="kz-heute-karte zentrale-kz"><button type="button" class="kz-karte" onclick="tabWechseln('alleaufgaben')">
+        <span class="kz-karte-kopf">${ic("ok-kreis")} Alle Aufgaben <span class="notiz-meta">${gesamt} offen</span></span>
+        ${gesamt ? `<span class="zentrale-auf-chips">${chips}</span>` : `<span class="kz-karte-leer">Keine offenen Aufgaben.</span>`}
+        ${ueber ? `<span class="kz-karte-zusatz"><span class="kz-karte-rot">${ueber} überfällig</span></span>` : ""}
+        <span class="kz-karte-weiter">Nach Bereich ansehen ${ic("weiter")}</span>
+      </button></div>`;
+  }
+  function renderAlleAufgaben() {
+    const box = document.getElementById("alleaufgaben-inhalt");
+    if (!box) return;
+    const heute = heuteISO();
+    const gruppen = aufgabenNachBereich();
+    if (!gruppen.length) { box.innerHTML = `<p class="empty-text">Keine offenen Aufgaben – gut so.</p>`; return; }
+    box.innerHTML = gruppen.map((g) => `
+      <details class="alle-auf-gruppe" open>
+        <summary><span class="cal-bereich-punkt" aria-hidden="true" style="background:${bereichFarbeVon({ bereich: g.bereich })}"></span>${escapeHtml(BEREICH_NAME[g.bereich] || BEREICH_KNOPF_TEXT[g.bereich] || g.bereich)} <span class="notiz-meta">${g.liste.length}</span></summary>
+        ${g.liste.map((a) => {
+          const ueber = a.faellig_am && a.faellig_am < heute;
+          const meta = a.faellig_am ? frDatumText(a.faellig_am) + (a.uhrzeit ? " " + String(a.uhrzeit).slice(0, 5) : "") : "ohne Datum";
+          return `<div class="alle-auf-zeile">
+            <button type="button" class="zl-check" onclick="zeitleisteUmschalten('aufgabe','${escapeAttr(String(a.id))}', this)" aria-label="${escapeAttr(a.titel)} als erledigt markieren" title="Erledigt"></button>
+            <button type="button" class="heute-zeile-inhalt" onclick="eintragBearbeiten('aufgabe','${escapeAttr(String(a.id))}')" title="Aufgabe bearbeiten">
+              <span class="heute-zeile-titel">${escapeHtml(a.titel)}</span>
+              <span class="heute-zeile-meta${ueber ? " alle-auf-ueber" : ""}">${escapeHtml(meta)}${ueber ? " · überfällig" : ""}</span>
+            </button>
+          </div>`;
+        }).join("")}
+      </details>`).join("");
+  }
   // Kennzahlen: kcal (Privat), Einkauf offen (alle Bereiche), verliehen (OGS), Stunden (Privat)
   function zentraleKennzahlenHtml() {
     const k = [];
@@ -10181,6 +10232,7 @@
   // früher in ladeDaten; Heute und Kalender zuerst, weil sie am häufigsten offen sind.
   const ZEICHNEN_JE_REITER = [
     ["heute", () => renderHeute()],
+    ["alleaufgaben", () => renderAlleAufgaben()],
     ["kalender", () => renderKalender()],
     ["aufgaben", () => render()],
     ["notizen", () => renderNotizen()],
@@ -11774,6 +11826,7 @@
     if (aktiv === "ernaehrung") { renderErnaehrung(); if (ernProfilGeladen) ernMetRendern(); }
     if (aktiv === "verlauf") renderVerlauf();
     if (aktiv === "reiterverwaltung") renderReiterVerwaltung();
+    if (aktiv === "alleaufgaben") renderAlleAufgaben();
     kontoMenuSchliessen();
   }
   window.tabWechseln = tabWechseln;
@@ -12408,7 +12461,7 @@
 
     if (zentrale) {
       document.getElementById("heute-bereich").innerHTML =
-        heuteNaechstesHtml(eintraege, jetztMinuten) + heuteFristenHtml() + zentraleKzHtml()
+        heuteNaechstesHtml(eintraege, jetztMinuten) + heuteFristenHtml() + zentraleKzHtml() + zentraleAufgabenKachelHtml()
         + heuteListeHtml(eintraege, jetztMinuten) + heuteUeberfaelligHtml(ueberfaellig, heuteIso) + zentraleKennzahlenHtml();
       return;
     }
