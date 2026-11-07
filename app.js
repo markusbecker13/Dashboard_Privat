@@ -169,7 +169,7 @@
     // Jugendwerk (seit Session 94): AWO Jugendwerk Erftstadt, Standard wie Business
     jugendwerk: ["heute", "aufgaben", "kalender", "notizen", "links", "verlauf", "anleitung", "stunden", "kommando", "fristen"],
     // Zentrale (seit Session 91): Tagesübersicht über alle Bereiche + Kommandozentrale
-    zentrale: ["heute", "kommando", "anleitung"],
+    zentrale: ["heute", "kalender", "kommando", "anleitung"], // Kalender seit Session 96: gemeinsamer Kalender aller Bereiche
   };
   // Kommandozentrale (seit Session 73) ist in allen Bereichen standardmäßig an –
   // dieselben Daten überall, je Bereich in der Reiter-Verwaltung ausblendbar
@@ -11746,7 +11746,7 @@
     document.getElementById("app").classList.remove("hidden");
     dashboardNameAnzeigen();
     untertitelAnzeigen();
-    if (aktiv === "kalender") { renderKalender(); ladeGoogleSyncStatus(); }
+    if (aktiv === "kalender") { renderKalender(); if (aktiverBereich !== "zentrale") ladeGoogleSyncStatus(); }
     if (aktiv === "heute") renderHeute();
     if (aktiv === "planung") renderPlanung();
     if (aktiv === "frei") renderFrei();
@@ -11811,6 +11811,7 @@
   function renderReiterVerwaltung() {
     const container = document.getElementById("reiter-verwaltung-liste");
     if (!container) return;
+    renderZuordnen();
     container.innerHTML = Object.entries(BEREICH_TABS).map(([bereich, tabsListe]) => `
       <div class="reiter-verwaltung-block">
         <h3>${BEREICH_TITEL_VERWALTUNG[bereich]}</h3>
@@ -11826,6 +11827,122 @@
       </div>
     `).join("");
   }
+
+  // ==========================================================
+  // Sammel-Zuordnung (seit Session 96): vorhandene Aufgaben und Termine in
+  // einen anderen Bereich verschieben – mehrere auf einmal, mit Rückgängig.
+  // Liegt im Verwaltungsbereich unter „Reiter“.
+  // ==========================================================
+  const zo = { typ: "aufgabe", von: "privat", suche: "", nurOffen: true, gewaehlt: new Set(), ziel: "", offen: false };
+  function zoListe() {
+    const q = zo.suche.trim().toLowerCase();
+    const heute = heuteISO();
+    const passt = (e) => (zo.von === "alle" || bereichVon(e) === zo.von) && !istTempId(e.id) && (!q || String(e.titel || "").toLowerCase().includes(q));
+    if (zo.typ === "termin") {
+      return termine.filter((t) => passt(t) && (!zo.nurOffen || t.wiederholung || String(t.datum) >= heute))
+        .sort((a, b) => String(a.datum).localeCompare(String(b.datum)) || String(a.uhrzeit || "").localeCompare(String(b.uhrzeit || "")));
+    }
+    return aufgaben.filter((a) => passt(a) && (!zo.nurOffen || !a.erledigt))
+      .sort((a, b) => (a.faellig_am ? 0 : 1) - (b.faellig_am ? 0 : 1) || String(a.faellig_am || "").localeCompare(String(b.faellig_am || "")) || String(a.titel).localeCompare(String(b.titel), "de"));
+  }
+  function bereichOptionenHtml(mitAlle, gewaehlt) {
+    return (mitAlle ? `<option value="alle"${gewaehlt === "alle" ? " selected" : ""}>Alle Bereiche</option>` : `<option value="">Bereich wählen …</option>`)
+      + BEREICH_FARBWELT.map((b) => `<option value="${b}"${gewaehlt === b ? " selected" : ""}>${escapeHtml(BEREICH_NAME[b] || BEREICH_KNOPF_TEXT[b] || b)}</option>`).join("");
+  }
+  function renderZuordnen() {
+    const el = document.getElementById("zuordnen-bereich");
+    if (!el) return;
+    el.innerHTML = `
+      <details class="anleitung-abschnitt zo-block"${zo.offen ? " open" : ""} ontoggle="zo.offen = this.open">
+        <summary>${ic("verschieben")} Einträge einem Bereich zuordnen</summary>
+        <div class="anleitung-text">
+          <p class="notiz-meta">Aufgaben oder Termine, die im falschen Bereich liegen (z. B. alles in Privat), ankreuzen und mit einem Tipp in den richtigen Bereich verschieben. Mit „Rückgängig“ geht es zurück.</p>
+          <div class="zo-segment" role="group" aria-label="Art">
+            <button type="button" class="btn-secondary zo-seg${zo.typ === "aufgabe" ? " aktiv" : ""}" onclick="zoArt('aufgabe')" aria-pressed="${zo.typ === "aufgabe"}">Aufgaben</button>
+            <button type="button" class="btn-secondary zo-seg${zo.typ === "termin" ? " aktiv" : ""}" onclick="zoArt('termin')" aria-pressed="${zo.typ === "termin"}">Termine</button>
+          </div>
+          <div class="zo-zeile">
+            <label class="zo-feld">Liegt jetzt in
+              <select id="zo-von" onchange="zoVon(this.value)">${bereichOptionenHtml(true, zo.von)}</select>
+            </label>
+            <label class="zo-feld">Suchen
+              <input type="search" id="zo-suche" value="${escapeAttr(zo.suche)}" placeholder="Wort im Titel" oninput="zoSuche(this.value)">
+            </label>
+          </div>
+          <label class="zo-haken"><input type="checkbox" id="zo-offen"${zo.nurOffen ? " checked" : ""} onchange="zoNurOffen(this.checked)"> <span id="zo-offen-text"></span></label>
+          <div id="zo-liste"></div>
+        </div>
+      </details>`;
+    zoListeZeichnen();
+  }
+  function zoListeZeichnen() {
+    const box = document.getElementById("zo-liste");
+    if (!box) return;
+    const t = document.getElementById("zo-offen-text");
+    if (t) t.textContent = zo.typ === "termin" ? "Nur kommende Termine und Serien" : "Nur offene Aufgaben";
+    const alle = zoListe();
+    const idsSichtbar = new Set(alle.map((e) => String(e.id)));
+    zo.gewaehlt = new Set([...zo.gewaehlt].filter((id) => idsSichtbar.has(id)));
+    const zeigen = alle.slice(0, 300);
+    const zeile = (e) => {
+      const id = String(e.id);
+      const datum = zo.typ === "termin" ? e.datum : e.faellig_am;
+      const zeit = e.uhrzeit ? " " + String(e.uhrzeit).slice(0, 5) : "";
+      const meta = [datum ? frDatumText(datum) + zeit : "ohne Datum", e.wiederholung ? "Serie" : "", BEREICH_KNOPF_TEXT[bereichVon(e)] || bereichVon(e)].filter(Boolean).join(" · ");
+      return `<label class="zo-zeile-eintrag"><input type="checkbox" ${zo.gewaehlt.has(id) ? "checked" : ""} onchange="zoHaken('${escapeAttr(id)}', this.checked)">
+        <span><span class="zo-titel">${escapeHtml(e.titel)}</span><span class="notiz-meta"> ${escapeHtml(meta)}</span></span></label>`;
+    };
+    box.innerHTML = alle.length === 0
+      ? `<p class="empty-text">Nichts gefunden.</p>`
+      : `<div class="zo-aktionen">
+          <button type="button" class="link-btn" onclick="zoAlle(true)">Alle ${alle.length} auswählen</button>
+          <button type="button" class="link-btn" onclick="zoAlle(false)">Keine</button>
+        </div>
+        <div class="zo-liste">${zeigen.map(zeile).join("")}</div>
+        ${alle.length > zeigen.length ? `<p class="notiz-meta">Es werden die ersten ${zeigen.length} gezeigt – grenze mit der Suche ein.</p>` : ""}
+        <div class="zo-ziel">
+          <label class="zo-feld">Verschieben nach
+            <select id="zo-ziel" onchange="zo.ziel = this.value; zoListeZeichnen()">${bereichOptionenHtml(false, zo.ziel)}</select>
+          </label>
+          <button type="button" class="btn-primary" onclick="zoVerschieben()"${zo.gewaehlt.size && zo.ziel ? "" : " disabled"}>${zo.gewaehlt.size} verschieben</button>
+        </div>`;
+  }
+  window.zo = zo;
+  window.zoArt = (a) => { zo.typ = a; zo.gewaehlt.clear(); renderZuordnen(); };
+  window.zoVon = (v) => { zo.von = v; zo.gewaehlt.clear(); zoListeZeichnen(); };
+  window.zoSuche = (v) => { zo.suche = v; zoListeZeichnen(); };
+  window.zoNurOffen = (an) => { zo.nurOffen = an; zoListeZeichnen(); };
+  window.zoHaken = (id, an) => { if (an) zo.gewaehlt.add(id); else zo.gewaehlt.delete(id); zoListeZeichnen(); };
+  window.zoAlle = (an) => { zo.gewaehlt = an ? new Set(zoListe().map((e) => String(e.id))) : new Set(); zoListeZeichnen(); };
+  window.zoVerschieben = async function() {
+    const typ = zo.typ, ziel = zo.ziel;
+    if (!zo.gewaehlt.size || !ziel) return;
+    const liste = typ === "termin" ? termine : aufgaben;
+    const ids = [...zo.gewaehlt];
+    // vorheriger Bereich je Eintrag, für Rückgängig
+    const vorher = new Map();
+    liste.forEach((e) => { if (zo.gewaehlt.has(String(e.id))) vorher.set(String(e.id), bereichVon(e)); });
+    const ok = await sofort(
+      () => {
+        liste.forEach((e) => { if (vorher.has(String(e.id))) e.bereich = ziel; });
+        return () => liste.forEach((e) => { if (vorher.has(String(e.id))) e.bereich = vorher.get(String(e.id)); });
+      },
+      () => api("bereich_zuordnen", { typ, ids, bereich: ziel }),
+      "Nicht verschoben"
+    );
+    if (ok === false) { zoListeZeichnen(); return; }
+    zo.gewaehlt.clear();
+    zoListeZeichnen();
+    const name = BEREICH_NAME[ziel] || BEREICH_KNOPF_TEXT[ziel] || ziel;
+    hinweisZeigen(`${ids.length} ${typ === "termin" ? (ids.length === 1 ? "Termin" : "Termine") : (ids.length === 1 ? "Aufgabe" : "Aufgaben")} nach ${name} verschoben`, async () => {
+      const gruppen = new Map();
+      vorher.forEach((alt, id) => { if (!gruppen.has(alt)) gruppen.set(alt, []); gruppen.get(alt).push(id); });
+      for (const [alt, gids] of gruppen) await api("bereich_zuordnen", { typ, ids: gids, bereich: alt });
+      liste.forEach((e) => { if (vorher.has(String(e.id))) e.bereich = vorher.get(String(e.id)); });
+      zoListeZeichnen();
+      hintergrundLaden();
+    });
+  };
 
   // Speichert die Sichtbarkeit eines Reiters je Bereich und aktualisiert die Navigation
   window.reiterUmschalten = async function(bereich, schluessel, sichtbar) {
@@ -12980,7 +13097,17 @@
 
   // Liefert die Termine des aktiven Bereichs an einem Tag (inkl. Serien), nach Uhrzeit sortiert
   function termineAmTag(isoDatum, mitAusfall = false) {
-    return termineVorkommen(termine.filter((t) => bereichVon(t) === aktiverBereich), isoDatum, isoDatum, mitAusfall);
+    return termineVorkommen(termine.filter(terminImKalender), isoDatum, isoDatum, mitAusfall);
+  }
+  // Gemeinsamer Kalender (seit Session 96): die Zentrale zeigt die Termine aller Bereiche
+  function terminImKalender(t) { return aktiverBereich === "zentrale" || bereichVon(t) === aktiverBereich; }
+  function bereichFarbeVon(t) {
+    const b = BEREICH_UMSCHALTER.find((x) => x.bereich === bereichVon(t));
+    return b ? b.farbe : "#888";
+  }
+  function bereichMarkeHtml(t) {
+    if (aktiverBereich !== "zentrale") return "";
+    return `<span class="notiz-meta cal-bereich-marke"><span class="cal-bereich-punkt" aria-hidden="true" style="background:${bereichFarbeVon(t)}"></span>${escapeHtml(BEREICH_KNOPF_TEXT[bereichVon(t)] || bereichVon(t))}</span> `;
   }
 
   document.getElementById("cal-prev").addEventListener("click", () => {
@@ -12996,6 +13123,12 @@
   function renderKalender() {
     document.getElementById("cal-monat-label").textContent =
       MONATSNAMEN[calMonat.getMonth()] + " " + calMonat.getFullYear();
+    // Gemeinsamer Kalender: ohne Zahnrad, Kategorien und Google-Karte (die gehören zu den Bereichen)
+    const zKal = aktiverBereich === "zentrale";
+    const hero = document.querySelector("#view-kalender .hero-text");
+    if (hero) hero.textContent = zKal ? "Alle Termine aus allen Bereichen – ein Punkt je Bereich." : "Termine eintragen und im Monatsüberblick behalten.";
+    document.querySelectorAll("#view-kalender .reiter-aktionen, #google-sync-karte").forEach((el) => el.classList.toggle("hidden", zKal));
+    if (zKal) document.getElementById("einst-kalender").classList.add("hidden"); // beim Verlassen nie von selbst aufklappen
 
     const jahr = calMonat.getFullYear();
     const monat = calMonat.getMonth();
@@ -13015,12 +13148,16 @@
       // Punkt in der Farbe des ersten Termins mit Kategorie (Geburtstage zuerst)
       const mitKat = amTag.find((t) => (terminKat(t) || {}).geburtstag) || amTag.find((t) => terminFarbe(t));
       const punktFarbe = mitKat ? terminFarbe(mitKat) : "";
+      // Zentrale: je Bereich ein Punkt in der Bereichsfarbe (höchstens vier)
+      const bereichsPunkte = aktiverBereich === "zentrale"
+        ? [...new Set(amTag.map(bereichVon))].slice(0, 4).map((b) => `<span class="dot" style="background:${(BEREICH_UMSCHALTER.find((x) => x.bereich === b) || {}).farbe || "#888"};"></span>`).join("")
+        : "";
       const classes = ["cal-day"];
       if (iso === heuteIso) classes.push("today");
       if (iso === calAusgewaehlterTag) classes.push("selected");
       html += `<div class="${classes.join(" ")}" onclick="calTagAuswaehlen('${iso}')">
         <span>${tag}</span>
-        ${anzahl > 0 ? `<span class="dot"${punktFarbe ? ` style="background:${punktFarbe};"` : ""}></span>` : ""}
+        ${anzahl > 0 ? (bereichsPunkte ? `<span class="dots">${bereichsPunkte}</span>` : `<span class="dot"${punktFarbe ? ` style="background:${punktFarbe};"` : ""}></span>`) : ""}
       </div>`;
     }
     document.getElementById("cal-grid").innerHTML = html;
@@ -13034,7 +13171,7 @@
   function renderUpcoming() {
     const heuteIso = dateToISO(new Date());
     // Seit Session 42 mit Serien (bis gut ein Jahr voraus)
-    const kommende = termineVorkommen(termine.filter((t) => bereichVon(t) === aktiverBereich), heuteIso, addTage(heuteIso, 400))
+    const kommende = termineVorkommen(termine.filter(terminImKalender), heuteIso, addTage(heuteIso, 400))
       .slice(0, 5);
 
     if (kommende.length === 0) {
@@ -13044,7 +13181,7 @@
     const html = kommende.map((t) => `
       <div class="upcoming-item">
         <span class="upcoming-datum">${formatDatumKurz(t.datum)}${t.uhrzeit ? " · " + t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : ""}</span>
-        <span>${terminMarkeHtml(t)}${escapeHtml(t.titel)}${terminAlter(t, t.datum) ? ` <span class="notiz-meta">wird ${terminAlter(t, t.datum)}</span>` : ""}</span>
+        <span>${bereichMarkeHtml(t)}${terminMarkeHtml(t)}${escapeHtml(t.titel)}${terminAlter(t, t.datum) ? ` <span class="notiz-meta">wird ${terminAlter(t, t.datum)}</span>` : ""}</span>
       </div>`).join("");
     document.getElementById("upcoming-bereich").innerHTML =
       `<div class="project-heading">Nächste Termine</div><div class="upcoming-list">${html}</div>`;
@@ -13101,7 +13238,8 @@
           const farbe = terminFarbe(t);
           const zusatz = terminZusatz(t, t.datum);
           const zeit = t.uhrzeit ? t.uhrzeit.slice(0,5) + (t.ende_uhrzeit ? "–" + t.ende_uhrzeit.slice(0,5) : "") : "";
-          const streifen = farbe ? ` style="box-shadow: inset 4px 0 0 ${farbe}; padding-left:0.7rem;"` : "";
+          const streifenFarbe = aktiverBereich === "zentrale" ? bereichFarbeVon(t) : farbe;
+          const streifen = streifenFarbe ? ` style="box-shadow: inset 4px 0 0 ${streifenFarbe}; padding-left:0.7rem;"` : "";
           // Ausgefallenes Vorkommen einer Serie (seit Session 60): durchgestrichen, „wieder aktivieren“
           if (t._ausfall) return `
           <div class="termin-item termin-ausfall"${streifen}>
@@ -13124,7 +13262,7 @@
             <button class="task-check termin-check ${t.erledigt ? "done" : ""}" onclick="terminAbhaken('${t.id}', ${tagArg}, this)"
               title="${t.erledigt ? "Wieder offen" : "Erledigt"}" aria-label="${escapeAttr(t.titel)} ${t.erledigt ? "wieder öffnen" : "abhaken"}" aria-pressed="${t.erledigt}">${t.erledigt ? "✓" : ""}</button>
             <span class="termin-zeit">${zeit}</span>
-            <span class="termin-titel">${terminMarkeHtml(t)}${escapeHtml(t.titel)}${t._verschoben ? `<span class="termin-notiz">${ic("verschieben")} verschoben vom ${escapeHtml(terminTagText(t._verschoben))}</span>` : ""}${zusatz ? `<span class="termin-notiz">${t._serie ? ic("serie") + " " : ""}${escapeHtml(zusatz)}</span>` : ""}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
+            <span class="termin-titel">${bereichMarkeHtml(t)}${terminMarkeHtml(t)}${escapeHtml(t.titel)}${t._verschoben ? `<span class="termin-notiz">${ic("verschieben")} verschoben vom ${escapeHtml(terminTagText(t._verschoben))}</span>` : ""}${zusatz ? `<span class="termin-notiz">${t._serie ? ic("serie") + " " : ""}${escapeHtml(zusatz)}</span>` : ""}${t.notiz ? `<span class="termin-notiz">${escapeHtml(t.notiz)}</span>` : ""}</span>
             <span class="termin-aktionen">
             ${t._serie ? `<button class="task-snooze" onclick="terminVerschiebenOeffnen('${t.id}','${t._tag}')" title="Nur diesen Termin verschieben" aria-label="Termin vom ${formatDatumKurz(t._tag)} verschieben">${ic("verschieben")}</button>` : ""}
             ${t._serie && !t._verschoben ? `<button class="task-snooze" onclick="terminAusfallOeffnen('${t.id}','${t._tag}')" title="Fällt aus …" aria-label="Termin am ${formatDatumKurz(t._tag)} ausfallen lassen">${ic("x-kreis")}</button>` : ""}
@@ -13139,7 +13277,8 @@
       <div class="cal-day-panel">
         <h3>${titel}</h3>
         ${itemsHtml}
-        <div class="termin-form">
+        ${aktiverBereich === "zentrale" ? `<p class="notiz-meta" style="margin:0;">Neue Termine legst du mit dem „+“ an (dort den Bereich wählen) oder im Kalender des Bereichs.</p>` : ""}
+        <div class="termin-form${aktiverBereich === "zentrale" ? " hidden" : ""}">
           <input type="text" id="termin-titel" placeholder="Titel, z. B. „Elternabend 19 Uhr“">
           <div class="schnell-erkannt form-erkannt hidden" id="termin-erkannt" role="status" aria-live="polite"></div>
           <input type="time" id="termin-uhrzeit" style="width:8rem;" title="Beginn (optional)">
