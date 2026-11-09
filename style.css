@@ -2685,3 +2685,7 @@ button.nf-ort { cursor: pointer; }
 .alle-auf-zeile { display: flex; align-items: center; gap: 0.6rem; border-top: 1px solid var(--border); padding: 0.35rem 0; }
 .alle-auf-zeile .heute-zeile-inhalt { flex: 1; text-align: left; }
 .alle-auf-ueber { color: var(--overdue-text, #b3261e); font-weight: 600; }
+
+/* Stunden: Bereich ohne Kategorie (seit Session 98) */
+.std-leer-hinweis { border: 1px dashed var(--accent); border-radius: var(--r-karte); padding: 0.7rem 0.9rem; margin-bottom: 0.9rem; background: var(--panel); }
+.std-leer-hinweis p { margin: 0 0 0.6rem; }
