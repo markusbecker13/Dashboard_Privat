@@ -5035,7 +5035,14 @@
       `<button type="button" class="schnell-chip${std.ansicht === a ? " aktiv" : ""}" aria-pressed="${std.ansicht === a}" onclick="stdAnsicht('${a}')">${t}</button>`).join("");
     const inhalt = std.ansicht === "woche" ? stdWocheHtml(kats, z) : std.ansicht === "monat" ? stdMonatHtml(kats, z) : stdJahrHtml(kats, z);
     const imZeitraum = heuteISO() >= z.von && heuteISO() <= z.bis;
+    // Der Filter zeigt nur Bereiche, die schon eine Kategorie haben – für einen neuen Bereich zuerst eine anlegen
+    const aktivName = (STD_BEREICHE.find(([b]) => b === aktiverBereich) || [])[1];
+    const leerHinweis = aktivName && !std.kategorien.some((k) => k.bereich === aktiverBereich)
+      ? `<div class="std-leer-hinweis" role="note"><p>Für <strong>${escapeHtml(aktivName)}</strong> gibt es noch keine Stunden-Kategorie. Deshalb fehlt der Bereich oben im Filter und es lässt sich nichts erfassen.</p>
+          <button type="button" class="btn-primary" onclick="blattNeu('stdkategorie', { bereich: '${escapeAttr(aktiverBereich)}' })">${ic("plus")}Kategorie für ${escapeHtml(aktivName)} anlegen</button></div>`
+      : "";
     el.innerHTML = `
+      ${leerHinweis}
       ${filter}
       <div class="reiter-aktionen bib-aktionen">
         <button type="button" class="btn-primary" onclick="stdNeuerEintrag()"${aktiv.length ? "" : " disabled"}>${ic("plus")}Eintrag</button>
