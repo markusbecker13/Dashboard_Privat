@@ -557,11 +557,17 @@
     renderHeute();
     renderOgsIdeen();
     renderReiterVerwaltung();
+    // Seit Session 99: Beim Bereichswechsel gelten ALLE Reiter als veraltet (sie zeigen
+    // sonst noch den alten Bereich, z. B. Links, Einkauf, Verlauf – Einträge fehlten
+    // bis zum nächsten neuen Eintrag). tabWechseln zeichnet den neuen Reiter sofort,
+    // die übrigen folgen in kleinen Häppchen.
+    try { zeichnenOffen = new Set(ZEICHNEN_JE_REITER.map(([t]) => t)); } catch (_e) { /* vor dem ersten Laden */ }
     if (bereich === "verwaltung") {
       tabWechseln("reiterverwaltung");
     } else {
       tabWechseln(ersterSichtbarerReiter());
     }
+    try { restSpaeterZeichnen(); } catch (_e) { /* vor dem ersten Laden */ }
   };
 
   // ==========================================================
