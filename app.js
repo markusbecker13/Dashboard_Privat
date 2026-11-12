@@ -4809,12 +4809,35 @@
     return vorhanden.has(aktiverBereich) && vorhanden.size > 1 ? aktiverBereich : "alle";
   }
   window.stdFilterWaehlen = function(f) {
-    try { localStorage.setItem("std-filter", f); } catch (_e) { /* egal */ }
+    try { localStorage.setItem("std-filter", f); localStorage.removeItem("std-kat-filter"); } catch (_e) { /* egal */ }
     renderStunden();
   };
-  function stdKategorienSichtbar(auchArchiv) {
+  // Kategorie-Filter (seit Session 100, nur dieses Gerät): eine Kategorie innerhalb des gewählten Bereichs
+  function stdKatFilter() {
+    let id = "";
+    try { id = localStorage.getItem("std-kat-filter") || ""; } catch (_e) { /* egal */ }
+    if (!id) return "";
     const f = stdFilter();
-    return std.kategorien.filter((k) => (f === "alle" || k.bereich === f) && (auchArchiv || !k.archiviert));
+    const k = std.kategorien.find((x) => String(x.id) === id);
+    return k && !k.archiviert && (f === "alle" || k.bereich === f) ? id : "";
+  }
+  window.stdKatFilterWaehlen = function(id) {
+    try { if (id) localStorage.setItem("std-kat-filter", id); else localStorage.removeItem("std-kat-filter"); } catch (_e) { /* egal */ }
+    renderStunden();
+  };
+  // „Nur Tage mit Einträgen“ in der Wochenansicht (spart Scrollen)
+  function stdNurBelegte() {
+    try { return localStorage.getItem("std-nur-belegte") === "1"; } catch (_e) { return false; }
+  }
+  window.stdNurBelegteUmschalten = function() {
+    try { localStorage.setItem("std-nur-belegte", stdNurBelegte() ? "0" : "1"); } catch (_e) { /* egal */ }
+    renderStunden();
+  };
+  // ohneKat = true: Kategorie-Filter ignorieren (Verwaltung, Vorschläge)
+  function stdKategorienSichtbar(auchArchiv, ohneKat) {
+    const f = stdFilter();
+    const kf = ohneKat ? "" : stdKatFilter();
+    return std.kategorien.filter((k) => (f === "alle" || k.bereich === f) && (auchArchiv || !k.archiviert) && (!kf || String(k.id) === kf));
   }
 
   window.stdAnsicht = function(a) { std.ansicht = a; renderStunden(); };
@@ -4949,7 +4972,8 @@
 
   function stdWocheHtml(kats, z) {
     let tage = "";
-    for (let d = z.von; d <= z.bis; d = addTage(d, 1)) tage += stdTagHtml(d, kats, true);
+    for (let d = z.von; d <= z.bis; d = addTage(d, 1)) tage += stdTagHtml(d, kats, !stdNurBelegte());
+    if (!tage) tage = `<p class="notiz-meta">Keine Einträge in dieser Woche.</p>`;
     return `<div class="std-tage">${tage}</div><h3 class="std-zwischen">Summe der Woche</h3>${stdTabelleHtml(kats, z.von, z.bis)}`;
   }
 
@@ -5001,7 +5025,7 @@
   }
 
   function stdKategorienHtml() {
-    const alle = stdKategorienSichtbar(true);
+    const alle = stdKategorienSichtbar(true, true);
     return `<details class="anleitung-abschnitt std-block"${std.kategorien.length ? "" : " open"}>
       <summary>Kategorien &amp; Soll</summary>
       <div class="anleitung-text">
@@ -5034,6 +5058,13 @@
       ? `<div class="schnell-chips std-filter" role="group" aria-label="Bereich">${[["alle", "Alle"], ...bereiche].map(([b, t]) =>
         `<button type="button" class="schnell-chip${f === b ? " aktiv" : ""}" aria-pressed="${f === b}" onclick="stdFilterWaehlen('${b}')">${t}</button>`).join("")}</div>`
       : "";
+    // Kategorie-Filter: nur sinnvoll, wenn im gewählten Bereich mehr als eine Kategorie aktiv ist
+    const kf = stdKatFilter();
+    const katWahl = stdKategorienSichtbar(false, true);
+    const katFilterHtml = katWahl.length > 1
+      ? `<div class="schnell-chips std-filter std-katfilter" role="group" aria-label="Kategorie">${[["", "Alle Kategorien"], ...katWahl.map((k) => [String(k.id), k.name])].map(([id, t]) =>
+        `<button type="button" class="schnell-chip${kf === id ? " aktiv" : ""}" aria-pressed="${kf === id}" data-id="${escapeAttr(id)}" onclick="stdKatFilterWaehlen(this.dataset.id)">${id ? `<span class="std-punkt" style="background:${escapeAttr(stdFarbe(katWahl.find((k) => String(k.id) === id)))}"></span>` : ""}${escapeHtml(t)}</button>`).join("")}</div>`
+      : "";
     const kats = stdKategorienSichtbar(true);
     const aktiv = kats.filter((k) => !k.archiviert);
     const z = stdZeitraum();
@@ -5050,6 +5081,7 @@
     el.innerHTML = `
       ${leerHinweis}
       ${filter}
+      ${katFilterHtml}
       <div class="reiter-aktionen bib-aktionen">
         <button type="button" class="btn-primary" onclick="stdNeuerEintrag()"${aktiv.length ? "" : " disabled"}>${ic("plus")}Eintrag</button>
         <button type="button" class="btn-secondary" onclick="blattNeu('stdabwesenheit', {})">${ic("kalender")}Abwesenheit</button>
@@ -5057,7 +5089,7 @@
       ${stdLaufendHtml(aktiv)}
       ${stdZuletztHtml()}
       ${stdSaldoKartenHtml(aktiv)}
-      <div class="schnell-chips std-ansicht" role="group" aria-label="Ansicht">${ansichten}</div>
+      <div class="schnell-chips std-ansicht" role="group" aria-label="Ansicht">${ansichten}${std.ansicht === "woche" ? `<button type="button" class="schnell-chip${stdNurBelegte() ? " aktiv" : ""}" aria-pressed="${stdNurBelegte()}" onclick="stdNurBelegteUmschalten()">Nur Tage mit Einträgen</button>` : ""}</div>
       <div class="std-nav">
         <button type="button" class="btn-secondary ern-pfeil" onclick="stdBlaettern(-1)" aria-label="Zurück">${ic("zurueck")}</button>
         <button type="button" class="std-nav-text" onclick="stdBlaettern(0)" title="Zu heute">${escapeHtml(stdZeitraumText(z))}${imZeitraum ? "" : " · heute"}</button>
@@ -5331,7 +5363,7 @@
       .sort((a, b) => (a.datum + a.von).localeCompare(b.datum + b.von));
     const abw = std.abw.filter((a) => a.bis >= z.von && a.von <= z.bis && (!a.kategorie_id || ids.has(String(a.kategorie_id))));
     const filter = stdFilter();
-    return { z, uebersicht, eintraege, abw, bisSoll, bereichName, filterText: filter === "alle" ? "alle Bereiche" : bereichName(filter) };
+    return { z, uebersicht, eintraege, abw, bisSoll, bereichName, filterText: (filter === "alle" ? "alle Bereiche" : bereichName(filter)) + (stdKatFilter() ? " · " + ((stdKat(stdKatFilter()) || {}).name || "") : "") };
   }
   const stdStd = (min) => Math.round(min / 60 * 100) / 100;
 
@@ -5426,7 +5458,7 @@
       let letzte = "";
       try { letzte = localStorage.getItem("std-letzte-kat") || ""; } catch (_e) { /* egal */ }
       const opt = stdKatOptionen(e.kategorie_id);
-      const vorschlag = e.kategorie_id || (opt.some(([id]) => id === letzte) ? letzte : (stdKategorienSichtbar(false)[0] || std.kategorien[0] || {}).id);
+      const vorschlag = e.kategorie_id || (opt.some(([id]) => id === letzte) ? letzte : (stdKategorienSichtbar(false, true)[0] || std.kategorien[0] || {}).id);
       return {
         kategorie: String(vorschlag || ""), datum: e.datum || heuteISO(),
         von: e.von ? String(e.von).slice(0, 5) : "", bis: e.bis ? String(e.bis).slice(0, 5) : "",
