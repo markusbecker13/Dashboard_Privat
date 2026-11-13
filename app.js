@@ -28117,10 +28117,16 @@
   };
   window.lhPaketDatei = async function(input) {
     const d = input.files && input.files[0];
-    input.value = "";
     if (!d) return;
-    if (d.size > 500000) { hinweisZeigen("Datei ist zu groß"); return; }
-    lh.paketText = await d.text();
+    if (d.size > 500000) { input.value = ""; hinweisZeigen("Datei ist zu groß"); return; }
+    let text = "";
+    try { text = await d.text(); } catch (_e) { text = ""; }
+    input.value = "";
+    if (!text.trim()) { hinweisZeigen("Die Datei ist leer oder nicht lesbar"); return; }
+    lh.paketText = text;
+    // Das Textfeld muss den Inhalt tragen, sonst überschreibt Prüfen ihn mit dem leeren Feld
+    const feld = document.getElementById("lh-paket-text");
+    if (feld) feld.value = text;
     window.lhPaketPruefen();
   };
 
