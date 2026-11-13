@@ -27375,6 +27375,17 @@
   }
 
   // ---- Übungen ----
+  // Eingeklappte Fächer merkt sich das Gerät (nur Anzeige, keine Daten)
+  function lhZu() {
+    try { return new Set(JSON.parse(localStorage.getItem("lh-faecher-zu") || "[]").map(String)); } catch (_e) { return new Set(); }
+  }
+  window.lhFachKlappe = function(id, offen) {
+    const z = lhZu();
+    if (offen) z.delete(String(id)); else z.add(String(id));
+    try { localStorage.setItem("lh-faecher-zu", JSON.stringify([...z])); } catch (_e) { /* ignorieren */ }
+    const pfeil = document.querySelector(`.lh-fach-gruppe[ontoggle*="'${String(id).replace(/'/g, "")}'"] > summary > span`);
+    if (pfeil) pfeil.textContent = offen ? "▾" : "▸";
+  };
   function lhUebungenHtml() {
     const faecher = lhFaecherSortiert(false);
     const aktiv = lh.uebungen.filter((u) => !u.archiviert);
@@ -27396,8 +27407,14 @@
     const gruppen = faecher.filter((f) => lh.fach === "alle" || String(f.id) === lh.fach).map((f) => {
       const liste = aktiv.filter((u) => String(u.fach_id) === String(f.id) && passtKlasse(u)).sort(lhUebungSortierung);
       if (!liste.length) return lh.fach === "alle" ? "" : `<p class="empty-text">In ${escapeHtml(f.name)} gibt es hier noch keine Übung.</p>`;
-      return `<h3 class="lh-fach-titel" style="--lh-farbe:${lhFarbe(f)}">${escapeHtml(f.symbol)} ${escapeHtml(f.name)}</h3>
-        <div class="lh-uebung-liste">${liste.map(lhUebungKarte).join("")}</div>`;
+      const offen = !lhZu().has(String(f.id));
+      return `<details class="lh-fach-gruppe"${offen ? " open" : ""} ontoggle="lhFachKlappe('${escapeAttr(String(f.id))}', this.open)">
+        <summary class="lh-fach-kopf" style="cursor:pointer;display:flex;align-items:center;gap:.5rem;list-style:none">
+          <h3 class="lh-fach-titel" style="--lh-farbe:${lhFarbe(f)};flex:1;margin:0">${escapeHtml(f.symbol)} ${escapeHtml(f.name)} <span class="lern-chip-zahl">${liste.length}</span></h3>
+          <span aria-hidden="true" class="notiz-meta">${offen ? "▾" : "▸"}</span>
+        </summary>
+        <div class="lh-uebung-liste">${liste.map(lhUebungKarte).join("")}</div>
+      </details>`;
     }).join("");
     // Übungen in archivierten Fächern: unten mit anzeigen, damit nichts verschwindet
     const ohneFach = aktiv.filter((u) => { const f = lhFach(u.fach_id); return !f || f.archiviert; });
