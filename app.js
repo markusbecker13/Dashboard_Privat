@@ -26677,7 +26677,7 @@
   const lh = {
     geladen: false, laedt: false, fehlt: false, fehler: "",
     kinder: [], faecher: [], uebungen: [], aufgaben: [], freigaben: [], durchlaeufe: [], regeln: [],
-    fach: "alle", klasse: "alle", // Filter in der Übersicht (Klasse seit Session 102)       // Filter in der Übersicht
+    fach: "alle", klasse: "alle", thema: "alle", suche: "", // Filter in der Übersicht (Klasse seit Session 102)       // Filter in der Übersicht
     ansicht: "liste",   // liste | editor | paket
     ed: null,           // Übung im Formular
     speichert: false,
@@ -27403,7 +27403,18 @@
         const an = String(lh.klasse) === w;
         return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lhKlasseFilter('${w}')">${t} <span class="lern-chip-zahl">${n}</span></button>`;
       }).join("") + `</div>`;
-    const passtKlasse = (u) => String(lh.klasse) === "alle" || String(u.klasse || 0) === String(lh.klasse);
+    if (lh.thema !== "alle" && !lhThemen().some((t) => t.toLowerCase() === String(lh.thema).toLowerCase())) lh.thema = "alle";
+    const suchWort = String(lh.suche || "").trim().toLowerCase();
+    const passtKlasse = (u) => (String(lh.klasse) === "alle" || String(u.klasse || 0) === String(lh.klasse))
+      && (lh.thema === "alle" || String(u.thema || "").trim().toLowerCase() === String(lh.thema).toLowerCase())
+      && (!suchWort || `${u.titel || ""} ${u.thema || ""}`.toLowerCase().includes(suchWort));
+    const filterZeile = aktiv.length ? `<div class="lh-filterzeile" style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0">
+      <select aria-label="Thema" onchange="lhThemaFilter(this.value)" style="flex:1;min-width:9rem">
+        <option value="alle">Alle Themen</option>
+        ${lhThemen().map((t) => `<option value="${escapeAttr(t)}"${t.toLowerCase() === String(lh.thema).toLowerCase() ? " selected" : ""}>${escapeHtml(t)}</option>`).join("")}
+      </select>
+      <input type="search" id="lh-suche" aria-label="Übung suchen" placeholder="Übung suchen …" value="${escapeAttr(lh.suche || "")}" oninput="lhSuche(this.value)" style="flex:2;min-width:9rem">
+    </div>` : "";
     const gruppen = faecher.filter((f) => lh.fach === "alle" || String(f.id) === lh.fach).map((f) => {
       const liste = aktiv.filter((u) => String(u.fach_id) === String(f.id) && passtKlasse(u)).sort(lhUebungSortierung);
       if (!liste.length) return lh.fach === "alle" ? "" : `<p class="empty-text">In ${escapeHtml(f.name)} gibt es hier noch keine Übung.</p>`;
@@ -27426,10 +27437,12 @@
       </div>
       ${faecher.length ? `<div class="schnell-chips lh-fachfilter" role="group" aria-label="Fach">${chips}</div>` : ""}
       ${aktiv.length ? klassenChips : ""}
+      ${filterZeile}
       <datalist id="lh-themen">${lhThemen().map((t) => `<option value="${escapeAttr(t)}">`).join("")}</datalist>
       ${aktiv.length ? "" : `<p class="empty-text">Noch keine Übung. Lege eine im Formular an oder lass Claude welche erstellen.</p>`}
       ${gruppen}
-      ${ohneFach.length && lh.fach === "alle" ? `<h3 class="lh-fach-titel">Fach archiviert</h3><div class="lh-uebung-liste">${ohneFach.map(lhUebungKarte).join("")}</div>` : ""}
+      ${aktiv.length && !gruppen.trim() && (lh.thema !== "alle" || suchWort || String(lh.klasse) !== "alle" || lh.fach !== "alle") ? `<p class="empty-text">Keine Übung passt zu diesem Filter.</p>` : ""}
+      ${ohneFach.length && lh.fach === "alle" && lh.thema === "alle" && !suchWort && String(lh.klasse) === "alle" ? `<h3 class="lh-fach-titel">Fach archiviert</h3><div class="lh-uebung-liste">${ohneFach.map(lhUebungKarte).join("")}</div>` : ""}
       ${!lh.kinder.length && aktiv.length ? `<p class="notiz-meta">Zum Freigeben oben erst ein Kind anlegen.</p>` : ""}
       ${archiv.length ? `<details class="anleitung-abschnitt std-block">
         <summary>Archivierte Übungen (${archiv.length})</summary>
@@ -27444,6 +27457,13 @@
       || (a.stufe || 1) - (b.stufe || 1) || String(a.titel).localeCompare(String(b.titel), "de");
   }
   window.lhKlasseFilter = function(k) { lh.klasse = k; renderLernhilfe(); };
+  window.lhThemaFilter = function(t) { lh.thema = t; renderLernhilfe(); };
+  window.lhSuche = function(w) {
+    lh.suche = String(w || "").slice(0, 60);
+    renderLernhilfe();
+    const el = document.getElementById("lh-suche");
+    if (el) { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (_e) { /* ignorieren */ } }
+  };
 
   function lhUebungKarte(u) {
     const f = lhFach(u.fach_id);
