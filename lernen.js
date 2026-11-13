@@ -23,6 +23,7 @@
   const STERNE_JE_STICKER = 3;   // wie in lernen-api
   const ANPASSUNGEN = ["reizarm", "struktur", "klare_sprache", "ohne_zeitdruck", "wenig_auswahl", "pause", "lesehilfe"]; // wie in lernen-api
   const LOB = ["Super!", "Klasse!", "Toll gemacht!", "Richtig!", "Prima!", "Stark!"];
+  const STUFEN = ["", "Leicht", "Mittel", "Schwer"]; // Schwierigkeit 1–3 (seit Session 102)
   const app = document.getElementById("app");
 
   // ---------- Speicher (kann im privaten Modus fehlen) ----------
@@ -228,13 +229,14 @@
     const liste = uebersicht.uebungen.filter((u) => u.fach_id === fachId);
     // Feste Struktur: immer dieselbe Reihenfolge (nach Freigabe, dann Titel), nichts springt nach oben
     if (hat("struktur")) {
-      return liste.sort((a, b) => String(a.freigegeben_am || "").localeCompare(String(b.freigegeben_am || "")) || String(a.titel).localeCompare(String(b.titel), "de"));
+      return liste.sort((a, b) => (a.klasse || 0) - (b.klasse || 0) || (a.stufe || 0) - (b.stufe || 0) || String(a.freigegeben_am || "").localeCompare(String(b.freigegeben_am || "")) || String(a.titel).localeCompare(String(b.titel), "de"));
     }
     return liste.sort((a, b) => {
       // Fällige zuerst (früheste oben), dann neue, dann zuletzt freigegebene
       const fa = a.faellig_am && !a.durchlaeufe ? a.faellig_am : "9999", fb = b.faellig_am && !b.durchlaeufe ? b.faellig_am : "9999";
       if (fa !== fb) return fa < fb ? -1 : 1;
       if (a.neu !== b.neu) return a.neu ? -1 : 1;
+      if (a.klasse && b.klasse && (a.klasse !== b.klasse || a.stufe !== b.stufe)) return a.klasse - b.klasse || (a.stufe || 0) - (b.stufe || 0);
       return String(b.freigegeben_am || "").localeCompare(String(a.freigegeben_am || ""));
     });
   }
@@ -343,7 +345,7 @@
           h("span", { class: "lk-uebung-meta" },
             u.neu ? h("span", { class: "lk-marke neu" }, "Neu") : null,
             faellig ? h("span", { class: "lk-marke faellig", text: faellig }) : null,
-            h("span", { text: [u.thema, u.anzahl_aufgaben === 1 ? "1 Aufgabe" : `${u.anzahl_aufgaben} Aufgaben`].filter(Boolean).join(" · ") }))),
+            h("span", { text: [u.klasse ? `Klasse ${u.klasse}` : "", u.klasse && STUFEN[u.stufe] ? STUFEN[u.stufe] : "", u.thema, u.anzahl_aufgaben === 1 ? "1 Aufgabe" : `${u.anzahl_aufgaben} Aufgaben`].filter(Boolean).join(" · ") }))),
         u.durchlaeufe ? h("span", { class: "lk-uebung-sterne", "aria-label": `Beste Runde: ${u.beste_sterne} von 3 Sternen` }, sterneText(u.beste_sterne)) : null,
         h("span", { class: "lk-pfeil", "aria-hidden": "true" }, "›"));
     });
