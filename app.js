@@ -26676,8 +26676,8 @@
   // ==========================================================
   const lh = {
     geladen: false, laedt: false, fehlt: false, fehler: "",
-    kinder: [], faecher: [], uebungen: [], aufgaben: [], freigaben: [], durchlaeufe: [],
-    fach: "alle",       // Filter in der Übersicht
+    kinder: [], faecher: [], uebungen: [], aufgaben: [], freigaben: [], durchlaeufe: [], regeln: [],
+    fach: "alle", klasse: "alle", // Filter in der Übersicht (Klasse seit Session 102)       // Filter in der Übersicht
     ansicht: "liste",   // liste | editor | paket
     ed: null,           // Übung im Formular
     speichert: false,
@@ -26695,6 +26695,20 @@
   const LH_TYP_REIHE = Object.keys(LH_TYPEN);
   const LH_FARBEN = { rot: ["Rot", "#d64545"], orange: ["Orange", "#d9731f"], gelb: ["Gelb", "#c99700"], gruen: ["Grün", "#2f9e6f"],
     tuerkis: ["Türkis", "#1a9aa0"], blau: ["Blau", "#2a5bd7"], lila: ["Lila", "#8b5fd9"], pink: ["Pink", "#d6457f"] };
+  // Klassen und Schwierigkeit (seit Session 102): Klasse 1–4, Stufe 1 leicht bis 3 schwer
+  const LH_KLASSEN = [1, 2, 3, 4];
+  const LH_STUFEN = { 1: "Leicht", 2: "Mittel", 3: "Schwer" };
+  const lhKlasseText = (k) => (k ? `Klasse ${k}` : "ohne Klasse");
+  // Passt eine Übung zu einer Regel? (wie regelPasst in lernen-api)
+  function lhRegelPasst(u, r) {
+    if (u.archiviert || !u.klasse) return false;
+    if (Number(u.klasse) !== Number(r.klasse) || String(u.fach_id) !== String(r.fach_id)) return false;
+    if (r.thema && String(u.thema || "").trim().toLowerCase() !== String(r.thema).trim().toLowerCase()) return false;
+    return Number(u.stufe || 1) <= Number(r.max_stufe);
+  }
+  const lhRegelnVon = (kid) => lh.regeln.filter((r) => String(r.kind_id) === String(kid));
+  const lhPerRegel = (kid, u) => lhRegelnVon(kid).some((r) => lhRegelPasst(u, r));
+  const lhThemen = () => [...new Set(lh.uebungen.map((u) => String(u.thema || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "de"));
   const LH_KIND_SYMBOLE = ["🦊", "🐻", "🐼", "🐯", "🦁", "🐸", "🐧", "🦉", "🐢", "🐬", "🦄", "🐝"];
   // Anpassungen der Kinderseite (seit Session 101): Schalter je Kind, benannt nach dem, was sie tun –
   // bewusst keine Diagnosen. Schlüssel müssen zu LERN_ANPASSUNGEN in index.ts und lernen.js passen.
@@ -26726,6 +26740,7 @@
       lh.aufgaben = r.aufgaben || [];
       lh.freigaben = r.freigaben || [];
       lh.durchlaeufe = r.durchlaeufe || [];
+      lh.regeln = r.regeln || [];
       lh.geladen = true;
     } catch (e) {
       if (e.message !== "unauthorized") lh.fehler = e.message || "Fehler";
@@ -27306,6 +27321,24 @@
   };
 
   // ---- Kinder ----
+  // Übungen, die ein Kind nur über eine Regel sieht (keine Einzel-Freigabe)
+  function lhNurRegel(kid) {
+    return lh.uebungen.filter((u) => !u.archiviert && !lhFreigabe(kid, u.id) && lhPerRegel(kid, u)).length;
+  }
+  // Freischalt-Regeln eines Kindes: Liste + Knopf
+  function lhRegelnHtml(k) {
+    const kid = escapeAttr(String(k.id));
+    const zeilen = lhRegelnVon(k.id).sort((a, b) => a.klasse - b.klasse).map((r) => {
+      const f = lhFach(r.fach_id);
+      const n = lh.uebungen.filter((u) => lhRegelPasst(u, r)).length;
+      return `<button type="button" class="schnell-chip lh-regel" onclick="blattOeffnen('lhregel', '${escapeAttr(String(r.id))}')" aria-label="Regel bearbeiten">
+        Klasse ${r.klasse} · ${escapeHtml(f ? f.symbol + " " + f.name : "Fach?")}${r.thema ? " · " + escapeHtml(r.thema) : " · alle Themen"} · bis ${LH_STUFEN[r.max_stufe] || "Schwer"} <span class="lern-chip-zahl">${n}</span></button>`;
+    }).join("");
+    return `<div class="lh-regeln"><span class="notiz-meta">Freigeschaltet nach Regel:${zeilen ? "" : " noch nichts"}</span>
+      ${zeilen ? `<div class="schnell-chips">${zeilen}</div>` : ""}
+      <button type="button" class="link-btn" onclick="blattNeu('lhregel', { kind_id: '${kid}' })">${ic("plus")}Regel</button></div>`;
+  }
+
   function lhKinderHtml() {
     const karten = lh.kinder.map((k) => {
       const kid = escapeAttr(String(k.id));
@@ -27319,7 +27352,8 @@
         <div class="lh-kind-info">
           <strong>${escapeHtml(k.pseudonym)}</strong>
           <span class="notiz-meta">${status}</span>
-          <span class="notiz-meta">${frei} ${frei === 1 ? "Übung" : "Übungen"} freigegeben</span>
+          <span class="notiz-meta">${frei} ${frei === 1 ? "Übung" : "Übungen"} einzeln freigegeben${lhNurRegel(k.id) ? ` · ${lhNurRegel(k.id)} per Regel offen` : ""}</span>
+          ${lhRegelnHtml(k)}
           ${lhAnpassungenText(k) ? `<span class="notiz-meta">Anpassungen: ${escapeHtml(lhAnpassungenText(k))}</span>` : ""}
         </div>
         <div class="lh-kind-knoepfe">
@@ -27352,9 +27386,16 @@
         const an = lh.fach === String(f.id);
         return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lhFachFilter('${escapeAttr(String(f.id))}')">${escapeHtml(f.symbol)} ${escapeHtml(f.name)} <span class="lern-chip-zahl">${n}</span></button>`;
       })).join("");
+    const klassenChips = `<div class="schnell-chips lh-fachfilter" role="group" aria-label="Klasse">` +
+      [["alle", "Alle Klassen"], ...LH_KLASSEN.map((k) => [String(k), `Klasse ${k}`]), ["0", "ohne Klasse"]].map(([w, t]) => {
+        const n = w === "alle" ? aktiv.length : aktiv.filter((u) => String(u.klasse || 0) === w).length;
+        const an = String(lh.klasse) === w;
+        return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lhKlasseFilter('${w}')">${t} <span class="lern-chip-zahl">${n}</span></button>`;
+      }).join("") + `</div>`;
+    const passtKlasse = (u) => String(lh.klasse) === "alle" || String(u.klasse || 0) === String(lh.klasse);
     const gruppen = faecher.filter((f) => lh.fach === "alle" || String(f.id) === lh.fach).map((f) => {
-      const liste = aktiv.filter((u) => String(u.fach_id) === String(f.id));
-      if (!liste.length) return lh.fach === "alle" ? "" : `<p class="empty-text">In ${escapeHtml(f.name)} gibt es noch keine Übung.</p>`;
+      const liste = aktiv.filter((u) => String(u.fach_id) === String(f.id) && passtKlasse(u)).sort(lhUebungSortierung);
+      if (!liste.length) return lh.fach === "alle" ? "" : `<p class="empty-text">In ${escapeHtml(f.name)} gibt es hier noch keine Übung.</p>`;
       return `<h3 class="lh-fach-titel" style="--lh-farbe:${lhFarbe(f)}">${escapeHtml(f.symbol)} ${escapeHtml(f.name)}</h3>
         <div class="lh-uebung-liste">${liste.map(lhUebungKarte).join("")}</div>`;
     }).join("");
@@ -27367,6 +27408,8 @@
         <button type="button" class="btn-secondary" onclick="lhPaketOeffnen()">${ic("funkeln")}Mit Claude erstellen</button>
       </div>
       ${faecher.length ? `<div class="schnell-chips lh-fachfilter" role="group" aria-label="Fach">${chips}</div>` : ""}
+      ${aktiv.length ? klassenChips : ""}
+      <datalist id="lh-themen">${lhThemen().map((t) => `<option value="${escapeAttr(t)}">`).join("")}</datalist>
       ${aktiv.length ? "" : `<p class="empty-text">Noch keine Übung. Lege eine im Formular an oder lass Claude welche erstellen.</p>`}
       ${gruppen}
       ${ohneFach.length && lh.fach === "alle" ? `<h3 class="lh-fach-titel">Fach archiviert</h3><div class="lh-uebung-liste">${ohneFach.map(lhUebungKarte).join("")}</div>` : ""}
@@ -27378,6 +27421,13 @@
     </section>`;
   }
 
+  // Sortierung: Klasse, Themenbereich, Schwierigkeit, Titel (ohne Klasse zuletzt)
+  function lhUebungSortierung(a, b) {
+    return (a.klasse || 9) - (b.klasse || 9) || String(a.thema || "").localeCompare(String(b.thema || ""), "de")
+      || (a.stufe || 1) - (b.stufe || 1) || String(a.titel).localeCompare(String(b.titel), "de");
+  }
+  window.lhKlasseFilter = function(k) { lh.klasse = k; renderLernhilfe(); };
+
   function lhUebungKarte(u) {
     const f = lhFach(u.fach_id);
     const aufg = lhAufgabenVon(u.id);
@@ -27388,9 +27438,10 @@
       const kid = escapeAttr(String(k.id));
       const erg = lhErgebnisse(k.id, u.id);
       const beste = erg.reduce((m, d) => Math.max(m, Number(d.sterne) || 0), 0);
-      const stand = !fr ? "" : erg.length
+      const regel = !fr && lhPerRegel(k.id, u) ? `<span class="badge reminder" title="Passt zu einer Freischalt-Regel von ${escapeAttr(k.pseudonym)}">per Regel offen</span>` : "";
+      const stand = regel + (!fr ? "" : erg.length
         ? `<span class="lh-stand" title="beste Sterne">${lhSterne(beste)} · ${erg.length}× gemacht</span>`
-        : `<span class="badge reminder">neu</span>`;
+        : `<span class="badge reminder">neu</span>`);
       return `<div class="lh-freigabe-zeile">
         <button type="button" class="schnell-chip${fr ? " aktiv" : ""}" aria-pressed="${!!fr}" onclick="lhFreigabeUmschalten('${kid}','${uid}')">
           ${escapeHtml(k.symbol || "")} ${escapeHtml(k.pseudonym)} ${fr ? "· freigegeben" : "· freigeben"}</button>
@@ -27403,7 +27454,7 @@
         <span class="lh-fach-symbol" aria-hidden="true">${escapeHtml(f ? f.symbol : "📘")}</span>
         <button type="button" class="lh-uebung-text" onclick="lhBearbeiten('${uid}')">
           <strong>${escapeHtml(u.titel)}</strong>
-          <span class="notiz-meta">${[u.thema ? escapeHtml(u.thema) : "", `${aufg.length} ${aufg.length === 1 ? "Aufgabe" : "Aufgaben"}`, escapeHtml(typen), u.quelle === "paket" ? "von Claude" : ""].filter(Boolean).join(" · ")}</span>
+          <span class="notiz-meta">${[u.klasse ? `Klasse ${u.klasse} · ${LH_STUFEN[u.stufe] || "Leicht"}` : "", u.thema ? escapeHtml(u.thema) : "", `${aufg.length} ${aufg.length === 1 ? "Aufgabe" : "Aufgaben"}`, escapeHtml(typen), u.quelle === "paket" ? "von Claude" : ""].filter(Boolean).join(" · ")}</span>
         </button>
         <button type="button" class="task-edit-btn" onclick="lhBearbeiten('${uid}')" aria-label="${escapeAttr(u.titel)} bearbeiten">${ic("stift")}</button>
       </div>
@@ -27550,6 +27601,7 @@
       id: null,
       fach_id: v.fach_id || (lh.fach !== "alle" ? lh.fach : String(faecher[0].id)),
       titel: v.titel || "", thema: v.thema || "", einleitung: v.einleitung || "",
+      klasse: v.klasse ? String(v.klasse) : (lh.klasse !== "alle" ? String(lh.klasse) : ""), stufe: String(v.stufe || 1),
       archiviert: false, quelle: v.quelle || "formular",
       aufgaben: (v.aufgaben && v.aufgaben.length ? v.aufgaben.map(lhAufgabeFuerFormular) : [lhLeereAufgabe("auswahl")]),
       geaendert: !!v.aufgaben,
@@ -27564,6 +27616,7 @@
     if (!u) return;
     lh.ed = {
       id: u.id, fach_id: String(u.fach_id), titel: u.titel || "", thema: u.thema || "", einleitung: u.einleitung || "",
+      klasse: u.klasse ? String(u.klasse) : "", stufe: String(u.stufe || 1),
       archiviert: !!u.archiviert, quelle: u.quelle,
       aufgaben: lhAufgabenVon(uid).map(lhAufgabeFuerFormular),
       geaendert: false,
@@ -27610,8 +27663,13 @@
       <div class="blatt-felder">
         <label class="blatt-feld halb" for="lh-f-fach"><span class="schnell-label blatt-label">Fach</span>
           <select id="lh-f-fach" data-lh="fach_id">${faecher.map((f) => `<option value="${escapeAttr(String(f.id))}"${String(f.id) === String(e.fach_id) ? " selected" : ""}>${escapeHtml(f.symbol)} ${escapeHtml(f.name)}</option>`).join("")}</select></label>
-        <label class="blatt-feld halb" for="lh-f-thema"><span class="schnell-label blatt-label">Thema</span>
-          <input type="text" id="lh-f-thema" data-lh="thema" maxlength="80" value="${escapeAttr(e.thema)}" placeholder="optional, z. B. Einmaleins" autocomplete="off"></label>
+        <label class="blatt-feld halb" for="lh-f-klasse"><span class="schnell-label blatt-label">Klasse</span>
+          <select id="lh-f-klasse" data-lh="klasse"><option value=""${!e.klasse ? " selected" : ""}>ohne Klasse</option>${LH_KLASSEN.map((k) => `<option value="${k}"${String(e.klasse) === String(k) ? " selected" : ""}>Klasse ${k}</option>`).join("")}</select></label>
+        <label class="blatt-feld halb" for="lh-f-stufe"><span class="schnell-label blatt-label">Schwierigkeit</span>
+          <select id="lh-f-stufe" data-lh="stufe">${[1, 2, 3].map((n) => `<option value="${n}"${String(e.stufe) === String(n) ? " selected" : ""}>${LH_STUFEN[n]}</option>`).join("")}</select></label>
+        <label class="blatt-feld" for="lh-f-thema"><span class="schnell-label blatt-label">Themenbereich</span>
+          <input type="text" id="lh-f-thema" data-lh="thema" maxlength="80" value="${escapeAttr(e.thema)}" list="lh-themen" placeholder="z. B. Punkt-vor-Strich" autocomplete="off">
+          <span class="blatt-hinweis">Gleich geschrieben wie bei den Übungen davor, dann passen die Freischalt-Regeln. Ohne Klasse wird die Übung nur einzeln freigegeben.</span></label>
         <label class="blatt-feld" for="lh-f-titel"><span class="schnell-label blatt-label">Titel</span>
           <input type="text" id="lh-f-titel" data-lh="titel" maxlength="120" value="${escapeAttr(e.titel)}" placeholder="z. B. 7er-Reihe" autocomplete="off"></label>
         <label class="blatt-feld" for="lh-f-einl"><span class="schnell-label blatt-label">Einleitung</span>
@@ -27930,6 +27988,7 @@
     try {
       const r = await api("lern_uebung_speichern", {
         id: e.id || undefined, fach_id: e.fach_id, titel: e.titel, thema: e.thema, einleitung: e.einleitung,
+        klasse: e.klasse ? Number(e.klasse) : null, stufe: Number(e.stufe) || 1,
         archiviert: e.id ? !!e.archiviert : undefined, quelle: e.quelle,
         aufgaben: e.aufgaben.map(lhAufgabeBereinigt),
       });
@@ -28027,7 +28086,8 @@
       "- Keine Namen echter Personen.",
       "",
       "Antworte NUR mit JSON in genau diesem Format, ohne weiteren Text:",
-      "{\"typ\":\"lern_uebungen\",\"version\":1,\"uebungen\":[{\"fach\":\"Mathe\",\"titel\":\"…\",\"thema\":\"…\",\"einleitung\":\"…\",\"aufgaben\":[…]}]}",
+      "{\"typ\":\"lern_uebungen\",\"version\":1,\"uebungen\":[{\"fach\":\"Mathe\",\"klasse\":4,\"stufe\":1,\"thema\":\"…\",\"titel\":\"…\",\"einleitung\":\"…\",\"aufgaben\":[…]}]}",
+      "\"klasse\" = 1 bis 4 (Klassenstufe), \"stufe\" = Schwierigkeit: 1 leicht, 2 mittel, 3 schwer. \"thema\" = Themenbereich im Fach (kurz, immer gleich geschrieben, z. B. \"Punkt-vor-Strich\").",
       "",
       "Aufgabenarten:",
       "1. Auswahl: {\"typ\":\"auswahl\",\"frage\":\"Welches Tier bellt?\",\"emoji\":\"🐾\",\"inhalt\":{\"optionen\":[{\"text\":\"Hund\",\"emoji\":\"🐶\"},{\"text\":\"Katze\",\"emoji\":\"🐱\"}],\"richtig\":0}}",
@@ -28097,6 +28157,8 @@
         aufgaben.forEach((a, i) => { const f = lhAufgabeFehler(a); if (f) fehler.push(`Aufgabe ${i + 1}: ${f}`); });
         return {
           titel: String(u.titel || "").slice(0, 120), thema: String(u.thema || "").slice(0, 80), einleitung: String(u.einleitung || "").slice(0, 500),
+          klasse: [1, 2, 3, 4].includes(Number(u.klasse)) ? Number(u.klasse) : null,
+          stufe: [1, 2, 3].includes(Number(u.stufe)) ? Number(u.stufe) : 1,
           fachName: String(u.fach || ""), fach_id: passend ? String(passend.id) : (faecher[0] ? String(faecher[0].id) : ""),
           aufgaben, fehler, gespeichert: false,
         };
@@ -28120,7 +28182,7 @@
       return `<article class="lh-uebung">
         <div class="lh-uebung-kopf"><div class="lh-uebung-text">
           <strong>${escapeHtml(u.titel || "(ohne Titel)")}</strong>
-          <span class="notiz-meta">${[u.thema ? escapeHtml(u.thema) : "", `${u.aufgaben.length} Aufgaben`, typen].filter(Boolean).join(" · ")}${u.fachName && !faecher.some((f) => f.name.toLowerCase() === u.fachName.toLowerCase()) ? ` · Fach „${escapeHtml(u.fachName)}“ gibt es nicht – bitte wählen` : ""}</span>
+          <span class="notiz-meta">${[u.klasse ? `Klasse ${u.klasse}` : "ohne Klasse", LH_STUFEN[u.stufe], u.thema ? escapeHtml(u.thema) : "", `${u.aufgaben.length} Aufgaben`, typen].filter(Boolean).join(" · ")}${u.fachName && !faecher.some((f) => f.name.toLowerCase() === u.fachName.toLowerCase()) ? ` · Fach „${escapeHtml(u.fachName)}“ gibt es nicht – bitte wählen` : ""}</span>
         </div></div>
         <label class="blatt-feld"><span class="schnell-label blatt-label">Fach</span>
           <select onchange="lhPaketFach(${k}, this.value)">${fachOpt}</select></label>
@@ -28142,7 +28204,7 @@
   window.lhPaketInsFormular = function(k) {
     const u = lh.paket && lh.paket[k];
     if (!u) return;
-    window.lhNeueUebung({ fach_id: u.fach_id, titel: u.titel, thema: u.thema, einleitung: u.einleitung, aufgaben: u.aufgaben.map(lhAufgabeBereinigt), quelle: "paket" });
+    window.lhNeueUebung({ fach_id: u.fach_id, titel: u.titel, thema: u.thema, einleitung: u.einleitung, klasse: u.klasse, stufe: u.stufe, aufgaben: u.aufgaben.map(lhAufgabeBereinigt), quelle: "paket" });
   };
   window.lhPaketSpeichern = async function() {
     if (!lh.paket || lh.speichert) return;
@@ -28154,7 +28216,7 @@
     for (const u of lh.paket) {
       if (u.fehler.length || u.gespeichert) continue;
       try {
-        await api("lern_uebung_speichern", { fach_id: u.fach_id, titel: u.titel, thema: u.thema, einleitung: u.einleitung, quelle: "paket", aufgaben: u.aufgaben.map(lhAufgabeBereinigt) });
+        await api("lern_uebung_speichern", { fach_id: u.fach_id, titel: u.titel, thema: u.thema, einleitung: u.einleitung, klasse: u.klasse || null, stufe: u.stufe || 1, quelle: "paket", aufgaben: u.aufgaben.map(lhAufgabeBereinigt) });
         u.gespeichert = true; ok++;
       } catch (e) {
         if (e.message === "unauthorized") { lh.speichert = false; return; }
@@ -28195,6 +28257,34 @@
     loeschFrage: (k) => `${k.pseudonym || "Kind"} wirklich löschen?\n\nGelöscht werden auch alle Freigaben und ALLE Ergebnisse dieses Kindes – endgültig. Der QR-Code funktioniert danach nicht mehr.\n\nVorher exportieren, falls du etwas aufheben musst.`,
     gespeichert: "Gespeichert",
     geloescht: "Kind und alle Ergebnisse gelöscht",
+    danach: () => { window.lhNeuLaden(); },
+  };
+  // Freischalt-Regel (seit Session 102): Klasse + Fach (+ Themenbereich) bis einschließlich Stufe
+  BLATT_ARTEN.lhregel = {
+    titel: "Regel bearbeiten",
+    titelNeu: "Neue Freischalt-Regel",
+    finden: (id) => lh.regeln.find((r) => String(r.id) === String(id)),
+    laden: (r) => {
+      const faecher = lhFaecherSortiert(false);
+      return {
+        id: r.id || "", kind_id: String(r.kind_id || ""),
+        klasse: String(r.klasse || 4),
+        fach_id: String(r.fach_id || (faecher[0] ? faecher[0].id : "")),
+        thema: r.thema || "", max_stufe: String(r.max_stufe || 3),
+      };
+    },
+    felder: [
+      { key: "klasse", label: "Klasse", typ: "chips", optionen: LH_KLASSEN.map((k) => [String(k), `Klasse ${k}`]) },
+      { key: "fach_id", label: "Fach", typ: "chips", optionen: () => lhFaecherSortiert(false).map((f) => [String(f.id), `${f.symbol} ${f.name}`]) },
+      { key: "thema", label: "Themenbereich", typ: "text", liste: "lh-themen", platzhalter: "leer = alle Themen",
+        hinweis: "Leer lassen schaltet das ganze Fach dieser Klasse frei. Sonst genau so schreiben wie bei der Übung (Groß/klein egal)." },
+      { key: "max_stufe", label: "Offen bis Schwierigkeit", typ: "chips", optionen: [["1", "Leicht"], ["2", "bis Mittel"], ["3", "bis Schwer"]] },
+    ],
+    speichern: (id, w) => api("lern_regel_speichern", { id: id || undefined, kind_id: w.kind_id, klasse: Number(w.klasse), fach_id: w.fach_id, thema: w.thema, max_stufe: Number(w.max_stufe) }),
+    loeschen: (id) => api("lern_regel_loeschen", { id }),
+    loeschFrage: () => "Diese Freischalt-Regel löschen? Einzel-Freigaben und Ergebnisse bleiben.",
+    gespeichert: "Regel gespeichert",
+    geloescht: "Regel gelöscht",
     danach: () => { window.lhNeuLaden(); },
   };
   BLATT_ARTEN.lhfach = {
