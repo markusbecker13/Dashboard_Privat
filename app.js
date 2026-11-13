@@ -26696,6 +26696,19 @@
   const LH_FARBEN = { rot: ["Rot", "#d64545"], orange: ["Orange", "#d9731f"], gelb: ["Gelb", "#c99700"], gruen: ["Grün", "#2f9e6f"],
     tuerkis: ["Türkis", "#1a9aa0"], blau: ["Blau", "#2a5bd7"], lila: ["Lila", "#8b5fd9"], pink: ["Pink", "#d6457f"] };
   const LH_KIND_SYMBOLE = ["🦊", "🐻", "🐼", "🐯", "🦁", "🐸", "🐧", "🦉", "🐢", "🐬", "🦄", "🐝"];
+  // Anpassungen der Kinderseite (seit Session 101): Schalter je Kind, benannt nach dem, was sie tun –
+  // bewusst keine Diagnosen. Schlüssel müssen zu LERN_ANPASSUNGEN in index.ts und lernen.js passen.
+  const LH_ANPASSUNGEN = [
+    ["reizarm", "Reizarm", "Ruhige Farben, keine Animationen, schlichte Rückmeldung"],
+    ["struktur", "Feste Struktur", "Immer gleicher Ablauf, „Aufgabe 3 von 8“, Antworten in angelegter Reihenfolge"],
+    ["klare_sprache", "Klare Sprache", "Wörtliche, neutrale Rückmeldungen ohne Floskeln"],
+    ["ohne_zeitdruck", "Ohne Zeitdruck", "Keine Zeitmessung bei Antworten und Runden"],
+    ["wenig_auswahl", "Weniger Auswahl", "Höchstens 3 Antworten, Runden mit höchstens 6 Aufgaben"],
+    ["pause", "Pausenknopf", "Das Kind kann selbst eine Pause machen"],
+    ["lesehilfe", "Lesehilfe", "Größere Schrift, mehr Abstand, Vorlesen-Knopf mit Beschriftung"],
+  ];
+  const lhAnpassungenText = (k) => (Array.isArray(k.anpassungen) ? k.anpassungen : [])
+    .map((a) => (LH_ANPASSUNGEN.find(([x]) => x === a) || [0, a])[1]).join(" · ");
   const LH_FACH_SYMBOLE = ["📖", "🔢", "🌍", "🔬", "🎨", "🎵", "⚽", "✏️", "🧩", "🌱"];
   const LH_MAX_AUFGABEN = 30;
   const LH_LUECKE = /\{\{([^{}]*)\}\}/g;
@@ -27307,6 +27320,7 @@
           <strong>${escapeHtml(k.pseudonym)}</strong>
           <span class="notiz-meta">${status}</span>
           <span class="notiz-meta">${frei} ${frei === 1 ? "Übung" : "Übungen"} freigegeben</span>
+          ${lhAnpassungenText(k) ? `<span class="notiz-meta">Anpassungen: ${escapeHtml(lhAnpassungenText(k))}</span>` : ""}
         </div>
         <div class="lh-kind-knoepfe">
           <button type="button" class="btn-secondary" onclick="lhZugangErstellen('${kid}')">${ic("nfc")}QR-Code</button>
@@ -27322,7 +27336,7 @@
       <div class="reiter-aktionen bib-aktionen">
         <button type="button" class="btn-secondary" onclick="blattNeu('lhkind', {})">${ic("plus")}Kind</button>
       </div>
-      <p class="notiz-meta">Nur ein Pseudonym (z. B. „Fuchs“), kein echter Name, keine Schule, nichts zum Förderbedarf.</p>
+      <p class="notiz-meta">Nur ein Pseudonym (z. B. „Fuchs“), kein echter Name, keine Schule, nichts zum Förderbedarf. Auch bei den Anpassungen (Stift am Kind) keine Gründe oder Diagnosen eintragen – es sind nur Schalter für die Ansicht.</p>
     </section>`;
   }
 
@@ -28167,13 +28181,15 @@
     titel: "Kind bearbeiten",
     titelNeu: "Neues Kind",
     finden: (id) => lhKind(id),
-    laden: (k) => ({ id: k.id || "", pseudonym: k.pseudonym || "", symbol: k.symbol || LH_KIND_SYMBOLE[0] }),
+    laden: (k) => ({ id: k.id || "", pseudonym: k.pseudonym || "", symbol: k.symbol || LH_KIND_SYMBOLE[0], anpassungen: Array.isArray(k.anpassungen) ? k.anpassungen.slice() : [] }),
     felder: [
       { key: "pseudonym", label: "Pseudonym", typ: "text", pflicht: true, platzhalter: "z. B. Fuchs",
         hinweis: "Kein echter Name. Das Kind sieht ihn auf seiner Seite." },
       { key: "symbol", label: "Symbol", typ: "chips", optionen: LH_KIND_SYMBOLE.map((s) => [s, s]) },
+      { key: "anpassungen", label: "Anpassungen der Übungsansicht", typ: "mehrfach", optionen: () => LH_ANPASSUNGEN,
+        hinweis: "Nur Schalter für die Ansicht des Kindes, keine Diagnosen. Ohne Haken sieht das Kind die Standardansicht. Wirkt beim nächsten Öffnen der Kinderseite." },
     ],
-    speichern: (id, w) => api("lern_kind_speichern", { id: id || undefined, pseudonym: w.pseudonym, symbol: w.symbol }),
+    speichern: (id, w) => api("lern_kind_speichern", { id: id || undefined, pseudonym: w.pseudonym, symbol: w.symbol, anpassungen: w.anpassungen || [] }),
     loeschen: (id) => api("lern_kind_loeschen", { id }),
     loeschText: "Kind mit allen Ergebnissen löschen",
     loeschFrage: (k) => `${k.pseudonym || "Kind"} wirklich löschen?\n\nGelöscht werden auch alle Freigaben und ALLE Ergebnisse dieses Kindes – endgültig. Der QR-Code funktioniert danach nicht mehr.\n\nVorher exportieren, falls du etwas aufheben musst.`,

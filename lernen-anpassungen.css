@@ -1,0 +1,60 @@
+/* ==========================================================
+   Anpassungen der Kinderseite (seit Session 101)
+   Schalter je Kind, keine Diagnosen. lernen.js setzt am <body> die
+   Klassen lk-a-reizarm, lk-a-struktur, lk-a-klare-sprache,
+   lk-a-ohne-zeitdruck, lk-a-wenig-auswahl, lk-a-pause, lk-a-lesehilfe.
+   Diese Datei steht NACH lernen.css und überschreibt nur Einzelheiten.
+   ========================================================== */
+
+/* Pausenknopf und Ablauf-Liste (auch ohne Klasse sichtbar, wenn vorhanden) */
+.lk-pause {
+  flex: none; display: inline-flex; align-items: center; gap: 0.3rem; min-height: 48px; padding: 0 0.9rem;
+  border-radius: 999px; border: 2px solid var(--rand); background: var(--karte); font-weight: 700; font-size: 1.05rem;
+}
+.lk-ablauf { text-align: left; margin: 1rem auto; padding-left: 1.6rem; max-width: 26rem; }
+.lk-ablauf li { margin: 0.4rem 0; }
+.lk-pause-seite { padding-top: 3rem; }
+.lk-pause-seite .lk-knopf { margin-top: 0.8rem; }
+.lk-vorlese-hinweis { margin: 0.6rem 0 0; }
+.lk-vorlesen-text { margin-left: 0.4rem; font-weight: 800; font-size: 1.05rem; }
+
+/* ---------- Reizarm: ruhige Farben, keine Bewegung, schlichte Flächen ---------- */
+body.lk-a-reizarm {
+  --bg: #f4f3ef; --karte: #fcfcfa; --rand: #d6d3ca; --ink: #2b3038; --ink-dim: #5d636c;
+  --gelb: #b9a77a; --gelb-bg: #f0ede4;
+  --ok: #2f6b4f; --ok-bg: #eaf1ec; --ok-rand: #a9c4b5;
+  --nein: #8f3b3b; --nein-bg: #f4eaea; --nein-rand: #d4b3b3;
+}
+body.lk-a-reizarm,
+html:has(body.lk-a-reizarm) { background: #f4f3ef; }
+body.lk-a-reizarm *, body.lk-a-reizarm *::before, body.lk-a-reizarm *::after {
+  animation: none !important; transition: none !important; scroll-behavior: auto !important;
+}
+body.lk-a-reizarm .lk-fach, body.lk-a-reizarm .lk-knopf { box-shadow: none; filter: saturate(0.65); }
+body.lk-a-reizarm .lk-knopf.leise { filter: none; }
+body.lk-a-reizarm .lk-fach-neu { box-shadow: none; background: #e4dfd0; }
+body.lk-a-reizarm .lk-ende-sterne { letter-spacing: 0.05em; font-size: 3rem; }
+body.lk-a-reizarm .lk-neu-sticker { font-size: 2.2rem; }
+body.lk-a-reizarm .lk-frage-emoji { font-size: 2.6rem; }
+
+/* ---------- Feste Struktur: nichts springt, alles an seinem Platz ---------- */
+body.lk-a-struktur .lk-zaehler { font-size: 1.05rem; }
+body.lk-a-struktur .lk-fach-neu { position: static; display: inline-block; align-self: center; }
+
+/* ---------- Weiter-/Klare-Sprache, Ohne Zeitdruck, Weniger Auswahl, Pause: nur Text/Ablauf in lernen.js ---------- */
+body.lk-a-wenig-auswahl .lk-optionen { grid-template-columns: 1fr; }
+
+/* ---------- Lesehilfe: größere Schrift, mehr Abstand, Vorlesen mit Beschriftung ---------- */
+body.lk-a-lesehilfe { font-size: 1.4rem; line-height: 1.75; letter-spacing: 0.02em; word-spacing: 0.08em; }
+body.lk-a-lesehilfe .lk-frage { font-size: 1.75rem; line-height: 1.6; }
+body.lk-a-lesehilfe .lk-option { font-size: 1.5rem; min-height: 80px; }
+body.lk-a-lesehilfe .lk-lueckentext { font-size: 1.7rem; line-height: 2.8; }
+body.lk-a-lesehilfe .lk-luecke { font-size: 1.6rem; }
+body.lk-a-lesehilfe .lk-erklaerung p, body.lk-a-lesehilfe .lk-einleitung p { line-height: 1.8; }
+body.lk-a-lesehilfe .lk-vorlesen { width: auto; min-width: 56px; padding: 0 0.9rem; border-radius: 999px; }
+body.lk-a-lesehilfe .lk-uebung-titel { font-size: 1.45rem; }
+body.lk-a-lesehilfe .lk-uebung-meta { font-size: 1.1rem; }
+@media (max-width: 380px) {
+  body.lk-a-lesehilfe { font-size: 1.25rem; }
+  body.lk-a-lesehilfe .lk-frage { font-size: 1.5rem; }
+}

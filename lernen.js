@@ -6,6 +6,12 @@
 // Bewertet wird auf dem Server; die Seite kennt die Lösung erst nach
 // der Antwort. Gebaut wird nur mit DOM-Methoden (kein innerHTML), damit
 // Texte aus Übungen nie als HTML ausgeführt werden.
+//
+// Anpassungen (seit Session 101): Das Kind hat Schalter (kind.anpassungen
+// aus „uebersicht“), z. B. reizarm oder pause. Sie sind reine Ansichts-
+// Einstellungen ohne Diagnose. Die Seite setzt für jeden Schalter eine
+// Klasse „lk-a-…“ am body (Stile in lernen-anpassungen.css) und passt Texte
+// und Ablauf an. Fehlen sie, gilt die Standardansicht.
 // ============================================================
 "use strict";
 (() => {
@@ -15,6 +21,7 @@
   const FARBEN = { rot: "#d64545", orange: "#d9731f", gelb: "#c99700", gruen: "#2f9e6f",
     tuerkis: "#1a9aa0", blau: "#2a5bd7", lila: "#8b5fd9", pink: "#d6457f" };
   const STERNE_JE_STICKER = 3;   // wie in lernen-api
+  const ANPASSUNGEN = ["reizarm", "struktur", "klare_sprache", "ohne_zeitdruck", "wenig_auswahl", "pause", "lesehilfe"]; // wie in lernen-api
   const LOB = ["Super!", "Klasse!", "Toll gemacht!", "Richtig!", "Prima!", "Stark!"];
   const app = document.getElementById("app");
 
@@ -27,6 +34,41 @@
   let fachWahl = null;     // gewähltes Fach (id) oder null
   let lauf = null;         // laufende Übung
   let neuZeichnen = () => {};
+
+  // ---------- Anpassungen ----------
+  const hat = (name) => !!(uebersicht && uebersicht.kind && Array.isArray(uebersicht.kind.anpassungen) && uebersicht.kind.anpassungen.includes(name));
+  function anpassungenAnwenden() {
+    for (const a of ANPASSUNGEN) document.body.classList.toggle("lk-a-" + a.replace(/_/g, "-"), hat(a));
+  }
+  // Reizarm: keine Emojis und Ausrufezeichen in Rückmeldungen
+  function ruhig(text) {
+    if (!hat("reizarm")) return text;
+    return String(text).replace(/\s*[\p{Extended_Pictographic}️‍]+/gu, "").replace(/!/g, ".").replace(/\.{2,}/g, ".").trim();
+  }
+  // Wörtliche Texte statt Floskeln (Klare Sprache). Schlüssel → [Standard, wörtlich]
+  const TEXTE = {
+    los: ["Los geht’s! 🚀", "Beginnen"],
+    waehle: ["Was möchtest du üben?", "Wähle ein Fach."],
+    pruefen: ["Fertig ✓", "Antwort prüfen"],
+    pruefen2: ["Nochmal prüfen ✓", "Zweiten Versuch prüfen"],
+    prueft: ["Ich schaue nach …", "Die Antwort wird geprüft."],
+    weiter: ["Weiter →", "Weiter"],
+    ergebnis: ["Zum Ergebnis 🏁", "Zum Ergebnis"],
+    fast: ["Fast! Schau noch mal genau hin 🔍", "Das war nicht richtig. Du hast noch einen Versuch."],
+    hinAuswahl: ["Probier eine andere Antwort.", "Wähle eine andere Antwort."],
+    hinEingabe: ["Die roten Lücken stimmen noch nicht.", "Die roten Lücken sind nicht richtig."],
+    hinRest: ["Die grünen Teile stimmen schon. Versuch den Rest noch einmal.", "Die grünen Teile sind richtig. Ändere die anderen Teile."],
+    zweiterRichtig: ["Jetzt stimmt’s! 👍", "Richtig. Das war der zweite Versuch."],
+    soRichtig: ["So ist es richtig:", "Das war nicht richtig. Die richtige Antwort:"],
+    ups: ["Ups!", "Fehler"],
+    nichts: ["Gerade gibt es keine Übungen für dich. Schau später wieder vorbei!", "Es gibt gerade keine Übungen. Schau später noch einmal nach."],
+    endeFertig: ["Geschafft!", "Die Übung ist fertig."],
+    endeGut: ["Gut gemacht!", "Die Übung ist fertig."],
+    endeSuper: ["Super gemacht!", "Die Übung ist fertig."],
+  };
+  const sag = (k) => ruhig(TEXTE[k][hat("klare_sprache") ? 1 : 0]);
+  // Lob: Standard wechselt, bei Klarer Sprache oder Fester Struktur immer gleich
+  const lob = () => ruhig(hat("klare_sprache") || hat("struktur") ? "Richtig." : `${zufall(LOB)} 🎉`);
 
   // ---------- Schlüssel aus der Adresse holen ----------
   function zugangAusAdresse() {
@@ -107,7 +149,7 @@
   // ---------- Vorlesen: nur Stimmen, die auf dem Gerät laufen ----------
   // Online-Stimmen (localService = false) würden den Text an einen fremden
   // Dienst schicken – die nehmen wir nicht. Gibt es keine Gerätestimme,
-  // erscheint kein Vorlese-Knopf.
+  // erscheint kein Vorlese-Knopf (mit Lesehilfe dafür ein Hinweis).
   let stimmen = [];
   function stimmenLaden() {
     if (!("speechSynthesis" in window)) return;
@@ -138,9 +180,14 @@
   }
   function vorleseKnopf(teile) {
     if (!kannVorlesen()) return null;
-    const k = h("button", { type: "button", class: "lk-vorlesen", "aria-label": "Vorlesen", title: "Vorlesen" }, "🔊");
+    // Lesehilfe: Knopf mit Beschriftung statt nur Symbol
+    const k = h("button", { type: "button", class: "lk-vorlesen", "aria-label": "Vorlesen", title: "Vorlesen" }, "🔊", hat("lesehilfe") ? h("span", { class: "lk-vorlesen-text", text: "Vorlesen" }) : null);
     k.addEventListener("click", () => vorlesen(typeof teile === "function" ? teile() : teile, k));
     return k;
+  }
+  // Lesehilfe ohne Gerätestimme: ehrlich sagen, dass Vorlesen hier nicht geht
+  function vorleseHinweis() {
+    return hat("lesehilfe") && !kannVorlesen() ? h("p", { class: "lk-leise lk-vorlese-hinweis", text: "Vorlesen geht auf diesem Gerät nicht." }) : null;
   }
 
   // ---------- Bildschirme ----------
@@ -157,7 +204,7 @@
     neuZeichnen = () => zeigeFehler(e, nochmal);
     zeige(h("div", { class: "lk-leer" },
       h("span", { class: "lk-leer-symbol", "aria-hidden": "true" }, e && e.netz ? "📡" : "🙈"),
-      h("h1", { text: "Ups!" }),
+      h("h1", { text: sag("ups") }),
       h("p", { text: (e && e.message) || "Da ist etwas schiefgegangen." }),
       h("button", { type: "button", class: "lk-knopf", onclick: nochmal }, "Nochmal versuchen")));
   }
@@ -171,13 +218,19 @@
       zeigeFehler(e, () => ladeUebersicht(danach));
       return;
     }
+    anpassungenAnwenden();
     if (fachWahl && !fachVon(fachWahl)) fachWahl = null;
     if (typeof danach === "function") danach();
     else zeigeUebersicht();
   }
 
   function uebungenVon(fachId) {
-    return uebersicht.uebungen.filter((u) => u.fach_id === fachId).sort((a, b) => {
+    const liste = uebersicht.uebungen.filter((u) => u.fach_id === fachId);
+    // Feste Struktur: immer dieselbe Reihenfolge (nach Freigabe, dann Titel), nichts springt nach oben
+    if (hat("struktur")) {
+      return liste.sort((a, b) => String(a.freigegeben_am || "").localeCompare(String(b.freigegeben_am || "")) || String(a.titel).localeCompare(String(b.titel), "de"));
+    }
+    return liste.sort((a, b) => {
       // Fällige zuerst (früheste oben), dann neue, dann zuletzt freigegebene
       const fa = a.faellig_am && !a.durchlaeufe ? a.faellig_am : "9999", fb = b.faellig_am && !b.durchlaeufe ? b.faellig_am : "9999";
       if (fa !== fb) return fa < fb ? -1 : 1;
@@ -212,7 +265,7 @@
     if (!faecher.length) {
       zeige(kopf, h("div", { class: "lk-leer" },
         h("span", { class: "lk-leer-symbol", "aria-hidden": "true" }, "🌈"),
-        h("p", { text: "Gerade gibt es keine Übungen für dich. Schau später wieder vorbei!" }),
+        h("p", { text: sag("nichts") }),
         h("button", { type: "button", class: "lk-knopf leise", onclick: () => ladeUebersicht() }, "🔄 Nachschauen")));
       return;
     }
@@ -225,7 +278,7 @@
         h("span", { class: "lk-fach-name", text: f.name }),
         h("span", { class: "lk-fach-info", text: liste.length === 1 ? "1 Übung" : `${liste.length} Übungen` }));
     });
-    zeige(kopf, h("p", { class: "lk-text", text: "Was möchtest du üben?" }), h("div", { class: "lk-faecher" }, kacheln), albumKnopf());
+    zeige(kopf, h("p", { class: "lk-text", text: sag("waehle") }), h("div", { class: "lk-faecher" }, kacheln), albumKnopf());
   }
 
   // ---------- Sammelalbum (seit Session 83) ----------
@@ -307,14 +360,22 @@
   function zeigeStart(u, fehler) {
     neuZeichnen = () => zeigeStart(u, fehler);
     const fach = fachVon(u.fach_id);
-    const losKnopf = h("button", { type: "button", class: "lk-knopf breit" }, "Los geht’s! 🚀");
+    const losKnopf = h("button", { type: "button", class: "lk-knopf breit" }, sag("los"));
     losKnopf.addEventListener("click", () => starten(u, losKnopf));
+    // Feste Struktur: immer derselbe, vorher bekannte Ablauf
+    const ablauf = hat("struktur") ? h("ol", { class: "lk-ablauf" },
+      h("li", { text: u.anzahl_aufgaben === 1 ? "Du bearbeitest 1 Aufgabe." : `Du bearbeitest ${u.anzahl_aufgaben} Aufgaben, eine nach der anderen.` }),
+      h("li", { text: "Nach jeder Aufgabe siehst du, ob sie richtig war." }),
+      h("li", { text: "Am Ende siehst du deine Sterne." })) : null;
     zeige(h("div", { class: "lk-start", farbe: fachFarbe(fach) },
       h("div", { class: "lk-leiste" }, h("button", { type: "button", class: "lk-zurueck", onclick: zeigeUebersicht }, "‹ Zurück")),
       h("div", { class: "lk-start-symbol", "aria-hidden": "true" }, (fach && fach.symbol) || "📚"),
       h("h1", { text: u.titel }),
       h("p", { class: "lk-leise", text: u.anzahl_aufgaben === 1 ? "1 Aufgabe" : `${u.anzahl_aufgaben} Aufgaben` }),
       u.einleitung ? h("div", { class: "lk-einleitung" }, h("p", { text: u.einleitung }), vorleseKnopf([[u.einleitung, "de"]])) : null,
+      vorleseHinweis(),
+      ablauf,
+      hat("ohne_zeitdruck") ? h("p", { class: "lk-leise", text: "Du hast so viel Zeit, wie du brauchst." }) : null,
       fehler ? h("div", { class: "lk-fehler", role: "alert", text: fehler }) : null,
       losKnopf));
   }
@@ -364,11 +425,15 @@
     const n = lauf.aufgaben.length;
 
     const schliessen = h("button", { type: "button", class: "lk-schliessen", "aria-label": "Aufhören", title: "Aufhören" }, "✕");
+    // Pausenknopf: nur wenn eingeschaltet
+    const pause = hat("pause") ? h("button", { type: "button", class: "lk-pause", "aria-label": "Pause machen", title: "Pause machen", onclick: zeigePause }, "⏸", h("span", { class: "lk-pause-text", text: "Pause" })) : null;
     const kopf = h("div", { class: "lk-lauf-kopf" },
       schliessen,
       h("div", { class: "lk-balken", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(n), "aria-valuenow": String(lauf.pos), "aria-label": "Fortschritt" },
         h("span", { vars: { width: `${Math.round((lauf.pos / n) * 100)}%` } })),
-      h("span", { class: "lk-zaehler", text: `${lauf.pos + 1} / ${n}` }));
+      // Feste Struktur: ausgeschrieben „Aufgabe 3 von 8“
+      h("span", { class: "lk-zaehler", text: hat("struktur") ? `Aufgabe ${lauf.pos + 1} von ${n}` : `${lauf.pos + 1} / ${n}` }),
+      pause);
     const unten = h("div");
     schliessen.addEventListener("click", () => aufhoerenFragen(unten));
 
@@ -377,7 +442,8 @@
       a.bild_url ? h("img", { class: "lk-frage-bild", src: a.bild_url, alt: "" }) : null,
       h("div", { class: "lk-frage-zeile" },
         h("p", { class: "lk-frage", id: "lk-frage", text: a.frage }),
-        vorleseKnopf(() => vorleseTeile(a, englisch))));
+        vorleseKnopf(() => vorleseTeile(a, englisch))),
+      vorleseHinweis());
 
     const bereich = h("div", { class: "lk-bereich" });
     zeichneBereich(a, bereich);
@@ -388,6 +454,25 @@
       const erste = bereich.querySelector("input:not([readonly])");
       if (erste && window.matchMedia("(hover: hover)").matches) erste.focus({ preventScroll: true });
     }
+  }
+
+  // Pause: die Aufgabe bleibt, wie sie ist (az wird nicht angefasst); die
+  // Pausenzeit zählt nicht zur Antwortzeit
+  function zeigePause() {
+    const seit = Date.now();
+    neuZeichnen = zeigePause;
+    const weiterKnopf = h("button", { type: "button", class: "lk-knopf breit" }, "Weiter üben");
+    weiterKnopf.addEventListener("click", () => {
+      if (az) az.start += Date.now() - seit;
+      zeigeAufgabe();
+    });
+    zeige(h("div", { class: "lk-leer lk-pause-seite" },
+      h("span", { class: "lk-leer-symbol", "aria-hidden": "true" }, "⏸"),
+      h("h1", { text: "Pause" }),
+      h("p", { text: "Du kannst so lange Pause machen, wie du möchtest. Deine Aufgabe wartet." }),
+      weiterKnopf,
+      h("button", { type: "button", class: "lk-knopf leise breit", onclick: () => { lauf = null; az = null; laufMerken(); ladeUebersicht(); } }, "Für heute aufhören")));
+    weiterKnopf.focus({ preventScroll: true });
   }
 
   function vorleseTeile(a, englisch) {
@@ -418,7 +503,7 @@
     if (az.rueck) teile.push(rueckmeldung(a));
     if (!fertig) {
       const pruefen = h("button", { type: "button", class: "lk-knopf breit", disabled: !fertigAusgefuellt(a) || az.gesperrt },
-        az.gesperrt ? "Ich schaue nach …" : (lauf.versuch === 2 ? "Nochmal prüfen ✓" : "Fertig ✓"));
+        az.gesperrt ? sag("prueft") : (lauf.versuch === 2 ? sag("pruefen2") : sag("pruefen")));
       pruefen.addEventListener("click", () => pruefe(a, bereich));
       teile.push(h("div", { class: "lk-aktion" }, pruefen));
     }
@@ -594,7 +679,9 @@
     zeichneBereich(a, bereich);
     let r;
     try {
-      r = await api("antwort", { durchlauf_id: lauf.did, aufgabe_id: a.id, versuch: lauf.versuch, antwort: antwortVon(a), dauer_ms: Date.now() - az.start });
+      // Ohne Zeitdruck: keine Zeit senden (der Server speichert dann auch keine)
+      const zeit = hat("ohne_zeitdruck") ? {} : { dauer_ms: Date.now() - az.start };
+      r = await api("antwort", { durchlauf_id: lauf.did, aufgabe_id: a.id, versuch: lauf.versuch, antwort: antwortVon(a), ...zeit });
     } catch (e) {
       az.gesperrt = false;
       if (e.abgemeldet) { lauf = null; zeigeKeinZugang(e.message); return; }
@@ -630,7 +717,7 @@
     laufMerken();
     zeichneBereich(a, bereich);
     const rueck = bereich.querySelector(".lk-rueck");
-    if (rueck) rueck.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (rueck) rueck.scrollIntoView({ block: "nearest", behavior: hat("reizarm") ? "auto" : "smooth" });
   }
   function zeigeFehlerHinweis(bereich, text) {
     bereich.append(h("div", { class: "lk-fehler", role: "alert", text }));
@@ -640,14 +727,14 @@
     const r = az.rueck;
     if (!r.fertig) {
       return h("div", { class: "lk-rueck nochmal", role: "status" },
-        h("p", { class: "lk-rueck-titel" }, h("span", null, "Fast! Schau noch mal genau hin 🔍")),
-        h("p", { text: a.typ === "auswahl" ? "Probier eine andere Antwort." : (a.typ === "eingabe" ? "Die roten Lücken stimmen noch nicht." : "Die grünen Teile stimmen schon. Versuch den Rest noch einmal.") }));
+        h("p", { class: "lk-rueck-titel" }, h("span", null, sag("fast"))),
+        h("p", { text: a.typ === "auswahl" ? sag("hinAuswahl") : (a.typ === "eingabe" ? sag("hinEingabe") : sag("hinRest")) }));
     }
     const letzte = lauf.pos >= lauf.aufgaben.length - 1;
-    const weiterKnopf = h("button", { type: "button", class: "lk-knopf breit" + (r.richtig ? " ok" : "") }, letzte ? "Zum Ergebnis 🏁" : "Weiter →");
+    const weiterKnopf = h("button", { type: "button", class: "lk-knopf breit" + (r.richtig ? " ok" : "") }, letzte ? sag("ergebnis") : sag("weiter"));
     weiterKnopf.addEventListener("click", weiter);
     setTimeout(() => weiterKnopf.focus({ preventScroll: true }), 50);
-    const titel = r.richtig ? (lauf.versuch === 2 ? "Jetzt stimmt’s! 👍" : `${zufall(LOB)} 🎉`) : "So ist es richtig:";
+    const titel = r.richtig ? (lauf.versuch === 2 ? sag("zweiterRichtig") : lob()) : sag("soRichtig");
     const kinder = [h("p", { class: "lk-rueck-titel" }, h("span", { text: titel }))];
     if (!r.richtig) {
       if (a.typ === "auswahl") {
@@ -688,7 +775,7 @@
         h("button", { type: "button", class: "lk-knopf", onclick: () => box.remove() }, "Weiter üben"),
         h("button", { type: "button", class: "lk-knopf leise", onclick: () => { lauf = null; az = null; laufMerken(); ladeUebersicht(); } }, "Aufhören")));
     ort.append(box);
-    box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    box.scrollIntoView({ block: "nearest", behavior: hat("reizarm") ? "auto" : "smooth" });
     box.querySelector("button").focus({ preventScroll: true });
   }
 
@@ -714,7 +801,7 @@
   function zeigeEnde(u, r) {
     neuZeichnen = () => zeigeEnde(u, r);
     const fach = fachVon(u.fach_id);
-    const titel = r.sterne >= 3 ? "Super gemacht!" : r.sterne === 2 ? "Gut gemacht!" : "Geschafft!";
+    const titel = sag(r.sterne >= 3 ? "endeSuper" : r.sterne === 2 ? "endeGut" : "endeFertig");
     const dazu = Math.max(0, (r.sterne_gesamt || 0) - (r.sterne_gesamt_vorher || 0));
     const nochmal = h("button", { type: "button", class: "lk-knopf leise breit" }, "🔁 Nochmal üben");
     nochmal.addEventListener("click", () => zeigeStart(u));
@@ -763,8 +850,9 @@
     }
     if (!schluessel) { zeigeKeinZugang(); return; }
     if (laufWiederherstellen()) {
-      // Neu geladen mitten in einer Übung: Übersicht holen (für Fächer/Farben), dann weiter
+      // Neu geladen mitten in einer Übung: Übersicht holen (für Fächer/Farben/Anpassungen), dann weiter
       try { uebersicht = await api("uebersicht"); } catch (e) { zeigeFehler(e, () => location.reload()); return; }
+      anpassungenAnwenden();
       zeigeAufgabe();
       return;
     }
