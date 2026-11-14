@@ -725,7 +725,7 @@
       el.innerHTML = kopf + (treffer.length
         ? `<p class="notiz-meta">${treffer.length} ${treffer.length === 1 ? "Treffer" : "Treffer"}${treffer.length > gezeigt.length ? ` – die ersten ${gezeigt.length}` : ""}</p>
           <div class="notiz-list">${gezeigt.map((t) => `
-            <button type="button" class="such-treffer bib-treffer" onclick="bibOeffnen('${escapeAttr(String(t.skript.id))}'${t.seite ? `, ${Number(t.seite)}` : ""})">
+            <button type="button" class="such-treffer bib-treffer" onclick="bibOeffnen(${jsArg(String(t.skript.id))}${t.seite ? `, ${Number(t.seite)}` : ""})">
               <span class="such-titel">${escapeHtml(bibTitel(t.skript))}${t.seite ? ` · S. ${Number(t.seite)}` : ""}</span>
               <span class="such-auszug">${t.html}</span>
             </button>`).join("")}</div>
@@ -1260,7 +1260,7 @@
   function lernChips(feld, optionen, aktiv, label) {
     return `<div class="schnell-chips lern-chips" role="group" aria-label="${escapeAttr(label)}">` + optionen.map(([wert, text]) => {
       const an = aktiv(wert);
-      return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lernEinstWaehlen('${feld}', '${escapeAttr(String(wert))}')">${text}</button>`;
+      return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lernEinstWaehlen('${feld}', ${jsArg(String(wert))})">${text}</button>`;
     }).join("") + `</div>`;
   }
 
@@ -1299,7 +1299,7 @@
         ${schluessel.map((k) => {
           const an = !!e.skripte && e.skripte.includes(k);
           const zahl = lernFragenVon(k).length;
-          return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lernEinstWaehlen('skript', '${escapeAttr(k)}')" title="${escapeAttr(lernSkriptName(k, true))}">${escapeHtml(lernSkriptName(k))} <span class="lern-chip-zahl">${zahl}</span></button>`;
+          return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lernEinstWaehlen('skript', ${jsArg(k)})" title="${escapeAttr(lernSkriptName(k, true))}">${escapeHtml(lernSkriptName(k))} <span class="lern-chip-zahl">${zahl}</span></button>`;
         }).join("")}
       </div>`;
     const passend = lernKandidaten(e).length;
@@ -1380,8 +1380,8 @@
               ${f.gemeldet ? `<div class="notiz-meta lern-gemeldet">${ic("warnung")} gemeldet: ${escapeHtml(f.meldung || "")}</div>` : ""}
             </div>
             <div class="spiel-karte-knoepfe">
-              <button class="task-edit-btn" onclick="lernMelden('${escapeAttr(String(f.id))}')" aria-label="${f.gemeldet ? "Meldung ansehen oder entfernen" : "Frage melden"}" title="${f.gemeldet ? "Meldung" : "Melden"}">${ic("warnung")}</button>
-              <button class="task-edit-btn" onclick="blattOeffnen('frage', '${escapeAttr(String(f.id))}')" aria-label="Frage bearbeiten" title="Bearbeiten">${ic("stift")}</button>
+              <button class="task-edit-btn" onclick="lernMelden(${jsArg(String(f.id))})" aria-label="${f.gemeldet ? "Meldung ansehen oder entfernen" : "Frage melden"}" title="${f.gemeldet ? "Meldung" : "Melden"}">${ic("warnung")}</button>
+              <button class="task-edit-btn" onclick="blattOeffnen('frage', ${jsArg(String(f.id))})" aria-label="Frage bearbeiten" title="Bearbeiten">${ic("stift")}</button>
             </div>
           </div>`;
       }).join("")}</div>` : `<p class="empty-text">Keine passenden Fragen.</p>`;
@@ -1419,9 +1419,9 @@
         ${f.hinweis ? `<p class="lern-hinweis">${ic("warnung")} ${escapeHtml(f.hinweis)}</p>` : ""}
         ${quelle ? `<p class="notiz-meta lern-quelle">Quelle: ${quelle}</p>` : ""}
         <div class="lern-knoepfe">
-          ${skript && skript.datei_pfad && f.seite ? `<button type="button" class="btn-secondary" onclick="bibOeffnen('${escapeAttr(String(f.skript_id))}', ${Number(f.seite)})">${ic("export")}PDF S. ${Number(f.seite)}</button>` : ""}
-          <button type="button" class="btn-secondary" onclick="lernMelden('${escapeAttr(String(f.id))}')">${ic("warnung")}${f.gemeldet ? "Gemeldet" : "Melden"}</button>
-          <button type="button" class="btn-secondary" onclick="blattOeffnen('frage', '${escapeAttr(String(f.id))}')">${ic("stift")}Bearbeiten</button>
+          ${skript && skript.datei_pfad && f.seite ? `<button type="button" class="btn-secondary" onclick="bibOeffnen(${jsArg(String(f.skript_id))}, ${Number(f.seite)})">${ic("export")}PDF S. ${Number(f.seite)}</button>` : ""}
+          <button type="button" class="btn-secondary" onclick="lernMelden(${jsArg(String(f.id))})">${ic("warnung")}${f.gemeldet ? "Gemeldet" : "Melden"}</button>
+          <button type="button" class="btn-secondary" onclick="blattOeffnen('frage', ${jsArg(String(f.id))})">${ic("stift")}Bearbeiten</button>
         </div>
         ${seiteText ? `<details class="lern-seitentext"><summary>Text von Seite ${Number(f.seite)} lesen</summary><div class="lern-seitentext-inhalt">${escapeHtml(seiteText)}</div></details>` : ""}
       </div>
@@ -1804,7 +1804,7 @@
         <button type="button" class="schnell-chip${!e.skripte ? " aktiv" : ""}" aria-pressed="${!e.skripte}" onclick="pruefEinstAendern('alle')">Alle Skripte</button>
         ${schluessel.map((k) => {
           const an = !!e.skripte && e.skripte.includes(k);
-          return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="pruefEinstAendern('skript', '${escapeAttr(k)}')" title="${escapeAttr(lernSkriptName(k, true))}">${escapeHtml(lernSkriptName(k))} <span class="lern-chip-zahl">${lernFragenVon(k).length}</span></button>`;
+          return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="pruefEinstAendern('skript', ${jsArg(k)})" title="${escapeAttr(lernSkriptName(k, true))}">${escapeHtml(lernSkriptName(k))} <span class="lern-chip-zahl">${lernFragenVon(k).length}</span></button>`;
         }).join("")}
       </div>`;
     const verlauf = lern.pruefungen || [];
@@ -1838,8 +1838,8 @@
                 <div class="notiz-meta">${escapeHtml(formatDatumKurz(String(p.erstellt_am).slice(0, 10)))} · Grenze ${p.grenze} %${p.dauer_sek !== null && p.dauer_sek !== undefined ? ` · ${pruefDauerText(p.dauer_sek)}${p.zeit_min ? ` von ${p.zeit_min} Min.` : ""}` : ""}</div>
               </div>
               <div class="spiel-karte-knoepfe">
-                <button class="task-edit-btn" onclick="pruefAnsehen('${escapeAttr(String(p.id))}')" aria-label="Prüfung ansehen" title="Ansehen">${ic("lupe")}</button>
-                <button class="task-edit-btn" onclick="pruefLoeschen('${escapeAttr(String(p.id))}')" aria-label="Prüfung löschen" title="Löschen">${ic("x")}</button>
+                <button class="task-edit-btn" onclick="pruefAnsehen(${jsArg(String(p.id))})" aria-label="Prüfung ansehen" title="Ansehen">${ic("lupe")}</button>
+                <button class="task-edit-btn" onclick="pruefLoeschen(${jsArg(String(p.id))})" aria-label="Prüfung löschen" title="Löschen">${ic("x")}</button>
               </div>
             </div>`).join("")}</div>`
           : `<p class="notiz-meta">Noch keine Prüfung abgelegt.</p>`}
@@ -1994,7 +1994,7 @@
               <span class="stat-gesehen" style="width:${anteilGesehen}%"></span><span class="stat-sicher" style="width:${anteilSicher}%"></span>
             </div>
             <div class="notiz-meta">${fr.length} Fragen · ${gesehen} beantwortet · ${sk} sicher (Kasten 3+)${n ? ` · ${lernProzent(r, n)} % richtig` : ""}</div>
-            ${gesehen ? `<button type="button" class="link-btn" onclick="lernSkriptSchwaechenUeben('${escapeAttr(k)}')">Schwächen üben</button>` : ""}
+            ${gesehen ? `<button type="button" class="link-btn" onclick="lernSkriptSchwaechenUeben(${jsArg(k)})">Schwächen üben</button>` : ""}
           </div>
         </div>`;
     }).join("");
@@ -2014,7 +2014,7 @@
             <div class="lern-liste-frage">${escapeHtml(g.titel || g.name)}</div>
             <div class="notiz-meta">${escapeHtml(lernSkriptName(g.skript))} · ${lernProzent(g.r, g.n)} % richtig (${g.r}/${g.n} Antworten) · ${g.fragen} ${g.fragen === 1 ? "Frage" : "Fragen"}</div>
           </div>
-          <div class="spiel-karte-knoepfe"><button type="button" class="btn-secondary" onclick="lernAbschnittUeben('${escapeAttr(g.key)}')">Üben</button></div>
+          <div class="spiel-karte-knoepfe"><button type="button" class="btn-secondary" onclick="lernAbschnittUeben(${jsArg(g.key)})">Üben</button></div>
         </div>`).join("")}</div>`
       : `<p class="notiz-meta">Noch zu wenige Antworten – ab 3 Antworten je Abschnitt erscheinen hier die schwächsten Themen.</p>`;
     // Antworten je Tag (14 Tage)
@@ -2093,7 +2093,7 @@
   function kartenChips(feld, optionen, aktiv, label) {
     return `<div class="schnell-chips lern-chips" role="group" aria-label="${escapeAttr(label)}">` + optionen.map(([wert, text]) => {
       const an = aktiv(wert);
-      return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="kartenEinstWaehlen('${feld}', '${escapeAttr(String(wert))}')">${text}</button>`;
+      return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="kartenEinstWaehlen('${feld}', ${jsArg(String(wert))})">${text}</button>`;
     }).join("") + `</div>`;
   }
 
@@ -2106,7 +2106,7 @@
         <button type="button" class="schnell-chip${!e.skripte ? " aktiv" : ""}" aria-pressed="${!e.skripte}" onclick="kartenEinstWaehlen('alle')">Alle Skripte</button>
         ${schluessel.map((k) => {
           const an = !!e.skripte && e.skripte.includes(k);
-          return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="kartenEinstWaehlen('skript', '${escapeAttr(k)}')" title="${escapeAttr(lernSkriptName(k, true))}">${escapeHtml(lernSkriptName(k))} <span class="lern-chip-zahl">${lernFragenVon(k).length}</span></button>`;
+          return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="kartenEinstWaehlen('skript', ${jsArg(k)})" title="${escapeAttr(lernSkriptName(k, true))}">${escapeHtml(lernSkriptName(k))} <span class="lern-chip-zahl">${lernFragenVon(k).length}</span></button>`;
         }).join("")}
       </div>`;
     const passend = lernKandidaten(e).length;
@@ -2212,7 +2212,7 @@
             <ul class="karte-falsche-liste">${falsche.map(([a]) => `<li>${ic("x-kreis")} ${escapeHtml(a)}</li>`).join("")}</ul></details>` : ""}
           ${quelle ? `<p class="notiz-meta lern-quelle">Quelle: ${quelle}</p>` : ""}
           <div class="lern-knoepfe">
-            ${skript && skript.datei_pfad && f.seite ? `<button type="button" class="btn-secondary" onclick="bibOeffnen('${escapeAttr(String(f.skript_id))}', ${Number(f.seite)})">${ic("export")}PDF S. ${Number(f.seite)}</button>` : ""}
+            ${skript && skript.datei_pfad && f.seite ? `<button type="button" class="btn-secondary" onclick="bibOeffnen(${jsArg(String(f.skript_id))}, ${Number(f.seite)})">${ic("export")}PDF S. ${Number(f.seite)}</button>` : ""}
             <button type="button" class="btn-secondary" onclick="lernMelden('${fid}')">${ic("warnung")}${f.gemeldet ? "Gemeldet" : "Melden"}</button>
             <button type="button" class="btn-secondary" onclick="blattOeffnen('frage', '${fid}')">${ic("stift")}Bearbeiten</button>
           </div>
@@ -2378,7 +2378,7 @@
       const mat = einheitMaterial(e);
       const meta = [einheitDatumText(e), e.ort, e.gruppe].filter(Boolean).map(escapeHtml).join(" · ");
       const vorbei = e.status !== "durchgefuehrt" && e.datum && e.datum < heute;
-      return `<button type="button" class="einheit-karte" onclick="einheitOeffnen('${escapeAttr(String(e.id))}')">
+      return `<button type="button" class="einheit-karte" onclick="einheitOeffnen(${jsArg(String(e.id))})">
           <span class="einheit-karte-titel">${escapeHtml(e.titel)}${vorbei ? ` <span class="badge overdue">vorbei</span>` : ""}</span>
           <span class="notiz-meta">${meta}</span>
           <span class="notiz-meta">${bs.length} ${bs.length === 1 ? "Baustein" : "Bausteine"}${dauer ? ` · ${minutenText(dauer)}` : ""}${mat.length ? ` · Material ${mat.filter((m) => m.erledigt).length}/${mat.length}` : ""}</span>
@@ -2424,7 +2424,7 @@
         <label class="einheit-material${m.erledigt ? " erledigt" : ""}">
           <input type="checkbox" data-material="${escapeAttr(m.key)}"${m.erledigt ? " checked" : ""}>
           <span class="em-text">${escapeHtml(m.text)}${m.quellen.length ? `<span class="notiz-meta">${escapeHtml(m.quellen.join(", "))}</span>` : ""}</span>
-          ${m.extra && !m.quellen.length ? `<button type="button" class="task-delete" onclick="event.preventDefault(); einheitMaterialEntfernen('${escapeAttr(m.key)}')" aria-label="${escapeAttr(m.text)} entfernen">${ic("x")}</button>` : ""}
+          ${m.extra && !m.quellen.length ? `<button type="button" class="task-delete" onclick="event.preventDefault(); einheitMaterialEntfernen(${jsArg(m.key)})" aria-label="${escapeAttr(m.text)} entfernen">${ic("x")}</button>` : ""}
         </label>`).join("");
     const spieleDrin = [...new Map(bs.filter((b) => b.spiel_id && spielVon(b.spiel_id)).map((b) => [String(b.spiel_id), spielVon(b.spiel_id)])).values()];
     const reflSicht = reiterIstSichtbar(aktiverBereich, "reflexion");
@@ -2607,7 +2607,7 @@
     if (!liste.length) { box.innerHTML = `<p class="empty-text">Kein Spiel gefunden.</p>`; return; }
     box.innerHTML = liste.slice(0, 60).map((s) => {
       const meta = [s.art === "methode" ? "Methode" + (s.phase ? " · " + methodePhaseText(s.phase) : "") : "", s.kategorie, s.dauer, s.altersgruppe, Number(s.bewertung) ? "★".repeat(Number(s.bewertung)) : ""].filter(Boolean).map(escapeHtml).join(" · ");
-      return `<button type="button" class="such-treffer" onclick="einheitSpielNehmen('${escapeAttr(String(s.id))}')">
+      return `<button type="button" class="such-treffer" onclick="einheitSpielNehmen(${jsArg(String(s.id))})">
           <span class="such-titel">${drin.has(String(s.id)) ? "✓ " : ""}${suchMarkieren(s.titel, woerter, 90)}</span>
           ${meta ? `<span class="notiz-meta such-meta">${meta}</span>` : ""}
           ${s.material ? `<span class="such-auszug">${ic("werkzeug")} ${escapeHtml(s.material)}</span>` : ""}
@@ -2715,7 +2715,7 @@
       const dauer = bs.reduce((x, b) => x + (Number(b.dauer_min) || 0), 0);
       const meta = [mehrereBereiche ? BEREICH_KNOPF_TEXT[bereichVon(e)] : "", einheitDatumText(e), e.gruppe,
         `${bs.length} ${bs.length === 1 ? "Baustein" : "Bausteine"}${dauer ? ` · ${minutenText(dauer)}` : ""}`].filter(Boolean).map(escapeHtml).join(" · ");
-      return `<button type="button" class="such-treffer" onclick="zuEinheitNehmen('${escapeAttr(String(e.id))}')">
+      return `<button type="button" class="such-treffer" onclick="zuEinheitNehmen(${jsArg(String(e.id))})">
           <span class="such-titel">${drin ? "✓ " : ""}${escapeHtml(e.titel)}${vorbei ? ` <span class="badge overdue">vorbei</span>` : ""}</span>
           <span class="notiz-meta such-meta">${meta}${drin ? " · schon im Ablauf" : ""}</span>
         </button>`;
@@ -2749,7 +2749,7 @@
     }
     await ladeDaten();
     status.innerHTML = `${ic("ok-kreis")} „${escapeHtml(s.titel)}“ steht jetzt am Ende von „${escapeHtml(e.titel)}“. `
-      + `<button type="button" class="link-knopf" onclick="zuEinheitZeigen('${escapeAttr(String(e.id))}')">Einheit öffnen</button>`;
+      + `<button type="button" class="link-knopf" onclick="zuEinheitZeigen(${jsArg(String(e.id))})">Einheit öffnen</button>`;
     zuEinheitRendern();
   };
   // Springt zur Einheit (bei Bedarf in ihren Bereich)
@@ -2987,8 +2987,8 @@
       abschnitt("Reflexionsfragen", m.reflexion_fragen),
     ].join("");
     const dateiZeilen = dateien.map((d) => `
-        <div>${ic("anhang")} <button type="button" class="link-knopf" onclick="spielDateiOeffnen('${escapeAttr(String(d.id))}')">${escapeHtml(d.datei_name)}</button>
-          <button type="button" class="icon-knopf-klein" onclick="spielDateiLoeschen('${escapeAttr(String(d.id))}')" title="Datei entfernen" aria-label="Datei ${escapeAttr(d.datei_name)} entfernen">${ic("x")}</button></div>`).join("");
+        <div>${ic("anhang")} <button type="button" class="link-knopf" onclick="spielDateiOeffnen(${jsArg(String(d.id))})">${escapeHtml(d.datei_name)}</button>
+          <button type="button" class="icon-knopf-klein" onclick="spielDateiLoeschen(${jsArg(String(d.id))})" title="Datei entfernen" aria-label="Datei ${escapeAttr(d.datei_name)} entfernen">${ic("x")}</button></div>`).join("");
     return `<article class="notiz-item methode-karte" id="methode-${id}">
         <div class="methode-kopf">
           <span class="notiz-text spiel-titel">${escapeHtml(m.titel)}</span>
@@ -3038,11 +3038,11 @@
           <div class="notiz-meta">${meta}</div>
           ${m.inhalte ? `<details class="methode-details"><summary>Inhalte</summary>${methodeText(m.inhalte)}</details>` : ""}
           ${m.notiz ? `<div class="notiz-meta methode-text">${escapeHtml(m.notiz)}</div>` : ""}
-          ${verkn.length ? `<div class="notiz-meta">Methoden: ${verkn.map((x) => `<button type="button" class="link-knopf" onclick="methodeZeigen('${escapeAttr(String(x.id))}')">${escapeHtml(x.titel)}</button>`).join(", ")}</div>` : ""}
+          ${verkn.length ? `<div class="notiz-meta">Methoden: ${verkn.map((x) => `<button type="button" class="link-knopf" onclick="methodeZeigen(${jsArg(String(x.id))})">${escapeHtml(x.titel)}</button>`).join(", ")}</div>` : ""}
           <div class="notiz-meta methode-fuss">
-            ${dateien.map((d) => `<div>${ic("anhang")} <button type="button" class="link-knopf" onclick="modulDateiOeffnen('${escapeAttr(String(d.id))}')">${escapeHtml(d.datei_name)}</button>
+            ${dateien.map((d) => `<div>${ic("anhang")} <button type="button" class="link-knopf" onclick="modulDateiOeffnen(${jsArg(String(d.id))})">${escapeHtml(d.datei_name)}</button>
               <span class="wb-datum-klein">(${new Date(d.hochgeladen_am).toLocaleDateString("de-DE")})</span>
-              <button type="button" class="icon-knopf-klein" onclick="modulDateiLoeschen('${escapeAttr(String(d.id))}')" title="Nachweis entfernen" aria-label="Nachweis ${escapeAttr(d.datei_name)} entfernen">${ic("x")}</button></div>`).join("")}
+              <button type="button" class="icon-knopf-klein" onclick="modulDateiLoeschen(${jsArg(String(d.id))})" title="Nachweis entfernen" aria-label="Nachweis ${escapeAttr(d.datei_name)} entfernen">${ic("x")}</button></div>`).join("")}
             <label class="link-knopf">${ic("anhang")} Nachweis hochladen<input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" class="hidden" onchange="modulDateiHinzufuegen('${id}', this)"></label>
           </div>
           <div class="methode-aktionen">
@@ -3254,8 +3254,8 @@
     if (d.liegen.length) {
       bloecke.push(`<section class="rueck-block"><h3>${ic("warnung")} Liegen geblieben</h3>
         <p class="notiz-meta" style="margin-top:0;">Offen und bis ${formatDatumKurz(d.so)} fällig.</p>` +
-        rueckListe(d.liegen, (a) => `<li><button type="button" class="rueck-eintrag" onclick="rueckOeffnen('aufgabe','${escapeAttr(String(a.id))}')"><span class="rueck-text">${escapeHtml(a.titel)}</span><span class="notiz-meta">fällig ${formatDatumKurz(a.faellig_am)}</span></button>
-          <button type="button" class="btn-secondary rueck-schieben" onclick="rueckVerschieben(['${escapeAttr(String(a.id))}'])" aria-label="${escapeAttr(a.titel)} auf ${escapeAttr(zielText)} verschieben">→ ${zielMontag === heute ? "heute" : RUECK_WOCHENTAG[1]}</button></li>`, 12) +
+        rueckListe(d.liegen, (a) => `<li><button type="button" class="rueck-eintrag" onclick="rueckOeffnen('aufgabe',${jsArg(String(a.id))})"><span class="rueck-text">${escapeHtml(a.titel)}</span><span class="notiz-meta">fällig ${formatDatumKurz(a.faellig_am)}</span></button>
+          <button type="button" class="btn-secondary rueck-schieben" onclick="rueckVerschieben([${jsArg(String(a.id))}])" aria-label="${escapeAttr(a.titel)} auf ${escapeAttr(zielText)} verschieben">→ ${zielMontag === heute ? "heute" : RUECK_WOCHENTAG[1]}</button></li>`, 12) +
         `<button type="button" class="btn-secondary" onclick="rueckVerschieben(null)">${ic("wiederholen")}Alle ${d.liegen.length} auf ${escapeHtml(zielText)}</button></section>`);
     }
     // Termine
@@ -3650,7 +3650,7 @@
           </button>`;
       }).join("");
       if (!offen && idx.length > SUCH_PRO_GRUPPE) {
-        html += `<button type="button" class="link-btn such-mehr" onclick="suchGruppeAufklappen('${escapeAttr(name)}')">+ ${idx.length - SUCH_PRO_GRUPPE} weitere</button>`;
+        html += `<button type="button" class="link-btn such-mehr" onclick="suchGruppeAufklappen(${jsArg(name)})">+ ${idx.length - SUCH_PRO_GRUPPE} weitere</button>`;
       }
       html += `</div>`;
     }
@@ -4908,7 +4908,7 @@
   function stdEintragZeileHtml(e) {
     const k = stdKat(e.kategorie_id) || {};
     const zeit = `${String(e.von).slice(0, 5)}–${String(e.bis).slice(0, 5)}${stdUhrMin(e.bis) <= stdUhrMin(e.von) ? " (+1)" : ""}`;
-    return `<button type="button" class="std-eintrag" onclick="blattOeffnen('stunde','${escapeAttr(String(e.id))}')">
+    return `<button type="button" class="std-eintrag" onclick="blattOeffnen('stunde',${jsArg(String(e.id))})">
       <span class="std-punkt" style="background:${escapeAttr(stdFarbe(k))}"></span>
       <span class="std-eintrag-text"><strong>${zeit}</strong> · ${escapeHtml(k.name || "?")}${Number(e.pause_min) ? ` · Pause ${Number(e.pause_min)} Min.` : ""}${e.notiz ? `<span class="notiz-meta"> ${escapeHtml(e.notiz)}</span>` : ""}</span>
       <span class="std-eintrag-dauer">${stdHm(stdDauer(e))}</span>
@@ -4925,7 +4925,7 @@
     const summe = eintraege.reduce((a, e) => a + stdDauer(e), 0);
     const marken = [
       fei ? `<span class="badge std-badge-fei">${escapeHtml(fei)}</span>` : "",
-      ...abw.map((a) => `<button type="button" class="badge std-badge-abw" onclick="blattOeffnen('stdabwesenheit','${escapeAttr(String(a.id))}')">${escapeHtml((STD_ARTEN.find(([k]) => k === a.art) || [0, a.art])[1])}${a.kategorie_id ? ` · ${escapeHtml((stdKat(a.kategorie_id) || {}).name || "")}` : ""}</button>`),
+      ...abw.map((a) => `<button type="button" class="badge std-badge-abw" onclick="blattOeffnen('stdabwesenheit',${jsArg(String(a.id))})">${escapeHtml((STD_ARTEN.find(([k]) => k === a.art) || [0, a.art])[1])}${a.kategorie_id ? ` · ${escapeHtml((stdKat(a.kategorie_id) || {}).name || "")}` : ""}</button>`),
     ].join(" ");
     const wt = new Date(iso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
     return `<div class="std-tag${iso === heuteISO() ? " heute" : ""}">
@@ -5015,7 +5015,7 @@
         ${liste.length ? `<div class="notiz-list">${liste.map((a) => {
           const k = a.kategorie_id ? stdKat(a.kategorie_id) : null;
           const tage = Math.round((Date.parse(a.bis) - Date.parse(a.von)) / 86400000) + 1;
-          return `<button type="button" class="std-eintrag" onclick="blattOeffnen('stdabwesenheit','${escapeAttr(String(a.id))}')">
+          return `<button type="button" class="std-eintrag" onclick="blattOeffnen('stdabwesenheit',${jsArg(String(a.id))})">
             <span class="std-eintrag-text"><strong>${escapeHtml((STD_ARTEN.find(([x]) => x === a.art) || [0, a.art])[1])}</strong> · ${datumDe(a.von)}${a.bis !== a.von ? ` – ${datumDe(a.bis)}` : ""} · ${k ? escapeHtml(k.name) : "alle mit Soll"}${a.notiz ? `<span class="notiz-meta"> ${escapeHtml(a.notiz)}</span>` : ""}</span>
             <span class="std-eintrag-dauer">${tage} ${tage === 1 ? "Tag" : "Tage"}</span>
           </button>`;
@@ -5035,7 +5035,7 @@
           const soll = s && Number(s.minuten_woche)
             ? `Soll ${stdHm(Number(s.minuten_woche))} h/Woche (${(s.tage || []).map((t) => STD_TAGE[Number(t) - 1]).join(", ")})`
             : "ohne Soll";
-          return `<button type="button" class="std-eintrag" onclick="blattOeffnen('stdkategorie','${escapeAttr(String(k.id))}')">
+          return `<button type="button" class="std-eintrag" onclick="blattOeffnen('stdkategorie',${jsArg(String(k.id))})">
             <span class="std-punkt" style="background:${escapeAttr(stdFarbe(k))}"></span>
             <span class="std-eintrag-text"><strong>${escapeHtml(k.name)}</strong>${k.archiviert ? " (archiviert)" : ""}<span class="notiz-meta"> ${escapeHtml((STD_BEREICHE.find(([b]) => b === k.bereich) || [0, k.bereich])[1])} · ${k.bezahlt ? "bezahlt" : "Ehrenamt / unbezahlt"} · ${soll}</span></span>
           </button>`;
@@ -5076,7 +5076,7 @@
     const aktivName = (STD_BEREICHE.find(([b]) => b === aktiverBereich) || [])[1];
     const leerHinweis = aktivName && !std.kategorien.some((k) => k.bereich === aktiverBereich)
       ? `<div class="std-leer-hinweis" role="note"><p>Für <strong>${escapeHtml(aktivName)}</strong> gibt es noch keine Stunden-Kategorie. Deshalb fehlt der Bereich oben im Filter und es lässt sich nichts erfassen.</p>
-          <button type="button" class="btn-primary" onclick="blattNeu('stdkategorie', { bereich: '${escapeAttr(aktiverBereich)}' })">${ic("plus")}Kategorie für ${escapeHtml(aktivName)} anlegen</button></div>`
+          <button type="button" class="btn-primary" onclick="blattNeu('stdkategorie', { bereich: ${jsArg(aktiverBereich)} })">${ic("plus")}Kategorie für ${escapeHtml(aktivName)} anlegen</button></div>`
       : "";
     el.innerHTML = `
       ${leerHinweis}
@@ -5527,7 +5527,7 @@
         : "kein Soll";
       return `<div class="ern-ziel-stand">
         <div class="ern-ziel-stand-text"><span><strong>Ab ${datumDe(s.gueltig_ab)}${naechster ? ` bis ${datumDe(addTage(naechster.gueltig_ab, -1))}` : ""}</strong>${s === aktuell ? ` <span class="badge">gilt heute</span>` : s.gueltig_ab > heute ? ` <span class="badge">geplant</span>` : ""}</span><span class="notiz-meta">${text}</span></div>
-        <button type="button" class="task-delete" onclick="stdSollLoeschen('${escapeAttr(String(s.id))}')" aria-label="Soll ab ${datumDe(s.gueltig_ab)} löschen">${ic("x")}</button>
+        <button type="button" class="task-delete" onclick="stdSollLoeschen(${jsArg(String(s.id))})" aria-label="Soll ab ${datumDe(s.gueltig_ab)} löschen">${ic("x")}</button>
       </div>`;
     }).reverse().join("");
   }
@@ -5822,7 +5822,7 @@
               <div class="kz-ueb-liste${ziel ? "" : " aus"}">${liste.map((a) => {
                 const pn = a.projekt_id ? projektName(a.projekt_id) : "";
                 const meta = [pn, a.faellig_am ? `fällig ${datumDe(a.faellig_am)}` : ""].filter(Boolean).join(" · ");
-                return `<label class="blatt-haken kz-ueb-haken"><input type="checkbox"${kzUeb.abgewaehlt.has(String(a.id)) ? "" : " checked"}${ziel ? "" : " disabled"} onchange="kzUebHaken('${escapeAttr(String(a.id))}', this.checked)">
+                return `<label class="blatt-haken kz-ueb-haken"><input type="checkbox"${kzUeb.abgewaehlt.has(String(a.id)) ? "" : " checked"}${ziel ? "" : " disabled"} onchange="kzUebHaken(${jsArg(String(a.id))}, this.checked)">
                   <span>${escapeHtml(a.titel)}${meta ? `<span class="blatt-hinweis">${escapeHtml(meta)}</span>` : ""}</span></label>`;
               }).join("")}</div>
             </div>`;
@@ -5951,7 +5951,7 @@
       ${verlauf.length ? `<details class="anleitung-abschnitt kz-ta-verlauf" data-kz-klapp="ta-verlauf"${kzOffen["ta-verlauf"] ? " open" : ""} ontoggle="kzUmklappen(this)">
         <summary>Letzte Tage (${verlauf.length})</summary>
         <div class="anleitung-text">${verlauf.map((x) => `<div class="kz-ta-tag">
-            <button type="button" class="link-btn" onclick="kzTaTagWaehlen('${escapeAttr(x.datum)}')">${escapeHtml(rueckTag(x.datum))}</button>
+            <button type="button" class="link-btn" onclick="kzTaTagWaehlen(${jsArg(x.datum)})">${escapeHtml(rueckTag(x.datum))}</button>
             ${x.stimmung ? `<span class="badge">Stimmung ${Number(x.stimmung)}</span>` : ""}
             ${x.zusammenfassung ? `<p>${escapeHtml(x.zusammenfassung)}</p>` : `<p class="notiz-meta">${x.rohtext || x.rohtext_dienstlich ? "noch nicht abgeschlossen" : "ohne Zusammenfassung"}</p>`}
           </div>`).join("")}</div>
@@ -6231,7 +6231,7 @@
   function kzWartetProjektHtml(p) {
     const wv = kzWiedervorlageFaellig(p);
     const b = kzBereich(p.bereich_id);
-    return `<button type="button" class="kz-wartet-projekt${wv ? " faellig" : ""}" onclick="blattOeffnen('kzprojekt', '${escapeAttr(String(p.id))}')">
+    return `<button type="button" class="kz-wartet-projekt${wv ? " faellig" : ""}" onclick="blattOeffnen('kzprojekt', ${jsArg(String(p.id))})">
         <span class="kz-wartet-projekt-kopf"><span class="task-titel">${escapeHtml(p.name)}</span><span class="kz-status-pille kz-pille-wartet">Projekt</span></span>
         <span class="task-meta">${badgeHtml(wv ? "today" : "", kzWartetText(p))}${p.wiedervorlage ? badgeHtml(wv ? "today" : "", `Wiedervorlage ${datumDe(p.wiedervorlage)}`) : ""}${b ? badgeHtml("", b.name) : ""}</span>
       </button>`;
@@ -6334,7 +6334,7 @@
         ${alt ? `<p class="kz-warnung">${ic("warnung")} ${alt} ${alt === 1 ? "Eintrag liegt" : "Einträge liegen"} schon länger als 3 Tage – zuordnen oder löschen.</p>` : ""}
         ${liste.length ? `<div class="task-list">${liste.map((a) => {
           const tage = kzTageSeit(a.erstellt_am);
-          return `<button type="button" class="kz-eingang-zeile${tage > 3 ? " alt" : ""}" onclick="blattOeffnen('kzaufgabe', '${escapeAttr(String(a.id))}')">
+          return `<button type="button" class="kz-eingang-zeile${tage > 3 ? " alt" : ""}" onclick="blattOeffnen('kzaufgabe', ${jsArg(String(a.id))})">
               <span class="kz-eingang-titel">${escapeHtml(a.titel)}</span>
               <span class="notiz-meta">${escapeHtml(tage <= 0 ? "heute" : tage === 1 ? "gestern" : `vor ${tage} Tagen`)} · zuordnen ${ic("weiter")}</span>
             </button>`;
@@ -6478,9 +6478,9 @@
           <div class="kz-bereich-liste">${bereiche.map((b, i) => `
             <div class="kz-bereich-zeile${b.archiviert ? " archiviert" : ""}">
               <span class="kz-bereich-zeile-name">${escapeHtml(b.name)}${b.dienstlich ? ` <span class="badge kz-dienstlich">dienstlich</span>` : ""}${b.archiviert ? ` <span class="badge">archiviert</span>` : ""}</span>
-              <button type="button" class="task-edit-btn" onclick="kzBereichSchieben('${escapeAttr(String(b.id))}', -1)" ${i === 0 ? "disabled" : ""} aria-label="${escapeAttr(b.name)} nach oben">↑</button>
-              <button type="button" class="task-edit-btn" onclick="kzBereichSchieben('${escapeAttr(String(b.id))}', 1)" ${i === bereiche.length - 1 ? "disabled" : ""} aria-label="${escapeAttr(b.name)} nach unten">↓</button>
-              <button type="button" class="task-edit-btn" onclick="blattOeffnen('kzbereich', '${escapeAttr(String(b.id))}')" aria-label="${escapeAttr(b.name)} bearbeiten" title="Bearbeiten">${ic("stift")}</button>
+              <button type="button" class="task-edit-btn" onclick="kzBereichSchieben(${jsArg(String(b.id))}, -1)" ${i === 0 ? "disabled" : ""} aria-label="${escapeAttr(b.name)} nach oben">↑</button>
+              <button type="button" class="task-edit-btn" onclick="kzBereichSchieben(${jsArg(String(b.id))}, 1)" ${i === bereiche.length - 1 ? "disabled" : ""} aria-label="${escapeAttr(b.name)} nach unten">↓</button>
+              <button type="button" class="task-edit-btn" onclick="blattOeffnen('kzbereich', ${jsArg(String(b.id))})" aria-label="${escapeAttr(b.name)} bearbeiten" title="Bearbeiten">${ic("stift")}</button>
             </div>`).join("")}</div>
           <button type="button" class="btn-secondary" onclick="blattNeu('kzbereich', {})">${ic("plus")}Bereich</button>
         </div>
@@ -6986,7 +6986,7 @@
     const zeilen = reihe.slice().reverse().map((ab) => {
       const x = mengeBis.get(String(ab.id));
       const wechsel = ab.art === "wechsel";
-      return `<button type="button" class="std-eintrag zl-ablesung" onclick="blattOeffnen('zablesung','${escapeAttr(String(ab.id))}')">
+      return `<button type="button" class="std-eintrag zl-ablesung" onclick="blattOeffnen('zablesung',${jsArg(String(ab.id))})">
         <span class="zl-ab-datum">${datumDe(ab.datum)}</span>
         <span class="std-eintrag-text">${wechsel ? `${ic("wiederholen")} Wechsel: alt ${zlFmt(ab.stand_alt)} → neu ${zlFmt(ab.stand)}` : zlFmt(ab.stand)}${ab.notiz ? ` <span class="notiz-meta">· ${escapeHtml(ab.notiz)}</span>` : ""}</span>
         <span class="std-eintrag-dauer">${x ? "+" + zlMenge(x.menge, z) : ""}</span>
@@ -7352,7 +7352,7 @@
           </div>`;
         }
       }
-      const verlauf = liste.slice().reverse().map((t) => `<button type="button" class="std-eintrag zl-ablesung" onclick="blattOeffnen('ztarif','${escapeAttr(String(t.id))}')">
+      const verlauf = liste.slice().reverse().map((t) => `<button type="button" class="std-eintrag zl-ablesung" onclick="blattOeffnen('ztarif',${jsArg(String(t.id))})">
           <span class="zl-ab-datum">ab ${datumDe(t.gueltig_ab)}</span>
           <span class="std-eintrag-text">${escapeHtml(zlTarifText(t))}${t.anbieter ? ` <span class="notiz-meta">· ${escapeHtml(t.anbieter)}</span>` : ""}</span>
         </button>`).join("");
@@ -8086,14 +8086,14 @@
       const tel = nfTelLink(k.wert);
       const inhalt = `<strong>${k.wert ? escapeHtml(k.wert) : "–"}</strong><span>${escapeHtml(k.was)}${k.wert ? "" : " – noch nicht eingetragen"}</span>`;
       if (bearbeiten && k.id !== undefined) {
-        return `<li><button type="button" class="nf-tel nf-tel--knopf" onclick="blattOeffnen('nfnummer','${escapeAttr(String(k.id))}')">${inhalt}</button></li>`;
+        return `<li><button type="button" class="nf-tel nf-tel--knopf" onclick="blattOeffnen('nfnummer',${jsArg(String(k.id))})">${inhalt}</button></li>`;
       }
       return tel ? `<li><a class="nf-tel" href="${escapeAttr(tel)}">${inhalt}</a></li>` : `<li><div class="nf-tel">${inhalt}</div></li>`;
     }).join("");
     const orte = nfSortiert(karte, "ort").map((k) => {
       const inhalt = `<span class="nf-ort-was">${escapeHtml(k.was)}</span><span class="nf-ort-wo${k.wert ? "" : " nf-ort-leer"}">${k.wert ? escapeHtml(k.wert) : "noch nicht eingetragen"}</span>`;
       return bearbeiten && k.id !== undefined
-        ? `<li><button type="button" class="nf-ort" onclick="blattOeffnen('nfort','${escapeAttr(String(k.id))}')">${inhalt}</button></li>`
+        ? `<li><button type="button" class="nf-ort" onclick="blattOeffnen('nfort',${jsArg(String(k.id))})">${inhalt}</button></li>`
         : `<li><div class="nf-ort">${inhalt}</div></li>`;
     }).join("");
     return `<section class="nf-karte">
@@ -8606,7 +8606,7 @@
         <div class="row" style="flex-wrap:wrap; align-items:center; gap:0.4rem;">
           <input type="date" id="rep-datum-${escapeAttr(u.id)}" value="${escapeAttr(addTage(repHeute(), -1))}" max="${escapeAttr(repHeute())}" aria-label="Datum">
           <input type="number" id="rep-nach-${escapeAttr(u.id)}" min="1" inputmode="numeric" placeholder="Anzahl" style="width:7rem;" aria-label="Anzahl">
-          <button type="button" class="link-btn" onclick="repNachtragen('${escapeAttr(u.id)}')">Eintragen</button>
+          <button type="button" class="link-btn" onclick="repNachtragen(${jsArg(u.id)})">Eintragen</button>
         </div></details>
     </div>`;
   }
@@ -8620,7 +8620,7 @@
     const geschafft = u.tagesziel && summe >= u.tagesziel;
     const letzte = rep.letzte[u.id] || (heutige.length ? heutige[heutige.length - 1].anzahl : null);
     const eintraege = heutige.length
-      ? heutige.map((e) => `<button type="button" class="rep-chip" onclick="repEintragLoeschen('${escapeAttr(e.id)}')" title="Eintrag löschen" aria-label="${e.anzahl} löschen">${repZahl(e.anzahl)} <span aria-hidden="true">×</span></button>`).join("")
+      ? heutige.map((e) => `<button type="button" class="rep-chip" onclick="repEintragLoeschen(${jsArg(e.id)})" title="Eintrag löschen" aria-label="${e.anzahl} löschen">${repZahl(e.anzahl)} <span aria-hidden="true">×</span></button>`).join("")
       : `<span class="notiz-meta">Heute noch nichts eingetragen.</span>`;
     return `<div class="rep-uebung${geschafft ? " rep-uebung--ok" : ""}">
       <div class="rep-kopfzeile">
@@ -8657,7 +8657,7 @@
       const archiv = rep.uebungen.filter((u) => u.archiviert);
       inhalt = (aktiv.length ? aktiv.map(repUebungHtml).join("")
         : `<p class="empty-text">Noch keine Zähl-Übung. Mit „+ Zähl-Übung“ legst du z. B. „Liegestütze“ an und trägst über den Tag Wiederholungen ein – die App addiert sie.</p>`)
-        + (archiv.length ? `<details class="rep-archiv"><summary>Archiviert (${archiv.length})</summary>${archiv.map((u) => `<button type="button" class="link-btn" onclick="blattOeffnen('repuebung','${escapeAttr(u.id)}')">${escapeHtml(u.name)}</button>`).join(" ")}</details>` : "");
+        + (archiv.length ? `<details class="rep-archiv"><summary>Archiviert (${archiv.length})</summary>${archiv.map((u) => `<button type="button" class="link-btn" onclick="blattOeffnen('repuebung',${jsArg(u.id)})">${escapeHtml(u.name)}</button>`).join(" ")}</details>` : "");
     }
     el.innerHTML = `<section class="rep-karte" aria-label="Tageszähler">
       <div class="rep-kopf"><h2 class="heute-label">Tageszähler</h2>
@@ -8825,7 +8825,7 @@
     const karte = (m) => {
       const p = mpPunkteVon(m.id);
       const offenN = p.filter((x) => !x.besprochen).length;
-      return `<button type="button" class="mp-karte" onclick="mappeOeffnenId('${escapeAttr(m.id)}')">
+      return `<button type="button" class="mp-karte" onclick="mappeOeffnenId(${jsArg(m.id)})">
         <span class="mp-karte-titel">${escapeHtml(m.titel)}</span>
         <span class="notiz-meta">${escapeHtml(mpTerminText(m))} · ${p.length === 0 ? "leer" : `${p.length} ${p.length === 1 ? "Punkt" : "Punkte"}${offenN && offenN !== p.length ? `, ${offenN} offen` : ""}`}</span>
       </button>`;
@@ -8857,19 +8857,19 @@
     return `<section class="mp-offen" aria-label="Mappe ${escapeAttr(m.titel)}">
       <div class="mp-kopf">
         <button type="button" class="link-btn" onclick="mappeSchliessen()">← Alle Mappen</button>
-        <button type="button" class="link-btn" onclick="blattOeffnen('mappe','${escapeAttr(m.id)}')">${ic("stift")} Mappe bearbeiten</button>
+        <button type="button" class="link-btn" onclick="blattOeffnen('mappe',${jsArg(m.id)})">${ic("stift")} Mappe bearbeiten</button>
       </div>
       <h2 class="mp-titel">${escapeHtml(m.titel)}</h2>
       <p class="notiz-meta">${escapeHtml(mpTerminText(m))}</p>
       <div class="mp-neu">
         <div class="schnell-chips" role="group" aria-label="Art">${artChips}</div>
         <textarea id="mp-neu-text" rows="2" maxlength="5000" placeholder="Neuer Punkt – Notiz, Idee oder Frage …" aria-label="Neuer Punkt"></textarea>
-        <button type="button" class="btn-primary" onclick="mpPunktHinzufuegen('${escapeAttr(m.id)}')">+ Hinzufügen</button>
+        <button type="button" class="btn-primary" onclick="mpPunktHinzufuegen(${jsArg(m.id)})">+ Hinzufügen</button>
       </div>
       <div class="mp-punkte">${zeilen || `<p class="empty-text">${punkte.length ? "Alles besprochen." : "Noch keine Punkte."}</p>`}</div>
       <div class="mp-fuss">
         ${besprochen ? `<button type="button" class="link-btn" onclick="mpBesprochenUmschalten()">${mp.zeigeBesprochen ? "Besprochene ausblenden" : `Besprochene zeigen (${besprochen})`}</button>` : ""}
-        ${punkte.length ? `<button type="button" class="link-btn" onclick="mpKopieren('${escapeAttr(m.id)}')">${ic("kopieren") || ""} Als Text kopieren</button>` : ""}
+        ${punkte.length ? `<button type="button" class="link-btn" onclick="mpKopieren(${jsArg(m.id)})">${ic("kopieren") || ""} Als Text kopieren</button>` : ""}
       </div>
     </section>`;
   }
@@ -9031,8 +9031,8 @@
           const ueber = a.faellig_am && a.faellig_am < heute;
           const meta = a.faellig_am ? frDatumText(a.faellig_am) + (a.uhrzeit ? " " + String(a.uhrzeit).slice(0, 5) : "") : "ohne Datum";
           return `<div class="alle-auf-zeile">
-            <button type="button" class="zl-check" onclick="zeitleisteUmschalten('aufgabe','${escapeAttr(String(a.id))}', this)" aria-label="${escapeAttr(a.titel)} als erledigt markieren" title="Erledigt"></button>
-            <button type="button" class="heute-zeile-inhalt" onclick="eintragBearbeiten('aufgabe','${escapeAttr(String(a.id))}')" title="Aufgabe bearbeiten">
+            <button type="button" class="zl-check" onclick="zeitleisteUmschalten('aufgabe',${jsArg(String(a.id))}, this)" aria-label="${escapeAttr(a.titel)} als erledigt markieren" title="Erledigt"></button>
+            <button type="button" class="heute-zeile-inhalt" onclick="eintragBearbeiten('aufgabe',${jsArg(String(a.id))})" title="Aufgabe bearbeiten">
               <span class="heute-zeile-titel">${escapeHtml(a.titel)}</span>
               <span class="heute-zeile-meta${ueber ? " alle-auf-ueber" : ""}">${escapeHtml(meta)}${ueber ? " · überfällig" : ""}</span>
             </button>
@@ -10139,6 +10139,24 @@
   }
 
   document.getElementById("btn-abmelden").addEventListener("click", abmelden);
+
+  // Andere Geräte abmelden (seit Sicherheits-Review 13.11.2026): beendet alle
+  // Sitzungen außer dieser – für ein verlorenes Handy oder einen fremden
+  // Rechner, an dem das Abmelden vergessen wurde. Dieses Gerät bleibt angemeldet.
+  async function andereGeraeteAbmelden() {
+    if (!confirm("Alle anderen Geräte abmelden?\n\nDieses Gerät bleibt angemeldet. Auf allen anderen ist danach das Passwort wieder nötig.")) return;
+    try {
+      const r = await api("sessions_alle_beenden", { nur_andere: true });
+      const n = Number(r.beendet) || 0;
+      alert(n === 0 ? "Es war kein anderes Gerät angemeldet."
+        : n === 1 ? "1 anderes Gerät wurde abgemeldet." : `${n} andere Geräte wurden abgemeldet.`);
+    } catch (e) {
+      if (e && (e.message === "unauthorized" || e.message === "rate-limited")) return;
+      alert("Das hat nicht geklappt: " + ((e && e.message) || "Serverfehler"));
+    }
+  }
+  const andereAbmeldenKnopf = document.getElementById("btn-andere-abmelden");
+  if (andereAbmeldenKnopf) andereAbmeldenKnopf.addEventListener("click", andereGeraeteAbmelden);
   document.getElementById("bereich-screen-abmelden").addEventListener("click", abmelden);
   document.getElementById("btn-bereich-wechseln").addEventListener("click", zeigeBereichAuswahl);
 
@@ -10819,8 +10837,14 @@
       feld.focus();
       return;
     }
+    // Seit Sicherheits-Review 13.11.2026 startet der Abruf nicht mehr von
+    // selbst: Sonst könnte ein zugeschickter Link (…/index.html?url=…) den
+    // Server ungefragt eine fremde Adresse abrufen lassen. Ein Tipp auf
+    // „Rezept laden“ genügt.
     feld.value = link;
-    document.getElementById("btn-rezept-import-laden").click();
+    status.textContent = "Link übernommen – tippe auf „Rezept laden“, um die Seite abzurufen.";
+    const laden = document.getElementById("btn-rezept-import-laden");
+    if (laden) laden.focus();
   }
 
   // ==========================================================
@@ -11323,7 +11347,7 @@
     const geraete = push.abos.map((a) => `<li>
         <span class="push-geraet-name">${escapeHtml(a.geraet || "Gerät")}${a.dieses ? " <em>(dieses)</em>" : ""}</span>
         <span class="notiz-meta">seit ${new Date(a.erstellt_am).toLocaleDateString("de-DE")}${a.fehler ? ` · ${a.fehler} Fehlversuche` : ""}</span>
-        <button type="button" class="icon-knopf-klein" onclick="pushGeraetEntfernen('${escapeAttr(String(a.id))}')" aria-label="${escapeAttr(a.geraet || "Gerät")} entfernen" title="Entfernen">${ic("x")}</button>
+        <button type="button" class="icon-knopf-klein" onclick="pushGeraetEntfernen(${jsArg(String(a.id))})" aria-label="${escapeAttr(a.geraet || "Gerät")} entfernen" title="Entfernen">${ic("x")}</button>
       </li>`).join("");
     box.innerHTML = `
       <section class="push-block">
@@ -11987,7 +12011,7 @@
       const datum = zo.typ === "termin" ? e.datum : e.faellig_am;
       const zeit = e.uhrzeit ? " " + String(e.uhrzeit).slice(0, 5) : "";
       const meta = [datum ? frDatumText(datum) + zeit : "ohne Datum", e.wiederholung ? "Serie" : "", BEREICH_KNOPF_TEXT[bereichVon(e)] || bereichVon(e)].filter(Boolean).join(" · ");
-      return `<label class="zo-zeile-eintrag"><input type="checkbox" ${zo.gewaehlt.has(id) ? "checked" : ""} onchange="zoHaken('${escapeAttr(id)}', this.checked)">
+      return `<label class="zo-zeile-eintrag"><input type="checkbox" ${zo.gewaehlt.has(id) ? "checked" : ""} onchange="zoHaken(${jsArg(id)}, this.checked)">
         <span><span class="zo-titel">${escapeHtml(e.titel)}</span><span class="notiz-meta"> ${escapeHtml(meta)}</span></span></label>`;
     };
     box.innerHTML = alle.length === 0
@@ -12689,7 +12713,7 @@
   function mappenChipsHtml(e) {
     const liste = mappenZuTermin(e.id);
     if (!liste.length) return "";
-    return liste.map((m) => `<button type="button" class="mp-chip" onclick="mappeVonStartOeffnen('${escapeAttr(m.bereich || e.bereich || aktiverBereich)}','${escapeAttr(m.id)}')" title="Mappe öffnen">▤ ${escapeHtml(m.titel)} · ${mpPunkteVon(m.id).length}</button>`).join("");
+    return liste.map((m) => `<button type="button" class="mp-chip" onclick="mappeVonStartOeffnen(${jsArg(m.bereich || e.bereich || aktiverBereich)},${jsArg(m.id)})" title="Mappe öffnen">▤ ${escapeHtml(m.titel)} · ${mpPunkteVon(m.id).length}</button>`).join("");
   }
   function heuteZeileHtml(e, jetztMinuten) {
     const laeuftJetzt = !e.erledigt && e.start && e.ende &&
@@ -13519,7 +13543,7 @@
     if (!liste.length) return `<p class="blatt-hinweis">Noch keine Ausfälle${(w.ausfaelle || []).length ? " (nur ältere)" : ""}.</p>`;
     return `<div class="termin-ausfall-liste">${liste.map((a) => {
       const wt = new Date(a + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "");
-      return `<span class="termin-ausfall-chip">${wt} ${datumDe(a)}<button type="button" onclick="terminAusfallWeg('${escapeAttr(String(w.id))}','${a}')" aria-label="Ausfall am ${datumDe(a)} zurücknehmen" title="wieder aktivieren">${ic("x")}</button></span>`;
+      return `<span class="termin-ausfall-chip">${wt} ${datumDe(a)}<button type="button" onclick="terminAusfallWeg(${jsArg(String(w.id))},'${a}')" aria-label="Ausfall am ${datumDe(a)} zurücknehmen" title="wieder aktivieren">${ic("x")}</button></span>`;
     }).join("")}</div>`;
   }
   BLATT_ARTEN.terminausfall = {
@@ -18194,7 +18218,7 @@
               <div class="notiz-meta" style="margin-top:0.3rem;">
                 ${dateiZeilen}
                 <label style="text-decoration:underline; cursor:pointer;">${ic("anhang")} Datei hinzufügen<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="spielDateiHinzufuegen('${s.id}', this)"></label>
-                ${zuEinheitMoeglich() ? `<div><button type="button" class="link-knopf spiel-zu-einheit" onclick="zuEinheitOeffnen('${escapeAttr(String(s.id))}')">${ic("plus")} Zu Einheit hinzufügen</button></div>` : ""}
+                ${zuEinheitMoeglich() ? `<div><button type="button" class="link-knopf spiel-zu-einheit" onclick="zuEinheitOeffnen(${jsArg(String(s.id))})">${ic("plus")} Zu Einheit hinzufügen</button></div>` : ""}
               </div>
             </div>
             <div class="spiel-karte-knoepfe">
@@ -18376,6 +18400,17 @@
   // Escaped Text für HTML-Attribute (zusätzlich Anführungszeichen)
   function escapeAttr(s) {
     return escapeHtml(s).replace(/"/g, "&quot;");
+  }
+
+  // Wert als Text-Argument in einem onclick="…" (seit Sicherheits-Review
+  // 13.11.2026). Schreibweise OHNE eigene Anführungszeichen:
+  //   onclick="oeffnen(${jsArg(name)})"   statt   onclick="oeffnen('${escapeAttr(name)}')"
+  // escapeAttr allein reicht dort nicht: Ein Apostroph im Wert beendet den
+  // Text im Skript vorzeitig – der Knopf geht kaputt, im schlimmsten Fall
+  // läuft fremder Code. jsArg macht den Wert erst zu einem Skript-Text
+  // (JSON) und dann attributsicher.
+  function jsArg(s) {
+    return escapeAttr(JSON.stringify(String(s ?? "")).replace(/</g, "\\u003c")).replace(/'/g, "&#39;");
   }
 
   // Rendert die Links des aktiven Bereichs, gruppiert nach Projekt, und füllt die Projektauswahl
@@ -22332,7 +22367,7 @@
         <div class="fin-kat-grid">
           ${kategorien.map((k) => `
             <button type="button" class="fin-kat-btn ${k === buchungKategorieAusgewaehlt ? "active" : ""}"
-              onclick="buchungKategorieWaehlen('${escapeAttr(k)}')">${escapeHtml(k)}</button>
+              onclick="buchungKategorieWaehlen(${jsArg(k)})">${escapeHtml(k)}</button>
           `).join("")}
         </div>
 
@@ -22859,12 +22894,12 @@
         (z.anders ? ` · ${z.anders} noch anders` : "");
       return `
         <div class="fin-regel">
-          <button type="button" class="fin-regel-info" onclick="blattOeffnen('katregel','${escapeAttr(String(r.id))}')">
+          <button type="button" class="fin-regel-info" onclick="blattOeffnen('katregel',${jsArg(String(r.id))})">
             <span class="fin-regel-zeile"><span class="fin-regel-muster">${escapeHtml(finNameAusSchluessel(r.muster))}</span>
               <span class="fin-regel-pfeil" aria-hidden="true">→</span> <strong>${escapeHtml(r.kategorie)}</strong></span>
             <span class="notiz-meta">${meta}</span>
           </button>
-          <button type="button" class="fin-loesch-btn" onclick="finRegelLoeschen('${escapeAttr(String(r.id))}')" title="Regel löschen" aria-label="Regel löschen">${ic("x")}</button>
+          <button type="button" class="fin-loesch-btn" onclick="finRegelLoeschen(${jsArg(String(r.id))})" title="Regel löschen" aria-label="Regel löschen">${ic("x")}</button>
         </div>`;
     }).join("");
     return `
@@ -23662,11 +23697,11 @@
       else if (e.status === "aufKurs") text = `Wie bisher klappt es: Ende ${monat(e.zielMonat)} etwa ${finEuro(e.standZiel)}, ${finEuro(-e.fehlt)} Puffer${weiter}.`;
       else if (e.proMonat) {
         text = `Wie bisher fehlen Ende ${monat(e.zielMonat)} etwa <strong>${finEuro(e.fehlt)}</strong>${weiter}. Dafür bräuchtest du rund <strong>${finEuro(e.proMonat)} mehr pro Monat</strong>.`;
-        knopf = `<button type="button" class="btn-secondary" onclick="finSparzielDurchrechnen('${escapeAttr(String(z.id))}')">In der Prognose durchrechnen</button>`;
+        knopf = `<button type="button" class="btn-secondary" onclick="finSparzielDurchrechnen(${jsArg(String(z.id))})">In der Prognose durchrechnen</button>`;
       } else text = `Bis Ende ${monat(e.zielMonat)} fehlen etwa <strong>${finEuro(e.fehlt)}</strong> – in diesem Monat kaum noch aufzuholen.`;
       return `
         <div class="fin-ziel fin-ziel-${e.status}">
-          <button type="button" class="fin-ziel-info" onclick="blattOeffnen('sparziel','${escapeAttr(String(z.id))}')">
+          <button type="button" class="fin-ziel-info" onclick="blattOeffnen('sparziel',${jsArg(String(z.id))})">
             <span class="fin-ziel-titel">${escapeHtml(z.titel)}</span>
             <span class="notiz-meta">${kopf}</span>
           </button>
@@ -26222,7 +26257,7 @@
       const treffer = res.treffer || [];
       el.innerHTML = treffer.length
         ? `<p class="ern-liste-titel">Open Food Facts</p>` + treffer.map((t) => `
-            <button class="ern-treffer-zeile" onclick="ernOffTrefferWaehlen('${escapeAttr(t.code)}')">
+            <button class="ern-treffer-zeile" onclick="ernOffTrefferWaehlen(${jsArg(t.code)})">
               <span class="ern-treffer-name">${escapeHtml(t.name)}${t.marke ? ` <span class="notiz-meta">(${escapeHtml(t.marke)})</span>` : ""}</span>
               <span class="notiz-meta">${t.kcal !== null && t.kcal !== undefined ? ernZahl(t.kcal, 0) + " kcal je 100 g · " : ""}Barcode ${escapeHtml(t.code)}</span>
             </button>`).join("")
@@ -26345,7 +26380,7 @@
     }
     el.innerHTML = treffer.length
       ? treffer.slice(0, 60).map((l) => `
-          <button class="ern-treffer-zeile" onclick="ernBarcodeZuordnen('${escapeAttr(l.id)}')">
+          <button class="ern-treffer-zeile" onclick="ernBarcodeZuordnen(${jsArg(l.id)})">
             <span class="ern-treffer-name">${escapeHtml(l.name)}${l.marke ? ` <span class="notiz-meta">(${escapeHtml(l.marke)})</span>` : ""}</span>
             <span class="notiz-meta">${ernZahl(l.kcal, 0)} kcal je 100 g · ${l.quell_code ? `hat schon Barcode ${escapeHtml(l.quell_code)}` : "noch ohne Barcode"}</span>
           </button>`).join("")
@@ -26463,7 +26498,7 @@
     const kopf = `<p class="ern-liste-titel">${ernMeineListe.length} eigene${woerter.length ? ` · ${treffer.length} passend` : ""} · ${mitBarcode} mit Barcode</p>`;
     el.innerHTML = kopf + (treffer.length
       ? treffer.slice(0, 100).map((l) => `
-          <button class="ern-treffer-zeile" onclick="ernMeineBearbeiten('${escapeAttr(l.id)}')">
+          <button class="ern-treffer-zeile" onclick="ernMeineBearbeiten(${jsArg(l.id)})">
             <span class="ern-treffer-name">${escapeHtml(l.name)}${l.marke ? ` <span class="notiz-meta">(${escapeHtml(l.marke)})</span>` : ""}</span>
             <span class="notiz-meta">${ernZahl(l.kcal, 0)} kcal · E ${ernZahl(l.eiweiss)} · F ${ernZahl(l.fett)} · KH ${ernZahl(l.kohlenhydrate)} je 100 g · ${l.quell_code ? `Barcode ${escapeHtml(l.quell_code)}` : "ohne Barcode"}</span>
           </button>`).join("") + (treffer.length > 100 ? `<p class="notiz-meta">… und ${treffer.length - 100} weitere – Filter nutzen.</p>` : "")
@@ -26908,7 +26943,7 @@
         min ? `${min} Min.` : "",
         d.wiederholung ? "Wiederholung" : "",
       ].filter(Boolean).join(" · ");
-      return `<li><button type="button" class="lh-ergebnis" onclick="lhErgebnisOeffnen('${escapeAttr(String(d.id))}', 'liste')">
+      return `<li><button type="button" class="lh-ergebnis" onclick="lhErgebnisOeffnen(${jsArg(String(d.id))}, 'liste')">
         <span class="lh-ergebnis-sterne" aria-label="${sterne} von 3 Sternen">${"★".repeat(sterne)}${"☆".repeat(3 - sterne)}</span>
         <span class="lh-ergebnis-text">
           <strong>${escapeHtml(k ? (k.symbol || "") + " " + k.pseudonym : "Kind gelöscht")} · ${escapeHtml(d.uebung_titel || "")}</strong>
@@ -27067,7 +27102,7 @@
     if (lh.aw.fehler) return kopf + `<p class="empty-text">Konnte nicht geladen werden: ${escapeHtml(lh.aw.fehler)}</p>`;
     const z = lhAwRechnen();
     if (!lh.aw.daten.durchlaeufe.length) return kopf + `<p class="empty-text">Noch keine Runden.</p>`;
-    const chips = ["alle", ...z.faecher].map((f) => `<button type="button" class="schnell-chip${lh.aw.fach === f ? " aktiv" : ""}" aria-pressed="${lh.aw.fach === f}" onclick="lhAwFach('${escapeAttr(f)}')">${escapeHtml(f === "alle" ? "Alle Fächer" : f)}</button>`).join("");
+    const chips = ["alle", ...z.faecher].map((f) => `<button type="button" class="schnell-chip${lh.aw.fach === f ? " aktiv" : ""}" aria-pressed="${lh.aw.fach === f}" onclick="lhAwFach(${jsArg(f)})">${escapeHtml(f === "alle" ? "Alle Fächer" : f)}</button>`).join("");
     const kz = z.kenn;
     const kacheln = [
       [kz.runden, kz.runden === 1 ? "Runde fertig" : "Runden fertig"],
@@ -27090,7 +27125,7 @@
           <span class="notiz-meta">${escapeHtml(d.fach_name)} · abgebrochen · ${escapeHtml(lhDatumZeit(d.gestartet_am))}</span></span></li>`;
       }
       const st = Number(d.sterne) || 0;
-      return `<li><button type="button" class="lh-ergebnis" onclick="lhErgebnisOeffnen('${escapeAttr(String(d.id))}', 'auswertung')">
+      return `<li><button type="button" class="lh-ergebnis" onclick="lhErgebnisOeffnen(${jsArg(String(d.id))}, 'auswertung')">
         <span class="lh-ergebnis-sterne" aria-label="${st} von 3 Sternen">${lhSterne(st)}</span>
         <span class="lh-ergebnis-text"><strong>${escapeHtml(d.uebung_titel)}${d.gesehen_am ? "" : ` <span class="badge reminder">neu</span>`}</strong>
           <span class="notiz-meta">${escapeHtml(d.fach_name)} · ${Number(d.punkte_prozent) || 0} % · ${d.richtig_erster}/${d.anzahl_aufgaben} gleich richtig · ${escapeHtml(lhMinuten(d.dauer_sek))}${d.wiederholung ? " · Wiederholung" : ""} · ${escapeHtml(lhDatumZeit(d.beendet_am))}</span></span>
@@ -27180,7 +27215,7 @@
       </div>
       <div class="lh-auf-liste">${aufgaben}</div>
       <div class="reiter-aktionen bib-aktionen lh-aw-aktionen">
-        <button type="button" class="btn-secondary lh-loeschen" onclick="lhErgebnisLoeschen('${escapeAttr(String(d.id))}')">${ic("x")}Ergebnis löschen</button>
+        <button type="button" class="btn-secondary lh-loeschen" onclick="lhErgebnisLoeschen(${jsArg(String(d.id))})">${ic("x")}Ergebnis löschen</button>
       </div>`;
   }
 
@@ -27331,7 +27366,7 @@
     const zeilen = lhRegelnVon(k.id).sort((a, b) => a.klasse - b.klasse).map((r) => {
       const f = lhFach(r.fach_id);
       const n = lh.uebungen.filter((u) => lhRegelPasst(u, r)).length;
-      return `<button type="button" class="schnell-chip lh-regel" onclick="blattOeffnen('lhregel', '${escapeAttr(String(r.id))}')" aria-label="Regel bearbeiten">
+      return `<button type="button" class="schnell-chip lh-regel" onclick="blattOeffnen('lhregel', ${jsArg(String(r.id))})" aria-label="Regel bearbeiten">
         Klasse ${r.klasse} · ${escapeHtml(f ? f.symbol + " " + f.name : "Fach?")}${r.thema ? " · " + escapeHtml(r.thema) : " · alle Themen"} · bis ${LH_STUFEN[r.max_stufe] || "Schwer"} <span class="lern-chip-zahl">${n}</span></button>`;
     }).join("");
     return `<div class="lh-regeln"><span class="notiz-meta">Freigeschaltet nach Regel:${zeilen ? "" : " noch nichts"}</span>
@@ -27395,7 +27430,7 @@
       .concat(faecher.map((f) => {
         const n = aktiv.filter((u) => String(u.fach_id) === String(f.id)).length;
         const an = lh.fach === String(f.id);
-        return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lhFachFilter('${escapeAttr(String(f.id))}')">${escapeHtml(f.symbol)} ${escapeHtml(f.name)} <span class="lern-chip-zahl">${n}</span></button>`;
+        return `<button type="button" class="schnell-chip${an ? " aktiv" : ""}" aria-pressed="${an}" onclick="lhFachFilter(${jsArg(String(f.id))})">${escapeHtml(f.symbol)} ${escapeHtml(f.name)} <span class="lern-chip-zahl">${n}</span></button>`;
       })).join("");
     const klassenChips = `<div class="schnell-chips lh-fachfilter" role="group" aria-label="Klasse">` +
       [["alle", "Alle Klassen"], ...LH_KLASSEN.map((k) => [String(k), `Klasse ${k}`]), ["0", "ohne Klasse"]].map(([w, t]) => {
@@ -27419,7 +27454,7 @@
       const liste = aktiv.filter((u) => String(u.fach_id) === String(f.id) && passtKlasse(u)).sort(lhUebungSortierung);
       if (!liste.length) return lh.fach === "alle" ? "" : `<p class="empty-text">In ${escapeHtml(f.name)} gibt es hier noch keine Übung.</p>`;
       const offen = !lhZu().has(String(f.id));
-      return `<details class="lh-fach-gruppe"${offen ? " open" : ""} ontoggle="lhFachKlappe('${escapeAttr(String(f.id))}', this.open)">
+      return `<details class="lh-fach-gruppe"${offen ? " open" : ""} ontoggle="lhFachKlappe(${jsArg(String(f.id))}, this.open)">
         <summary class="lh-fach-kopf" style="cursor:pointer;display:flex;align-items:center;gap:.5rem;list-style:none">
           <h3 class="lh-fach-titel" style="--lh-farbe:${lhFarbe(f)};flex:1;margin:0">${escapeHtml(f.symbol)} ${escapeHtml(f.name)} <span class="lern-chip-zahl">${liste.length}</span></h3>
           <span aria-hidden="true" class="notiz-meta">${offen ? "▾" : "▸"}</span>
@@ -27507,7 +27542,7 @@
       return `<div class="kz-bereich-zeile${f.archiviert ? " archiviert" : ""}">
         <span class="lh-farbpunkt" style="background:${lhFarbe(f)}" aria-hidden="true"></span>
         <span class="kz-bereich-zeile-name">${escapeHtml(f.symbol)} ${escapeHtml(f.name)} <span class="notiz-meta">${n} ${n === 1 ? "Übung" : "Übungen"}${f.archiviert ? " · archiviert" : ""}</span></span>
-        <button type="button" class="task-edit-btn" onclick="blattOeffnen('lhfach', '${escapeAttr(String(f.id))}')" aria-label="${escapeAttr(f.name)} bearbeiten">${ic("stift")}</button>
+        <button type="button" class="task-edit-btn" onclick="blattOeffnen('lhfach', ${jsArg(String(f.id))})" aria-label="${escapeAttr(f.name)} bearbeiten">${ic("stift")}</button>
       </div>`;
     }).join("");
     return `<details class="anleitung-abschnitt std-block kz-verwalten">
