@@ -2693,3 +2693,67 @@ button.nf-ort { cursor: pointer; }
 /* Stunden: Kategorie-Filter (Session 100) */
 .std-katfilter .std-punkt { margin-right: 0.35rem; vertical-align: middle; }
 .std-ansicht { flex-wrap: wrap; }
+
+/* ==========================================================
+   Kommandozentrale → Landkarte + Status-Import (seit Session 103)
+   Handy: eine Kachel pro Zeile, Tippflächen ≥ 44 px. Ab ca. 620 px
+   zwei Kacheln nebeneinander. Rot = Stand älter als 14 Tage.
+   ========================================================== */
+.kz-lk-fazit { margin: 0 0 0.7rem; line-height: 1.5; }
+.kz-lk-grid { display: grid; grid-template-columns: 1fr; gap: 0.7rem; margin-bottom: 1.1rem; }
+@media (min-width: 620px) { .kz-lk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kz-lk-kachel {
+  background: var(--panel); border: 1px solid var(--border); border-top: 4px solid var(--accent);
+  border-radius: var(--r-karte); padding: 0.75rem 0.8rem 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; min-width: 0;
+}
+.kz-lk-kachel.rot { border-top-color: var(--overdue-text); }
+.kz-lk-kachel.leer { border-top-style: dashed; border-top-color: var(--border); }
+.kz-lk-kachel.leer .notiz-meta { margin: 0; }
+.kz-lk-kopf { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.2rem 0.55rem; margin: 0; font-size: 1rem; }
+.kz-lk-kuerzel { font-family: var(--font-display); font-weight: 800; font-size: 1.25rem; letter-spacing: 0.02em; }
+.kz-lk-bname { font-family: var(--font-text); font-weight: 500; font-size: 0.85rem; color: var(--ink-dim); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.kz-lk-projekt { background: var(--bg); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--r-mittel); }
+.kz-lk-projekt.ohne-stand { border-left-color: var(--border); border-left-style: dashed; }
+.kz-lk-projekt.rot { border-color: var(--overdue-border); border-left-color: var(--overdue-text); background: var(--overdue-bg); }
+.kz-lk-projekt > summary {
+  list-style: none; cursor: pointer; min-height: 44px; padding: 0.6rem 0.7rem;
+  display: flex; flex-direction: column; gap: 0.3rem;
+}
+.kz-lk-projekt > summary::-webkit-details-marker { display: none; }
+.kz-lk-projekt > summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: var(--r-mittel); }
+.kz-lk-pname { font-weight: 700; font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
+.kz-lk-pname::before { content: "▸ "; color: var(--accent); }
+.kz-lk-projekt[open] .kz-lk-pname::before { content: "▾ "; }
+.kz-lk-schritt { font-size: 0.95rem; line-height: 1.4; overflow-wrap: anywhere; }
+.kz-lk-schritt .ic { width: 0.95rem; height: 0.95rem; vertical-align: -0.14em; color: var(--accent); }
+.kz-lk-schritt.kz-rot .ic { color: var(--overdue-text); }
+.kz-lk-meta { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.kz-lk-meta .badge { font-size: 0.78rem; padding: 0.18rem 0.55rem; }
+.badge.kz-lk-leise { opacity: 0.75; border-style: dashed; }
+.badge.kz-prio { font-weight: 700; }
+.badge.kz-prio-a { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.badge.kz-prio-b { background: var(--reminder-bg); color: var(--ink); }
+.badge.kz-aus-status { border-style: dotted; }
+.badge.kz-kuerzel { font-weight: 700; letter-spacing: 0.03em; }
+.kz-lk-inhalt { padding: 0 0.7rem 0.75rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.kz-lk-inhalt .schnell-label { margin: 0.2rem 0 0; }
+.kz-lk-liste { margin: 0; padding-left: 1.2rem; font-size: 0.92rem; line-height: 1.45; }
+.kz-lk-liste li { overflow-wrap: anywhere; }
+.kz-lk-import .anleitung-text { display: flex; flex-direction: column; gap: 0.5rem; }
+.kz-lk-import summary .ic { vertical-align: -0.15em; }
+.kz-lk-import .kz-schutz.dienstlich, .kz-lk-import p { margin: 0; }
+.kz-lk-text { width: 100%; box-sizing: border-box; font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 0.85rem; line-height: 1.4; }
+.kz-lk-import .kz-aktionen { margin: 0; }
+.kz-lk-import .kz-aktionen .btn-primary, .kz-lk-import .kz-aktionen .btn-secondary { min-height: 44px; display: inline-flex; align-items: center; gap: 0.35rem; }
+.kz-lk-vorschau { display: flex; flex-direction: column; gap: 0.55rem; }
+.kz-lk-vorschau .std-zwischen { margin: 0.3rem 0 0; }
+.kz-lk-v { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-mittel); padding: 0.65rem 0.75rem; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.92rem; }
+.kz-lk-v p { margin: 0; overflow-wrap: anywhere; }
+.kz-lk-v .ic { width: 0.95rem; height: 0.95rem; vertical-align: -0.14em; }
+.kz-lk-v.fehler, .kz-lk-v.aelter { border-color: var(--overdue-border); background: var(--overdue-bg); }
+.kz-lk-v-kopf { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.kz-lk-v-kopf strong { overflow-wrap: anywhere; min-width: 0; }
+.kz-lk-v-kopf .badge { flex: none; }
+.kz-lk-v select { width: 100%; min-height: 44px; }
+.kz-lk-v .schnell-label { margin: 0.3rem 0 0; }
+.kz-lk-aelter { border: 1px solid var(--overdue-border); border-radius: var(--r-mittel); }
