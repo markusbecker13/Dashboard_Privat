@@ -5616,7 +5616,7 @@
     // Seit Session 74: Ansicht „heute“ oder „alles“ (je Gerät gemerkt); Fokus ins Eingabefeld nach App-Verknüpfung
     ansicht: "heute", fokusSchnell: false,
   };
-  try { const a = localStorage.getItem("kz-ansicht"); if (a === "alles" || a === "abschluss") kz.ansicht = a; } catch (_e) { /* egal */ }
+  try { const a = localStorage.getItem("kz-ansicht"); if (a === "alles" || a === "abschluss" || a === "landkarte") kz.ansicht = a; } catch (_e) { /* egal */ }
   const KZ_HEUTE_MAX = 3;
   const KZ_PROJEKT_STATUS = [["aktiv", "Aktiv"], ["wartet", "Wartet"], ["hintergrund", "Hintergrund"], ["idee", "Idee"], ["abgeschlossen", "Abgeschlossen"]];
   const KZ_PROJEKT_REIHE = ["aktiv", "wartet", "hintergrund", "idee", "abgeschlossen"];
@@ -5726,7 +5726,13 @@
         <button type="button" class="schnell-chip${kz.ansicht === "heute" ? " aktiv" : ""}" aria-pressed="${kz.ansicht === "heute"}" onclick="kzAnsicht('heute')">Heute</button>
         <button type="button" class="schnell-chip${kz.ansicht === "alles" ? " aktiv" : ""}" aria-pressed="${kz.ansicht === "alles"}" onclick="kzAnsicht('alles')">Alle Projekte</button>
         <button type="button" class="schnell-chip${kz.ansicht === "abschluss" ? " aktiv" : ""}" aria-pressed="${kz.ansicht === "abschluss"}" onclick="kzAnsicht('abschluss')">Tagesabschluss</button>
+        <button type="button" class="schnell-chip${kz.ansicht === "landkarte" ? " aktiv" : ""}" aria-pressed="${kz.ansicht === "landkarte"}" onclick="kzAnsicht('landkarte')">Landkarte</button>
       </div>`;
+    if (kz.ansicht === "landkarte") {
+      el.innerHTML = umschalter + kzLandkarteHtml();
+      kzLandkarteBinden();
+      return;
+    }
     if (kz.ansicht === "abschluss") {
       el.innerHTML = umschalter + kzAbschlussHtml();
       kzAbschlussBinden();
@@ -5759,7 +5765,7 @@
     }
   }
   window.kzAnsicht = function(a) {
-    kz.ansicht = a === "alles" || a === "abschluss" ? a : "heute";
+    kz.ansicht = a === "alles" || a === "abschluss" || a === "landkarte" ? a : "heute";
     try { localStorage.setItem("kz-ansicht", kz.ansicht); } catch (_e) { /* egal */ }
     renderKommando();
   };
@@ -6153,6 +6159,270 @@
     } finally { kzTa.speichert = false; renderKommando(); }
   };
 
+  // ---- Landkarte + Status-Import (seit Session 103) ----
+  // Je Kürzel eine Kachel, darin die Projekte mit nächstem Schritt, offenen
+  // A-Aufgaben und Stand. Stand älter als 14 Tage = rot. Darunter das Feld
+  // „Status importieren“ für die JSON-Blöcke aus den STATUS-Dateien der
+  // Claude-Projekte: erst Vorschau vom Server, dann „Übernehmen“.
+  const KZ_KUERZEL = ["PRIVAT", "HAUS", "JW", "OV", "OGS", "ZKC", "EP", "TECH"];
+  const KZ_STAND_ROT_TAGE = 14;
+  const kzLk = { text: "", pakete: null, vorschau: null, zuordnung: {}, aeltereOk: false, status: "", fehlerText: "", laeuft: false };
+
+  function kzKuerzelDa() { return kz.bereiche.some((b) => Object.prototype.hasOwnProperty.call(b, "kuerzel")); }
+  function kzStandRot(p) { const t = kzTageSeit(p.status_stand); return t !== null && t > KZ_STAND_ROT_TAGE; }
+  function kzAOffen(p) { return kz.aufgaben.filter((a) => String(a.projekt_id) === String(p.id) && a.status !== "erledigt" && a.prio === "A").length; }
+  // Projekte einer Kachel: alle mit Stand aus der STATUS-Datei, dazu aktive ohne Stand
+  function kzLkProjekte(b) {
+    return kz.projekte.filter((p) => String(p.bereich_id) === String(b.id) && p.status !== "abgeschlossen" && (p.status_stand || p.status === "aktiv"))
+      .sort((x, y) => (kzStandRot(y) ? 1 : 0) - (kzStandRot(x) ? 1 : 0)
+        || (x.status_stand ? 0 : 1) - (y.status_stand ? 0 : 1)
+        || (x.naechster_schritt_faellig ? 0 : 1) - (y.naechster_schritt_faellig ? 0 : 1)
+        || String(x.naechster_schritt_faellig || "").localeCompare(String(y.naechster_schritt_faellig || ""))
+        || String(x.name).localeCompare(String(y.name), "de"));
+  }
+  function kzFaelligBadge(iso) {
+    const h = heuteISO();
+    if (!iso) return badgeHtml("kz-lk-leise", "ohne Datum");
+    if (iso < h) return badgeHtml("overdue", `überfällig ${datumDe(iso)}`);
+    if (iso === h) return badgeHtml("today", "heute fällig");
+    return badgeHtml("", `fällig ${datumDe(iso)}`);
+  }
+  function kzStandBadge(p) {
+    if (!p.status_stand) return badgeHtml("kz-lk-leise", "kein Stand");
+    const t = kzTageSeit(p.status_stand);
+    if (t > KZ_STAND_ROT_TAGE) return badgeHtml("overdue", `Stand vor ${t} Tagen`);
+    return badgeHtml("", `Stand ${datumDe(p.status_stand)}`);
+  }
+  // Offene Aufgaben: A, B, C, ohne Prio – dann nach Fälligkeit
+  function kzNachPrio(liste) {
+    const rang = (a) => (a.prio === "A" ? 0 : a.prio === "B" ? 1 : a.prio === "C" ? 2 : 3);
+    return kzAufgabenSortiert(liste).sort((a, b) => rang(a) - rang(b));
+  }
+
+  function kzLkProjektHtml(p) {
+    const rot = kzStandRot(p);
+    const nA = kzAOffen(p);
+    const offen = kzNachPrio(kz.aufgaben.filter((a) => String(a.projekt_id) === String(p.id) && a.status !== "erledigt"));
+    const inArbeit = Array.isArray(p.in_arbeit) ? p.in_arbeit : [];
+    const schluessel = "lk-" + p.id;
+    return `<details class="kz-lk-projekt${rot ? " rot" : ""}${p.status_stand ? "" : " ohne-stand"}" data-kz-klapp="${escapeAttr(schluessel)}"${kzOffen[schluessel] ? " open" : ""} ontoggle="kzUmklappen(this)">
+        <summary>
+          <span class="kz-lk-pname">${escapeHtml(p.name)}</span>
+          ${p.naechster_schritt ? `<span class="kz-lk-schritt">${ic("weiter")} ${escapeHtml(p.naechster_schritt)}</span>` : `<span class="kz-lk-schritt kz-rot">${ic("warnung")} Nächster Schritt fehlt</span>`}
+          <span class="kz-lk-meta">
+            ${kzFaelligBadge(p.naechster_schritt_faellig)}
+            ${badgeHtml(nA ? "kz-prio kz-prio-a" : "kz-lk-leise", `${nA} × A offen`)}
+            ${kzStandBadge(p)}
+          </span>
+        </summary>
+        <div class="kz-lk-inhalt">
+          ${inArbeit.length ? `<div class="schnell-label">In Arbeit</div><ul class="kz-lk-liste">${inArbeit.map((t) => `<li>${escapeHtml(String(t))}</li>`).join("")}</ul>` : ""}
+          ${offen.length ? `<div class="schnell-label">Offen (${offen.length})</div><div class="task-list">${offen.map((a) => kzAufgabeHtml(a)).join("")}</div>` : `<p class="notiz-meta">Keine offenen Aufgaben.</p>`}
+          <div class="kz-bereich-knoepfe">
+            <button type="button" class="link-btn" onclick="blattOeffnen('kzprojekt', ${jsArg(String(p.id))})">${ic("stift")}Projekt bearbeiten</button>
+          </div>
+        </div>
+      </details>`;
+  }
+
+  function kzLkKachelHtml(k) {
+    const b = kz.bereiche.find((x) => x.kuerzel === k);
+    const id = "kz-lk-" + k.toLowerCase();
+    if (!b) {
+      return `<section class="kz-lk-kachel leer" aria-labelledby="${id}">
+          <h3 class="kz-lk-kopf" id="${id}"><span class="kz-lk-kuerzel">${k}</span></h3>
+          <p class="notiz-meta">Kein Bereich mit diesem Kürzel. „Alle Projekte“ → „Bereiche verwalten“ → Stift → Kürzel ${k}.</p>
+        </section>`;
+    }
+    const projekte = kzLkProjekte(b);
+    const nRot = projekte.filter(kzStandRot).length;
+    return `<section class="kz-lk-kachel${nRot ? " rot" : ""}" aria-labelledby="${id}">
+        <h3 class="kz-lk-kopf" id="${id}">
+          <span class="kz-lk-kuerzel">${k}</span>
+          <span class="kz-lk-bname">${escapeHtml(b.name)}</span>
+          ${nRot ? badgeHtml("overdue", `${nRot} veraltet`) : ""}
+        </h3>
+        ${projekte.length ? projekte.map(kzLkProjektHtml).join("") : `<p class="notiz-meta">Noch kein Projekt mit Stand – Status aus dem Claude-Projekt unten importieren.</p>`}
+      </section>`;
+  }
+
+  function kzLandkarteHtml() {
+    if (!kzKuerzelDa()) {
+      return `<p class="kz-warnung">${ic("warnung")} Für die Landkarte bitte zuerst <code>kommandozentrale_landkarte_setup.sql</code> in Supabase ausführen und die neue <code>index.ts</code> einspielen.</p>`;
+    }
+    const alle = KZ_KUERZEL.map((k) => kz.bereiche.find((b) => b.kuerzel === k)).filter(Boolean).flatMap(kzLkProjekte);
+    const nRot = alle.filter(kzStandRot).length;
+    const nOhne = alle.filter((p) => !p.status_stand).length;
+    const nUeber = alle.filter((p) => p.naechster_schritt_faellig && p.naechster_schritt_faellig < heuteISO()).length;
+    const fazit = [
+      `${alle.length} ${alle.length === 1 ? "Projekt" : "Projekte"}`,
+      nRot ? `<strong class="kz-rot">${nRot} Stand älter als ${KZ_STAND_ROT_TAGE} Tage</strong>` : "",
+      nUeber ? `<strong class="kz-rot">${nUeber} Schritt${nUeber === 1 ? "" : "e"} überfällig</strong>` : "",
+      nOhne ? `${nOhne} ohne Stand` : "",
+    ].filter(Boolean).join(" · ");
+    return `<div class="kz-lk">
+        <p class="notiz-meta kz-lk-fazit">${fazit}</p>
+        <div class="kz-lk-grid">${KZ_KUERZEL.map(kzLkKachelHtml).join("")}</div>
+        ${kzLkImportHtml()}
+      </div>`;
+  }
+
+  function kzLkImportHtml() {
+    const offen = kzOffen["lk-import"] !== undefined ? kzOffen["lk-import"] : true;
+    return `<details class="anleitung-abschnitt kz-lk-import" data-kz-klapp="lk-import"${offen ? " open" : ""} ontoggle="kzUmklappen(this)">
+        <summary>${ic("import")} Status importieren</summary>
+        <div class="anleitung-text">
+          <p class="notiz-meta" style="margin-top:0;">Im Claude-Projekt „Status“ schreiben, den JSON-Block kopieren und hier einfügen – mehrere Blöcke auf einmal gehen. Pro Projekt werden nächster Schritt, Stand, „In Arbeit“ und die Aufgaben aus früheren Status-Importen überschrieben. Von Hand angelegte Aufgaben und Projekte bleiben.</p>
+          <p class="kz-schutz dienstlich">${ic("warnung")} Keine Namen von Kindern, Familien oder Teamenden – auch nicht in dienstlichen Bereichen.</p>
+          <label class="schnell-label" for="kz-lk-text">JSON-Block(e) einfügen</label>
+          <textarea id="kz-lk-text" class="schnell-notiz kz-lk-text" rows="5" spellcheck="false" autocomplete="off" placeholder='{"projekt":"…","bereich":"TECH","stand":"…", …}'>${escapeHtml(kzLk.text)}</textarea>
+          <div class="reiter-aktionen kz-aktionen">
+            <button type="button" class="btn-primary" onclick="kzLkPruefen()"${kzLk.laeuft ? " disabled" : ""}>${ic("lupe")}Prüfen</button>
+            ${kzLk.text ? `<button type="button" class="btn-secondary" onclick="kzLkLeeren()">Leeren</button>` : ""}
+          </div>
+          ${kzLk.status ? `<p class="notiz-meta kz-lk-status" role="status"><strong>${escapeHtml(kzLk.status)}</strong></p>` : ""}
+          ${kzLk.fehlerText ? `<p class="kz-warnung" role="alert">${ic("warnung")} ${escapeHtml(kzLk.fehlerText)}</p>` : ""}
+          <div id="kz-lk-vorschau">${kzLk.vorschau ? kzLkVorschauHtml() : ""}</div>
+        </div>
+      </details>`;
+  }
+
+  function kzLkVorschauHtml() {
+    const v = kzLk.vorschau;
+    const gut = v.filter((z) => !z.fehler);
+    const aelter = gut.filter((z) => z.aelter);
+    const wirkt = gut.filter((z) => !z.aelter || kzLk.aeltereOk).length;
+    const zahl = (z) => [
+      z.aufgaben.neu ? `${z.aufgaben.neu} neu` : "",
+      z.aufgaben.aktualisiert ? `${z.aufgaben.aktualisiert} bleiben` : "",
+      z.aufgaben.entfernt ? `${z.aufgaben.entfernt} entfernt` : "",
+    ].filter(Boolean).join(" · ") || "keine";
+    return `<section class="kz-lk-vorschau" aria-labelledby="kz-lk-v-titel">
+        <h2 class="std-zwischen" id="kz-lk-v-titel">Vorschau – noch nichts gespeichert</h2>
+        ${v.map((z) => `<div class="kz-lk-v${z.fehler ? " fehler" : ""}${z.aelter ? " aelter" : ""}">
+            <div class="kz-lk-v-kopf">
+              <strong>${z.kuerzel ? escapeHtml(z.kuerzel) + " · " : ""}${escapeHtml(z.name || z.projekt || "Block " + (z.index + 1))}</strong>
+              ${z.fehler ? badgeHtml("overdue", "Fehler") : badgeHtml(z.aktion === "neu" ? "today" : "reminder", z.aktion === "neu" ? "neues Projekt" : "aktualisieren")}
+            </div>
+            ${z.fehler ? `<p class="kz-rot">${escapeHtml(z.fehler)}</p>` : `
+              <p>${escapeHtml(z.bereich)}${z.dienstlich ? " (dienstlich)" : ""} · Stand ${escapeHtml(datumDe(z.stand))}${z.stand_alt ? ` · bisher ${escapeHtml(datumDe(z.stand_alt))}` : ""}</p>
+              ${z.aelter ? `<p class="kz-rot">${ic("warnung")} Älter als der gespeicherte Stand – wird nur mit Haken unten übernommen.</p>` : ""}
+              <p>${ic("weiter")} ${escapeHtml(z.schritt)}${z.schritt_faellig ? ` · fällig ${escapeHtml(datumDe(z.schritt_faellig))}` : ""}</p>
+              <p class="notiz-meta">Status-Aufgaben: ${escapeHtml(zahl(z))} · davon A: ${Number(z.a_offen) || 0} · In Arbeit: ${Number(z.in_arbeit) || 0}</p>
+              ${(z.hinweise || []).map((h) => `<p class="notiz-meta">${escapeHtml(h)}</p>`).join("")}
+              <label class="schnell-label" for="kz-lk-zuo-${z.index}">Ziel im Dashboard</label>
+              <select id="kz-lk-zuo-${z.index}" data-lk-zuo="${z.index}">
+                <option value="neu"${z.aktion === "neu" ? " selected" : ""}>Neues Projekt „${escapeHtml(z.name)}“ anlegen</option>
+                ${(z.kandidaten || []).map((k) => `<option value="${escapeAttr(String(k.id))}"${String(k.id) === String(z.projekt_id) ? " selected" : ""}>${escapeHtml(k.name)}${k.status === "abgeschlossen" ? " (abgeschlossen)" : ""}</option>`).join("")}
+              </select>`}
+          </div>`).join("")}
+        ${aelter.length ? `<label class="blatt-haken kz-lk-aelter"><input type="checkbox" id="kz-lk-aelter"${kzLk.aeltereOk ? " checked" : ""}><span>Ältere Stände trotzdem übernehmen (${aelter.length})</span></label>` : ""}
+        <div class="reiter-aktionen kz-aktionen">
+          <button type="button" class="btn-primary" onclick="kzLkUebernehmen()"${!wirkt || kzLk.laeuft ? " disabled" : ""}>${ic("ok-kreis")}Übernehmen (${wirkt})</button>
+          <button type="button" class="btn-secondary" onclick="kzLkVerwerfen()">Verwerfen</button>
+        </div>
+      </section>`;
+  }
+
+  function kzLandkarteBinden() {
+    const t = document.getElementById("kz-lk-text");
+    if (t) t.addEventListener("input", () => {
+      kzLk.text = t.value;
+      // Text geändert: alte Vorschau passt nicht mehr
+      if (kzLk.vorschau) { kzLk.vorschau = null; kzLk.pakete = null; const v = document.getElementById("kz-lk-vorschau"); if (v) v.innerHTML = ""; }
+    });
+    const al = document.getElementById("kz-lk-aelter");
+    if (al) al.addEventListener("change", () => { kzLk.aeltereOk = al.checked; renderKommando(); });
+    document.querySelectorAll("[data-lk-zuo]").forEach((sel) => sel.addEventListener("change", () => {
+      kzLk.zuordnung[sel.dataset.lkZuo] = sel.value;
+      kzLkVorschauHolen();
+    }));
+  }
+
+  // Alle { … }-Blöcke auf oberster Ebene aus beliebigem Text holen (auch mit
+  // Markdown-Codeblöcken und Text drumherum; eine Liste [ {…}, {…} ] geht auch)
+  function kzStatusBloeckeLesen(text) {
+    const s = String(text || "");
+    const bloecke = [];
+    let tiefe = 0, start = -1, inText = false, esc = false;
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (inText) {
+        if (esc) esc = false;
+        else if (c === "\\") esc = true;
+        else if (c === '"') inText = false;
+        continue;
+      }
+      if (c === '"' && tiefe > 0) { inText = true; continue; }
+      if (c === "{") { if (tiefe === 0) start = i; tiefe++; }
+      else if (c === "}" && tiefe > 0) { tiefe--; if (tiefe === 0) bloecke.push(s.slice(start, i + 1)); }
+    }
+    const pakete = [], fehler = [];
+    bloecke.forEach((b, n) => {
+      let o;
+      try { o = JSON.parse(b); } catch (_e) {
+        fehler.push(`Block ${n + 1} ist kein gültiges JSON${/[„“”]/.test(b) ? " (typografische Anführungszeichen „ “ statt \")" : ""}.`);
+        return;
+      }
+      if (o && typeof o === "object" && !Array.isArray(o) && ("projekt" in o || "naechster_schritt" in o)) pakete.push(o);
+      else fehler.push(`Block ${n + 1} ist kein Status-Block (es fehlt „projekt“).`);
+    });
+    return { pakete, fehler };
+  }
+
+  async function kzLkVorschauHolen() {
+    if (!kzLk.pakete || kzLk.laeuft) return;
+    kzLk.laeuft = true;
+    try {
+      const r = await api("kz_status_import", { pakete: kzLk.pakete, zuordnung: kzLk.zuordnung, nur_pruefen: true });
+      kzLk.vorschau = r.pakete || [];
+      kzLk.status = "";
+    } catch (e) {
+      if (e.message !== "unauthorized") { kzLk.vorschau = null; kzLk.status = "Nicht geprüft: " + (e.message || "Fehler"); }
+    } finally { kzLk.laeuft = false; }
+    renderKommando();
+  }
+
+  window.kzLkPruefen = async function() {
+    const t = document.getElementById("kz-lk-text");
+    if (t) kzLk.text = t.value;
+    const { pakete, fehler } = kzStatusBloeckeLesen(kzLk.text);
+    kzLk.fehlerText = fehler.join(" ");
+    kzLk.zuordnung = {}; kzLk.aeltereOk = false; kzLk.vorschau = null;
+    if (!pakete.length) {
+      kzLk.pakete = null;
+      kzLk.status = fehler.length ? "" : "Kein Status-Block gefunden – bitte den { … }-Block aus dem Claude-Projekt einfügen.";
+      renderKommando();
+      return;
+    }
+    if (pakete.length > 20) { kzLk.pakete = null; kzLk.status = "Höchstens 20 Status-Blöcke auf einmal."; renderKommando(); return; }
+    kzLk.pakete = pakete;
+    kzLk.status = "Prüfe …";
+    renderKommando();
+    await kzLkVorschauHolen();
+    const v = document.querySelector(".kz-lk-vorschau");
+    if (v) v.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  window.kzLkLeeren = function() { Object.assign(kzLk, { text: "", pakete: null, vorschau: null, zuordnung: {}, aeltereOk: false, status: "", fehlerText: "" }); renderKommando(); };
+  window.kzLkVerwerfen = function() { kzLk.vorschau = null; kzLk.pakete = null; kzLk.status = ""; renderKommando(); };
+  window.kzLkUebernehmen = async function() {
+    if (!kzLk.pakete || !kzLk.vorschau || kzLk.laeuft) return;
+    kzLk.laeuft = true;
+    renderKommando();
+    try {
+      const r = await api("kz_status_import", { pakete: kzLk.pakete, zuordnung: kzLk.zuordnung, nur_pruefen: false, aeltere_ok: kzLk.aeltereOk });
+      const fehler = (r.pakete || []).filter((z) => z.fehler).length;
+      kzLk.status = `Übernommen: ${r.uebernommen} ${r.uebernommen === 1 ? "Projekt" : "Projekte"}`
+        + (r.uebersprungen ? `, ${r.uebersprungen} übersprungen (älterer Stand)` : "")
+        + (fehler ? `, ${fehler} mit Fehler nicht übernommen` : "") + ".";
+      kzLk.text = ""; kzLk.pakete = null; kzLk.vorschau = null; kzLk.zuordnung = {}; kzLk.aeltereOk = false; kzLk.fehlerText = "";
+      hinweisZeigen("Status übernommen");
+      kzNeuLaden();
+    } catch (e) {
+      if (e.message !== "unauthorized") kzLk.status = "Nicht übernommen: " + (e.message || "Fehler");
+    } finally { kzLk.laeuft = false; renderKommando(); }
+  };
+
   // ---- Heute-Ansicht (seit Session 74) ----
   // Gestern (oder früher) markiert und heute noch nicht bestätigt
   function kzNichtGeschafft() {
@@ -6444,6 +6714,8 @@
     const heute = heuteISO();
     const meta = [];
     if (a.heute) meta.push(badgeHtml("reminder", a.heute_seit && a.heute_seit < heute ? `Top 3 ${kzSeitText(kzTageSeit(a.heute_seit))}` : "Top 3 heute"));
+    if (a.prio && !done) meta.push(badgeHtml(`kz-prio kz-prio-${a.prio === "A" ? "a" : a.prio === "B" ? "b" : "c"}`, `Prio ${a.prio}`));
+    if (a.quelle === "status" && !done) meta.push(badgeHtml("kz-aus-status", "aus STATUS"));
     if (mitHerkunft === true) { const h = kzHerkunft(a); if (h) meta.push(badgeHtml("", h)); }
     if (!done && a.faellig_am) {
       if (a.faellig_am < heute) meta.push(badgeHtml("overdue", `überfällig · ${datumDe(a.faellig_am)}`));
@@ -6477,7 +6749,7 @@
           <p class="notiz-meta" style="margin-top:0;">Reihenfolge mit ↑ ↓, Stift = Name, „dienstlich“ und Archivieren. Dienstliche Bereiche zeigen im Formular einen deutlichen Datenschutz-Hinweis.</p>
           <div class="kz-bereich-liste">${bereiche.map((b, i) => `
             <div class="kz-bereich-zeile${b.archiviert ? " archiviert" : ""}">
-              <span class="kz-bereich-zeile-name">${escapeHtml(b.name)}${b.dienstlich ? ` <span class="badge kz-dienstlich">dienstlich</span>` : ""}${b.archiviert ? ` <span class="badge">archiviert</span>` : ""}</span>
+              <span class="kz-bereich-zeile-name">${b.kuerzel ? `<span class="badge kz-kuerzel">${escapeHtml(b.kuerzel)}</span> ` : ""}${escapeHtml(b.name)}${b.dienstlich ? ` <span class="badge kz-dienstlich">dienstlich</span>` : ""}${b.archiviert ? ` <span class="badge">archiviert</span>` : ""}</span>
               <button type="button" class="task-edit-btn" onclick="kzBereichSchieben(${jsArg(String(b.id))}, -1)" ${i === 0 ? "disabled" : ""} aria-label="${escapeAttr(b.name)} nach oben">↑</button>
               <button type="button" class="task-edit-btn" onclick="kzBereichSchieben(${jsArg(String(b.id))}, 1)" ${i === bereiche.length - 1 ? "disabled" : ""} aria-label="${escapeAttr(b.name)} nach unten">↓</button>
               <button type="button" class="task-edit-btn" onclick="blattOeffnen('kzbereich', ${jsArg(String(b.id))})" aria-label="${escapeAttr(b.name)} bearbeiten" title="Bearbeiten">${ic("stift")}</button>
@@ -6691,19 +6963,24 @@
     titel: "Bereich bearbeiten",
     titelNeu: "Neuer Bereich",
     finden: (id) => kzBereich(id),
-    laden: (b) => ({ id: b.id || "", name: b.name || "", dienstlich: b.dienstlich ? "ja" : "nein", archiviert: b.archiviert ? "ja" : "nein" }),
+    laden: (b) => ({ id: b.id || "", name: b.name || "", dienstlich: b.dienstlich ? "ja" : "nein", archiviert: b.archiviert ? "ja" : "nein", kuerzel: b.kuerzel || "" }),
     felder: [
       { key: "name", label: "Name", typ: "text", pflicht: true, platzhalter: "z. B. Garten, Verein" },
       { key: "dienstlich", label: "Dienstlich", typ: "chips", optionen: [["nein", "Nein – privat"], ["ja", "Ja – dienstlich / Ehrenamt / Business"]],
         hinweis: "Dienstlich: deutlicher Hinweis „keine Namen Dritter“ im Formular. Später gehen dienstliche Inhalte nicht an den KI-Tagesabschluss." },
       { key: "archiviert", label: "Archiviert", typ: "chips", wenn: (w) => !!w.id, optionen: [["nein", "Nein"], ["ja", "Ja – steht unten, nicht mehr zur Auswahl"]] },
+      { key: "kuerzel", label: "Kürzel", typ: "chips", wenn: () => kzKuerzelDa(), optionen: [["", "keins"], ...KZ_KUERZEL.map((k) => [k, k])],
+        hinweis: "Für Landkarte und Status-Import aus den Claude-Projekten. Jedes Kürzel gehört zu genau einem Bereich." },
     ],
     pruefen: (w) => {
       if (w.name.length > 60) return "Höchstens 60 Zeichen.";
       if (kz.bereiche.some((b) => String(b.id) !== String(w.id) && String(b.name).toLowerCase() === w.name.toLowerCase())) return "Einen Bereich mit diesem Namen gibt es schon.";
+      const belegt = w.kuerzel && kz.bereiche.find((b) => String(b.id) !== String(w.id) && b.kuerzel === w.kuerzel);
+      if (belegt) return `Das Kürzel ${w.kuerzel} hat schon „${belegt.name}“ – dort erst auf „keins“ stellen.`;
       return "";
     },
-    speichern: (id, w) => api("kz_bereich_speichern", { id, name: w.name, dienstlich: w.dienstlich === "ja", archiviert: w.archiviert === "ja" }),
+    speichern: (id, w) => api("kz_bereich_speichern", { id, name: w.name, dienstlich: w.dienstlich === "ja", archiviert: w.archiviert === "ja",
+      ...(kzKuerzelDa() ? { kuerzel: w.kuerzel || "" } : {}) }),
     loeschen: (id) => api("kz_bereich_loeschen", { id }),
     loeschFrage: (b) => `Bereich „${b.name || ""}“ löschen? Geht nur, wenn er keine Projekte und Aufgaben hat – sonst archivieren.`,
     gespeichert: "Bereich gespeichert",
